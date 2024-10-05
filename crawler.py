@@ -20,6 +20,9 @@ import select
 import sys
 import re
 
+APPNAME = 'vmcrawl'
+VERSION = '0.1'
+
 # Add your color constants here
 BOLD = '\033[1m'
 RED = '\033[31m'
@@ -31,38 +34,19 @@ ORANGE = '\033[38;5;208m'
 PINK = '\033[38;5;198m'
 RESET = '\033[0m'
 
-print("Direction to process:")
-print("1.  Standard")
-print("2.  Backwards")
-print("3.  Random")
-print("Dataset options:")
-print("4.  Retry Error Overflow")
-print("5.  Retry Error Underflow")
-print("6.  Retry Old Good")
-print("7.  Retry Ignored")
-print("8.  Retry Outdated")
-print("9.  Retry SSL")
-print("10. Retry DNS")
-print("11. Retry ###")
-print("12. Retry HTTP")
-print("13. Retry 400-599")
-print("14. Retry Failed")
-print("15. Retry ???")
-print("16. Retry API")
-print("17. Retry JSON")
-print("18. Retry XML")
-print("19. Retry 500+")
-print("20. Retry 404")
-print("21. Retry Active Zero")
-print("22. Retry Main Runners")
-
-print("Enter your choice (1, 2, 3, etc): ", end='', flush=True)
+print(f'{BOLD}{APPNAME} v{VERSION}{RESET}')
+print(f'{PINK}Alter direction:{RESET} 2=Reverse 3=Random')
+print(f'{PINK}Retry general errors:{RESET} 4=Overflow 5=Underflow')
+print(f'{PINK}Retry specific errors:{RESET} 9=SSL 10=DNS 11=### 12=HTTP 13=400-599 15=??? 16=API 17=JSON 18=XML')
+print(f'{PINK}Retry fatal errors:{RESET} 7=Ignored 14=Failed')
+print(f'{PINK}Retry good data:{RESET} 6=Stale 8=Outdated 21=Inactive 22=Main')
+print(f'{CYAN}Enter your choice (1, 2, 3, etc):{RESET} ', end='', flush=True)
 ready, _, _ = select.select([sys.stdin], [], [], 5)  # Wait for input for 5 seconds
 
 if ready:
     user_choice = sys.stdin.readline().strip()
 else:
-    print("\nNo selection made. Defaulting to option 1.")
+    print("\nDefaulting to standard scan")
     user_choice = "1"
 
 print(f"Choice selected: {user_choice}")
@@ -1011,10 +995,6 @@ def load_from_database(user_choice):
         cursor.execute("SELECT Domain FROM RawDomains WHERE Reason = 'JSON' ORDER BY Domain")
     elif user_choice == "18":
         cursor.execute("SELECT Domain FROM RawDomains WHERE Reason = 'XML' ORDER BY Domain")
-    elif user_choice == "19":
-        cursor.execute("SELECT Domain FROM RawDomains WHERE Reason LIKE '%5%' ORDER BY Domain")
-    elif user_choice == "20":
-        cursor.execute("SELECT Domain FROM RawDomains WHERE Reason LIKE '%404%' ORDER BY Domain")
     elif user_choice == "21":
         cursor.execute('SELECT Domain FROM MastodonDomains WHERE "Active Users (Monthly)" = 0 ORDER BY Domain')
     elif user_choice == "22":
