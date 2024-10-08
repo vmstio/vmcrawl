@@ -1,21 +1,23 @@
 #!/usr/bin/env python3
 
-import requests
-import re
-import datetime
-import dns.resolver
-import sqlite3
-import sys
-import os
-import random
-import json
-from OpenSSL import SSL
-from bs4 import BeautifulSoup
-import socket
-from urllib.parse import urlparse, urlunparse
-import select
-import sys
-import re
+try:
+    import datetime
+    import dns.resolver
+    import json
+    import os
+    import random
+    import re
+    import requests
+    import select
+    import socket
+    import sqlite3
+    import sys
+    from bs4 import BeautifulSoup
+    from OpenSSL import SSL
+    from urllib.parse import urlparse, urlunparse
+except ImportError as e:
+    print(f"Error importing module: {e}")
+    sys.exit(1)
 
 APPNAME = 'vmcrawl'
 VERSION = '0.1'
