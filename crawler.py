@@ -37,7 +37,8 @@ RESET = '\033[0m'
 print(f'{BOLD}{APPNAME} v{VERSION}{RESET}')
 print(f'{PINK}Alter direction:{RESET} 2=Reverse 3=Random')
 print(f'{PINK}Retry general errors:{RESET} 4=Overflow 5=Underflow')
-print(f'{PINK}Retry specific errors:{RESET} 9=SSL 10=DNS 11=### 12=HTTP 13=400-599 15=??? 16=API 17=JSON 18=404 23=TXT')
+print(f'{PINK}Retry specific errors:{RESET} 9=SSL 10=DNS 11=### 15=??? 16=API 17=JSON 23=TXT')
+print(f'{PINK}Retry HTTP errors:{RESET} 12=HTTP 13=400-599 403=403 404=404 406=406')
 print(f'{PINK}Retry fatal errors:{RESET} 7=Ignored 14=Failed')
 print(f'{PINK}Retry good data:{RESET} 6=Stale 8=Outdated 21=Inactive 22=Main')
 print(f'{BOLD}Enter your choice (1, 2, 3, etc):{RESET} ', end='', flush=True)
@@ -298,7 +299,7 @@ def check_version_wrongpatch(software_version):
         x, y, z = int(match.group(1)), int(match.group(2)), int(match.group(3))
         additional_data = match.group(4)  # This will be None if no dash and additional data is present
 
-        if x is 4:
+        if x == 4:
             # Check if Y is 3 or 4
             if y in (3, 4):
                 # If Z is not 0, change it to 0
@@ -541,6 +542,12 @@ def check_and_record_domains(domain_list, ignored_domains, failed_domains, user_
                         continue
                     webfinger_domain = urlparse(first_webfinger_alias)
                     real_domain = webfinger_domain.netloc
+                elif webfinger_response.status_code == 403:
+                    error_to_print = f'{domain} is HTTP {webfinger_response.status_code} restricted (webfinger)'
+                    print(f'{MAGENTA}{error_to_print}{RESET}')
+                    mark_ignore_domain(domain, conn)
+                    delete_domain_if_known(domain, conn)
+                    continue
                 elif webfinger_response.status_code == 410:
                     print(f'{RED}{domain} returned HTTP {webfinger_response.status_code}{RESET}')
                     mark_failed_domain(domain, conn)
@@ -597,6 +604,12 @@ def check_and_record_domains(domain_list, ignored_domains, failed_domains, user_
                             error_reason = 'JSON'
                             increment_domain_error(domain, conn, error_reason)
                             continue
+                elif wk_nodeinfo_response.status_code == 403:
+                    error_to_print = f'{domain} is HTTP {wk_nodeinfo_response.status_code} restricted (nodeinfo)'
+                    print(f'{MAGENTA}{error_to_print}{RESET}')
+                    mark_ignore_domain(domain, conn)
+                    delete_domain_if_known(domain, conn)
+                    continue
                 elif wk_nodeinfo_response.status_code == 404:
                     error_to_print = f'{domain} is not using Mastodon'
                     print(f'{MAGENTA}{error_to_print}{RESET}')
@@ -618,7 +631,7 @@ def check_and_record_domains(domain_list, ignored_domains, failed_domains, user_
                     continue
 
                 if ('code' in data and data['code'] in ['rest_no_route', 'rest_not_logged_in', 'rest_forbidden', 'rest_user_invalid', 'rest_login_required']) or ('error' in data and data['error'] == 'Restricted'):
-                    error_to_print = f'{domain} is restricted (nodeinfo)'
+                    error_to_print = f'{domain} is JSON restricted (nodeinfo)'
                     print(f'{MAGENTA}{error_to_print}{RESET}')
                     mark_ignore_domain(domain, conn)
                     delete_domain_if_known(domain, conn)
@@ -786,7 +799,11 @@ def check_and_record_domains(domain_list, ignored_domains, failed_domains, user_
                                 delete_domain_if_known(domain, conn)
                         else:
                             error_to_print = f'{domain} returned HTTP {discovered_nodeinfo_response.status_code} @ {discovered_nodeinfo_url}'
-                            if discovered_nodeinfo_response.status_code == 410:
+                            if discovered_nodeinfo_response.status_code == 403:
+                                print(f'{MAGENTA}{error_to_print}{RESET}')
+                                mark_ignore_domain(domain, conn)
+                                delete_domain_if_known(domain, conn)
+                            elif discovered_nodeinfo_response.status_code == 410:
                                 print(f'{RED}{error_to_print}{RESET}')
                                 mark_failed_domain(domain, conn)
                                 delete_domain_if_known(domain, conn)
@@ -987,8 +1004,6 @@ def load_from_database(user_choice):
         cursor.execute("SELECT Domain FROM RawDomains WHERE Reason = 'API' ORDER BY Domain")
     elif user_choice == "17":
         cursor.execute("SELECT Domain FROM RawDomains WHERE Reason = 'JSON' ORDER BY Domain DESC")
-    elif user_choice == "18":
-        cursor.execute("SELECT Domain FROM RawDomains WHERE Reason LIKE '%404%' ORDER BY Domain")
     elif user_choice == "21":
         cursor.execute('SELECT Domain FROM MastodonDomains WHERE "Active Users (Monthly)" = 0 ORDER BY Domain')
     elif user_choice == "22":
@@ -1003,6 +1018,12 @@ def load_from_database(user_choice):
         cursor.execute(query)
     elif user_choice == "23":
         cursor.execute("SELECT Domain FROM RawDomains WHERE Reason = 'TXT' ORDER BY Domain")
+    elif user_choice == "403":
+        cursor.execute("SELECT Domain FROM RawDomains WHERE Reason LIKE '%403%'' ORDER BY Domain")
+    elif user_choice == "404":
+        cursor.execute("SELECT Domain FROM RawDomains WHERE Reason LIKE '%404%' ORDER BY Domain")
+    elif user_choice == "406":
+        cursor.execute("SELECT Domain FROM RawDomains WHERE Reason LIKE '%406%' ORDER BY Domain")
     else:
         cursor.execute("SELECT Domain FROM RawDomains WHERE (Failed IS NULL OR Failed = '' OR Failed = '0') AND (Ignore IS NULL OR Ignore = '' OR Ignore = '0') AND (Errors < 6 OR Errors IS NULL) ORDER BY Domain ASC")
     domain_list = [row[0].strip() for row in cursor.fetchall() if row[0].strip()]
