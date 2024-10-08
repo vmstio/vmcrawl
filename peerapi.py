@@ -1,8 +1,17 @@
-import requests
-import sys
-import sqlite3
-import ipaddress
-import re
+try:
+    import requests
+    import sys
+    import sqlite3
+    import ipaddress
+    import re
+    from dotenv import load_dotenv
+    import os
+except ImportError as e:
+    print(f"Error importing module: {e}")
+    sys.exit(1)
+
+from common import *
+load_dotenv()
 
 def is_valid_domain(domain):
     # Regular expression pattern for valid domain format (case-insensitive)
@@ -134,7 +143,7 @@ if __name__ == "__main__":
 
     domain = sys.argv[1]
     api_url = f"https://{domain}/api/v1/instance/peers"
-    db_path = "/Users/vmstan/Documents/MastodonDomains.sqlite"
+    db_path = os.getenv("db_path")
     output_file = f"target/import_{domain}.txt"
 
     existing_domains = get_existing_domains(db_path)

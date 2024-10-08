@@ -1,5 +1,7 @@
 .DS_Store
 .nova
 .venv/
+__pycache__/
 target/*.txt
 error/*.txt
+.env

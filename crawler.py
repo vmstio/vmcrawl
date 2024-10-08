@@ -9,30 +9,19 @@ try:
     import re
     import requests
     import select
-    import socket
     import sqlite3
     import sys
     from bs4 import BeautifulSoup
     from OpenSSL import SSL
     from urllib.parse import urlparse, urlunparse
+    from dotenv import load_dotenv
+    import os
 except ImportError as e:
     print(f"Error importing module: {e}")
     sys.exit(1)
 
-APPNAME = 'vmcrawl'
-VERSION = '0.1'
-
-# Add your color constants here
-BOLD = '\033[1m'
-RED = '\033[91m'
-GREEN = '\033[92m'
-YELLOW = '\033[93m'
-MAGENTA = '\033[95m'
-CYAN = '\033[96m'
-ORANGE = '\033[38;5;208m'
-PINK = '\033[38;5;198m'
-PURPLE = '\033[94m'
-RESET = '\033[0m'
+from common import *
+load_dotenv()
 
 print(f'{BOLD}{APPNAME} v{VERSION}{RESET}')
 print(f'{PINK}Alter direction:{RESET} 2=Reverse 3=Random')
@@ -52,7 +41,7 @@ else:
 
 print(f"Choice selected: {user_choice}")
 
-db_path = '/Users/vmstan/Documents/MastodonDomains.sqlite'
+db_path = os.getenv("db_path")
 
 def resolve_dns_with_dnspython(domain):
     record_types = ['A', 'AAAA', 'CNAME']
