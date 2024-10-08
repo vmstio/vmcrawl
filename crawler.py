@@ -77,32 +77,6 @@ def resolve_dns_with_dnspython(domain):
     # If the loop completes without finding a record or encountering a DNS issue, then no desired records were found
     return False  # Neither A, AAAA, nor CNAME records found
 
-def check_ssl_expiry(domain):
-    # Create an SSL context that doesn't verify certificates
-    context = SSL.Context(SSL.SSLv23_METHOD)
-    context.set_verify(SSL.VERIFY_NONE, lambda *args: True)  # Disable verification
-
-    with socket.create_connection((domain, 443)) as sock:
-        # Wrap the socket and specify the server hostname for SNI support
-        conn = SSL.Connection(context, sock)
-        conn.set_tlsext_host_name(domain.encode())
-        conn.set_connect_state()
-        conn.do_handshake()
-
-        cert = conn.get_peer_certificate()
-        if cert:
-            # Convert ASN1_TIME to a readable format using datetime.datetime.strptime
-            expires_naive = datetime.datetime.strptime(cert.get_notAfter().decode('ascii'), '%Y%m%d%H%M%SZ')
-            expires = expires_naive.replace(tzinfo=datetime.timezone.utc)
-            now = datetime.datetime.now(datetime.timezone.utc)
-            if now > expires:
-                delta = now - expires
-                return f"{delta.days}"
-            else:
-                return "0"
-        else:
-            return "0"
-
 def is_valid_email(email):
     pattern = r'^[\w\.-]+(?:\+[\w\.-]+)?@[\w\.-]+\.\w+$'
     return re.match(pattern, email) is not None
@@ -493,7 +467,6 @@ def check_and_record_domains(domain_list, ignored_domains, failed_domains, user_
                     except json.JSONDecodeError:
                         content_type = webfinger_response.headers.get('Content-Type', '')
                         if 'application/jrd+json' in content_type or 'application/json' in content_type or 'application/activity+json' in content_type :
-                            webfinger_url_trimmed = webfinger_url.split('?')[0]
                             error_to_print = f'{domain} JSON is invalid (webfinger)'
                             print(f'{YELLOW}{error_to_print}{RESET}')
                             with open(error_file, 'a') as file:
@@ -502,7 +475,6 @@ def check_and_record_domains(domain_list, ignored_domains, failed_domains, user_
                             increment_domain_error(domain, conn, error_reason)
                             continue
                         elif not webfinger_response.content:
-                            webfinger_url_trimmed = webfinger_url.split('?')[0]
                             error_to_print = f'{domain} JSON is empty (webfinger)'
                             print(f'{YELLOW}{error_to_print}{RESET}')
                             with open(error_file, 'a') as file:
@@ -511,7 +483,6 @@ def check_and_record_domains(domain_list, ignored_domains, failed_domains, user_
                             increment_domain_error(domain, conn, error_reason)
                             continue
                         elif content_type != '':
-                            webfinger_url_trimmed = webfinger_url.split('?')[0]
                             content_type_strip = content_type.split(';')[0].strip()
                             error_to_print = f'{domain} JSON is {content_type_strip} (webfinger)'
                             print(f'{YELLOW}{error_to_print}{RESET}')
@@ -521,7 +492,6 @@ def check_and_record_domains(domain_list, ignored_domains, failed_domains, user_
                             increment_domain_error(domain, conn, error_reason)
                             continue
                         else:
-                            webfinger_url_trimmed = webfinger_url.split('?')[0]
                             error_to_print = f'{domain} JSON is fucked (webfinger)'
                             print(f'{YELLOW}{error_to_print}{RESET}')
                             with open(error_file, 'a') as file:
@@ -531,16 +501,17 @@ def check_and_record_domains(domain_list, ignored_domains, failed_domains, user_
                             continue
 
                     webfinger_data = webfinger_response.json()
-                    webfinger_alias = webfinger_data.get('aliases', [])
-                    if webfinger_alias:  # Check if the list is not empty
+                    if isinstance(webfinger_data, dict):
+                        webfinger_alias = webfinger_data.get('aliases', [])
                         first_webfinger_alias = next((alias for alias in webfinger_alias if 'https' in alias), None)
+                        webfinger_domain = urlparse(first_webfinger_alias)
+                        real_domain = webfinger_domain.netloc
                     else:
                         print(f'{MAGENTA}{domain} is not using Mastodon{RESET}')
                         mark_ignore_domain(domain, conn)
                         delete_domain_if_known(domain, conn)
                         continue
-                    webfinger_domain = urlparse(first_webfinger_alias)
-                    real_domain = webfinger_domain.netloc
+
                 elif webfinger_response.status_code == 202:
                     if 'sgcaptcha' in webfinger_response.text:
                         print(f'{MAGENTA}{domain} returned CAPTCHA{RESET}')
@@ -548,7 +519,7 @@ def check_and_record_domains(domain_list, ignored_domains, failed_domains, user_
                         delete_domain_if_known(domain, conn)
                         continue
                 elif webfinger_response.status_code == 403:
-                    error_to_print = f'{domain} is HTTP {webfinger_response.status_code} restricted (webfinger)'
+                    error_to_print = f'{domain} is HTTP {webfinger_response.status_code} restricted'
                     print(f'{MAGENTA}{error_to_print}{RESET}')
                     mark_ignore_domain(domain, conn)
                     delete_domain_if_known(domain, conn)
@@ -616,7 +587,7 @@ def check_and_record_domains(domain_list, ignored_domains, failed_domains, user_
                         delete_domain_if_known(domain, conn)
                         continue
                 elif wk_nodeinfo_response.status_code == 403:
-                    error_to_print = f'{domain} is HTTP {wk_nodeinfo_response.status_code} restricted (nodeinfo)'
+                    error_to_print = f'{domain} is HTTP {wk_nodeinfo_response.status_code} restricted'
                     print(f'{MAGENTA}{error_to_print}{RESET}')
                     mark_ignore_domain(domain, conn)
                     delete_domain_if_known(domain, conn)
@@ -1022,7 +993,7 @@ def load_from_database(user_choice):
         SELECT Domain
         FROM MastodonDomains
         WHERE
-            "Software Version" LIKE '4.3%' OR "Software Version" LIKE '4.4%'
+            "Software Version" LIKE '4.4%'
         ORDER BY "Total Users" DESC
         ;
         """
