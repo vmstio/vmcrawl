@@ -355,7 +355,7 @@ def check_and_record_domains(domain_list, ignored_domains, failed_domains, user_
     error_file = os.path.join(error_directory, f'errors_{timestamp}.txt')
 
     default_user_agent = requests.utils.default_user_agent()
-    appended_user_agent = 'vmcrawl/0.1 (https://docs.vmst.io/projects/crawler)'
+    appended_user_agent = '{APPNAME}/{VERSION} (https://docs.vmst.io/projects/crawler)'
     custom_headers = {
         'User-Agent': appended_user_agent,
     }
