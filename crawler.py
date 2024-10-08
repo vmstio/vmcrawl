@@ -2,7 +2,6 @@
 
 import requests
 import re
-import csv
 import datetime
 import dns.resolver
 import sqlite3
@@ -14,8 +13,6 @@ from OpenSSL import SSL
 from bs4 import BeautifulSoup
 import socket
 from urllib.parse import urlparse, urlunparse
-import xml.etree.ElementTree as ET
-from lxml import etree
 import select
 import sys
 import re
@@ -37,7 +34,7 @@ RESET = '\033[0m'
 print(f'{BOLD}{APPNAME} v{VERSION}{RESET}')
 print(f'{PINK}Alter direction:{RESET} 2=Reverse 3=Random')
 print(f'{PINK}Retry general errors:{RESET} 4=Overflow 5=Underflow')
-print(f'{PINK}Retry specific errors:{RESET} 9=SSL 10=DNS 11=### 12=HTTP 13=400-599 15=??? 16=API 17=JSON 18=XML')
+print(f'{PINK}Retry specific errors:{RESET} 9=SSL 10=DNS 11=### 12=HTTP 13=400-599 15=??? 16=API 17=JSON 18=XML 23=TXT')
 print(f'{PINK}Retry fatal errors:{RESET} 7=Ignored 14=Failed')
 print(f'{PINK}Retry good data:{RESET} 6=Stale 8=Outdated 21=Inactive 22=Main')
 print(f'{CYAN}Enter your choice (1, 2, 3, etc):{RESET} ', end='', flush=True)
@@ -46,7 +43,7 @@ ready, _, _ = select.select([sys.stdin], [], [], 5)  # Wait for input for 5 seco
 if ready:
     user_choice = sys.stdin.readline().strip()
 else:
-    print("\nDefaulting to standard scan")
+    print("\nDefaulting to standard crawl")
     user_choice = "1"
 
 print(f"Choice selected: {user_choice}")
@@ -390,7 +387,6 @@ def check_and_record_domains(domain_list, ignored_domains, failed_domains, user_
         if loopback is True:
             continue
 
-        hostmeta_url = f'https://{domain}/.well-known/host-meta'
         webfinger_url = f'https://{domain}/.well-known/webfinger?resource=acct:{domain}@{domain}'
         robots_url = f'https://{domain}/robots.txt'
         try:
@@ -432,7 +428,7 @@ def check_and_record_domains(domain_list, ignored_domains, failed_domains, user_
 
                 elif robots_response.status_code == 202:
                     if 'sgcaptcha' in robots_response.text:
-                        print(f'{RED}{domain} uses a captcha challenge{RESET}')
+                        print(f'{RED}{domain} returned CAPTCHA{RESET}')
                         mark_failed_domain(domain, conn)
                         delete_domain_if_known(domain, conn)
                         continue
@@ -441,170 +437,284 @@ def check_and_record_domains(domain_list, ignored_domains, failed_domains, user_
                         'User-Agent': default_user_agent,
                     }
                 elif robots_response.status_code == 410:
-                    print(f'{RED}{domain} returned HTTP {robots_response.status_code} @ {robots_url}{RESET}')
+                    print(f'{RED}{domain} returned HTTP {robots_response.status_code}{RESET}')
                     mark_failed_domain(domain, conn)
                     delete_domain_if_known(domain, conn)
                     continue
 
-            with requests.get(hostmeta_url, headers=custom_headers, timeout=5) as hostmeta_response:
-                if hostmeta_response.status_code == 200:
+            with requests.get(webfinger_url, headers=custom_headers, timeout=5) as webfinger_response:
+                if webfinger_response.status_code == 200:
                     try:
-                        content = hostmeta_response.content.strip()
-                        xmldata = etree.fromstring(content)
-                    except etree.XMLSyntaxError:
-                        content_type = hostmeta_response.headers.get('Content-Type', '')
-                        if 'application/xml' in content_type or 'application/xrd+xml' in content_type:
-                            error_to_print = f'{domain} XML is invalid @ {hostmeta_url}'
+                        # Try to parse the webfinger_response content as JSON
+                        data = json.loads(webfinger_response.text)
+                        data = webfinger_response.json()
+                    except json.JSONDecodeError:
+                        content_type = webfinger_response.headers.get('Content-Type', '')
+                        if 'application/jrd+json' in content_type or 'application/json' in content_type or 'application/activity+json' in content_type :
+                            webfinger_url_trimmed = webfinger_url.split('?')[0]
+                            error_to_print = f'{domain} JSON is invalid @ {webfinger_url_trimmed}'
                             print(f'{YELLOW}{error_to_print}{RESET}')
                             with open(error_file, 'a') as file:
                                 file.write(error_to_print + '\n')
-                            error_reason = 'XML'
+                            error_reason = 'JSON'
                             increment_domain_error(domain, conn, error_reason)
                             continue
-                        elif not hostmeta_response.content:
-                            error_to_print = f'{domain} XML is empty @ {hostmeta_url}'
+                        elif not webfinger_response.content:
+                            webfinger_url_trimmed = webfinger_url.split('?')[0]
+                            error_to_print = f'{domain} JSON is empty @ {webfinger_url_trimmed}'
                             print(f'{YELLOW}{error_to_print}{RESET}')
                             with open(error_file, 'a') as file:
                                 file.write(error_to_print + '\n')
-                            error_reason = 'XML'
+                            error_reason = 'JSON'
+                            increment_domain_error(domain, conn, error_reason)
+                            continue
+                        elif content_type != '':
+                            webfinger_url_trimmed = webfinger_url.split('?')[0]
+                            content_type_strip = content_type.split(';')[0].strip()
+                            error_to_print = f'{domain} JSON is {content_type_strip} @ {webfinger_url_trimmed}'
+                            print(f'{YELLOW}{error_to_print}{RESET}')
+                            with open(error_file, 'a') as file:
+                                file.write(error_to_print + '\n')
+                            error_reason = 'JSON'
+                            increment_domain_error(domain, conn, error_reason)
+                            continue
+                        else:
+                            webfinger_url_trimmed = webfinger_url.split('?')[0]
+                            error_to_print = f'{domain} JSON is fucked @ {webfinger_url_trimmed}'
+                            print(f'{YELLOW}{error_to_print}{RESET}')
+                            with open(error_file, 'a') as file:
+                                file.write(error_to_print + '\n')
+                            error_reason = 'JSON'
+                            increment_domain_error(domain, conn, error_reason)
+                            continue
+
+                    webfinger_data = webfinger_response.json()
+                    webfinger_alias = webfinger_data.get('aliases', [])
+                    if webfinger_alias:  # Check if the list is not empty
+                        first_webfinger_alias = next((alias for alias in webfinger_alias if 'https' in alias), None)
+                    else:
+                        print(f'{MAGENTA}{domain} is not using Mastodon{RESET}')
+                        mark_ignore_domain(domain, conn)
+                        delete_domain_if_known(domain, conn)
+                        continue
+                    webfinger_domain = urlparse(first_webfinger_alias)
+                    real_domain = webfinger_domain.netloc
+                else:
+                    real_domain = domain
+
+            wk_nodeinfo_url = f'https://{real_domain}/.well-known/nodeinfo'
+            with requests.get(wk_nodeinfo_url, headers=custom_headers, timeout=5) as wk_nodeinfo_response:
+                if wk_nodeinfo_response.status_code == 200:
+                    try:
+                        data = json.loads(wk_nodeinfo_response.text)
+                        data = wk_nodeinfo_response.json()
+                    except json.JSONDecodeError:
+                        content_type = wk_nodeinfo_response.headers.get('Content-Type', '')
+                        if 'application/jrd+json' in content_type or 'application/json' in content_type or 'application/activity+json' in content_type :
+                            error_to_print = f'{domain} JSON is invalid @ {wk_nodeinfo_url}'
+                            print(f'{YELLOW}{error_to_print}{RESET}')
+                            with open(error_file, 'a') as file:
+                                file.write(error_to_print + '\n')
+                            error_reason = 'JSON'
+                            increment_domain_error(domain, conn, error_reason)
+                            continue
+                        elif not wk_nodeinfo_response.content:
+                            error_to_print = f'{domain} JSON is empty @ {wk_nodeinfo_url}'
+                            print(f'{YELLOW}{error_to_print}{RESET}')
+                            with open(error_file, 'a') as file:
+                                file.write(error_to_print + '\n')
+                            error_reason = 'JSON'
                             increment_domain_error(domain, conn, error_reason)
                             continue
                         elif content_type != '':
                             content_type_strip = content_type.split(';')[0].strip()
-                            error_to_print = f'{domain} XML is {content_type_strip} @ {hostmeta_url}'
+                            error_to_print = f'{domain} JSON is {content_type_strip} @ {wk_nodeinfo_url}'
                             print(f'{YELLOW}{error_to_print}{RESET}')
                             with open(error_file, 'a') as file:
                                 file.write(error_to_print + '\n')
-                            error_reason = 'XML'
+                            error_reason = 'JSON'
                             increment_domain_error(domain, conn, error_reason)
                             continue
                         else:
-                            error_to_print = f'{domain} XML error @ {hostmeta_url}'
+                            error_to_print = f'{domain} JSON is fucked @ {wk_nodeinfo_url}'
                             print(f'{YELLOW}{error_to_print}{RESET}')
                             with open(error_file, 'a') as file:
                                 file.write(error_to_print + '\n')
-                            error_reason = 'XML'
+                            error_reason = 'JSON'
                             increment_domain_error(domain, conn, error_reason)
                             continue
-                    except Exception:
-                        error_to_print = f'{domain} XML fucked @ {hostmeta_url}'
-                        print(f'{YELLOW}{error_to_print}{RESET}')
-                        with open(error_file, 'a') as file:
-                            file.write(error_to_print + '\n')
-                        error_reason = 'XML'
-                        increment_domain_error(domain, conn, error_reason)
+                else:
+                    error_to_print = f'{domain} returned HTTP {wk_nodeinfo_response.status_code} @ {wk_nodeinfo_url}'
+                    print(f'{YELLOW}{error_to_print}{RESET}')
+                    with open(error_file, 'a') as file:
+                        file.write(error_to_print + '\n')
+                    error_reason = wk_nodeinfo_response.status_code
+                    increment_domain_error(domain, conn, error_reason)
+                    continue
+
+                if ('code' in data and data['code'] in ['rest_no_route', 'rest_not_logged_in', 'rest_forbidden', 'rest_user_invalid', 'rest_login_required']) or ('error' in data and data['error'] == 'Restricted'):
+                    error_to_print = f'{domain} has restricted nodeinfo'
+                    print(f'{MAGENTA}{error_to_print}{RESET}')
+                    mark_ignore_domain(domain, conn)
+                    delete_domain_if_known(domain, conn)
+                    continue
+
+                if 'links' in data and len(data['links']) > 0 and 'href' in data['links'][0]:
+                    discovered_nodeinfo_url = data['links'][0]['href']
+
+                    if 'wp-json' in discovered_nodeinfo_url:
+                        error_to_print = f'{domain} is not using Mastodon'
+                        print(f'{MAGENTA}{error_to_print}{RESET}')
+                        mark_ignore_domain(domain, conn)
+                        delete_domain_if_known(domain, conn)
                         continue
 
-                    ns = {'xrd': 'http://docs.oasis-open.org/ns/xri/xrd-1.0'}  # Namespace
-                    link = xmldata.find(".//xrd:Link[@rel='lrdd']", namespaces=ns)
-                    try:
-                        parsed_link = urlparse(link.get('template'))
-                        real_domain = parsed_link.netloc
-                    except Exception as e:
-                        with requests.get(webfinger_url, headers=custom_headers, timeout=5) as webfinger_response:
-                            if webfinger_response.status_code == 200:
-                                try:
-                                    # Try to parse the webfinger_response content as JSON
-                                    data = json.loads(webfinger_response.text)
-                                    data = webfinger_response.json()
-                                except json.JSONDecodeError:
-                                    content_type = webfinger_response.headers.get('Content-Type', '')
-                                    if 'application/jrd+json' in content_type or 'application/json' in content_type or 'application/activity+json' in content_type :
-                                        webfinger_url_trimmed = webfinger_url.split('?')[0]
-                                        error_to_print = f'{domain} JSON is invalid @ {webfinger_url_trimmed}'
-                                        print(f'{YELLOW}{error_to_print}{RESET}')
-                                        with open(error_file, 'a') as file:
-                                            file.write(error_to_print + '\n')
-                                        error_reason = 'JSON'
-                                        increment_domain_error(domain, conn, error_reason)
-                                        continue
-                                    elif not webfinger_response.content:
-                                        webfinger_url_trimmed = webfinger_url.split('?')[0]
-                                        error_to_print = f'{domain} JSON is empty @ {webfinger_url_trimmed}'
-                                        print(f'{YELLOW}{error_to_print}{RESET}')
-                                        with open(error_file, 'a') as file:
-                                            file.write(error_to_print + '\n')
-                                        error_reason = 'JSON'
-                                        increment_domain_error(domain, conn, error_reason)
-                                        continue
-                                    elif content_type != '':
-                                        webfinger_url_trimmed = webfinger_url.split('?')[0]
-                                        content_type_strip = content_type.split(';')[0].strip()
-                                        error_to_print = f'{domain} JSON is {content_type_strip} @ {webfinger_url_trimmed}'
-                                        print(f'{YELLOW}{error_to_print}{RESET}')
-                                        with open(error_file, 'a') as file:
-                                            file.write(error_to_print + '\n')
-                                        error_reason = 'JSON'
-                                        increment_domain_error(domain, conn, error_reason)
-                                        continue
-                                    else:
-                                        webfinger_url_trimmed = webfinger_url.split('?')[0]
-                                        error_to_print = f'{domain} JSON is fucked @ {webfinger_url_trimmed}'
-                                        print(f'{YELLOW}{error_to_print}{RESET}')
-                                        with open(error_file, 'a') as file:
-                                            file.write(error_to_print + '\n')
-                                        error_reason = 'JSON'
-                                        increment_domain_error(domain, conn, error_reason)
-                                        continue
-
-                                webfinger_data = webfinger_response.json()
-                                webfinger_alias = webfinger_data.get('aliases', [])
-                                if webfinger_alias:  # Check if the list is not empty
-                                    first_webfinger_alias = str(webfinger_alias[0])
-                                else:
-                                    print(f'{MAGENTA}{domain} is not using Mastodon{RESET}')
+                    with requests.get(discovered_nodeinfo_url, headers=custom_headers, timeout=5) as discovered_nodeinfo_response:
+                        if discovered_nodeinfo_response.status_code == 200:
+                            content_type = discovered_nodeinfo_response.headers.get('Content-Type', '')
+                            if 'application/json' not in content_type:
+                                if 'application/activity+json' in content_type:
+                                    error_to_print = f'{domain} is not using Mastodon'
+                                    print(f'{MAGENTA}{error_to_print}{RESET}')
                                     mark_ignore_domain(domain, conn)
                                     delete_domain_if_known(domain, conn)
                                     continue
-                                webfinger_domain = urlparse(first_webfinger_alias)
-                                real_domain = webfinger_domain.netloc
-                            else:
-                                real_domain = domain
-
-                    wk_nodeinfo_url = f'https://{real_domain}/.well-known/nodeinfo'
-                    with requests.get(wk_nodeinfo_url, headers=custom_headers, timeout=5) as wk_nodeinfo_response:
-                        if wk_nodeinfo_response.status_code == 200:
-                            try:
-                                data = json.loads(wk_nodeinfo_response.text)
-                                data = wk_nodeinfo_response.json()
-                            except json.JSONDecodeError:
-                                content_type = wk_nodeinfo_response.headers.get('Content-Type', '')
-                                if 'application/jrd+json' in content_type or 'application/json' in content_type or 'application/activity+json' in content_type :
-                                    error_to_print = f'{domain} JSON is invalid @ {wk_nodeinfo_url}'
-                                    print(f'{YELLOW}{error_to_print}{RESET}')
-                                    with open(error_file, 'a') as file:
-                                        file.write(error_to_print + '\n')
-                                    error_reason = 'JSON'
-                                    increment_domain_error(domain, conn, error_reason)
-                                    continue
-                                elif not wk_nodeinfo_response.content:
-                                    error_to_print = f'{domain} JSON is empty @ {wk_nodeinfo_url}'
-                                    print(f'{YELLOW}{error_to_print}{RESET}')
-                                    with open(error_file, 'a') as file:
-                                        file.write(error_to_print + '\n')
-                                    error_reason = 'JSON'
-                                    increment_domain_error(domain, conn, error_reason)
-                                    continue
-                                elif content_type != '':
-                                    content_type_strip = content_type.split(';')[0].strip()
-                                    error_to_print = f'{domain} JSON is {content_type_strip} @ {wk_nodeinfo_url}'
-                                    print(f'{YELLOW}{error_to_print}{RESET}')
-                                    with open(error_file, 'a') as file:
-                                        file.write(error_to_print + '\n')
-                                    error_reason = 'JSON'
-                                    increment_domain_error(domain, conn, error_reason)
-                                    continue
                                 else:
-                                    error_to_print = f'{domain} JSON is fucked @ {wk_nodeinfo_url}'
+                                    error_to_print = f'{domain} did not return JSON @ {discovered_nodeinfo_url}'
                                     print(f'{YELLOW}{error_to_print}{RESET}')
                                     with open(error_file, 'a') as file:
                                         file.write(error_to_print + '\n')
                                     error_reason = 'JSON'
                                     increment_domain_error(domain, conn, error_reason)
                                     continue
+                            discovered_nodeinfo_data = discovered_nodeinfo_response.json()
+
+                            if discovered_nodeinfo_data['software']['name'].lower() == 'mastodon' or discovered_nodeinfo_data['software']['name'].lower() == 'hometown' or discovered_nodeinfo_data['software']['name'].lower() == 'kmyblue' or discovered_nodeinfo_data['software']['name'].lower() == 'glitchcafe':
+                                parsed_url = urlparse(discovered_nodeinfo_url)
+                                backend_domain = parsed_url.netloc
+
+                                software_version_full = discovered_nodeinfo_data['software']['version']
+                                if isinstance(software_version_full, str):
+                                    # Remove any unwanted or invalid suffixes from the version string
+                                    software_version = clean_version_suffix(software_version_full)
+
+                                software_version = clean_version_date(software_version)
+                                software_version = clean_version_suffix_more(software_version)
+                                software_version = clean_version_hometown(software_version)
+                                software_version = clean_version_development(software_version)
+                                software_version = check_version_wrongpatch(software_version)
+                                software_version = clean_version_doubledash(software_version)
+                                # rewrite dumb data
+                                # if software_version.startswith("4.2.10"):
+                                #     software_version = "4.2.10"
+
+                                total_users = discovered_nodeinfo_data['usage']['users']['total']
+                                active_month_users = discovered_nodeinfo_data['usage']['users']['activeMonth']
+
+                                if active_month_users > max(total_users + 6, total_users + (total_users * 0.25)):
+                                    error_to_print = f'{domain} is running Mastodon v{software_version} with invalid counts ({active_month_users}:{total_users})'
+                                    print(f'{PINK}{error_to_print}{RESET}')
+                                    with open(error_file, 'a') as file:
+                                        file.write(error_to_print + '\n')
+                                    error_reason = '###'
+                                    increment_domain_error(domain, conn, error_reason)
+                                    delete_domain_if_known(domain, conn)
+                                    continue
+
+                                if software_version.startswith("4"):
+                                    backend_url = f'https://{backend_domain}/api/v2/instance'
+                                else:
+                                    backend_url = f'https://{backend_domain}/api/v1/instance'
+
+                                with requests.get(backend_url, headers=custom_headers, timeout=5) as backend_response:
+                                    content_type = backend_response.headers.get('Content-Type', '')
+                                    if 'application/json' not in content_type:
+                                        if backend_response.status_code != 200:
+                                            error_to_print = f'{domain} API is unhealthy'
+                                            print(f'{YELLOW}{error_to_print}{RESET}')
+                                            with open(error_file, 'a') as file:
+                                                file.write(error_to_print + '\n')
+                                            error_reason = 'API'
+                                            increment_domain_error(domain, conn, error_reason)
+                                            continue
+                                        error_to_print = f'{domain} API did not return JSON @ {backend_url}'
+                                        print(f'{YELLOW}{error_to_print}{RESET}')
+                                        with open(error_file, 'a') as file:
+                                            file.write(error_to_print + '\n')
+                                        error_reason = 'JSON'
+                                        increment_domain_error(domain, conn, error_reason)
+                                        continue
+                                    backend_data = backend_response.json()
+                                    if 'error' in backend_data:
+                                        if backend_data['error'] == "This method requires an authenticated user":
+                                            error_to_print = f'{domain} API requires authentication'
+                                            print(f'{MAGENTA}{error_to_print}{RESET}')
+                                            mark_ignore_domain(domain, conn)
+                                            delete_domain_if_known(domain, conn)
+                                            continue
+                                    if software_version.startswith("4"):
+                                        actual_domain_raw = backend_data['domain']
+                                        actual_domain = actual_domain_raw.lower()
+                                        contact_account_raw = backend_data['contact']['email']
+                                        contact_account = normalize_email(contact_account_raw).lower()
+                                        source_url = backend_data['source_url']
+                                    else:
+                                        actual_domain_raw = backend_data['uri']
+                                        actual_domain = actual_domain_raw.lower()
+                                        contact_account_raw = backend_data['email']
+                                        contact_account = normalize_email(contact_account_raw).lower()
+                                        source_url = find_code_repository(backend_domain)
+                                    if not is_valid_email(contact_account):
+                                        # Discard the value since it's not valid
+                                        contact_account = None
+
+                                    if source_url:
+                                        source_url = limit_url_depth(source_url)
+
+                                    if source_url == '/source.tar.gz':
+                                        source_url = 'https://' + actual_domain + source_url
+
+                                    if discovered_nodeinfo_data['software']['name'].lower() == 'hometown':
+                                        source_url = 'https://github.com/hometown-fork/hometown'
+
+                                    if actual_domain == "gc2.jp":
+                                        source_url = "https://github.com/gc2-jp/freespeech"
+
+                                print(f'{GREEN}{actual_domain} is running Mastodon v{software_version}{RESET}')
+
+                                if domain != actual_domain:
+                                        # First, check if a record exists for the initial domain
+                                        cursor.execute('''
+                                            SELECT COUNT(*) FROM MastodonDomains WHERE "Domain" = ?
+                                        ''', (domain,))
+                                        record_exists = cursor.fetchone()[0] > 0
+
+                                        if record_exists:
+                                            print(f'{MAGENTA}Deleting duplicate record for {domain} which is really {actual_domain}{RESET}')
+                                            # Delete the record associated with the initial domain
+                                            delete_domain_if_known(domain, conn)
+
+                                cursor.execute('''
+                                    INSERT INTO MastodonDomains ("Domain", "Software Version", "Total Users", "Active Users (Monthly)", "Timestamp", "Contact", "Source", "Full Version")
+                                    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                                    ON CONFLICT("Domain") DO UPDATE SET
+                                    "Software Version" = excluded."Software Version",
+                                    "Total Users" = excluded."Total Users",
+                                    "Active Users (Monthly)" = excluded."Active Users (Monthly)",
+                                    "Timestamp" = excluded."Timestamp",
+                                    "Contact" = excluded."Contact",
+                                    "Source" = excluded."Source",
+                                    "Full Version" = excluded."Full Version"
+                                ''', (actual_domain, software_version, total_users, active_month_users, datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S'), contact_account, source_url, software_version_full))
+                                conn.commit()
+                                clear_domain_error(domain, conn)
+                            else:
+                                print(f'{MAGENTA}{domain} is not using Mastodon{RESET}')
+                                mark_ignore_domain(domain, conn)
+                                delete_domain_if_known(domain, conn)
                         else:
-                            error_to_print = f'{domain} returned HTTP {wk_nodeinfo_response.status_code} @ {wk_nodeinfo_url}'
-                            if 400 <= wk_nodeinfo_response.status_code <= 499 and wk_nodeinfo_response.status_code != 404:
+                            error_to_print = f'{domain} returned HTTP {discovered_nodeinfo_response.status_code} @ {discovered_nodeinfo_url}'
+                            if 400 <= discovered_nodeinfo_response.status_code <= 499 and discovered_nodeinfo_response.status_code != 404:
                                 print(f'{RED}{error_to_print}{RESET}')
                                 mark_failed_domain(domain, conn)
                                 delete_domain_if_known(domain, conn)
@@ -612,206 +722,12 @@ def check_and_record_domains(domain_list, ignored_domains, failed_domains, user_
                                 print(f'{YELLOW}{error_to_print}{RESET}')
                                 with open(error_file, 'a') as file:
                                     file.write(error_to_print + '\n')
-                                error_reason = wk_nodeinfo_response.status_code
+                                error_reason = discovered_nodeinfo_response.status_code
                                 increment_domain_error(domain, conn, error_reason)
-                            continue
-
-                    if 'code' in data and (data['code'] == 'rest_no_route' or data['code'] == 'rest_not_logged_in' or data['code'] == 'rest_forbidden' or data['code'] == 'rest_user_invalid' or data['code'] == 'rest_login_required'):
-                        error_to_print = f'{domain} has restricted nodeinfo'
-                        print(f'{MAGENTA}{error_to_print}{RESET}')
-                        mark_ignore_domain(domain, conn)
-                        delete_domain_if_known(domain, conn)
-                        continue
-
-                    if 'error' in data and data['error'] == 'Restricted':
-                        error_to_print = f'{domain} has restricted nodeinfo'
-                        print(f'{MAGENTA}{error_to_print}{RESET}')
-                        mark_ignore_domain(domain, conn)
-                        delete_domain_if_known(domain, conn)
-                        continue
-
-                    if 'links' in data and len(data['links']) > 0 and 'href' in data['links'][0]:
-                        discovered_nodeinfo_url = data['links'][0]['href']
-
-                        if 'wp-json' in discovered_nodeinfo_url:
-                            error_to_print = f'{domain} is not using Mastodon'
-                            print(f'{MAGENTA}{error_to_print}{RESET}')
-                            mark_ignore_domain(domain, conn)
-                            delete_domain_if_known(domain, conn)
-                            continue
-
-                        with requests.get(discovered_nodeinfo_url, headers=custom_headers, timeout=5) as discovered_nodeinfo_response:
-                            if discovered_nodeinfo_response.status_code == 200:
-                                content_type = discovered_nodeinfo_response.headers.get('Content-Type', '')
-                                if 'application/json' not in content_type:
-                                    if 'application/activity+json' in content_type:
-                                        error_to_print = f'{domain} is not using Mastodon'
-                                        print(f'{MAGENTA}{error_to_print}{RESET}')
-                                        mark_ignore_domain(domain, conn)
-                                        delete_domain_if_known(domain, conn)
-                                        continue
-                                    else:
-                                        error_to_print = f'{domain} did not return JSON @ {discovered_nodeinfo_url}'
-                                        print(f'{YELLOW}{error_to_print}{RESET}')
-                                        with open(error_file, 'a') as file:
-                                            file.write(error_to_print + '\n')
-                                        error_reason = 'JSON'
-                                        increment_domain_error(domain, conn, error_reason)
-                                        continue
-                                discovered_nodeinfo_data = discovered_nodeinfo_response.json()
-
-                                if discovered_nodeinfo_data['software']['name'].lower() == 'mastodon' or discovered_nodeinfo_data['software']['name'].lower() == 'hometown' or discovered_nodeinfo_data['software']['name'].lower() == 'kmyblue' or discovered_nodeinfo_data['software']['name'].lower() == 'glitchcafe':
-                                    parsed_url = urlparse(discovered_nodeinfo_url)
-                                    backend_domain = parsed_url.netloc
-
-                                    software_version_full = discovered_nodeinfo_data['software']['version']
-                                    if isinstance(software_version_full, str):
-                                        # Remove any unwanted or invalid suffixes from the version string
-                                        software_version = clean_version_suffix(software_version_full)
-
-                                    software_version = clean_version_date(software_version)
-                                    software_version = clean_version_suffix_more(software_version)
-                                    software_version = clean_version_hometown(software_version)
-                                    software_version = clean_version_development(software_version)
-                                    software_version = check_version_wrongpatch(software_version)
-                                    software_version = clean_version_doubledash(software_version)
-                                    # rewrite dumb data
-                                    # if software_version.startswith("4.2.10"):
-                                    #     software_version = "4.2.10"
-
-                                    total_users = discovered_nodeinfo_data['usage']['users']['total']
-                                    active_month_users = discovered_nodeinfo_data['usage']['users']['activeMonth']
-
-                                    if active_month_users > max(total_users + 6, total_users + (total_users * 0.25)):
-                                        error_to_print = f'{domain} is running Mastodon v{software_version} with invalid counts ({active_month_users}:{total_users})'
-                                        print(f'{PINK}{error_to_print}{RESET}')
-                                        with open(error_file, 'a') as file:
-                                            file.write(error_to_print + '\n')
-                                        error_reason = '###'
-                                        increment_domain_error(domain, conn, error_reason)
-                                        delete_domain_if_known(domain, conn)
-                                        continue
-
-                                    if software_version.startswith("4"):
-                                        backend_url = f'https://{backend_domain}/api/v2/instance'
-                                    else:
-                                        backend_url = f'https://{backend_domain}/api/v1/instance'
-
-                                    with requests.get(backend_url, headers=custom_headers, timeout=5) as backend_response:
-                                        content_type = backend_response.headers.get('Content-Type', '')
-                                        if 'application/json' not in content_type:
-                                            if backend_response.status_code != 200:
-                                                error_to_print = f'{domain} API is unhealthy'
-                                                print(f'{YELLOW}{error_to_print}{RESET}')
-                                                with open(error_file, 'a') as file:
-                                                    file.write(error_to_print + '\n')
-                                                error_reason = 'API'
-                                                increment_domain_error(domain, conn, error_reason)
-                                                continue
-                                            error_to_print = f'{domain} API did not return JSON @ {backend_url}'
-                                            print(f'{YELLOW}{error_to_print}{RESET}')
-                                            with open(error_file, 'a') as file:
-                                                file.write(error_to_print + '\n')
-                                            error_reason = 'JSON'
-                                            increment_domain_error(domain, conn, error_reason)
-                                            continue
-                                        backend_data = backend_response.json()
-                                        if 'error' in backend_data:
-                                            if backend_data['error'] == "This method requires an authenticated user":
-                                                error_to_print = f'{domain} API requires authentication'
-                                                print(f'{MAGENTA}{error_to_print}{RESET}')
-                                                mark_ignore_domain(domain, conn)
-                                                delete_domain_if_known(domain, conn)
-                                                continue
-                                        if software_version.startswith("4"):
-                                            actual_domain_raw = backend_data['domain']
-                                            actual_domain = actual_domain_raw.lower()
-                                            contact_account_raw = backend_data['contact']['email']
-                                            contact_account = normalize_email(contact_account_raw).lower()
-                                            source_url = backend_data['source_url']
-                                        else:
-                                            actual_domain_raw = backend_data['uri']
-                                            actual_domain = actual_domain_raw.lower()
-                                            contact_account_raw = backend_data['email']
-                                            contact_account = normalize_email(contact_account_raw).lower()
-                                            source_url = find_code_repository(backend_domain)
-                                        if not is_valid_email(contact_account):
-                                            # Discard the value since it's not valid
-                                            contact_account = None
-
-                                        if source_url:
-                                            source_url = limit_url_depth(source_url)
-
-                                        if source_url == '/source.tar.gz':
-                                            source_url = 'https://' + actual_domain + source_url
-
-                                        if discovered_nodeinfo_data['software']['name'].lower() == 'hometown':
-                                            source_url = 'https://github.com/hometown-fork/hometown'
-
-                                        if actual_domain == "gc2.jp":
-                                            source_url = "https://github.com/gc2-jp/freespeech"
-
-                                    print(f'{GREEN}{actual_domain} is running Mastodon v{software_version}{RESET}')
-
-                                    if domain != actual_domain:
-                                            # First, check if a record exists for the initial domain
-                                            cursor.execute('''
-                                                SELECT COUNT(*) FROM MastodonDomains WHERE "Domain" = ?
-                                            ''', (domain,))
-                                            record_exists = cursor.fetchone()[0] > 0
-
-                                            if record_exists:
-                                                print(f'{MAGENTA}Deleting duplicate record for {domain} which is really {actual_domain}{RESET}')
-                                                # Delete the record associated with the initial domain
-                                                delete_domain_if_known(domain, conn)
-
-                                    cursor.execute('''
-                                        INSERT INTO MastodonDomains ("Domain", "Software Version", "Total Users", "Active Users (Monthly)", "Timestamp", "Contact", "Source", "Full Version")
-                                        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-                                        ON CONFLICT("Domain") DO UPDATE SET
-                                        "Software Version" = excluded."Software Version",
-                                        "Total Users" = excluded."Total Users",
-                                        "Active Users (Monthly)" = excluded."Active Users (Monthly)",
-                                        "Timestamp" = excluded."Timestamp",
-                                        "Contact" = excluded."Contact",
-                                        "Source" = excluded."Source",
-                                        "Full Version" = excluded."Full Version"
-                                    ''', (actual_domain, software_version, total_users, active_month_users, datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S'), contact_account, source_url, software_version_full))
-                                    conn.commit()
-                                    clear_domain_error(domain, conn)
-                                else:
-                                    print(f'{MAGENTA}{domain} is not using Mastodon{RESET}')
-                                    mark_ignore_domain(domain, conn)
-                                    delete_domain_if_known(domain, conn)
-                            else:
-                                error_to_print = f'{domain} returned HTTP {discovered_nodeinfo_response.status_code} @ {discovered_nodeinfo_url}'
-                                if 400 <= discovered_nodeinfo_response.status_code <= 499 and discovered_nodeinfo_response.status_code != 404:
-                                    print(f'{RED}{error_to_print}{RESET}')
-                                    mark_failed_domain(domain, conn)
-                                    delete_domain_if_known(domain, conn)
-                                else:
-                                    print(f'{YELLOW}{error_to_print}{RESET}')
-                                    with open(error_file, 'a') as file:
-                                        file.write(error_to_print + '\n')
-                                    error_reason = discovered_nodeinfo_response.status_code
-                                    increment_domain_error(domain, conn, error_reason)
-                    else:
-                        print(f'{MAGENTA}{domain} is not using Mastodon{RESET}')
-                        mark_ignore_domain(domain, conn)
-                        delete_domain_if_known(domain, conn)
-                elif hostmeta_response.status_code == 410:
-                    error_to_print = f'{domain} returned HTTP {hostmeta_response.status_code} @ {hostmeta_url}'
-                    print(f'{RED}{error_to_print}{RESET}')
-                    mark_failed_domain(domain, conn)
-                    delete_domain_if_known(domain, conn)
-                # temporary end
                 else:
-                    error_to_print = f'{domain} returned HTTP {hostmeta_response.status_code} @ {hostmeta_url}'
-                    print(f'{YELLOW}{error_to_print}{RESET}')
-                    with open(error_file, 'a') as file:
-                        file.write(error_to_print + '\n')
-                    error_reason = hostmeta_response.status_code
-                    increment_domain_error(domain, conn, error_reason)
+                    print(f'{MAGENTA}{domain} is not using Mastodon{RESET}')
+                    mark_ignore_domain(domain, conn)
+                    delete_domain_if_known(domain, conn)
 
         except requests.exceptions.ConnectionError as e:
             dns_result = resolve_dns_with_dnspython(domain)
@@ -1007,6 +923,8 @@ def load_from_database(user_choice):
         ;
         """
         cursor.execute(query)
+    elif user_choice == "23":
+        cursor.execute("SELECT Domain FROM RawDomains WHERE Reason = 'TXT' ORDER BY Domain")
     else:
         cursor.execute("SELECT Domain FROM RawDomains WHERE (Failed IS NULL OR Failed = '' OR Failed = '0') AND (Ignore IS NULL OR Ignore = '' OR Ignore = '0') AND (Errors < 6 OR Errors IS NULL) ORDER BY Domain ASC")
     domain_list = [row[0].strip() for row in cursor.fetchall() if row[0].strip()]
