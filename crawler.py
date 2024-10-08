@@ -35,11 +35,11 @@ PURPLE = '\033[94m'
 RESET = '\033[0m'
 
 print(f'{BOLD}{APPNAME} v{VERSION}{RESET}')
-print(f'{BOLD}Alter direction:{RESET} 2=Reverse 3=Random')
-print(f'{BOLD}Retry general errors:{RESET} 4=Overflow 5=Underflow')
-print(f'{BOLD}Retry specific errors:{RESET} 9=SSL 10=DNS 11=### 12=HTTP 13=400-599 15=??? 16=API 17=JSON 23=TXT')
-print(f'{BOLD}Retry fatal errors:{RESET} 7=Ignored 14=Failed')
-print(f'{BOLD}Retry good data:{RESET} 6=Stale 8=Outdated 21=Inactive 22=Main')
+print(f'{PINK}Alter direction:{RESET} 2=Reverse 3=Random')
+print(f'{PINK}Retry general errors:{RESET} 4=Overflow 5=Underflow')
+print(f'{PINK}Retry specific errors:{RESET} 9=SSL 10=DNS 11=### 12=HTTP 13=400-599 15=??? 16=API 17=JSON 18=404 23=TXT')
+print(f'{PINK}Retry fatal errors:{RESET} 7=Ignored 14=Failed')
+print(f'{PINK}Retry good data:{RESET} 6=Stale 8=Outdated 21=Inactive 22=Main')
 print(f'{BOLD}Enter your choice (1, 2, 3, etc):{RESET} ', end='', flush=True)
 ready, _, _ = select.select([sys.stdin], [], [], 5)  # Wait for input for 5 seconds
 
@@ -282,6 +282,13 @@ def clean_version_doubledash(software_version):
 
     return software_version
 
+def clean_version_oddballs(domain, software_version):
+    oddballs = ['exquisite.social', 'bark.lgbt', 'drk.st', 'sharlayan.in', 'glitch.taks.garden']
+    if domain in oddballs:
+        software_version = software_version + "-odd.0"
+
+    return software_version
+
 def check_version_wrongpatch(software_version):
     # Regular expression to match the version format X.Y.Z optionally followed by a dash and additional data
     match = re.match(r'^(\d+)\.(\d+)\.(\d+)(-.+)?$', software_version)
@@ -446,7 +453,36 @@ def check_and_record_domains(domain_list, ignored_domains, failed_domains, user_
                     continue
 
             with requests.get(webfinger_url, headers=custom_headers, timeout=5) as webfinger_response:
-                if webfinger_response.status_code == 200:
+                if webfinger_response.status_code == 404:
+                    content_type = webfinger_response.headers.get('Content-Type', '')
+                    if 'application/jrd+json' in content_type or 'application/json' in content_type or 'application/activity+json' in content_type :
+                        try:
+                            # Try to parse the webfinger_response content as JSON
+                            data = json.loads(webfinger_response.text)
+                            data = webfinger_response.json()
+
+                            error_to_print = f'{domain} is not using Mastodon'
+                            print(f'{MAGENTA}{error_to_print}{RESET}')
+                            mark_ignore_domain(domain, conn)
+                            delete_domain_if_known(domain, conn)
+                            continue
+                        except json.JSONDecodeError:
+                            error_to_print = f'{domain} JSON from HTTP {webfinger_response.status_code} is invalid (webfinger)'
+                            print(f'{YELLOW}{error_to_print}{RESET}')
+                            with open(error_file, 'a') as file:
+                                file.write(error_to_print + '\n')
+                            error_reason = 'JSON'
+                            increment_domain_error(domain, conn, error_reason)
+                            continue
+                    else:
+                        error_to_print = f'{domain} returned HTTP {webfinger_response.status_code} (webfinger)'
+                        print(f'{CYAN}{error_to_print}{RESET}')
+                        with open(error_file, 'a') as file:
+                            file.write(error_to_print + '\n')
+                        error_reason = webfinger_response.status_code
+                        increment_domain_error(domain, conn, error_reason)
+                        continue
+                elif webfinger_response.status_code == 200:
                     try:
                         # Try to parse the webfinger_response content as JSON
                         data = json.loads(webfinger_response.text)
@@ -455,7 +491,7 @@ def check_and_record_domains(domain_list, ignored_domains, failed_domains, user_
                         content_type = webfinger_response.headers.get('Content-Type', '')
                         if 'application/jrd+json' in content_type or 'application/json' in content_type or 'application/activity+json' in content_type :
                             webfinger_url_trimmed = webfinger_url.split('?')[0]
-                            error_to_print = f'{domain} Webfinger JSON is invalid'
+                            error_to_print = f'{domain} JSON is invalid (webfinger)'
                             print(f'{YELLOW}{error_to_print}{RESET}')
                             with open(error_file, 'a') as file:
                                 file.write(error_to_print + '\n')
@@ -464,7 +500,7 @@ def check_and_record_domains(domain_list, ignored_domains, failed_domains, user_
                             continue
                         elif not webfinger_response.content:
                             webfinger_url_trimmed = webfinger_url.split('?')[0]
-                            error_to_print = f'{domain} Webfinger JSON is empty'
+                            error_to_print = f'{domain} JSON is empty (webfinger)'
                             print(f'{YELLOW}{error_to_print}{RESET}')
                             with open(error_file, 'a') as file:
                                 file.write(error_to_print + '\n')
@@ -474,7 +510,7 @@ def check_and_record_domains(domain_list, ignored_domains, failed_domains, user_
                         elif content_type != '':
                             webfinger_url_trimmed = webfinger_url.split('?')[0]
                             content_type_strip = content_type.split(';')[0].strip()
-                            error_to_print = f'{domain} Webfinger JSON is {content_type_strip}'
+                            error_to_print = f'{domain} JSON is {content_type_strip} (webfinger)'
                             print(f'{YELLOW}{error_to_print}{RESET}')
                             with open(error_file, 'a') as file:
                                 file.write(error_to_print + '\n')
@@ -483,7 +519,7 @@ def check_and_record_domains(domain_list, ignored_domains, failed_domains, user_
                             continue
                         else:
                             webfinger_url_trimmed = webfinger_url.split('?')[0]
-                            error_to_print = f'{domain} Webfinger JSON is fucked'
+                            error_to_print = f'{domain} JSON is fucked (webfinger)'
                             print(f'{YELLOW}{error_to_print}{RESET}')
                             with open(error_file, 'a') as file:
                                 file.write(error_to_print + '\n')
@@ -509,7 +545,7 @@ def check_and_record_domains(domain_list, ignored_domains, failed_domains, user_
                     continue
                 else:
                     # real_domain = domain
-                    error_to_print = f'{domain} Webfinger returned HTTP {webfinger_response.status_code}'
+                    error_to_print = f'{domain} returned HTTP {webfinger_response.status_code} (webfinger)'
                     print(f'{CYAN}{error_to_print}{RESET}')
                     with open(error_file, 'a') as file:
                         file.write(error_to_print + '\n')
@@ -526,7 +562,7 @@ def check_and_record_domains(domain_list, ignored_domains, failed_domains, user_
                     except json.JSONDecodeError:
                         content_type = wk_nodeinfo_response.headers.get('Content-Type', '')
                         if 'application/jrd+json' in content_type or 'application/json' in content_type or 'application/activity+json' in content_type :
-                            error_to_print = f'{domain} Nodeinfo JSON is invalid'
+                            error_to_print = f'{domain} JSON is invalid (nodeinfo)'
                             print(f'{YELLOW}{error_to_print}{RESET}')
                             with open(error_file, 'a') as file:
                                 file.write(error_to_print + '\n')
@@ -534,7 +570,7 @@ def check_and_record_domains(domain_list, ignored_domains, failed_domains, user_
                             increment_domain_error(domain, conn, error_reason)
                             continue
                         elif not wk_nodeinfo_response.content:
-                            error_to_print = f'{domain} Nodeinfo JSON is empty'
+                            error_to_print = f'{domain} JSON is empty (nodeinfo)'
                             print(f'{YELLOW}{error_to_print}{RESET}')
                             with open(error_file, 'a') as file:
                                 file.write(error_to_print + '\n')
@@ -543,7 +579,7 @@ def check_and_record_domains(domain_list, ignored_domains, failed_domains, user_
                             continue
                         elif content_type != '':
                             content_type_strip = content_type.split(';')[0].strip()
-                            error_to_print = f'{domain} Nodeinfo JSON is {content_type_strip}'
+                            error_to_print = f'{domain} JSON is {content_type_strip} (nodeinfo)'
                             print(f'{YELLOW}{error_to_print}{RESET}')
                             with open(error_file, 'a') as file:
                                 file.write(error_to_print + '\n')
@@ -551,15 +587,21 @@ def check_and_record_domains(domain_list, ignored_domains, failed_domains, user_
                             increment_domain_error(domain, conn, error_reason)
                             continue
                         else:
-                            error_to_print = f'{domain} Nodeinfo JSON is fucked'
+                            error_to_print = f'{domain} JSON is fucked (nodeinfo)'
                             print(f'{YELLOW}{error_to_print}{RESET}')
                             with open(error_file, 'a') as file:
                                 file.write(error_to_print + '\n')
                             error_reason = 'JSON'
                             increment_domain_error(domain, conn, error_reason)
                             continue
+                elif wk_nodeinfo_response.status_code == 404:
+                    error_to_print = f'{domain} is not using Mastodon'
+                    print(f'{MAGENTA}{error_to_print}{RESET}')
+                    mark_ignore_domain(domain, conn)
+                    delete_domain_if_known(domain, conn)
+                    continue
                 else:
-                    error_to_print = f'{domain} Nodeinfo returned HTTP {wk_nodeinfo_response.status_code}'
+                    error_to_print = f'{domain} returned HTTP {wk_nodeinfo_response.status_code} (nodeinfo)'
                     print(f'{CYAN}{error_to_print}{RESET}')
                     with open(error_file, 'a') as file:
                         file.write(error_to_print + '\n')
@@ -568,7 +610,7 @@ def check_and_record_domains(domain_list, ignored_domains, failed_domains, user_
                     continue
 
                 if ('code' in data and data['code'] in ['rest_no_route', 'rest_not_logged_in', 'rest_forbidden', 'rest_user_invalid', 'rest_login_required']) or ('error' in data and data['error'] == 'Restricted'):
-                    error_to_print = f'{domain} has restricted Nodeinfo'
+                    error_to_print = f'{domain} is restricted (nodeinfo)'
                     print(f'{MAGENTA}{error_to_print}{RESET}')
                     mark_ignore_domain(domain, conn)
                     delete_domain_if_known(domain, conn)
@@ -595,7 +637,7 @@ def check_and_record_domains(domain_list, ignored_domains, failed_domains, user_
                                     delete_domain_if_known(domain, conn)
                                     continue
                                 else:
-                                    error_to_print = f'{domain} did not return JSON @ {discovered_nodeinfo_url}'
+                                    error_to_print = f'{domain} did not return application/activity+json @ {discovered_nodeinfo_url}'
                                     print(f'{YELLOW}{error_to_print}{RESET}')
                                     with open(error_file, 'a') as file:
                                         file.write(error_to_print + '\n')
@@ -619,6 +661,7 @@ def check_and_record_domains(domain_list, ignored_domains, failed_domains, user_
                                 software_version = clean_version_development(software_version)
                                 software_version = check_version_wrongpatch(software_version)
                                 software_version = clean_version_doubledash(software_version)
+                                software_version = clean_version_oddballs(domain, software_version)
                                 # rewrite dumb data
                                 # if software_version.startswith("4.2.10"):
                                 #     software_version = "4.2.10"
@@ -645,7 +688,7 @@ def check_and_record_domains(domain_list, ignored_domains, failed_domains, user_
                                     content_type = backend_response.headers.get('Content-Type', '')
                                     if 'application/json' not in content_type:
                                         if backend_response.status_code != 200 and backend_response.status_code != 410:
-                                            error_to_print = f'{domain} API returned HTTP {backend_response.status_code}'
+                                            error_to_print = f'{domain} returned HTTP {backend_response.status_code} (API)'
                                             print(f'{CYAN}{error_to_print}{RESET}')
                                             with open(error_file, 'a') as file:
                                                 file.write(error_to_print + '\n')
@@ -653,12 +696,12 @@ def check_and_record_domains(domain_list, ignored_domains, failed_domains, user_
                                             increment_domain_error(domain, conn, error_reason)
                                             continue
                                         elif backend_response.status_code == 410:
-                                            print(f'{RED}{domain} API returned HTTP {backend_response.status_code}{RESET}')
+                                            print(f'{RED}{domain} returned HTTP {backend_response.status_code} (API){RESET}')
                                             mark_failed_domain(domain, conn)
                                             delete_domain_if_known(domain, conn)
                                             continue
 
-                                        error_to_print = f'{domain} API did not return JSON @ {backend_url}'
+                                        error_to_print = f'{domain} did not return JSON (API)'
                                         print(f'{YELLOW}{error_to_print}{RESET}')
                                         with open(error_file, 'a') as file:
                                             file.write(error_to_print + '\n')
@@ -668,7 +711,7 @@ def check_and_record_domains(domain_list, ignored_domains, failed_domains, user_
                                     backend_data = backend_response.json()
                                     if 'error' in backend_data:
                                         if backend_data['error'] == "This method requires an authenticated user":
-                                            error_to_print = f'{domain} API requires authentication'
+                                            error_to_print = f'{domain} requires authentication (API)'
                                             print(f'{MAGENTA}{error_to_print}{RESET}')
                                             mark_ignore_domain(domain, conn)
                                             delete_domain_if_known(domain, conn)
@@ -911,10 +954,9 @@ def load_from_database(user_choice):
         FROM MastodonDomains
         WHERE
             "Software Version" NOT LIKE '4.4.0%' AND
-            "Software Version" NOT LIKE '4.3.0-nightly.2024-10%' AND
-            "Software Version" NOT LIKE '4.3.0-rc.1%' AND
-            "Software Version" NOT LIKE '4.2.13%' AND
-            "Software Version" NOT LIKE '4.1.20%'
+            "Software Version" NOT LIKE '4.3.0' AND
+            "Software Version" NOT LIKE '4.2.13' AND
+            "Software Version" NOT LIKE '4.1.20'
         ORDER BY "Total Users" DESC
         ;
         """
@@ -936,7 +978,9 @@ def load_from_database(user_choice):
     elif user_choice == "16":
         cursor.execute("SELECT Domain FROM RawDomains WHERE Reason = 'API' ORDER BY Domain")
     elif user_choice == "17":
-        cursor.execute("SELECT Domain FROM RawDomains WHERE Reason = 'JSON' ORDER BY Domain")
+        cursor.execute("SELECT Domain FROM RawDomains WHERE Reason = 'JSON' ORDER BY Domain DESC")
+    elif user_choice == "18":
+        cursor.execute("SELECT Domain FROM RawDomains WHERE Reason LIKE '%404%' ORDER BY Domain")
     elif user_choice == "21":
         cursor.execute('SELECT Domain FROM MastodonDomains WHERE "Active Users (Monthly)" = 0 ORDER BY Domain')
     elif user_choice == "22":
