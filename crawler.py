@@ -525,7 +525,7 @@ def check_and_record_domains(domain_list, ignored_domains, failed_domains, user_
                     except json.JSONDecodeError:
                         content_type = wk_nodeinfo_response.headers.get('Content-Type', '')
                         if 'application/jrd+json' in content_type or 'application/json' in content_type or 'application/activity+json' in content_type :
-                            error_to_print = f'{domain} JSON is invalid @ {wk_nodeinfo_url}'
+                            error_to_print = f'{domain} Nodeinfo JSON is invalid'
                             print(f'{YELLOW}{error_to_print}{RESET}')
                             with open(error_file, 'a') as file:
                                 file.write(error_to_print + '\n')
@@ -533,7 +533,7 @@ def check_and_record_domains(domain_list, ignored_domains, failed_domains, user_
                             increment_domain_error(domain, conn, error_reason)
                             continue
                         elif not wk_nodeinfo_response.content:
-                            error_to_print = f'{domain} JSON is empty @ {wk_nodeinfo_url}'
+                            error_to_print = f'{domain} Nodeinfo JSON is empty'
                             print(f'{YELLOW}{error_to_print}{RESET}')
                             with open(error_file, 'a') as file:
                                 file.write(error_to_print + '\n')
@@ -542,7 +542,7 @@ def check_and_record_domains(domain_list, ignored_domains, failed_domains, user_
                             continue
                         elif content_type != '':
                             content_type_strip = content_type.split(';')[0].strip()
-                            error_to_print = f'{domain} JSON is {content_type_strip} @ {wk_nodeinfo_url}'
+                            error_to_print = f'{domain} Nodeinfo JSON is {content_type_strip}'
                             print(f'{YELLOW}{error_to_print}{RESET}')
                             with open(error_file, 'a') as file:
                                 file.write(error_to_print + '\n')
@@ -550,7 +550,7 @@ def check_and_record_domains(domain_list, ignored_domains, failed_domains, user_
                             increment_domain_error(domain, conn, error_reason)
                             continue
                         else:
-                            error_to_print = f'{domain} JSON is fucked @ {wk_nodeinfo_url}'
+                            error_to_print = f'{domain} Nodeinfo JSON is fucked'
                             print(f'{YELLOW}{error_to_print}{RESET}')
                             with open(error_file, 'a') as file:
                                 file.write(error_to_print + '\n')
@@ -558,7 +558,7 @@ def check_and_record_domains(domain_list, ignored_domains, failed_domains, user_
                             increment_domain_error(domain, conn, error_reason)
                             continue
                 else:
-                    error_to_print = f'{domain} returned HTTP {wk_nodeinfo_response.status_code} @ {wk_nodeinfo_url}'
+                    error_to_print = f'{domain} Nodeinfo returned HTTP {wk_nodeinfo_response.status_code}'
                     print(f'{YELLOW}{error_to_print}{RESET}')
                     with open(error_file, 'a') as file:
                         file.write(error_to_print + '\n')
@@ -567,7 +567,7 @@ def check_and_record_domains(domain_list, ignored_domains, failed_domains, user_
                     continue
 
                 if ('code' in data and data['code'] in ['rest_no_route', 'rest_not_logged_in', 'rest_forbidden', 'rest_user_invalid', 'rest_login_required']) or ('error' in data and data['error'] == 'Restricted'):
-                    error_to_print = f'{domain} has restricted nodeinfo'
+                    error_to_print = f'{domain} has restricted Nodeinfo'
                     print(f'{MAGENTA}{error_to_print}{RESET}')
                     mark_ignore_domain(domain, conn)
                     delete_domain_if_known(domain, conn)
@@ -643,14 +643,20 @@ def check_and_record_domains(domain_list, ignored_domains, failed_domains, user_
                                 with requests.get(backend_url, headers=custom_headers, timeout=5) as backend_response:
                                     content_type = backend_response.headers.get('Content-Type', '')
                                     if 'application/json' not in content_type:
-                                        if backend_response.status_code != 200:
-                                            error_to_print = f'{domain} API is unhealthy'
+                                        if backend_response.status_code != 200 and backend_response.status_code != 410:
+                                            error_to_print = f'{domain} API returned HTTP {backend_response.status_code}'
                                             print(f'{YELLOW}{error_to_print}{RESET}')
                                             with open(error_file, 'a') as file:
                                                 file.write(error_to_print + '\n')
                                             error_reason = 'API'
                                             increment_domain_error(domain, conn, error_reason)
                                             continue
+                                        elif backend_response.status_code == 410:
+                                            print(f'{RED}{domain} API returned HTTP {backend_response.status_code}{RESET}')
+                                            mark_failed_domain(domain, conn)
+                                            delete_domain_if_known(domain, conn)
+                                            continue
+
                                         error_to_print = f'{domain} API did not return JSON @ {backend_url}'
                                         print(f'{YELLOW}{error_to_print}{RESET}')
                                         with open(error_file, 'a') as file:
