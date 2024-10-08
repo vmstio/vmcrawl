@@ -36,11 +36,11 @@ RESET = '\033[0m'
 
 print(f'{BOLD}{APPNAME} v{VERSION}{RESET}')
 print(f'{PINK}Alter direction:{RESET} 2=Reverse 3=Random')
-print(f'{PINK}Retry general errors:{RESET} 4=Overflow 5=Underflow')
-print(f'{PINK}Retry specific errors:{RESET} 9=SSL 10=DNS 11=### 15=??? 16=API 17=JSON 23=TXT')
-print(f'{PINK}Retry HTTP errors:{RESET} 12=HTTP 13=400-599 403=403 404=404 406=406')
-print(f'{PINK}Retry fatal errors:{RESET} 7=Ignored 14=Failed')
-print(f'{PINK}Retry good data:{RESET} 6=Stale 8=Outdated 21=Inactive 22=Main')
+print(f'{YELLOW}Retry general errors:{RESET} 4=Overflow 5=Underflow')
+print(f'{ORANGE}Retry specific errors:{RESET} 9=SSL 10=DNS 11=### 15=??? 16=API 17=JSON 23=TXT')
+print(f'{CYAN}Retry HTTP errors:{RESET} 12=HTTP 13=400-599 202=202 403=403 404=404 406=406')
+print(f'{RED}Retry fatal errors:{RESET} 7=Ignored 14=Failed')
+print(f'{GREEN}Retry good data:{RESET} 6=Stale 8=Outdated 21=Inactive 22=Main')
 print(f'{BOLD}Enter your choice (1, 2, 3, etc):{RESET} ', end='', flush=True)
 ready, _, _ = select.select([sys.stdin], [], [], 5)  # Wait for input for 5 seconds
 
@@ -439,6 +439,12 @@ def check_and_record_domains(domain_list, ignored_domains, failed_domains, user_
                         error_reason = 'TXT'
                         increment_domain_error(domain, conn, error_reason)
                         continue
+                elif robots_response.status_code == 202:
+                    if 'sgcaptcha' in robots_response.text:
+                        print(f'{RED}{domain} returned CAPTCHA{RESET}')
+                        mark_ignore_domain(domain, conn)
+                        delete_domain_if_known(domain, conn)
+                        continue
                 elif robots_response.status_code == 403:
                     custom_headers = {
                         'User-Agent': default_user_agent,
@@ -535,6 +541,12 @@ def check_and_record_domains(domain_list, ignored_domains, failed_domains, user_
                         continue
                     webfinger_domain = urlparse(first_webfinger_alias)
                     real_domain = webfinger_domain.netloc
+                elif webfinger_response.status_code == 202:
+                    if 'sgcaptcha' in webfinger_response.text:
+                        print(f'{MAGENTA}{domain} returned CAPTCHA{RESET}')
+                        mark_ignore_domain(domain, conn)
+                        delete_domain_if_known(domain, conn)
+                        continue
                 elif webfinger_response.status_code == 403:
                     error_to_print = f'{domain} is HTTP {webfinger_response.status_code} restricted (webfinger)'
                     print(f'{MAGENTA}{error_to_print}{RESET}')
@@ -597,6 +609,12 @@ def check_and_record_domains(domain_list, ignored_domains, failed_domains, user_
                             error_reason = 'JSON'
                             increment_domain_error(domain, conn, error_reason)
                             continue
+                elif wk_nodeinfo_response.status_code == 202:
+                    if 'sgcaptcha' in wk_nodeinfo_response.text:
+                        print(f'{MAGENTA}{domain} returned CAPTCHA{RESET}')
+                        mark_ignore_domain(domain, conn)
+                        delete_domain_if_known(domain, conn)
+                        continue
                 elif wk_nodeinfo_response.status_code == 403:
                     error_to_print = f'{domain} is HTTP {wk_nodeinfo_response.status_code} restricted (nodeinfo)'
                     print(f'{MAGENTA}{error_to_print}{RESET}')
@@ -685,7 +703,7 @@ def check_and_record_domains(domain_list, ignored_domains, failed_domains, user_
 
                                 if active_month_users > max(total_users + 6, total_users + (total_users * 0.25)):
                                     error_to_print = f'{domain} is running Mastodon v{software_version} with invalid counts ({active_month_users}:{total_users})'
-                                    print(f'{PINK}{error_to_print}{RESET}')
+                                    print(f'{YELLOW}{error_to_print}{RESET}')
                                     with open(error_file, 'a') as file:
                                         file.write(error_to_print + '\n')
                                     error_reason = '###'
@@ -821,7 +839,7 @@ def check_and_record_domains(domain_list, ignored_domains, failed_domains, user_
                 continue
             elif dns_result is None:
                 error_to_print = f'{domain} DNS query failed'
-                print(f'{PURPLE}{error_to_print}{RESET}')
+                print(f'{ORANGE}{error_to_print}{RESET}')
                 with open(error_file, 'a') as file:
                     file.write(error_to_print + '\n')
                 error_reason = 'DNS'
@@ -913,7 +931,7 @@ def check_and_record_domains(domain_list, ignored_domains, failed_domains, user_
                     error_reason = 'HTTP'
                 else:
                     error_to_print = f'{domain} failed with unhandled error: {e}'
-                    print(f'{CYAN}{error_to_print}{RESET}')
+                    print(f'{ORANGE}{error_to_print}{RESET}')
                     error_reason = '???'
                 with open(error_file, 'a') as file:
                     file.write(error_to_print + '\n')
@@ -942,7 +960,7 @@ def check_and_record_domains(domain_list, ignored_domains, failed_domains, user_
                 delete_domain_if_known(domain, conn)
             else:
                 error_to_print = f'{domain} encountered an unexpected error: {e}'
-                print(f'{CYAN}{error_to_print}{RESET}')
+                print(f'{YELLOW}{error_to_print}{RESET}')
                 with open(error_file, 'a') as file:
                     file.write(error_to_print + '\n')
                 error_reason = '???'
@@ -1011,6 +1029,8 @@ def load_from_database(user_choice):
         cursor.execute(query)
     elif user_choice == "23":
         cursor.execute("SELECT Domain FROM RawDomains WHERE Reason = 'TXT' ORDER BY Domain")
+    elif user_choice == "202":
+        cursor.execute("SELECT Domain FROM RawDomains WHERE Reason LIKE '%202%' ORDER BY Domain")
     elif user_choice == "403":
         cursor.execute("SELECT Domain FROM RawDomains WHERE Reason LIKE '%403%' ORDER BY Domain")
     elif user_choice == "404":
