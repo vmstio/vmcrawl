@@ -600,6 +600,11 @@ def check_and_record_domains(domain_list, ignored_domains, failed_domains, user_
                     mark_ignore_domain(domain, conn)
                     delete_domain_if_known(domain, conn)
                     continue
+                elif wk_nodeinfo_response.status_code == 410:
+                    print(f'{RED}{domain} returned HTTP {wk_nodeinfo_response.status_code}{RESET}')
+                    mark_failed_domain(domain, conn)
+                    delete_domain_if_known(domain, conn)
+                    continue
                 else:
                     error_to_print = f'{domain} returned HTTP {wk_nodeinfo_response.status_code} (nodeinfo)'
                     print(f'{CYAN}{error_to_print}{RESET}')
