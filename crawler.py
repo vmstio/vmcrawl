@@ -439,13 +439,6 @@ def check_and_record_domains(domain_list, ignored_domains, failed_domains, user_
                         error_reason = 'TXT'
                         increment_domain_error(domain, conn, error_reason)
                         continue
-
-                elif robots_response.status_code == 202:
-                    if 'sgcaptcha' in robots_response.text:
-                        print(f'{RED}{domain} returned CAPTCHA{RESET}')
-                        mark_failed_domain(domain, conn)
-                        delete_domain_if_known(domain, conn)
-                        continue
                 elif robots_response.status_code == 403:
                     custom_headers = {
                         'User-Agent': default_user_agent,
@@ -1019,7 +1012,7 @@ def load_from_database(user_choice):
     elif user_choice == "23":
         cursor.execute("SELECT Domain FROM RawDomains WHERE Reason = 'TXT' ORDER BY Domain")
     elif user_choice == "403":
-        cursor.execute("SELECT Domain FROM RawDomains WHERE Reason LIKE '%403%'' ORDER BY Domain")
+        cursor.execute("SELECT Domain FROM RawDomains WHERE Reason LIKE '%403%' ORDER BY Domain")
     elif user_choice == "404":
         cursor.execute("SELECT Domain FROM RawDomains WHERE Reason LIKE '%404%' ORDER BY Domain")
     elif user_choice == "406":
