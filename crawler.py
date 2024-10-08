@@ -381,7 +381,7 @@ def check_and_record_domains(domain_list, ignored_domains, failed_domains, user_
         loopback = False  # Reset the loopback variable
         for bad_tld in get_bad_tld(db_path):
             if domain.endswith(bad_tld):
-                print(f'{MAGENTA}{domain} is known bad TLD{RESET}')
+                print(f'{MAGENTA}{domain} has known bad TLD{RESET}')
                 mark_failed_domain(domain, conn)
                 delete_domain_if_known(domain, conn)
                 loopback = True
@@ -395,7 +395,7 @@ def check_and_record_domains(domain_list, ignored_domains, failed_domains, user_
             with requests.get(robots_url, headers=custom_headers, timeout=5) as robots_response:
                 if robots_response.status_code == 200:
                     if robots_response.headers.get('Content-Type', '') == 'application/octet-stream':
-                        error_to_print = f'{domain} returned binary file @ {robots_url}'
+                        error_to_print = f'{domain} returned binary file'
                         print(f'{YELLOW}{error_to_print}{RESET}')
                         with open(error_file, 'a') as file:
                             file.write(error_to_print + '\n')
@@ -454,7 +454,7 @@ def check_and_record_domains(domain_list, ignored_domains, failed_domains, user_
                         content_type = webfinger_response.headers.get('Content-Type', '')
                         if 'application/jrd+json' in content_type or 'application/json' in content_type or 'application/activity+json' in content_type :
                             webfinger_url_trimmed = webfinger_url.split('?')[0]
-                            error_to_print = f'{domain} JSON is invalid @ {webfinger_url_trimmed}'
+                            error_to_print = f'{domain} Webfinger JSON is invalid'
                             print(f'{YELLOW}{error_to_print}{RESET}')
                             with open(error_file, 'a') as file:
                                 file.write(error_to_print + '\n')
@@ -463,7 +463,7 @@ def check_and_record_domains(domain_list, ignored_domains, failed_domains, user_
                             continue
                         elif not webfinger_response.content:
                             webfinger_url_trimmed = webfinger_url.split('?')[0]
-                            error_to_print = f'{domain} JSON is empty @ {webfinger_url_trimmed}'
+                            error_to_print = f'{domain} Webfinger JSON is empty'
                             print(f'{YELLOW}{error_to_print}{RESET}')
                             with open(error_file, 'a') as file:
                                 file.write(error_to_print + '\n')
@@ -473,7 +473,7 @@ def check_and_record_domains(domain_list, ignored_domains, failed_domains, user_
                         elif content_type != '':
                             webfinger_url_trimmed = webfinger_url.split('?')[0]
                             content_type_strip = content_type.split(';')[0].strip()
-                            error_to_print = f'{domain} JSON is {content_type_strip} @ {webfinger_url_trimmed}'
+                            error_to_print = f'{domain} Webfinger JSON is {content_type_strip}'
                             print(f'{YELLOW}{error_to_print}{RESET}')
                             with open(error_file, 'a') as file:
                                 file.write(error_to_print + '\n')
@@ -482,7 +482,7 @@ def check_and_record_domains(domain_list, ignored_domains, failed_domains, user_
                             continue
                         else:
                             webfinger_url_trimmed = webfinger_url.split('?')[0]
-                            error_to_print = f'{domain} JSON is fucked @ {webfinger_url_trimmed}'
+                            error_to_print = f'{domain} Webfinger JSON is fucked'
                             print(f'{YELLOW}{error_to_print}{RESET}')
                             with open(error_file, 'a') as file:
                                 file.write(error_to_print + '\n')
@@ -501,8 +501,20 @@ def check_and_record_domains(domain_list, ignored_domains, failed_domains, user_
                         continue
                     webfinger_domain = urlparse(first_webfinger_alias)
                     real_domain = webfinger_domain.netloc
+                elif webfinger_response.status_code == 410:
+                    print(f'{RED}{domain} returned HTTP {webfinger_response.status_code}{RESET}')
+                    mark_failed_domain(domain, conn)
+                    delete_domain_if_known(domain, conn)
+                    continue
                 else:
-                    real_domain = domain
+                    # real_domain = domain
+                    error_to_print = f'{domain} Webfinger returned HTTP {webfinger_response.status_code}'
+                    print(f'{YELLOW}{error_to_print}{RESET}')
+                    with open(error_file, 'a') as file:
+                        file.write(error_to_print + '\n')
+                    error_reason = webfinger_response.status_code
+                    increment_domain_error(domain, conn, error_reason)
+                    continue
 
             wk_nodeinfo_url = f'https://{real_domain}/.well-known/nodeinfo'
             with requests.get(wk_nodeinfo_url, headers=custom_headers, timeout=5) as wk_nodeinfo_response:
@@ -841,6 +853,13 @@ def check_and_record_domains(domain_list, ignored_domains, failed_domains, user_
 
         except requests.exceptions.ReadTimeout:
             error_to_print = f'{domain} HTTP connection timed out'
+            print(f'{CYAN}{error_to_print}{RESET}')
+            with open(error_file, 'a') as file:
+                file.write(error_to_print + '\n')
+            error_reason = 'HTTP'
+            increment_domain_error(domain, conn, error_reason)
+        except requests.exceptions.RequestException:
+            error_to_print = f'{domain} HTTP connection had an exception'
             print(f'{CYAN}{error_to_print}{RESET}')
             with open(error_file, 'a') as file:
                 file.write(error_to_print + '\n')
