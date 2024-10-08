@@ -425,7 +425,7 @@ def check_and_record_domains(domain_list, ignored_domains, failed_domains, user_
                         line = line.strip()
                         if line.lower().startswith('user-agent:'):
                             user_agent = line.split(':', 1)[1].strip().lower()
-                        if user_agent == '{APPNAME}' and line.lower().startswith('disallow:'):
+                        if user_agent == APPNAME and line.lower().startswith('disallow:'):
                             disallow_path = line.split(':', 1)[1].strip()
                             if disallow_path == '/' or disallow_path == '*':
                                 disallow_found = True  # Bot is disallowed
