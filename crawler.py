@@ -734,7 +734,11 @@ def check_and_record_domains(domain_list, ignored_domains, failed_domains, user_
                                 delete_domain_if_known(domain, conn)
                         else:
                             error_to_print = f'{domain} returned HTTP {discovered_nodeinfo_response.status_code} @ {discovered_nodeinfo_url}'
-                            if 400 <= discovered_nodeinfo_response.status_code <= 499 and discovered_nodeinfo_response.status_code != 404:
+                            if 400 <= discovered_nodeinfo_response.status_code <= 499 and discovered_nodeinfo_response.status_code != 404 and discovered_nodeinfo_response.status_code != 410:
+                                print(f'{RED}{error_to_print}{RESET}')
+                                mark_failed_domain(domain, conn)
+                                delete_domain_if_known(domain, conn)
+                            elif discovered_nodeinfo_response.status_code == 410:
                                 print(f'{RED}{error_to_print}{RESET}')
                                 mark_failed_domain(domain, conn)
                                 delete_domain_if_known(domain, conn)
