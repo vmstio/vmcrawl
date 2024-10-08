@@ -441,7 +441,7 @@ def check_and_record_domains(domain_list, ignored_domains, failed_domains, user_
                         continue
                 elif robots_response.status_code == 202:
                     if 'sgcaptcha' in robots_response.text:
-                        print(f'{RED}{domain} returned CAPTCHA{RESET}')
+                        print(f'{MAGENTA}{domain} returned CAPTCHA{RESET}')
                         mark_ignore_domain(domain, conn)
                         delete_domain_if_known(domain, conn)
                         continue
