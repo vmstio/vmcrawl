@@ -16,8 +16,8 @@ load_dotenv()
 # Path to your SQLite database file
 db_path = os.getenv("db_path")
 
-DB_LIMIT = 1000
-DB_OFFSET = 0
+db_limit = 1000
+db_offset = 0
 
 def fetch_exclude_domains(conn):
     """Fetch the list of excluded domains from the NoPeers table."""
@@ -38,7 +38,7 @@ def fetch_domain_list(conn, exclude_domains_sql):
             SELECT Domain FROM MastodonDomains
             WHERE Domain NOT IN ({exclude_domains_sql})
             ORDER BY "Active Users (Monthly)" DESC
-            LIMIT {DB_LIMIT} OFFSET {DB_OFFSET}
+            LIMIT {db_limit} OFFSET {db_offset}
         """
         cursor.execute(query)
         return [row[0] for row in cursor.fetchall()]
@@ -48,7 +48,7 @@ def fetch_domain_list(conn, exclude_domains_sql):
 
 def process_domain(domain, counter, total):
     """Process each domain by running peerapi.py and crawler.py."""
-    print(f"{BOLD}Processing {domain} ({counter}/{total})...{RESET}")
+    print(f"{color_bold}Processing {domain} ({counter}/{total})...{color_reset}")
 
     # Execute peerapi.py for the domain
     subprocess.run(["python3", "peerapi.py", domain])
@@ -65,14 +65,14 @@ def main():
     # Connect to the SQLite database
     conn = sqlite3.connect(db_path)
 
-    print(f"{BOLD}Fetching list of excluded domains from SQLite database...{RESET}")
+    print(f"{color_bold}Fetching list of excluded domains from SQLite database...{color_reset}")
     exclude_domains_sql = fetch_exclude_domains(conn)
 
     if exclude_domains_sql is None:
         print("Exiting due to error.")
         return
 
-    print(f"{BOLD}Fetching top peers from the database...{RESET}")
+    print(f"{color_bold}Fetching top peers from the database...{color_reset}")
     domain_list = fetch_domain_list(conn, exclude_domains_sql)
 
     if not domain_list:
@@ -86,7 +86,7 @@ def main():
     for counter, domain in enumerate(domain_list, start=1):
         process_domain(domain, counter, total)
 
-    print(f"{BOLD}All domains processed!{RESET}")
+    print(f"{color_bold}All domains processed!{color_reset}")
 
 if __name__ == "__main__":
     main()
