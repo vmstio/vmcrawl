@@ -298,16 +298,19 @@ def check_version_wrongpatch(software_version):
         x, y, z = int(match.group(1)), int(match.group(2)), int(match.group(3))
         additional_data = match.group(4)  # This will be None if no dash and additional data is present
 
-        # Check if Y is 3 or 4
-        if y in (3, 4):
-            # If Z is not 0, change it to 0
-            if z != 0:
-                z = 0
-                # Rebuild the version string with the modified Z and preserve the additional data if present
-                return f"{x}.{y}.{z}{additional_data or ''}"
-            return software_version  # Return original version if no change needed
+        if x is 4:
+            # Check if Y is 3 or 4
+            if y in (3, 4):
+                # If Z is not 0, change it to 0
+                if z != 0:
+                    z = 0
+                    # Rebuild the version string with the modified Z and preserve the additional data if present
+                    return f"{x}.{y}.{z}{additional_data or ''}"
+                return software_version  # Return original version if no change needed
+            else:
+                return software_version  # Return original version if Y is not 3 or 4
         else:
-            return software_version  # Return original version if Y is not 3 or 4
+            return software_version
     else:
         # If version format doesn't match
         return software_version
