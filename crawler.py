@@ -24,22 +24,23 @@ VERSION = '0.1'
 
 # Add your color constants here
 BOLD = '\033[1m'
-RED = '\033[31m'
-GREEN = '\033[32m'
-YELLOW = '\033[33m'
-MAGENTA = '\033[35m'
-CYAN = '\033[36m'
+RED = '\033[91m'
+GREEN = '\033[92m'
+YELLOW = '\033[93m'
+MAGENTA = '\033[95m'
+CYAN = '\033[96m'
 ORANGE = '\033[38;5;208m'
 PINK = '\033[38;5;198m'
+PURPLE = '\033[94m'
 RESET = '\033[0m'
 
 print(f'{BOLD}{APPNAME} v{VERSION}{RESET}')
-print(f'{PINK}Alter direction:{RESET} 2=Reverse 3=Random')
-print(f'{PINK}Retry general errors:{RESET} 4=Overflow 5=Underflow')
-print(f'{PINK}Retry specific errors:{RESET} 9=SSL 10=DNS 11=### 12=HTTP 13=400-599 15=??? 16=API 17=JSON 18=XML 23=TXT')
-print(f'{PINK}Retry fatal errors:{RESET} 7=Ignored 14=Failed')
-print(f'{PINK}Retry good data:{RESET} 6=Stale 8=Outdated 21=Inactive 22=Main')
-print(f'{CYAN}Enter your choice (1, 2, 3, etc):{RESET} ', end='', flush=True)
+print(f'{BOLD}Alter direction:{RESET} 2=Reverse 3=Random')
+print(f'{BOLD}Retry general errors:{RESET} 4=Overflow 5=Underflow')
+print(f'{BOLD}Retry specific errors:{RESET} 9=SSL 10=DNS 11=### 12=HTTP 13=400-599 15=??? 16=API 17=JSON 23=TXT')
+print(f'{BOLD}Retry fatal errors:{RESET} 7=Ignored 14=Failed')
+print(f'{BOLD}Retry good data:{RESET} 6=Stale 8=Outdated 21=Inactive 22=Main')
+print(f'{BOLD}Enter your choice (1, 2, 3, etc):{RESET} ', end='', flush=True)
 ready, _, _ = select.select([sys.stdin], [], [], 5)  # Wait for input for 5 seconds
 
 if ready:
@@ -509,7 +510,7 @@ def check_and_record_domains(domain_list, ignored_domains, failed_domains, user_
                 else:
                     # real_domain = domain
                     error_to_print = f'{domain} Webfinger returned HTTP {webfinger_response.status_code}'
-                    print(f'{YELLOW}{error_to_print}{RESET}')
+                    print(f'{CYAN}{error_to_print}{RESET}')
                     with open(error_file, 'a') as file:
                         file.write(error_to_print + '\n')
                     error_reason = webfinger_response.status_code
@@ -559,7 +560,7 @@ def check_and_record_domains(domain_list, ignored_domains, failed_domains, user_
                             continue
                 else:
                     error_to_print = f'{domain} Nodeinfo returned HTTP {wk_nodeinfo_response.status_code}'
-                    print(f'{YELLOW}{error_to_print}{RESET}')
+                    print(f'{CYAN}{error_to_print}{RESET}')
                     with open(error_file, 'a') as file:
                         file.write(error_to_print + '\n')
                     error_reason = wk_nodeinfo_response.status_code
@@ -645,7 +646,7 @@ def check_and_record_domains(domain_list, ignored_domains, failed_domains, user_
                                     if 'application/json' not in content_type:
                                         if backend_response.status_code != 200 and backend_response.status_code != 410:
                                             error_to_print = f'{domain} API returned HTTP {backend_response.status_code}'
-                                            print(f'{YELLOW}{error_to_print}{RESET}')
+                                            print(f'{CYAN}{error_to_print}{RESET}')
                                             with open(error_file, 'a') as file:
                                                 file.write(error_to_print + '\n')
                                             error_reason = 'API'
@@ -734,16 +735,12 @@ def check_and_record_domains(domain_list, ignored_domains, failed_domains, user_
                                 delete_domain_if_known(domain, conn)
                         else:
                             error_to_print = f'{domain} returned HTTP {discovered_nodeinfo_response.status_code} @ {discovered_nodeinfo_url}'
-                            if 400 <= discovered_nodeinfo_response.status_code <= 499 and discovered_nodeinfo_response.status_code != 404 and discovered_nodeinfo_response.status_code != 410:
-                                print(f'{RED}{error_to_print}{RESET}')
-                                mark_failed_domain(domain, conn)
-                                delete_domain_if_known(domain, conn)
-                            elif discovered_nodeinfo_response.status_code == 410:
+                            if discovered_nodeinfo_response.status_code == 410:
                                 print(f'{RED}{error_to_print}{RESET}')
                                 mark_failed_domain(domain, conn)
                                 delete_domain_if_known(domain, conn)
                             else:
-                                print(f'{YELLOW}{error_to_print}{RESET}')
+                                print(f'{CYAN}{error_to_print}{RESET}')
                                 with open(error_file, 'a') as file:
                                     file.write(error_to_print + '\n')
                                 error_reason = discovered_nodeinfo_response.status_code
@@ -763,7 +760,7 @@ def check_and_record_domains(domain_list, ignored_domains, failed_domains, user_
                 continue
             elif dns_result is None:
                 error_to_print = f'{domain} DNS query failed'
-                print(f'{CYAN}{error_to_print}{RESET}')
+                print(f'{PURPLE}{error_to_print}{RESET}')
                 with open(error_file, 'a') as file:
                     file.write(error_to_print + '\n')
                 error_reason = 'DNS'
@@ -940,8 +937,6 @@ def load_from_database(user_choice):
         cursor.execute("SELECT Domain FROM RawDomains WHERE Reason = 'API' ORDER BY Domain")
     elif user_choice == "17":
         cursor.execute("SELECT Domain FROM RawDomains WHERE Reason = 'JSON' ORDER BY Domain")
-    elif user_choice == "18":
-        cursor.execute("SELECT Domain FROM RawDomains WHERE Reason = 'XML' ORDER BY Domain")
     elif user_choice == "21":
         cursor.execute('SELECT Domain FROM MastodonDomains WHERE "Active Users (Monthly)" = 0 ORDER BY Domain')
     elif user_choice == "22":
