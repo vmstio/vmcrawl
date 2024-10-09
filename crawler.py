@@ -27,7 +27,7 @@ print(f'{color_bold}{appname} v{appversion}{color_reset}')
 print(f'{color_pink}Alter direction:{color_reset} 2=Reverse 3=Random')
 print(f'{color_yellow}Retry general errors:{color_reset} 4=Overflow 5=Underflow')
 print(f'{color_orange}Retry specific errors:{color_reset} 9=SSL 10=DNS 11=### 15=??? 16=API 17=JSON 23=TXT')
-print(f'{color_cyan}Retry HTTP errors:{color_reset} 12=HTTP 13=400-599 202=202 403=403 404=404 406=406')
+print(f'{color_cyan}Retry HTTP errors:{color_reset} 12=HTTP 13=400s 18=500s 404=404 406=406')
 print(f'{color_red}Retry fatal errors:{color_reset} 7=Ignored 14=Failed')
 print(f'{color_green}Retry good data:{color_reset} 6=Stale 8=Outdated 21=Inactive 22=Main')
 print(f'{color_bold}Enter your choice (1, 2, 3, etc):{color_reset} ', end='', flush=True)
@@ -950,33 +950,33 @@ def load_from_database(user_choice):
         FROM MastodonDomains
         WHERE
             "Software Version" NOT LIKE '4.4.0%' AND
-            "Software Version" NOT LIKE '4.3.0' AND
-            "Software Version" NOT LIKE '4.2.13' AND
-            "Software Version" NOT LIKE '4.1.20'
+            "Software Version" NOT LIKE '4.3.0'
         ORDER BY "Total Users" DESC
         ;
         """
         cursor.execute(query)
     elif user_choice == "9":
-        cursor.execute("SELECT Domain FROM RawDomains WHERE Reason = 'SSL' ORDER BY Domain")
+        cursor.execute("SELECT Domain FROM RawDomains WHERE Reason = 'SSL' ORDER BY Errors DESC")
     elif user_choice == "10":
-        cursor.execute("SELECT Domain FROM RawDomains WHERE Reason = 'DNS' ORDER BY Domain")
+        cursor.execute("SELECT Domain FROM RawDomains WHERE Reason = 'DNS' ORDER BY Errors DESC")
     elif user_choice == "11":
-        cursor.execute("SELECT Domain FROM RawDomains WHERE Reason = '###' ORDER BY Domain")
+        cursor.execute("SELECT Domain FROM RawDomains WHERE Reason = '###' ORDER BY Errors DESC")
     elif user_choice == "12":
-        cursor.execute("SELECT Domain FROM RawDomains WHERE Reason = 'HTTP' ORDER BY Domain")
+        cursor.execute("SELECT Domain FROM RawDomains WHERE Reason = 'HTTP' ORDER BY Errors DESC")
     elif user_choice == "13":
-        cursor.execute("SELECT Domain FROM RawDomains WHERE Reason < '399' ORDER BY Domain")
+        cursor.execute("SELECT Domain FROM RawDomains WHERE Reason > 399 AND Reason < 500 ORDER BY Errors DESC;")
     elif user_choice == "14":
         cursor.execute("SELECT Domain FROM RawDomains WHERE Failed = '1' ORDER BY Domain")
     elif user_choice == "15":
-        cursor.execute("SELECT Domain FROM RawDomains WHERE Reason = '???' ORDER BY Domain")
+        cursor.execute("SELECT Domain FROM RawDomains WHERE Reason = '???' ORDER BY Errors DESC")
     elif user_choice == "16":
-        cursor.execute("SELECT Domain FROM RawDomains WHERE Reason = 'API' ORDER BY Domain")
+        cursor.execute("SELECT Domain FROM RawDomains WHERE Reason = 'API' ORDER BY Errors DESC")
     elif user_choice == "17":
-        cursor.execute("SELECT Domain FROM RawDomains WHERE Reason = 'JSON' ORDER BY Domain DESC")
+        cursor.execute("SELECT Domain FROM RawDomains WHERE Reason = 'JSON' ORDER BY Errors DESC")
+    elif user_choice == "18":
+        cursor.execute("SELECT Domain FROM RawDomains WHERE Reason > 499 AND Reason < 600 ORDER BY Errors DESC;")
     elif user_choice == "21":
-        cursor.execute('SELECT Domain FROM MastodonDomains WHERE "Active Users (Monthly)" = 0 ORDER BY Domain')
+        cursor.execute('SELECT Domain FROM MastodonDomains WHERE "Active Users (Monthly)" = 0 ORDER BY Timestamp ASC')
     elif user_choice == "22":
         query = """
         SELECT Domain
@@ -988,15 +988,11 @@ def load_from_database(user_choice):
         """
         cursor.execute(query)
     elif user_choice == "23":
-        cursor.execute("SELECT Domain FROM RawDomains WHERE Reason = 'TXT' ORDER BY Domain")
-    elif user_choice == "202":
-        cursor.execute("SELECT Domain FROM RawDomains WHERE Reason LIKE '%202%' ORDER BY Domain")
-    elif user_choice == "403":
-        cursor.execute("SELECT Domain FROM RawDomains WHERE Reason LIKE '%403%' ORDER BY Domain")
+        cursor.execute("SELECT Domain FROM RawDomains WHERE Reason = 'TXT' ORDER BY Errors DESC")
     elif user_choice == "404":
-        cursor.execute("SELECT Domain FROM RawDomains WHERE Reason LIKE '%404%' ORDER BY Domain")
+        cursor.execute("SELECT Domain FROM RawDomains WHERE Reason LIKE '%404%' ORDER BY Errors DESC")
     elif user_choice == "406":
-        cursor.execute("SELECT Domain FROM RawDomains WHERE Reason LIKE '%406%' ORDER BY Domain")
+        cursor.execute("SELECT Domain FROM RawDomains WHERE Reason LIKE '%406%' ORDER BY Errors DESC")
     else:
         cursor.execute("SELECT Domain FROM RawDomains WHERE (Failed IS NULL OR Failed = '' OR Failed = '0') AND (Ignore IS NULL OR Ignore = '' OR Ignore = '0') AND (Errors < 6 OR Errors IS NULL) ORDER BY Domain ASC")
     domain_list = [row[0].strip() for row in cursor.fetchall() if row[0].strip()]
