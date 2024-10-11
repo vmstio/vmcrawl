@@ -626,18 +626,18 @@ def check_and_record_domains(domain_list, ignored_domains, failed_domains, user_
                     continue
 
                 if 'links' in data and len(data['links']) > 0 and 'href' in data['links'][0]:
-                    hrefinfo_url = data['links'][0]['href']
+                    linked_nodeinfo_url = data['links'][0]['href']
 
-                    if 'wp-json' in hrefinfo_url:
+                    if 'wp-json' in linked_nodeinfo_url:
                         error_to_print = f'{domain} is not using Mastodon'
                         print(f'{color_magenta}{error_to_print}{color_reset}')
                         mark_ignore_domain(domain, conn)
                         delete_domain_if_known(domain, conn)
                         continue
 
-                    with requests.get(hrefinfo_url, headers=custom_headers, timeout=5) as hrefinfo_response:
-                        if hrefinfo_response.status_code == 200:
-                            content_type = hrefinfo_response.headers.get('Content-Type', '')
+                    with requests.get(linked_nodeinfo_url, headers=custom_headers, timeout=5) as linked_nodeinfo_response:
+                        if linked_nodeinfo_response.status_code == 200:
+                            content_type = linked_nodeinfo_response.headers.get('Content-Type', '')
                             if 'application/json' not in content_type:
                                 if 'application/activity+json' in content_type:
                                     error_to_print = f'{domain} is not using Mastodon'
@@ -646,17 +646,17 @@ def check_and_record_domains(domain_list, ignored_domains, failed_domains, user_
                                     delete_domain_if_known(domain, conn)
                                     continue
                                 else:
-                                    error_to_print = f'{domain} did not return application/activity+json @ {hrefinfo_url}'
+                                    error_to_print = f'{domain} did not return application/activity+json @ {linked_nodeinfo_url}'
                                     print(f'{color_yellow}{error_to_print}{color_reset}')
                                     with open(error_file, 'a') as file:
                                         file.write(error_to_print + '\n')
                                     error_reason = 'JSON'
                                     increment_domain_error(domain, conn, error_reason)
                                     continue
-                            hrefinfo_data = hrefinfo_response.json()
+                            linked_nodeinfo_data = linked_nodeinfo_response.json()
 
-                            if hrefinfo_data['software']['name'].lower() == 'mastodon' or hrefinfo_data['software']['name'].lower() == 'hometown' or hrefinfo_data['software']['name'].lower() == 'kmyblue' or hrefinfo_data['software']['name'].lower() == 'glitchcafe':
-                                software_version_full = hrefinfo_data['software']['version']
+                            if linked_nodeinfo_data['software']['name'].lower() == 'mastodon' or linked_nodeinfo_data['software']['name'].lower() == 'hometown' or linked_nodeinfo_data['software']['name'].lower() == 'kmyblue' or linked_nodeinfo_data['software']['name'].lower() == 'glitchcafe':
+                                software_version_full = linked_nodeinfo_data['software']['version']
                                 if isinstance(software_version_full, str):
                                     # Remove any unwanted or invalid suffixes from the version string
                                     software_version = clean_version_suffix(software_version_full)
@@ -672,8 +672,8 @@ def check_and_record_domains(domain_list, ignored_domains, failed_domains, user_
                                 # if software_version.startswith("4.2.10"):
                                 #     software_version = "4.2.10"
 
-                                total_users = hrefinfo_data['usage']['users']['total']
-                                active_month_users = hrefinfo_data['usage']['users']['activeMonth']
+                                total_users = linked_nodeinfo_data['usage']['users']['total']
+                                active_month_users = linked_nodeinfo_data['usage']['users']['activeMonth']
 
                                 if active_month_users > max(total_users + 6, total_users + (total_users * 0.25)):
                                     error_to_print = f'{domain} is running Mastodon v{software_version} with invalid counts ({active_month_users}:{total_users})'
@@ -690,19 +690,19 @@ def check_and_record_domains(domain_list, ignored_domains, failed_domains, user_
                                 else:
                                     instance_api_url = f'https://{backend_domain}/api/v1/instance'
 
-                                with requests.get(instance_api_url, headers=custom_headers, timeout=5) as backend_response:
-                                    content_type = backend_response.headers.get('Content-Type', '')
+                                with requests.get(instance_api_url, headers=custom_headers, timeout=5) as instance_api_response:
+                                    content_type = instance_api_response.headers.get('Content-Type', '')
                                     if 'application/json' not in content_type:
-                                        if backend_response.status_code != 200 and backend_response.status_code != 410:
-                                            error_to_print = f'{domain} returned HTTP {backend_response.status_code} (API)'
+                                        if instance_api_response.status_code != 200 and instance_api_response.status_code != 410:
+                                            error_to_print = f'{domain} returned HTTP {instance_api_response.status_code} (API)'
                                             print(f'{color_cyan}{error_to_print}{color_reset}')
                                             with open(error_file, 'a') as file:
                                                 file.write(error_to_print + '\n')
                                             error_reason = 'API'
                                             increment_domain_error(domain, conn, error_reason)
                                             continue
-                                        elif backend_response.status_code == 410:
-                                            print(f'{color_red}{domain} returned HTTP {backend_response.status_code} (API){color_reset}')
+                                        elif instance_api_response.status_code == 410:
+                                            print(f'{color_red}{domain} returned HTTP {instance_api_response.status_code} (API){color_reset}')
                                             mark_failed_domain(domain, conn)
                                             delete_domain_if_known(domain, conn)
                                             continue
@@ -714,7 +714,7 @@ def check_and_record_domains(domain_list, ignored_domains, failed_domains, user_
                                         error_reason = 'JSON'
                                         increment_domain_error(domain, conn, error_reason)
                                         continue
-                                    backend_data = backend_response.json()
+                                    backend_data = instance_api_response.json()
                                     if 'error' in backend_data:
                                         if backend_data['error'] == "This method requires an authenticated user":
                                             error_to_print = f'{domain} requires authentication (API)'
@@ -744,7 +744,7 @@ def check_and_record_domains(domain_list, ignored_domains, failed_domains, user_
                                     if source_url == '/source.tar.gz':
                                         source_url = 'https://' + actual_domain + source_url
 
-                                    if hrefinfo_data['software']['name'].lower() == 'hometown':
+                                    if linked_nodeinfo_data['software']['name'].lower() == 'hometown':
                                         source_url = 'https://github.com/hometown-fork/hometown'
 
                                     if actual_domain == "gc2.jp":
@@ -783,12 +783,12 @@ def check_and_record_domains(domain_list, ignored_domains, failed_domains, user_
                                 mark_ignore_domain(domain, conn)
                                 delete_domain_if_known(domain, conn)
                         else:
-                            error_to_print = f'{domain} returned HTTP {hrefinfo_response.status_code} @ {hrefinfo_url}'
-                            if hrefinfo_response.status_code == 403:
+                            error_to_print = f'{domain} returned HTTP {linked_nodeinfo_response.status_code} @ {linked_nodeinfo_url}'
+                            if linked_nodeinfo_response.status_code == 403:
                                 print(f'{color_magenta}{error_to_print}{color_reset}')
                                 mark_ignore_domain(domain, conn)
                                 delete_domain_if_known(domain, conn)
-                            elif hrefinfo_response.status_code == 410:
+                            elif linked_nodeinfo_response.status_code == 410:
                                 print(f'{color_red}{error_to_print}{color_reset}')
                                 mark_failed_domain(domain, conn)
                                 delete_domain_if_known(domain, conn)
@@ -796,7 +796,7 @@ def check_and_record_domains(domain_list, ignored_domains, failed_domains, user_
                                 print(f'{color_cyan}{error_to_print}{color_reset}')
                                 with open(error_file, 'a') as file:
                                     file.write(error_to_print + '\n')
-                                error_reason = hrefinfo_response.status_code
+                                error_reason = linked_nodeinfo_response.status_code
                                 increment_domain_error(domain, conn, error_reason)
                 else:
                     print(f'{color_magenta}{domain} is not using Mastodon{color_reset}')
