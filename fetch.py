@@ -16,7 +16,7 @@ load_dotenv()
 # Path to your SQLite database file
 db_path = os.getenv("db_path")
 
-db_limit = 1000
+db_limit = 250
 db_offset = 0
 
 def fetch_exclude_domains(conn):
