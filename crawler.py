@@ -55,9 +55,9 @@ def resolve_dns_with_dnspython(domain):
         except dns.resolver.NXDOMAIN:
             return False  # Domain does not exist
         except dns.resolver.NoNameservers:
-            return False  # No nameservers available for this domain
+            return None  # No nameservers available for this domain
         except dns.resolver.NoRootSOA:
-            return False  # No root SOA available for this domain
+            return None  # No root SOA available for this domain
         except dns.resolver.Timeout:
             return None  # DNS query failed due to timeout or other DNS issues
         except dns.exception.DNSException:
@@ -190,6 +190,9 @@ def clean_version_suffix(software_version_full):
         .split('_')[0] \
         .split(' ')[0] \
         .split('/')[0] \
+        .split('@')[0] \
+        .split('&')[0] \
+        .split('ht')[0] \
         .split('patch')[0]
 
     return software_version
@@ -421,7 +424,12 @@ def check_and_record_domains(domain_list, ignored_domains, failed_domains, user_
             with requests.get(webfinger_url, headers=custom_headers, timeout=5) as webfinger_response:
                 if webfinger_response.status_code == 404:
                     content_type = webfinger_response.headers.get('Content-Type', '')
-                    if 'application/jrd+json' in content_type or 'application/json' in content_type or 'application/activity+json' in content_type :
+                    json_content_types = (
+                        'application/jrd+json', 'application/json', 'application/activity+json',
+                        'application/problem+json', 'application/ld+json', 'application/activitystreams+json',
+                        'application/activitypub+json'
+                    )
+                    if any(ct in content_type for ct in json_content_types):
                         try:
                             # Try to parse the webfinger_response content as JSON
                             data = json.loads(webfinger_response.text)
@@ -455,7 +463,12 @@ def check_and_record_domains(domain_list, ignored_domains, failed_domains, user_
                         data = webfinger_response.json()
                     except json.JSONDecodeError:
                         content_type = webfinger_response.headers.get('Content-Type', '')
-                        if 'application/jrd+json' in content_type or 'application/json' in content_type or 'application/activity+json' in content_type :
+                        json_content_types = (
+                            'application/jrd+json', 'application/json', 'application/activity+json',
+                            'application/problem+json', 'application/ld+json', 'application/activitystreams+json',
+                            'application/activitypub+json'
+                        )
+                        if any(ct in content_type for ct in json_content_types):
                             error_to_print = f'{domain} JSON is invalid (webfinger)'
                             print(f'{color_yellow}{error_to_print}{color_reset}')
                             with open(error_file, 'a') as file:
@@ -536,7 +549,12 @@ def check_and_record_domains(domain_list, ignored_domains, failed_domains, user_
                         data = wk_nodeinfo_response.json()
                     except json.JSONDecodeError:
                         content_type = wk_nodeinfo_response.headers.get('Content-Type', '')
-                        if 'application/jrd+json' in content_type or 'application/json' in content_type or 'application/activity+json' in content_type :
+                        json_content_types = (
+                            'application/jrd+json', 'application/json', 'application/activity+json',
+                            'application/problem+json', 'application/ld+json', 'application/activitystreams+json',
+                            'application/activitypub+json'
+                        )
+                        if any(ct in content_type for ct in json_content_types):
                             error_to_print = f'{domain} JSON is invalid (nodeinfo)'
                             print(f'{color_yellow}{error_to_print}{color_reset}')
                             with open(error_file, 'a') as file:
@@ -937,9 +955,9 @@ def load_from_database(user_choice):
     conn = sqlite3.connect(db_path)  # Connect to your SQLite database
     cursor = conn.cursor()
     if user_choice == "4":
-        cursor.execute("SELECT Domain FROM RawDomains WHERE Errors > 7 ORDER BY LENGTH(DOMAIN) DESC")
+        cursor.execute("SELECT Domain FROM RawDomains WHERE Errors > 7 ORDER BY LENGTH(DOMAIN) ASC")
     elif user_choice == "5":
-        cursor.execute("SELECT Domain FROM RawDomains WHERE Errors < 6 ORDER BY LENGTH(DOMAIN) DESC")
+        cursor.execute("SELECT Domain FROM RawDomains WHERE Errors < 6 ORDER BY LENGTH(DOMAIN) ASC")
     elif user_choice == "6":
         cursor.execute('SELECT Domain FROM MastodonDomains WHERE Timestamp < datetime("now", "-3 days") ORDER BY Timestamp ASC')
     elif user_choice == "7":
@@ -956,25 +974,25 @@ def load_from_database(user_choice):
         """
         cursor.execute(query)
     elif user_choice == "9":
-        cursor.execute("SELECT Domain FROM RawDomains WHERE Reason = 'SSL' ORDER BY Errors DESC")
+        cursor.execute("SELECT Domain FROM RawDomains WHERE Reason = 'SSL' ORDER BY Errors ASC")
     elif user_choice == "10":
-        cursor.execute("SELECT Domain FROM RawDomains WHERE Reason = 'DNS' ORDER BY Errors DESC")
+        cursor.execute("SELECT Domain FROM RawDomains WHERE Reason = 'DNS' ORDER BY Errors ASC")
     elif user_choice == "11":
-        cursor.execute("SELECT Domain FROM RawDomains WHERE Reason = '###' ORDER BY Errors DESC")
+        cursor.execute("SELECT Domain FROM RawDomains WHERE Reason = '###' ORDER BY Errors ASC")
     elif user_choice == "12":
-        cursor.execute("SELECT Domain FROM RawDomains WHERE Reason = 'HTTP' ORDER BY Errors DESC")
+        cursor.execute("SELECT Domain FROM RawDomains WHERE Reason = 'HTTP' ORDER BY Errors ASC")
     elif user_choice == "13":
-        cursor.execute("SELECT Domain FROM RawDomains WHERE Reason > 399 AND Reason < 500 ORDER BY Errors DESC;")
+        cursor.execute("SELECT Domain FROM RawDomains WHERE Reason > 399 AND Reason < 500 ORDER BY Errors ASC;")
     elif user_choice == "14":
         cursor.execute("SELECT Domain FROM RawDomains WHERE Failed = '1' ORDER BY Domain")
     elif user_choice == "15":
-        cursor.execute("SELECT Domain FROM RawDomains WHERE Reason = '???' ORDER BY Errors DESC")
+        cursor.execute("SELECT Domain FROM RawDomains WHERE Reason = '???' ORDER BY Errors ASC")
     elif user_choice == "16":
-        cursor.execute("SELECT Domain FROM RawDomains WHERE Reason = 'API' ORDER BY Errors DESC")
+        cursor.execute("SELECT Domain FROM RawDomains WHERE Reason = 'API' ORDER BY Errors ASC")
     elif user_choice == "17":
-        cursor.execute("SELECT Domain FROM RawDomains WHERE Reason = 'JSON' ORDER BY Errors DESC")
+        cursor.execute("SELECT Domain FROM RawDomains WHERE Reason = 'JSON' ORDER BY Errors ASC")
     elif user_choice == "18":
-        cursor.execute("SELECT Domain FROM RawDomains WHERE Reason > 499 AND Reason < 600 ORDER BY Errors DESC;")
+        cursor.execute("SELECT Domain FROM RawDomains WHERE Reason > 499 AND Reason < 600 ORDER BY Errors ASC;")
     elif user_choice == "21":
         cursor.execute('SELECT Domain FROM MastodonDomains WHERE "Active Users (Monthly)" = 0 ORDER BY Timestamp ASC')
     elif user_choice == "22":
@@ -988,11 +1006,11 @@ def load_from_database(user_choice):
         """
         cursor.execute(query)
     elif user_choice == "23":
-        cursor.execute("SELECT Domain FROM RawDomains WHERE Reason = 'TXT' ORDER BY Errors DESC")
+        cursor.execute("SELECT Domain FROM RawDomains WHERE Reason = 'TXT' ORDER BY Errors ASC")
     elif user_choice == "404":
-        cursor.execute("SELECT Domain FROM RawDomains WHERE Reason LIKE '%404%' ORDER BY Errors DESC")
+        cursor.execute("SELECT Domain FROM RawDomains WHERE Reason LIKE '%404%' ORDER BY Errors ASC")
     elif user_choice == "406":
-        cursor.execute("SELECT Domain FROM RawDomains WHERE Reason LIKE '%406%' ORDER BY Errors DESC")
+        cursor.execute("SELECT Domain FROM RawDomains WHERE Reason LIKE '%406%' ORDER BY Errors ASC")
     else:
         cursor.execute("SELECT Domain FROM RawDomains WHERE (Failed IS NULL OR Failed = '' OR Failed = '0') AND (Ignore IS NULL OR Ignore = '' OR Ignore = '0') AND (Errors < 6 OR Errors IS NULL) ORDER BY Domain ASC")
     domain_list = [row[0].strip() for row in cursor.fetchall() if row[0].strip()]
