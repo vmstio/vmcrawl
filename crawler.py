@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 
 try:
-    import datetime
+    from datetime import datetime, timedelta
     import dns.resolver
     import json
     import os
@@ -192,7 +192,6 @@ def clean_version_suffix(software_version_full):
         .split('/')[0] \
         .split('@')[0] \
         .split('&')[0] \
-        .split('ht')[0] \
         .split('patch')[0]
 
     return software_version
@@ -246,6 +245,8 @@ def clean_version_hometown(software_version):
 def clean_version_doubledash(software_version):
     if "--" in software_version:
         software_version = software_version.replace("--", "-")
+    if software_version.endswith('-'):
+        software_version = software_version[:-1]
 
     return software_version
 
@@ -256,7 +257,7 @@ def clean_version_oddballs(domain, software_version):
 
     return software_version
 
-def check_version_wrongpatch(software_version):
+def clean_version_wrongpatch(software_version):
     # Regular expression to match the version format X.Y.Z optionally followed by a dash and additional data
     match = re.match(r'^(\d+)\.(\d+)\.(\d+)(-.+)?$', software_version)
 
@@ -281,6 +282,71 @@ def check_version_wrongpatch(software_version):
     else:
         # If version format doesn't match
         return software_version
+
+def clean_version_nightly(software_version):
+    # Handle 4.4.0-nightly
+    if "4.4.0-nightly" in software_version:
+        software_version = "4.4.0-alpha.1"
+
+    # Handle 4.3.0-nightly with date and -security suffix
+    match = re.match(r"4\.3\.0-nightly\.(\d{4}-\d{2}-\d{2})(-security)?", software_version)
+    if match:
+        nightly_date_str = match.group(1)
+        is_security = match.group(2)
+
+        # Use datetime.strptime to parse the date string into a datetime object
+        nightly_date = datetime.strptime(nightly_date_str, "%Y-%m-%d")
+
+        # If the version ends with "-security", increment the date by one day
+        if is_security:
+            nightly_date += timedelta(days=1)
+
+        start_date = datetime(2024, 10, 2)
+        end_date = datetime(2024, 10, 7)
+        if start_date <= nightly_date <= end_date:
+            software_version = "4.3.0-rc.1"
+
+        start_date = datetime(2024, 9, 18)
+        end_date = datetime(2024, 10, 1)
+        if start_date <= nightly_date <= end_date:
+            software_version = "4.3.0-beta.2"
+
+        start_date = datetime(2024, 8, 23)
+        end_date = datetime(2024, 9, 17)
+        if start_date <= nightly_date <= end_date:
+            software_version = "4.3.0-beta.1"
+
+        start_date = datetime(2024, 7, 5)
+        end_date = datetime(2024, 8, 22)
+        if start_date <= nightly_date <= end_date:
+            software_version = "4.3.0-alpha.5"
+
+        start_date = datetime(2024, 5, 31)
+        end_date = datetime(2024, 7, 4)
+        if start_date <= nightly_date <= end_date:
+            software_version = "4.3.0-alpha.4"
+
+        start_date = datetime(2024, 2, 17)
+        end_date = datetime(2024, 5, 30)
+        if start_date <= nightly_date <= end_date:
+            software_version = "4.3.0-alpha.3"
+
+        start_date = datetime(2024, 2, 15)
+        end_date = datetime(2024, 2, 17)
+        if start_date <= nightly_date <= end_date:
+            software_version = "4.3.0-alpha.2"
+
+        start_date = datetime(2024, 1, 30)
+        end_date = datetime(2024, 2, 14)
+        if start_date <= nightly_date <= end_date:
+            software_version = "4.3.0-alpha.1"
+
+        start_date = datetime(2023, 9, 28)
+        end_date = datetime(2024, 1, 29)
+        if start_date <= nightly_date <= end_date:
+            software_version = "4.3.0-alpha.0"
+
+    return software_version
 
 def get_junk_keywords(db_path):
     try:
@@ -314,7 +380,7 @@ def check_and_record_domains(domain_list, ignored_domains, failed_domains, user_
     conn = sqlite3.connect(db_path)
     cursor = conn.cursor()
 
-    timestamp = datetime.datetime.now().strftime('%Y%m%d_%H%M%S')
+    timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
     error_directory = 'error'  # Name of the error subfolder
     if not os.path.exists(error_directory):
         os.makedirs(error_directory)
@@ -665,9 +731,10 @@ def check_and_record_domains(domain_list, ignored_domains, failed_domains, user_
                                 software_version = clean_version_suffix_more(software_version)
                                 software_version = clean_version_hometown(software_version)
                                 software_version = clean_version_development(software_version)
-                                software_version = check_version_wrongpatch(software_version)
+                                software_version = clean_version_wrongpatch(software_version)
                                 software_version = clean_version_doubledash(software_version)
                                 software_version = clean_version_oddballs(domain, software_version)
+                                software_version = clean_version_nightly(software_version)
                                 # rewrite dumb data
                                 # if software_version.startswith("4.2.10"):
                                 #     software_version = "4.2.10"
@@ -775,7 +842,7 @@ def check_and_record_domains(domain_list, ignored_domains, failed_domains, user_
                                     "Contact" = excluded."Contact",
                                     "Source" = excluded."Source",
                                     "Full Version" = excluded."Full Version"
-                                ''', (actual_domain, software_version, total_users, active_month_users, datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S'), contact_account, source_url, software_version_full))
+                                ''', (actual_domain, software_version, total_users, active_month_users, datetime.now().strftime('%Y-%m-%d %H:%M:%S'), contact_account, source_url, software_version_full))
                                 conn.commit()
                                 clear_domain_error(domain, conn)
                             else:
