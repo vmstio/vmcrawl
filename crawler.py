@@ -488,32 +488,53 @@ def check_and_record_domains(domain_list, ignored_domains, failed_domains, user_
                     continue
 
             with requests.get(webfinger_url, headers=custom_headers, timeout=5) as webfinger_response:
-                if webfinger_response.status_code == 404:
+                if webfinger_response.status_code == 405 or webfinger_response.status_code == 404 or webfinger_response.status_code == 400:
                     content_type = webfinger_response.headers.get('Content-Type', '')
+                    content_length = webfinger_response.headers.get('Content-Length', '')
+                    content = webfinger_response.text
                     json_content_types = (
                         'application/jrd+json', 'application/json', 'application/activity+json',
                         'application/problem+json', 'application/ld+json', 'application/activitystreams+json',
                         'application/activitypub+json'
                     )
                     if any(ct in content_type for ct in json_content_types):
-                        try:
-                            # Try to parse the webfinger_response content as JSON
-                            data = json.loads(webfinger_response.text)
-                            data = webfinger_response.json()
-
+                        if content == '':
                             error_to_print = f'{domain} is not using Mastodon'
                             print(f'{color_magenta}{error_to_print}{color_reset}')
                             mark_ignore_domain(domain, conn)
                             delete_domain_if_known(domain, conn)
                             continue
-                        except json.JSONDecodeError:
-                            error_to_print = f'{domain} JSON from HTTP {webfinger_response.status_code} is invalid (webfinger)'
-                            print(f'{color_yellow}{error_to_print}{color_reset}')
-                            with open(error_file, 'a') as file:
-                                file.write(error_to_print + '\n')
-                            error_reason = 'JSON'
-                            increment_domain_error(domain, conn, error_reason)
-                            continue
+                        else:
+                            try:
+                                # Try to parse the webfinger_response content as JSON
+                                data = json.loads(webfinger_response.text)
+                                data = webfinger_response.json()
+
+                                error_to_print = f'{domain} is not using Mastodon'
+                                print(f'{color_magenta}{error_to_print}{color_reset}')
+                                mark_ignore_domain(domain, conn)
+                                delete_domain_if_known(domain, conn)
+                                continue
+                            except json.JSONDecodeError:
+                                error_to_print = f'{domain} JSON from HTTP {webfinger_response.status_code} is invalid (webfinger)'
+                                print(f'{color_yellow}{error_to_print}{color_reset}')
+                                with open(error_file, 'a') as file:
+                                    file.write(error_to_print + '\n')
+                                error_reason = 'JSON'
+                                increment_domain_error(domain, conn, error_reason)
+                                continue
+                    if 'text/plain' in content_type:
+                        error_to_print = f'{domain} is not using Mastodon'
+                        print(f'{color_magenta}{error_to_print}{color_reset}')
+                        mark_ignore_domain(domain, conn)
+                        delete_domain_if_known(domain, conn)
+                        continue
+                    if content_length == '0':
+                        error_to_print = f'{domain} is not using Mastodon'
+                        print(f'{color_magenta}{error_to_print}{color_reset}')
+                        mark_ignore_domain(domain, conn)
+                        delete_domain_if_known(domain, conn)
+                        continue
                     else:
                         error_to_print = f'{domain} returned HTTP {webfinger_response.status_code} (webfinger)'
                         print(f'{color_cyan}{error_to_print}{color_reset}')
