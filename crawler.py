@@ -557,7 +557,7 @@ def check_and_record_domains(domain_list, ignored_domains, failed_domains, user_
                                 delete_domain_if_known(domain)
                                 continue
                             except json.JSONDecodeError:
-                                error_to_print = f'JSON response to webfinger request was invalid (HTTP {webfinger_response.status_code})'
+                                error_to_print = f'JSON response to WebFinger request was invalid (HTTP {webfinger_response.status_code})'
                                 error_reason = 'JSON'
                                 print_colored(f'{error_to_print}', 'yellow')
                                 log_error(domain, error_to_print)
@@ -583,7 +583,7 @@ def check_and_record_domains(domain_list, ignored_domains, failed_domains, user_
                         delete_domain_if_known(domain)
                         continue
                     else:
-                        error_to_print = f'HTTP {webfinger_response.status_code} returned to webfinger request'
+                        error_to_print = f'HTTP {webfinger_response.status_code} returned to WebFinger request'
                         error_reason = webfinger_response.status_code
                         print_colored(f'{error_to_print}', 'yellow')
                         log_error(domain, error_to_print)
@@ -602,14 +602,14 @@ def check_and_record_domains(domain_list, ignored_domains, failed_domains, user_
                             'application/activitypub+json'
                         )
                         if any(ct in content_type for ct in json_content_types):
-                            error_to_print = f'JSON response to webfinger was invalid (HTTP {webfinger_response.status_code})'
+                            error_to_print = f'JSON response to WebFinger was invalid (HTTP {webfinger_response.status_code})'
                             error_reason = 'JSON'
                             print_colored(f'{error_to_print}', 'yellow')
                             log_error(domain, error_to_print)
                             increment_domain_error(domain, error_reason)
                             continue
                         elif not webfinger_response.content:
-                            error_to_print = f'JSON response to webfinger was empty (HTTP {webfinger_response.status_code})'
+                            error_to_print = f'JSON response to WebFinger was empty (HTTP {webfinger_response.status_code})'
                             error_reason = 'JSON'
                             print_colored(f'{error_to_print}', 'yellow')
                             log_error(domain, error_to_print)
@@ -617,14 +617,14 @@ def check_and_record_domains(domain_list, ignored_domains, failed_domains, user_
                             continue
                         elif content_type != '':
                             content_type_strip = content_type.split(';')[0].strip()
-                            error_to_print = f'JSON response to webfinger was {content_type_strip} (HTTP {webfinger_response.status_code})'
+                            error_to_print = f'JSON response to WebFinger was {content_type_strip} (HTTP {webfinger_response.status_code})'
                             error_reason = 'JSON'
                             print_colored(f'{error_to_print}', 'yellow')
                             log_error(domain, error_to_print)
                             increment_domain_error(domain, error_reason)
                             continue
                         else:
-                            error_to_print = f'JSON response to webfinger was all jacked up (HTTP {webfinger_response.status_code})'
+                            error_to_print = f'JSON response to WebFinger was all jacked up (HTTP {webfinger_response.status_code})'
                             error_reason = 'JSON'
                             print_colored(f'{error_to_print}', 'yellow')
                             log_error(domain, error_to_print)
@@ -646,25 +646,25 @@ def check_and_record_domains(domain_list, ignored_domains, failed_domains, user_
 
                 elif webfinger_response.status_code == 202:
                     if 'sgcaptcha' in webfinger_response.text:
-                        error_to_print = f'Responded with CAPTCHA to webfinger request, marking as ignored...'
+                        error_to_print = f'Responded with CAPTCHA to WebFinger request, marking as ignored...'
                         print_colored(f'{error_to_print}', 'magenta')
                         mark_ignore_domain(domain)
                         delete_domain_if_known(domain)
                         continue
                 elif webfinger_response.status_code == 403:
-                    error_to_print = f'Responded HTTP {webfinger_response.status_code} to webfinger request, marking as ignored...'
+                    error_to_print = f'Responded HTTP {webfinger_response.status_code} to WebFinger request, marking as ignored...'
                     print_colored(f'{error_to_print}', 'magenta')
                     mark_ignore_domain(domain)
                     delete_domain_if_known(domain)
                     continue
                 elif webfinger_response.status_code == 410:
-                    error_to_print = f'Responded HTTP {webfinger_response.status_code} to webfinger request, marking as failed...'
+                    error_to_print = f'Responded HTTP {webfinger_response.status_code} to WebFinger request, marking as failed...'
                     print_colored(f'{error_to_print}', 'red')
                     mark_failed_domain(domain)
                     delete_domain_if_known(domain)
                     continue
                 else:
-                    error_to_print = f'Responded HTTP {webfinger_response.status_code} to webfinger request'
+                    error_to_print = f'Responded HTTP {webfinger_response.status_code} to WebFinger request'
                     print_colored(f'{error_to_print}', 'yellow')
                     log_error(domain, error_to_print)
                     error_reason = webfinger_response.status_code
