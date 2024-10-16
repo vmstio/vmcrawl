@@ -32,7 +32,7 @@ custom_headers = {
     'User-Agent': appended_user_agent,
 }
 
-def resolve_dns_with_dnspython(domain):
+def perform_dns_query(domain):
     record_types = ['A', 'AAAA', 'CNAME']
     for record_type in record_types:
         try:
@@ -454,6 +454,20 @@ def check_and_record_domains(domain_list, ignored_domains, failed_domains, user_
                 continue
         if loopback is True:
             continue
+
+        dns_result = perform_dns_query(domain)
+        if dns_result is False:
+            error_to_print = f'{domain} DNS query returned NXDOMAIN'
+            print(f'{color_red}{error_to_print}{color_reset}')
+            mark_failed_domain(domain)
+            delete_domain_if_known(domain)
+            continue
+        elif dns_result is None:
+            error_to_print = f'{domain} DNS query failed'
+            error_reason = 'DNS'
+            print(f'{color_orange}{error_to_print}{color_reset}')
+            log_error(domain, error_to_print)
+            increment_domain_error(domain, error_reason)
 
         webfinger_url = f'https://{domain}/.well-known/webfinger?resource=acct:{domain}@{domain}'
         robots_url = f'https://{domain}/robots.txt'
@@ -909,110 +923,96 @@ def check_and_record_domains(domain_list, ignored_domains, failed_domains, user_
                     delete_domain_if_known(domain)
 
         except requests.exceptions.ConnectionError as e:
-            dns_result = resolve_dns_with_dnspython(domain)
-            if dns_result is False:
-                error_to_print = f'{domain} DNS query returned NXDOMAIN'
+            error_message = str(e)
+            if 'SSLError' in error_message and 'Hostname mismatch' in error_message:
+                error_to_print = f'{domain} SSL certfificate does not match hostname'
+                error_reason = 'SSL'
+                print(f'{color_orange}{error_to_print}{color_reset}')
+                delete_domain_if_known(domain)
+            elif 'SSLError' in error_message and 'self-signed' in error_message:
+                error_to_print = f'{domain} SSL certificate is self signed'
+                error_reason = 'SSL'
+                print(f'{color_orange}{error_to_print}{color_reset}')
+                delete_domain_if_known(domain)
+            elif 'SSLError' in error_message and 'certificate key too weak' in error_message:
+                error_to_print = f'{domain} SSL certificate has a weak key'
+                error_reason = 'SSL'
+                print(f'{color_orange}{error_to_print}{color_reset}')
+                delete_domain_if_known(domain)
+            elif 'SSLError' in error_message and 'certificate has expired' in error_message:
+                error_to_print = f'{domain} SSL certificate has expired'
+                error_reason = 'SSL'
+                print(f'{color_orange}{error_to_print}{color_reset}')
+                delete_domain_if_known(domain)
+            elif 'SSLError' in error_message and 'tlsv1' in error_message:
+                error_to_print = f'{domain} SSL returned was TLSV1'
+                error_reason = 'SSL'
+                print(f'{color_orange}{error_to_print}{color_reset}')
+                delete_domain_if_known(domain)
+            elif 'SSLError' in error_message and 'SSLV3_ALERT_HANDSHAKE_FAILURE' in error_message:
+                error_to_print = f'{domain} SSL returned was SSLV3'
+                error_reason = 'SSL'
+                print(f'{color_orange}{error_to_print}{color_reset}')
+                delete_domain_if_known(domain)
+            elif 'SSLError' in error_message and 'UNEXPECTED_EOF_WHILE_READING' in error_message:
+                error_to_print = f'{domain} SSL returned an unexpected EOF'
+                error_reason = 'SSL'
+                print(f'{color_orange}{error_to_print}{color_reset}')
+                delete_domain_if_known(domain)
+            elif 'SSLError' in error_message and 'unable to get local issuer certificate' in error_message:
+                error_to_print = f'{domain} SSL returned with untrusted CA'
+                error_reason = 'SSL'
+                print(f'{color_orange}{error_to_print}{color_reset}')
+                delete_domain_if_known(domain)
+            elif 'SSLError' in error_message and 'record layer failure' in error_message:
+                error_to_print = f'{domain} SSL returned with record layer failure'
+                error_reason = 'SSL'
+                print(f'{color_orange}{error_to_print}{color_reset}')
+                delete_domain_if_known(domain)
+            elif 'SSLError' in error_message and 'UNSAFE_LEGACY_RENEGOTIATION_DISABLED' in error_message:
+                error_to_print = f'{domain} SSL returned with unsafe legacy renegotiation'
+                print(f'{color_orange}{error_to_print}{color_reset}')
+                error_reason = 'SSL'
+                delete_domain_if_known(domain)
+            elif 'SSLError' in error_message and 'IP address mismatch' in error_message:
+                error_to_print = f'{domain} SSL returned with IP address mismatch'
+                error_reason = 'SSL'
+                print(f'{color_orange}{error_to_print}{color_reset}')
+                delete_domain_if_known(domain)
+            elif 'Exceeded 30 redirects' in error_message:
                 print(f'{color_red}{error_to_print}{color_reset}')
                 mark_failed_domain(domain)
                 delete_domain_if_known(domain)
-                continue
-            elif dns_result is None:
-                error_to_print = f'{domain} DNS query failed'
-                error_reason = 'DNS'
-                print(f'{color_orange}{error_to_print}{color_reset}')
-                log_error(domain, error_to_print)
-                increment_domain_error(domain, error_reason)
+            elif 'ConnectTimeoutError' in error_message or 'ConnectionResetError' in error_message:
+                error_to_print = f'{domain} HTTP connection was reset'
+                error_reason = 'HTTP'
+                print(f'{color_cyan}{error_to_print}{color_reset}')
+            elif 'InvalidChunkLength' in error_message:
+                error_to_print = f'{domain} HTTP response was an invalid chunk length'
+                print(f'{color_cyan}{error_to_print}{color_reset}')
+                error_reason = 'HTTP'
+            elif 'RemoteDisconnected' in error_message:
+                error_to_print = f'{domain} HTTP request was disconnected remotely'
+                error_reason = 'HTTP'
+                print(f'{color_cyan}{error_to_print}{color_reset}')
+            elif 'NewConnectionError' in error_message:
+                error_to_print = f'{domain} HTTP request failed to connect'
+                error_reason = 'HTTP'
+                print(f'{color_cyan}{error_to_print}{color_reset}')
+            elif 'NameResolutionError' in error_message:
+                error_to_print = f'{domain} HTTP request failed to resolve'
+                error_reason = 'HTTP'
+                print(f'{color_cyan}{error_to_print}{color_reset}')
+            elif 'LineTooLong' in error_message:
+                error_to_print = f'{domain} HTTP response header was too large'
+                error_reason = 'HTTP'
+                print(f'{color_cyan}{error_to_print}{color_reset}')
             else:
-                error_message = str(e)
-                if 'SSLError' in error_message and 'Hostname mismatch' in error_message:
-                    error_to_print = f'{domain} SSL certfificate does not match hostname'
-                    error_reason = 'SSL'
-                    print(f'{color_orange}{error_to_print}{color_reset}')
-                    delete_domain_if_known(domain)
-                elif 'SSLError' in error_message and 'self-signed' in error_message:
-                    error_to_print = f'{domain} SSL certificate is self signed'
-                    error_reason = 'SSL'
-                    print(f'{color_orange}{error_to_print}{color_reset}')
-                    delete_domain_if_known(domain)
-                elif 'SSLError' in error_message and 'certificate key too weak' in error_message:
-                    error_to_print = f'{domain} SSL certificate has a weak key'
-                    error_reason = 'SSL'
-                    print(f'{color_orange}{error_to_print}{color_reset}')
-                    delete_domain_if_known(domain)
-                elif 'SSLError' in error_message and 'certificate has expired' in error_message:
-                    error_to_print = f'{domain} SSL certificate has expired'
-                    error_reason = 'SSL'
-                    print(f'{color_orange}{error_to_print}{color_reset}')
-                    delete_domain_if_known(domain)
-                elif 'SSLError' in error_message and 'tlsv1' in error_message:
-                    error_to_print = f'{domain} SSL returned was TLSV1'
-                    error_reason = 'SSL'
-                    print(f'{color_orange}{error_to_print}{color_reset}')
-                    delete_domain_if_known(domain)
-                elif 'SSLError' in error_message and 'SSLV3_ALERT_HANDSHAKE_FAILURE' in error_message:
-                    error_to_print = f'{domain} SSL returned was SSLV3'
-                    error_reason = 'SSL'
-                    print(f'{color_orange}{error_to_print}{color_reset}')
-                    delete_domain_if_known(domain)
-                elif 'SSLError' in error_message and 'UNEXPECTED_EOF_WHILE_READING' in error_message:
-                    error_to_print = f'{domain} SSL returned an unexpected EOF'
-                    error_reason = 'SSL'
-                    print(f'{color_orange}{error_to_print}{color_reset}')
-                    delete_domain_if_known(domain)
-                elif 'SSLError' in error_message and 'unable to get local issuer certificate' in error_message:
-                    error_to_print = f'{domain} SSL returned with untrusted CA'
-                    error_reason = 'SSL'
-                    print(f'{color_orange}{error_to_print}{color_reset}')
-                    delete_domain_if_known(domain)
-                elif 'SSLError' in error_message and 'record layer failure' in error_message:
-                    error_to_print = f'{domain} SSL returned with record layer failure'
-                    error_reason = 'SSL'
-                    print(f'{color_orange}{error_to_print}{color_reset}')
-                    delete_domain_if_known(domain)
-                elif 'SSLError' in error_message and 'UNSAFE_LEGACY_RENEGOTIATION_DISABLED' in error_message:
-                    error_to_print = f'{domain} SSL returned with unsafe legacy renegotiation'
-                    print(f'{color_orange}{error_to_print}{color_reset}')
-                    error_reason = 'SSL'
-                    delete_domain_if_known(domain)
-                elif 'SSLError' in error_message and 'IP address mismatch' in error_message:
-                    error_to_print = f'{domain} SSL returned with IP address mismatch'
-                    error_reason = 'SSL'
-                    print(f'{color_orange}{error_to_print}{color_reset}')
-                    delete_domain_if_known(domain)
-                elif 'Exceeded 30 redirects' in error_message:
-                    print(f'{color_red}{error_to_print}{color_reset}')
-                    mark_failed_domain(domain)
-                    delete_domain_if_known(domain)
-                elif 'ConnectTimeoutError' in error_message or 'ConnectionResetError' in error_message:
-                    error_to_print = f'{domain} HTTP connection was reset'
-                    error_reason = 'HTTP'
-                    print(f'{color_cyan}{error_to_print}{color_reset}')
-                elif 'InvalidChunkLength' in error_message:
-                    error_to_print = f'{domain} HTTP response was an invalid chunk length'
-                    print(f'{color_cyan}{error_to_print}{color_reset}')
-                    error_reason = 'HTTP'
-                elif 'RemoteDisconnected' in error_message:
-                    error_to_print = f'{domain} HTTP request was disconnected remotely'
-                    error_reason = 'HTTP'
-                    print(f'{color_cyan}{error_to_print}{color_reset}')
-                elif 'NewConnectionError' in error_message:
-                    error_to_print = f'{domain} HTTP request failed to connect'
-                    error_reason = 'HTTP'
-                    print(f'{color_cyan}{error_to_print}{color_reset}')
-                elif 'NameResolutionError' in error_message:
-                    error_to_print = f'{domain} HTTP request failed to resolve'
-                    error_reason = 'HTTP'
-                    print(f'{color_cyan}{error_to_print}{color_reset}')
-                elif 'LineTooLong' in error_message:
-                    error_to_print = f'{domain} HTTP response header was too large'
-                    error_reason = 'HTTP'
-                    print(f'{color_cyan}{error_to_print}{color_reset}')
-                else:
-                    error_to_print = f'{domain} failed with unhandled error: {e}'
-                    error_reason = '???'
-                    print(f'{color_orange}{error_to_print}{color_reset}')
-                log_error(domain, error_to_print)
-                increment_domain_error(domain, error_reason)
+                error_to_print = f'{domain} failed with unhandled error: {e}'
+                error_reason = '???'
+                print(f'{color_orange}{error_to_print}{color_reset}')
+            log_error(domain, error_to_print)
+            increment_domain_error(domain, error_reason)
 
         except requests.exceptions.ReadTimeout:
             error_to_print = f'{domain} HTTP connection timed out'
