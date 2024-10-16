@@ -1019,9 +1019,6 @@ def read_domain_list(file_path):
     with open(file_path, 'r') as file:
         return [line.strip() for line in file]
 
-default_source = 'database'  # Default source is set to 'database'
-domain_list_file = sys.argv[1] if len(sys.argv) > 1 else None
-
 def load_from_database(user_choice):
     cursor = conn.cursor()
     try:
@@ -1113,6 +1110,9 @@ def load_from_file(file_name):
                     cursor.close()
                 conn.commit()
     return domain_list
+
+default_source = 'database'  # Default source is set to 'database'
+domain_list_file = sys.argv[1] if len(sys.argv) > 1 else None
 
 try:
     if domain_list_file:  # File name provided as argument
