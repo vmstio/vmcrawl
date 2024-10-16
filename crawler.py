@@ -27,7 +27,7 @@ print(f'{color_bold}{appname} v{appversion}{color_reset}')
 print(f'{color_pink}Alter direction:{color_reset} 2=Reverse 3=Random')
 print(f'{color_yellow}Retry general errors:{color_reset} 4=Overflow 5=Underflow')
 print(f'{color_orange}Retry specific errors:{color_reset} 9=SSL 10=DNS 11=### 15=??? 16=API 17=JSON 23=TXT')
-print(f'{color_cyan}Retry HTTP errors:{color_reset} 12=HTTP 13=400s 18=500s 404=404 406=406')
+print(f'{color_cyan}Retry HTTP errors:{color_reset} 12=HTTP 13=400s 18=500s 400=400 404=404 406=406')
 print(f'{color_red}Retry fatal errors:{color_reset} 7=Ignored 14=Failed')
 print(f'{color_green}Retry good data:{color_reset} 6=Stale 8=Outdated 21=Inactive 22=Main')
 print(f'{color_bold}Enter your choice (1, 2, 3, etc):{color_reset} ', end='', flush=True)
@@ -529,6 +529,13 @@ def check_and_record_domains(domain_list, ignored_domains, failed_domains, user_
                         mark_ignore_domain(domain, conn)
                         delete_domain_if_known(domain, conn)
                         continue
+                    if 'text/html' in content_type:
+                        if content == '':
+                            error_to_print = f'{domain} is not using Mastodon'
+                            print(f'{color_magenta}{error_to_print}{color_reset}')
+                            mark_ignore_domain(domain, conn)
+                            delete_domain_if_known(domain, conn)
+                            continue
                     if content_length == '0':
                         error_to_print = f'{domain} is not using Mastodon'
                         print(f'{color_magenta}{error_to_print}{color_reset}')
@@ -1091,6 +1098,8 @@ def load_from_database(user_choice):
         cursor.execute(query)
     elif user_choice == "23":
         cursor.execute("SELECT Domain FROM RawDomains WHERE Reason = 'TXT' ORDER BY Errors ASC")
+    elif user_choice == "400":
+        cursor.execute("SELECT Domain FROM RawDomains WHERE Reason LIKE '%400%' ORDER BY Errors ASC")
     elif user_choice == "404":
         cursor.execute("SELECT Domain FROM RawDomains WHERE Reason LIKE '%404%' ORDER BY Errors ASC")
     elif user_choice == "406":
