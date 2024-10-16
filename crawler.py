@@ -122,6 +122,7 @@ def clear_domain_error(domain):
         cursor.close()
 
 def mark_ignore_domain(domain):
+    cursor = conn.cursor()
     try:
         # Insert or update the domain with the new errors count
         cursor.execute('''
@@ -364,16 +365,34 @@ def get_bad_tld():
         cursor.close()
     return []
 
-def check_and_record_domains(domain_list, ignored_domains, failed_domains, user_choice):
-    default_user_agent = requests.utils.default_user_agent()
-    appended_user_agent = '{appname}/{appversion} (https://docs.vmst.io/projects/crawler)'
-    custom_headers = {
-        'User-Agent': appended_user_agent,
-    }
+def get_failed_domains():
+    cursor = conn.cursor()
+    try:
+        cursor.execute("SELECT Domain FROM RawDomains WHERE Failed = '1'")  # Replace 'domains_table' and 'domain' with your actual table and column names
+        failed_domains = [row[0].strip() for row in cursor.fetchall() if row[0].strip()]
+        conn.commit()
+    except Exception as e:
+        print(f"Failed to obtain failed domains: {e}")
+        conn.rollback()
+    finally:
+        cursor.close()
+    return failed_domains
 
+def get_ignored_domains():
+    cursor = conn.cursor()
+    try:
+        cursor.execute("SELECT Domain FROM RawDomains WHERE Ignore = '1'")  # Replace 'domains_table' and 'domain' with your actual table and column names
+        ignored_domains = [row[0].strip() for row in cursor.fetchall() if row[0].strip()]
+        conn.commit()
+    except Exception as e:
+        print(f"Failed to obtain ignored domains: {e}")
+        conn.rollback()
+    finally:
+        cursor.close()
+    return ignored_domains
+
+def check_and_record_domains(domain_list, ignored_domains, failed_domains, user_choice, junk_domains, bad_tlds, custom_headers):
     total_domains = len(domain_list)
-    junk_domains = get_junk_keywords()
-    bad_tlds = get_bad_tld()
     for index, domain in enumerate(domain_list, start=1):
         print(f'Attempting to query {domain} ({index}/{total_domains})')
 
@@ -1092,26 +1111,37 @@ def load_from_file(file_name):
                 conn.commit()
     return domain_list
 
-# Main program starts here
-print(f'{color_bold}{appname} v{appversion}{color_reset}')
-print(f'{color_pink}Alter direction:{color_reset} 2=Reverse 3=Random')
-print(f'{color_yellow}Retry general errors:{color_reset} 4=Overflow 5=Underflow')
-print(f'{color_orange}Retry specific errors:{color_reset} 9=SSL 10=DNS 11=### 15=??? 16=API 17=JSON 23=TXT')
-print(f'{color_cyan}Retry HTTP errors:{color_reset} 12=HTTP 13=400s 18=500s 400=400 404=404 406=406')
-print(f'{color_red}Retry fatal errors:{color_reset} 7=Ignored 14=Failed')
-print(f'{color_green}Retry good data:{color_reset} 6=Stale 8=Outdated 21=Inactive 22=Main')
-print(f'{color_bold}Enter your choice (1, 2, 3, etc):{color_reset} ', end='', flush=True)
-ready, _, _ = select.select([sys.stdin], [], [], 5)  # Wait for input for 5 seconds
+def print_colored(text: str, color: str, **kwargs) -> None:
+    print(f"{colors.get(color, '')}{text}{colors['reset']}", **kwargs)
 
-if ready:
-    user_choice = sys.stdin.readline().strip()
-else:
-    print("\nDefaulting to standard crawl")
-    user_choice = "1"
+def print_menu() -> None:
+    menu_options = {
+        "Alter direction": {"2": "Reverse", "3": "Random"},
+        "Retry general errors": {"4": "Overflow", "5": "Underflow"},
+        "Retry specific errors": {"9": "SSL", "10": "DNS", "11": "###", "15": "???", "16": "API", "17": "JSON", "23": "TXT"},
+        "Retry HTTP errors": {"12": "HTTP", "13": "400s", "18": "500s", "400": "400", "404": "404", "406": "406"},
+        "Retry fatal errors": {"7": "Ignored", "14": "Failed"},
+        "Retry good data": {"6": "Stale", "8": "Outdated", "21": "Inactive", "22": "Main"},
+    }
 
-print(f"Choice selected: {user_choice}")
+    print_colored(f"{appname} v{appversion}", "bold")
+    for category, options in menu_options.items():
+        options_str = " ".join(f"{key}={value}" for key, value in options.items())
+        print_colored(f"{category}: {options_str}", "bold")
+    print_colored("Enter your choice (1, 2, 3, etc):", "bold", end=" ")
+    sys.stdout.flush()
 
-default_source = 'database'  # Default source is set to 'database'
+def get_user_choice() -> str:
+    ready, _, _ = select.select([sys.stdin], [], [], 5)  # Wait for input for 5 seconds
+    if ready:
+        return sys.stdin.readline().strip()
+    print_colored("\nDefaulting to standard crawl", "cyan")
+    return "1"
+
+print_menu()
+user_choice = get_user_choice()
+print_colored(f"Choice selected: {user_choice}", "magenta")
+
 domain_list_file = sys.argv[1] if len(sys.argv) > 1 else None
 
 try:
@@ -1132,17 +1162,15 @@ except sqlite3.Error as e:
     print(f"Database error: {e}")
     sys.exit(1)
 
-cursor = conn.cursor()
-try:
-    cursor.execute("SELECT Domain FROM RawDomains WHERE Failed = '1'")  # Replace 'domains_table' and 'domain' with your actual table and column names
-    failed_domains = [row[0].strip() for row in cursor.fetchall() if row[0].strip()]
-    cursor.execute("SELECT Domain FROM RawDomains WHERE Ignore = '1'")  # Replace 'domains_table' and 'domain' with your actual table and column names
-    ignored_domains = [row[0].strip() for row in cursor.fetchall() if row[0].strip()]
-    conn.commit()
-except Exception as e:
-    print(f"Failed to obtain excluded domains: {e}")
-    conn.rollback()
-finally:
-    cursor.close()
+default_user_agent = requests.utils.default_user_agent()
+appended_user_agent = '{appname}/{appversion} (https://docs.vmst.io/projects/crawler)'
+custom_headers = {
+    'User-Agent': appended_user_agent,
+}
 
-check_and_record_domains(domain_list, ignored_domains, failed_domains, user_choice)
+junk_domains = get_junk_keywords()
+bad_tlds = get_bad_tld()
+failed_domains = get_failed_domains()
+ignored_domains = get_ignored_domains()
+
+check_and_record_domains(domain_list, ignored_domains, failed_domains, user_choice, junk_domains, bad_tlds, custom_headers)
