@@ -803,15 +803,6 @@ def check_and_record_domains(domain_list, ignored_domains, failed_domains, user_
                                 total_users = linked_nodeinfo_data['usage']['users']['total']
                                 active_month_users = linked_nodeinfo_data['usage']['users']['activeMonth']
 
-                                if active_month_users > max(total_users + 6, total_users + (total_users * 0.25)):
-                                    error_to_print = f'Running Mastodon v{software_version} with invalid counts ({active_month_users}:{total_users})'
-                                    error_reason = '###'
-                                    print_colored(f'{error_to_print}', 'pink')
-                                    log_error(domain, error_to_print)
-                                    increment_domain_error(domain, error_reason)
-                                    delete_domain_if_known(domain)
-                                    continue
-
                                 if software_version.startswith("4"):
                                     instance_api_url = f'https://{backend_domain}/api/v2/instance'
                                 else:
@@ -876,11 +867,6 @@ def check_and_record_domains(domain_list, ignored_domains, failed_domains, user_
                                     if actual_domain == "gc2.jp":
                                         source_url = "https://github.com/gc2-jp/freespeech"
 
-                                if software_version == software_version_full:
-                                    print_colored(f'Mastodon v{software_version}', 'green')
-                                else:
-                                    print_colored(f'Mastodon v{software_version} ({software_version_full})', 'green')
-
                                 cursor = conn.cursor()
                                 try:
                                     if domain != actual_domain:
@@ -913,7 +899,23 @@ def check_and_record_domains(domain_list, ignored_domains, failed_domains, user_
                                     conn.rollback()
                                 finally:
                                     cursor.close()
+
+                                if active_month_users > max(total_users + 6, total_users + (total_users * 0.25)):
+                                    error_to_print = f'Mastodon v{software_version} with invalid counts ({active_month_users}:{total_users})'
+                                    error_reason = '###'
+                                    print_colored(f'{error_to_print}', 'pink')
+                                    log_error(domain, error_to_print)
+                                    increment_domain_error(domain, error_reason)
+                                    delete_domain_if_known(domain)
+                                    continue
+
                                 clear_domain_error(domain)
+
+                                if software_version == software_version_full:
+                                    print_colored(f'Mastodon v{software_version}', 'green')
+                                else:
+                                    print_colored(f'Mastodon v{software_version} ({software_version_full})', 'green')
+
                             else:
                                 error_to_print = f'Not using Mastodon, marking as ignored...'
                                 print_colored(f'{error_to_print}', 'magenta')
