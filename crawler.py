@@ -166,7 +166,20 @@ def find_code_repository(backend_domain):
     url = f'https://{backend_domain}/about'
 
     # List of code repository domains to look for
-    repo_domains = ['github.com', 'gitlab.com', 'bitbucket.org', 'sourcehut.org', 'codeberg.org', 'code.as', 'git.qoto.org', 'git.sr.ht', 'gitlab.ejone.co', 'gitea.treehouse.systems', 'git.closed.social', 'git.asonix.dog', 'git.pixie.town']
+    repo_domains = [
+        'bitbucket.org',
+        'code.as',
+        'codeberg.org',
+        'git.closed.social',
+        'git.pixie.town',
+        'git.qoto.org',
+        'git.sr.ht',
+        'gitea.treehouse.systems',
+        'gitlab.com',
+        'gitlab.ejone.co',
+        'github.com',
+        'sourcehut.org'
+    ]
 
     # Send a GET request to the site
     response = requests.get(url)
