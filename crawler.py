@@ -286,7 +286,13 @@ def clean_version_doubledash(software_version):
     return software_version
 
 def clean_version_oddballs(domain, software_version):
-    oddballs = ['exquisite.social', 'bark.lgbt', 'drk.st', 'sharlayan.in', 'glitch.taks.garden']
+    oddballs = [
+        'bark.lgbt',
+        'drk.st',
+        'exquisite.social',
+        'glitch.taks.garden',
+        'sharlayan.in'
+    ]
     if domain in oddballs:
         software_version = software_version + "-odd.0"
 
