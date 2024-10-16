@@ -26,6 +26,12 @@ load_dotenv()
 db_path = os.getenv("db_path")
 conn = sqlite3.connect(db_path)
 
+default_user_agent = requests.utils.default_user_agent()
+appended_user_agent = '{appname}/{appversion} (https://docs.vmst.io/projects/{appname})'
+custom_headers = {
+    'User-Agent': appended_user_agent,
+}
+
 def resolve_dns_with_dnspython(domain):
     record_types = ['A', 'AAAA', 'CNAME']
     for record_type in record_types:
@@ -387,7 +393,7 @@ def get_bad_tld():
 def get_failed_domains():
     cursor = conn.cursor()
     try:
-        cursor.execute("SELECT Domain FROM RawDomains WHERE Failed = '1'")  # Replace 'domains_table' and 'domain' with your actual table and column names
+        cursor.execute("SELECT Domain FROM RawDomains WHERE Failed = '1'")
         failed_domains = [row[0].strip() for row in cursor.fetchall() if row[0].strip()]
         conn.commit()
     except Exception as e:
@@ -400,7 +406,7 @@ def get_failed_domains():
 def get_ignored_domains():
     cursor = conn.cursor()
     try:
-        cursor.execute("SELECT Domain FROM RawDomains WHERE Ignore = '1'")  # Replace 'domains_table' and 'domain' with your actual table and column names
+        cursor.execute("SELECT Domain FROM RawDomains WHERE Ignore = '1'")
         ignored_domains = [row[0].strip() for row in cursor.fetchall() if row[0].strip()]
         conn.commit()
     except Exception as e:
@@ -1180,12 +1186,6 @@ except FileNotFoundError:
 except sqlite3.Error as e:
     print(f"Database error: {e}")
     sys.exit(1)
-
-default_user_agent = requests.utils.default_user_agent()
-appended_user_agent = '{appname}/{appversion} (https://docs.vmst.io/projects/crawler)'
-custom_headers = {
-    'User-Agent': appended_user_agent,
-}
 
 junk_domains = get_junk_keywords()
 bad_tlds = get_bad_tld()
