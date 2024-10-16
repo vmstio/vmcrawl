@@ -97,68 +97,92 @@ def log_error(domain, conn, error_to_print):
 
 def increment_domain_error(domain, conn, error_reason):
     cursor = conn.cursor()
-    cursor.execute('SELECT Errors FROM RawDomains WHERE Domain = ?', (domain,))
-    result = cursor.fetchone()
-    if result:
-        current_errors = result[0] if result[0] is not None else 0
-        new_errors = current_errors + 1
-    else:
-        # If the domain is not found, initialize errors count to 1
-        new_errors = 1
+    try:
+        cursor.execute('SELECT Errors FROM RawDomains WHERE Domain = ?', (domain,))
+        result = cursor.fetchone()
+        if result:
+            current_errors = result[0] if result[0] is not None else 0
+            new_errors = current_errors + 1
+        else:
+            # If the domain is not found, initialize errors count to 1
+            new_errors = 1
 
-    # Insert or update the domain with the new errors count
-    cursor.execute('''
-        INSERT INTO RawDomains (Domain, Failed, Ignore, Errors, Reason)
-        VALUES (?, ?, ?, ?, ?)
-        ON CONFLICT(Domain) DO UPDATE SET
-        Failed = excluded.Failed,
-        Ignore = excluded.Ignore,
-        Errors = excluded.Errors,
-        Reason = excluded.Reason
-    ''', (domain, None, None, new_errors, error_reason))
-    conn.commit()
+        # Insert or update the domain with the new errors count
+        cursor.execute('''
+            INSERT INTO RawDomains (Domain, Failed, Ignore, Errors, Reason)
+            VALUES (?, ?, ?, ?, ?)
+            ON CONFLICT(Domain) DO UPDATE SET
+            Failed = excluded.Failed,
+            Ignore = excluded.Ignore,
+            Errors = excluded.Errors,
+            Reason = excluded.Reason
+        ''', (domain, None, None, new_errors, error_reason))
+        conn.commit()
+    except Exception as e:
+        print(f"Failed to increment domain error: {e}")
+        conn.rollback()
+    finally:
+        cursor.close()
 
 def clear_domain_error(domain, conn):
     cursor = conn.cursor()
-    # Insert or update the domain with the new errors count
-    cursor.execute('''
-        INSERT INTO RawDomains (Domain, Failed, Ignore, Errors, Reason)
-        VALUES (?, ?, ?, ?, ?)
-        ON CONFLICT(Domain) DO UPDATE SET
-        Failed = excluded.Failed,
-        Ignore = excluded.Ignore,
-        Errors = excluded.Errors,
-        Reason = excluded.Reason
-    ''', (domain, None, None, None, None))
-    conn.commit()
+    try:
+        # Insert or update the domain with the new errors count
+        cursor.execute('''
+            INSERT INTO RawDomains (Domain, Failed, Ignore, Errors, Reason)
+            VALUES (?, ?, ?, ?, ?)
+            ON CONFLICT(Domain) DO UPDATE SET
+            Failed = excluded.Failed,
+            Ignore = excluded.Ignore,
+            Errors = excluded.Errors,
+            Reason = excluded.Reason
+        ''', (domain, None, None, None, None))
+        conn.commit()
+    except Exception as e:
+        print(f"Failed to clear domain error: {e}")
+        conn.rollback()
+    finally:
+        cursor.close()
 
 def mark_ignore_domain(domain, conn):
     cursor = conn.cursor()
-    # Insert or update the domain with the new errors count
-    cursor.execute('''
-        INSERT INTO RawDomains (Domain, Failed, Ignore, Errors, Reason)
-        VALUES (?, ?, ?, ?, ?)
-        ON CONFLICT(Domain) DO UPDATE SET
-        Failed = excluded.Failed,
-        Ignore = excluded.Ignore,
-        Errors = excluded.Errors,
-        Reason = excluded.Reason
-    ''', (domain, None, 1, None, None))
-    conn.commit()
+    try:
+        # Insert or update the domain with the new errors count
+        cursor.execute('''
+            INSERT INTO RawDomains (Domain, Failed, Ignore, Errors, Reason)
+            VALUES (?, ?, ?, ?, ?)
+            ON CONFLICT(Domain) DO UPDATE SET
+            Failed = excluded.Failed,
+            Ignore = excluded.Ignore,
+            Errors = excluded.Errors,
+            Reason = excluded.Reason
+        ''', (domain, None, 1, None, None))
+        conn.commit()
+    except Exception as e:
+        print(f"Failed to mark domain ignored: {e}")
+        conn.rollback()
+    finally:
+        cursor.close()
 
 def mark_failed_domain(domain, conn):
     cursor = conn.cursor()
-    # Insert or update the domain with the new errors count
-    cursor.execute('''
-        INSERT INTO RawDomains (Domain, Failed, Ignore, Errors, Reason)
-        VALUES (?, ?, ?, ?, ?)
-        ON CONFLICT(Domain) DO UPDATE SET
-        Failed = excluded.Failed,
-        Ignore = excluded.Ignore,
-        Errors = excluded.Errors,
-        Reason = excluded.Reason
-    ''', (domain, 1, None, None, None))
-    conn.commit()
+    try:
+        # Insert or update the domain with the new errors count
+        cursor.execute('''
+            INSERT INTO RawDomains (Domain, Failed, Ignore, Errors, Reason)
+            VALUES (?, ?, ?, ?, ?)
+            ON CONFLICT(Domain) DO UPDATE SET
+            Failed = excluded.Failed,
+            Ignore = excluded.Ignore,
+            Errors = excluded.Errors,
+            Reason = excluded.Reason
+        ''', (domain, 1, None, None, None))
+        conn.commit()
+    except Exception as e:
+        print(f"Failed to mark domain failed: {e}")
+        conn.rollback()
+    finally:
+        cursor.close()
 
 def find_code_repository(backend_domain):
     # URL of the site you want to parse
@@ -197,10 +221,16 @@ def limit_url_depth(source_url, depth=2):
 
 def delete_domain_if_known(domain, conn):
     cursor = conn.cursor()
-    cursor.execute('''
-        DELETE FROM MastodonDomains WHERE "Domain" = ?
-        ''', (domain,))
-    conn.commit()
+    try:
+        cursor.execute('''
+            DELETE FROM MastodonDomains WHERE "Domain" = ?
+            ''', (domain,))
+        conn.commit()
+    except Exception as e:
+        print(f"Failed to delete known domain: {e}")
+        conn.rollback()
+    finally:
+        cursor.close()
 
 def clean_version_suffix(software_version_full):
     # Remove any unwanted or invalid suffixes from the version string
@@ -330,32 +360,32 @@ def clean_version_nightly(software_version):
 
     return software_version
 
-def get_junk_keywords(db_path):
+def get_junk_keywords(conn):
+    cursor = conn.cursor()
     try:
-        conn = sqlite3.connect(db_path)
-        cursor = conn.cursor()
         cursor.execute("SELECT Keywords FROM JunkWords")
         junk_domains = [row[0] for row in cursor.fetchall()]
-        conn.close()
+        conn.commit()
         return junk_domains
-    except sqlite3.Error as e:
-        print(f"Database error: {e}")
     except Exception as e:
-        print(f"An unexpected error occurred: {e}")
+        print(f"Failed to obtain junk keywords: {e}")
+        conn.rollback()
+    finally:
+        cursor.close()
     return []
 
-def get_bad_tld(db_path):
+def get_bad_tld(conn):
+    cursor = conn.cursor()
     try:
-        conn = sqlite3.connect(db_path)
-        cursor = conn.cursor()
         cursor.execute("SELECT TLD FROM BadTLD")
-        keywords = [row[0] for row in cursor.fetchall()]
-        conn.close()
-        return keywords
-    except sqlite3.Error as e:
-        print(f"Database error: {e}")
+        bad_tlds = [row[0] for row in cursor.fetchall()]
+        conn.commit()
+        return bad_tlds
     except Exception as e:
-        print(f"An unexpected error occurred: {e}")
+        print(f"Failed to obtain bad TLDs: {e}")
+        conn.rollback()
+    finally:
+        cursor.close()
     return []
 
 def check_and_record_domains(domain_list, ignored_domains, failed_domains, user_choice):
@@ -387,7 +417,7 @@ def check_and_record_domains(domain_list, ignored_domains, failed_domains, user_
                 continue
 
         loopback = False  # Reset the loopback variable
-        junk_domains = get_junk_keywords(db_path)
+        junk_domains = get_junk_keywords(conn)
         for junk_domain in junk_domains:
             if junk_domain in domain:
                 print(f'{color_magenta}{domain} is known junk domain{color_reset}')
@@ -399,7 +429,7 @@ def check_and_record_domains(domain_list, ignored_domains, failed_domains, user_
             continue
 
         loopback = False  # Reset the loopback variable
-        for bad_tld in get_bad_tld(db_path):
+        for bad_tld in get_bad_tld(conn):
             if domain.endswith(bad_tld):
                 print(f'{color_magenta}{domain} has known bad TLD{color_reset}')
                 mark_failed_domain(domain, conn)
