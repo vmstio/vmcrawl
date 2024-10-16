@@ -43,11 +43,11 @@ print(f"Choice selected: {user_choice}")
 
 db_path = os.getenv("db_path")
 
-timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
-error_directory = 'error'  # Name of the error subfolder
-if not os.path.exists(error_directory):
-    os.makedirs(error_directory)
-error_file = os.path.join(error_directory, f'errors_{timestamp}.txt')
+# timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+# error_directory = 'error'  # Name of the error subfolder
+# if not os.path.exists(error_directory):
+#     os.makedirs(error_directory)
+# error_file = os.path.join(error_directory, f'errors_{timestamp}.txt')
 
 def resolve_dns_with_dnspython(domain):
     record_types = ['A', 'AAAA', 'CNAME']
@@ -80,6 +80,20 @@ def normalize_email(email):
     email = re.sub(r'(\[at\]|\(at\)|\{at\}| at | @ |\[@\]| \[at\] | \(at\) | \{at\} )', '@', email, flags=re.IGNORECASE)
     email = re.sub(r'(\[dot\]|\(dot\)|\{dot\}| dot | \[dot\] | \(dot\) | \{dot\} )', '.', email, flags=re.IGNORECASE)
     return email
+
+def log_error(domain, conn, error_to_print):
+    cursor = conn.cursor()
+    try:
+        cursor.execute('''
+            INSERT INTO ErrorLog (Domain, Error)
+            VALUES (?, ?)
+        ''', (domain, error_to_print))
+        conn.commit()
+    except Exception as e:
+        print(f"Failed to log error: {e}")
+        conn.rollback()
+    finally:
+        cursor.close()
 
 def increment_domain_error(domain, conn, error_reason):
     cursor = conn.cursor()
@@ -344,10 +358,6 @@ def get_bad_tld(db_path):
         print(f"An unexpected error occurred: {e}")
     return []
 
-def log_error(error_to_print):
-    with open(error_file, 'a') as file:
-        file.write(error_to_print + '\n')
-
 def check_and_record_domains(domain_list, ignored_domains, failed_domains, user_choice):
     conn = sqlite3.connect(db_path)
     cursor = conn.cursor()
@@ -358,7 +368,7 @@ def check_and_record_domains(domain_list, ignored_domains, failed_domains, user_
         'User-Agent': appended_user_agent,
     }
 
-    open(error_file, 'w').close()
+    # open(error_file, 'w').close()
 
     total_domains = len(domain_list)
     for index, domain in enumerate(domain_list, start=1):
@@ -407,7 +417,7 @@ def check_and_record_domains(domain_list, ignored_domains, failed_domains, user_
                     if robots_response.headers.get('Content-Type', '') == 'application/octet-stream':
                         error_to_print = f'{domain} returned binary file'
                         print(f'{color_yellow}{error_to_print}{color_reset}')
-                        log_error(error_to_print)
+                        log_error(domain, conn, error_to_print)
                         error_reason = 'BIN'
                         increment_domain_error(domain, conn, error_reason)
                         continue
@@ -431,7 +441,7 @@ def check_and_record_domains(domain_list, ignored_domains, failed_domains, user_
                     if disallow_found is True:
                         error_to_print = f'{domain} is blocked by robots.txt'
                         print(f'{color_orange}{error_to_print}{color_reset}')
-                        log_error(error_to_print)
+                        log_error(domain, conn, error_to_print)
                         error_reason = 'TXT'
                         increment_domain_error(domain, conn, error_reason)
                         continue
@@ -482,7 +492,7 @@ def check_and_record_domains(domain_list, ignored_domains, failed_domains, user_
                             except json.JSONDecodeError:
                                 error_to_print = f'{domain} JSON from HTTP {webfinger_response.status_code} is invalid (webfinger)'
                                 print(f'{color_yellow}{error_to_print}{color_reset}')
-                                log_error(error_to_print)
+                                log_error(domain, conn, error_to_print)
                                 error_reason = 'JSON'
                                 increment_domain_error(domain, conn, error_reason)
                                 continue
@@ -508,7 +518,7 @@ def check_and_record_domains(domain_list, ignored_domains, failed_domains, user_
                     else:
                         error_to_print = f'{domain} returned HTTP {webfinger_response.status_code} (webfinger)'
                         print(f'{color_cyan}{error_to_print}{color_reset}')
-                        log_error(error_to_print)
+                        log_error(domain, conn, error_to_print)
                         error_reason = webfinger_response.status_code
                         increment_domain_error(domain, conn, error_reason)
                         continue
@@ -527,14 +537,14 @@ def check_and_record_domains(domain_list, ignored_domains, failed_domains, user_
                         if any(ct in content_type for ct in json_content_types):
                             error_to_print = f'{domain} JSON is invalid (webfinger)'
                             print(f'{color_yellow}{error_to_print}{color_reset}')
-                            log_error(error_to_print)
+                            log_error(domain, conn, error_to_print)
                             error_reason = 'JSON'
                             increment_domain_error(domain, conn, error_reason)
                             continue
                         elif not webfinger_response.content:
                             error_to_print = f'{domain} JSON is empty (webfinger)'
                             print(f'{color_yellow}{error_to_print}{color_reset}')
-                            log_error(error_to_print)
+                            log_error(domain, conn, error_to_print)
                             error_reason = 'JSON'
                             increment_domain_error(domain, conn, error_reason)
                             continue
@@ -542,14 +552,14 @@ def check_and_record_domains(domain_list, ignored_domains, failed_domains, user_
                             content_type_strip = content_type.split(';')[0].strip()
                             error_to_print = f'{domain} JSON is {content_type_strip} (webfinger)'
                             print(f'{color_yellow}{error_to_print}{color_reset}')
-                            log_error(error_to_print)
+                            log_error(domain, conn, error_to_print)
                             error_reason = 'JSON'
                             increment_domain_error(domain, conn, error_reason)
                             continue
                         else:
                             error_to_print = f'{domain} JSON is fucked (webfinger)'
                             print(f'{color_yellow}{error_to_print}{color_reset}')
-                            log_error(error_to_print)
+                            log_error(domain, conn, error_to_print)
                             error_reason = 'JSON'
                             increment_domain_error(domain, conn, error_reason)
                             continue
@@ -586,7 +596,7 @@ def check_and_record_domains(domain_list, ignored_domains, failed_domains, user_
                 else:
                     error_to_print = f'{domain} returned HTTP {webfinger_response.status_code} (webfinger)'
                     print(f'{color_cyan}{error_to_print}{color_reset}')
-                    log_error(error_to_print)
+                    log_error(domain, conn, error_to_print)
                     error_reason = webfinger_response.status_code
                     increment_domain_error(domain, conn, error_reason)
                     continue
@@ -607,14 +617,14 @@ def check_and_record_domains(domain_list, ignored_domains, failed_domains, user_
                         if any(ct in content_type for ct in json_content_types):
                             error_to_print = f'{domain} JSON is invalid (nodeinfo)'
                             print(f'{color_yellow}{error_to_print}{color_reset}')
-                            log_error(error_to_print)
+                            log_error(domain, conn, error_to_print)
                             error_reason = 'JSON'
                             increment_domain_error(domain, conn, error_reason)
                             continue
                         elif not nodeinfo_response.content:
                             error_to_print = f'{domain} JSON is empty (nodeinfo)'
                             print(f'{color_yellow}{error_to_print}{color_reset}')
-                            log_error(error_to_print)
+                            log_error(domain, conn, error_to_print)
                             error_reason = 'JSON'
                             increment_domain_error(domain, conn, error_reason)
                             continue
@@ -622,14 +632,14 @@ def check_and_record_domains(domain_list, ignored_domains, failed_domains, user_
                             content_type_strip = content_type.split(';')[0].strip()
                             error_to_print = f'{domain} JSON is {content_type_strip} (nodeinfo)'
                             print(f'{color_yellow}{error_to_print}{color_reset}')
-                            log_error(error_to_print)
+                            log_error(domain, conn, error_to_print)
                             error_reason = 'JSON'
                             increment_domain_error(domain, conn, error_reason)
                             continue
                         else:
                             error_to_print = f'{domain} JSON is fucked (nodeinfo)'
                             print(f'{color_yellow}{error_to_print}{color_reset}')
-                            log_error(error_to_print)
+                            log_error(domain, conn, error_to_print)
                             error_reason = 'JSON'
                             increment_domain_error(domain, conn, error_reason)
                             continue
@@ -659,7 +669,7 @@ def check_and_record_domains(domain_list, ignored_domains, failed_domains, user_
                 else:
                     error_to_print = f'{domain} returned HTTP {nodeinfo_response.status_code} (nodeinfo)'
                     print(f'{color_cyan}{error_to_print}{color_reset}')
-                    log_error(error_to_print)
+                    log_error(domain, conn, error_to_print)
                     error_reason = nodeinfo_response.status_code
                     increment_domain_error(domain, conn, error_reason)
                     continue
@@ -694,7 +704,7 @@ def check_and_record_domains(domain_list, ignored_domains, failed_domains, user_
                                 else:
                                     error_to_print = f'{domain} did not return application/activity+json @ {linked_nodeinfo_url}'
                                     print(f'{color_yellow}{error_to_print}{color_reset}')
-                                    log_error(error_to_print)
+                                    log_error(domain, conn, error_to_print)
                                     error_reason = 'JSON'
                                     increment_domain_error(domain, conn, error_reason)
                                     continue
@@ -724,7 +734,7 @@ def check_and_record_domains(domain_list, ignored_domains, failed_domains, user_
                                 if active_month_users > max(total_users + 6, total_users + (total_users * 0.25)):
                                     error_to_print = f'{domain} is running Mastodon v{software_version} with invalid counts ({active_month_users}:{total_users})'
                                     print(f'{color_yellow}{error_to_print}{color_reset}')
-                                    log_error(error_to_print)
+                                    log_error(domain, conn, error_to_print)
                                     error_reason = '###'
                                     increment_domain_error(domain, conn, error_reason)
                                     delete_domain_if_known(domain, conn)
@@ -741,7 +751,7 @@ def check_and_record_domains(domain_list, ignored_domains, failed_domains, user_
                                         if instance_api_response.status_code != 200 and instance_api_response.status_code != 410:
                                             error_to_print = f'{domain} returned HTTP {instance_api_response.status_code} (API)'
                                             print(f'{color_cyan}{error_to_print}{color_reset}')
-                                            log_error(error_to_print)
+                                            log_error(domain, conn, error_to_print)
                                             error_reason = 'API'
                                             increment_domain_error(domain, conn, error_reason)
                                             continue
@@ -753,7 +763,7 @@ def check_and_record_domains(domain_list, ignored_domains, failed_domains, user_
 
                                         error_to_print = f'{domain} did not return JSON (API)'
                                         print(f'{color_yellow}{error_to_print}{color_reset}')
-                                        log_error(error_to_print)
+                                        log_error(domain, conn, error_to_print)
                                         error_reason = 'JSON'
                                         increment_domain_error(domain, conn, error_reason)
                                         continue
@@ -837,7 +847,7 @@ def check_and_record_domains(domain_list, ignored_domains, failed_domains, user_
                                 delete_domain_if_known(domain, conn)
                             else:
                                 print(f'{color_cyan}{error_to_print}{color_reset}')
-                                log_error(error_to_print)
+                                log_error(domain, conn, error_to_print)
                                 error_reason = linked_nodeinfo_response.status_code
                                 increment_domain_error(domain, conn, error_reason)
                 else:
@@ -856,7 +866,7 @@ def check_and_record_domains(domain_list, ignored_domains, failed_domains, user_
             elif dns_result is None:
                 error_to_print = f'{domain} DNS query failed'
                 print(f'{color_orange}{error_to_print}{color_reset}')
-                log_error(error_to_print)
+                log_error(domain, conn, error_to_print)
                 error_reason = 'DNS'
                 increment_domain_error(domain, conn, error_reason)
             else:
@@ -948,19 +958,19 @@ def check_and_record_domains(domain_list, ignored_domains, failed_domains, user_
                     error_to_print = f'{domain} failed with unhandled error: {e}'
                     print(f'{color_orange}{error_to_print}{color_reset}')
                     error_reason = '???'
-                log_error(error_to_print)
+                log_error(domain, conn, error_to_print)
                 increment_domain_error(domain, conn, error_reason)
 
         except requests.exceptions.ReadTimeout:
             error_to_print = f'{domain} HTTP connection timed out'
             print(f'{color_cyan}{error_to_print}{color_reset}')
-            log_error(error_to_print)
+            log_error(domain, conn, error_to_print)
             error_reason = 'HTTP'
             increment_domain_error(domain, conn, error_reason)
         except requests.exceptions.RequestException:
             error_to_print = f'{domain} HTTP connection had an exception'
             print(f'{color_cyan}{error_to_print}{color_reset}')
-            log_error(error_to_print)
+            log_error(domain, conn, error_to_print)
             error_reason = 'HTTP'
             increment_domain_error(domain, conn, error_reason)
 
@@ -973,7 +983,7 @@ def check_and_record_domains(domain_list, ignored_domains, failed_domains, user_
             else:
                 error_to_print = f'{domain} encountered an unexpected error: {e}'
                 print(f'{color_yellow}{error_to_print}{color_reset}')
-                log_error(error_to_print)
+                log_error(domain, conn, error_to_print)
                 error_reason = '???'
                 increment_domain_error(domain, conn, error_reason)
 
