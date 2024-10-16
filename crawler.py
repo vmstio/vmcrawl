@@ -852,6 +852,7 @@ def check_and_record_domains(domain_list, ignored_domains, failed_domains, user_
                                         "Source" = excluded."Source",
                                         "Full Version" = excluded."Full Version"
                                     ''', (actual_domain, software_version, total_users, active_month_users, datetime.now().strftime('%Y-%m-%d %H:%M:%S'), contact_account, source_url, software_version_full))
+                                    conn.commit()
                                 except Exception as e:
                                     print(f"Failed to write domain data: {e}")
                                     conn.rollback()
@@ -1086,6 +1087,7 @@ def load_from_database(user_choice):
         else:
             cursor.execute("SELECT Domain FROM RawDomains WHERE (Failed IS NULL OR Failed = '' OR Failed = '0') AND (Ignore IS NULL OR Ignore = '' OR Ignore = '0') AND (Errors < 6 OR Errors IS NULL) ORDER BY Domain ASC")
         domain_list = [row[0].strip() for row in cursor.fetchall() if row[0].strip()]
+        conn.commit()
     except Exception as e:
         print(f"Failed to obtain selected domain list: {e}")
         conn.rollback()
@@ -1109,6 +1111,7 @@ def load_from_file(file_name):
                 if not exists:
                     cursor.execute('INSERT INTO RawDomains (Domain, Errors) VALUES (?, ?)', (domain, None))
                     cursor.close()
+                conn.commit()
     return domain_list
 
 try:
@@ -1135,6 +1138,7 @@ try:
     failed_domains = [row[0].strip() for row in cursor.fetchall() if row[0].strip()]
     cursor.execute("SELECT Domain FROM RawDomains WHERE Ignore = '1'")  # Replace 'domains_table' and 'domain' with your actual table and column names
     ignored_domains = [row[0].strip() for row in cursor.fetchall() if row[0].strip()]
+    conn.commit()
 except Exception as e:
     print(f"Failed to obtain excluded domains: {e}")
     conn.rollback()
