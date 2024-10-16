@@ -12,7 +12,6 @@ try:
     import sqlite3
     import sys
     from bs4 import BeautifulSoup
-    from OpenSSL import SSL
     from urllib.parse import urlparse, urlunparse
     from dotenv import load_dotenv
     import os
