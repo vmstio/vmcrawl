@@ -371,9 +371,9 @@ def check_and_record_domains(domain_list, ignored_domains, failed_domains, user_
         'User-Agent': appended_user_agent,
     }
 
-    # open(error_file, 'w').close()
-
     total_domains = len(domain_list)
+    junk_domains = get_junk_keywords()
+    bad_tlds = get_bad_tld()
     for index, domain in enumerate(domain_list, start=1):
         print(f'Attempting to query {domain} ({index}/{total_domains})')
 
@@ -390,7 +390,6 @@ def check_and_record_domains(domain_list, ignored_domains, failed_domains, user_
                 continue
 
         loopback = False  # Reset the loopback variable
-        junk_domains = get_junk_keywords()
         for junk_domain in junk_domains:
             if junk_domain in domain:
                 print(f'{color_magenta}{domain} is known junk domain{color_reset}')
@@ -402,7 +401,7 @@ def check_and_record_domains(domain_list, ignored_domains, failed_domains, user_
             continue
 
         loopback = False  # Reset the loopback variable
-        for bad_tld in get_bad_tld():
+        for bad_tld in bad_tlds:
             if domain.endswith(bad_tld):
                 print(f'{color_magenta}{domain} has known bad TLD{color_reset}')
                 mark_failed_domain(domain)
