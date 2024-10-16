@@ -286,65 +286,32 @@ def clean_version_wrongpatch(software_version):
 def clean_version_nightly(software_version):
     # Handle 4.4.0-nightly
     if "4.4.0-nightly" in software_version:
-        software_version = "4.4.0-alpha.1"
+        return "4.4.0-alpha.1"
 
     # Handle 4.3.0-nightly with date and -security suffix
     match = re.match(r"4\.3\.0-nightly\.(\d{4}-\d{2}-\d{2})(-security)?", software_version)
     if match:
-        nightly_date_str = match.group(1)
-        is_security = match.group(2)
-
-        # Use datetime.strptime to parse the date string into a datetime object
+        nightly_date_str, is_security = match.groups()
         nightly_date = datetime.strptime(nightly_date_str, "%Y-%m-%d")
 
-        # If the version ends with "-security", increment the date by one day
         if is_security:
             nightly_date += timedelta(days=1)
 
-        start_date = datetime(2024, 10, 2)
-        end_date = datetime(2024, 10, 7)
-        if start_date <= nightly_date <= end_date:
-            software_version = "4.3.0-rc.1"
+        version_ranges = [
+            ("4.3.0-rc.1", datetime(2024, 10, 2), datetime(2024, 10, 7)),
+            ("4.3.0-beta.2", datetime(2024, 9, 18), datetime(2024, 10, 1)),
+            ("4.3.0-beta.1", datetime(2024, 8, 23), datetime(2024, 9, 17)),
+            ("4.3.0-alpha.5", datetime(2024, 7, 5), datetime(2024, 8, 22)),
+            ("4.3.0-alpha.4", datetime(2024, 5, 31), datetime(2024, 7, 4)),
+            ("4.3.0-alpha.3", datetime(2024, 2, 17), datetime(2024, 5, 30)),
+            ("4.3.0-alpha.2", datetime(2024, 2, 15), datetime(2024, 2, 17)),
+            ("4.3.0-alpha.1", datetime(2024, 1, 30), datetime(2024, 2, 14)),
+            ("4.3.0-alpha.0", datetime(2023, 9, 28), datetime(2024, 1, 29))
+        ]
 
-        start_date = datetime(2024, 9, 18)
-        end_date = datetime(2024, 10, 1)
-        if start_date <= nightly_date <= end_date:
-            software_version = "4.3.0-beta.2"
-
-        start_date = datetime(2024, 8, 23)
-        end_date = datetime(2024, 9, 17)
-        if start_date <= nightly_date <= end_date:
-            software_version = "4.3.0-beta.1"
-
-        start_date = datetime(2024, 7, 5)
-        end_date = datetime(2024, 8, 22)
-        if start_date <= nightly_date <= end_date:
-            software_version = "4.3.0-alpha.5"
-
-        start_date = datetime(2024, 5, 31)
-        end_date = datetime(2024, 7, 4)
-        if start_date <= nightly_date <= end_date:
-            software_version = "4.3.0-alpha.4"
-
-        start_date = datetime(2024, 2, 17)
-        end_date = datetime(2024, 5, 30)
-        if start_date <= nightly_date <= end_date:
-            software_version = "4.3.0-alpha.3"
-
-        start_date = datetime(2024, 2, 15)
-        end_date = datetime(2024, 2, 17)
-        if start_date <= nightly_date <= end_date:
-            software_version = "4.3.0-alpha.2"
-
-        start_date = datetime(2024, 1, 30)
-        end_date = datetime(2024, 2, 14)
-        if start_date <= nightly_date <= end_date:
-            software_version = "4.3.0-alpha.1"
-
-        start_date = datetime(2023, 9, 28)
-        end_date = datetime(2024, 1, 29)
-        if start_date <= nightly_date <= end_date:
-            software_version = "4.3.0-alpha.0"
+        for version, start_date, end_date in version_ranges:
+            if start_date <= nightly_date <= end_date:
+                return version
 
     return software_version
 
