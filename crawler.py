@@ -419,24 +419,27 @@ def get_ignored_domains():
 def check_and_record_domains(domain_list, ignored_domains, failed_domains, user_choice, junk_domains, bad_tlds, custom_headers):
     total_domains = len(domain_list)
     for index, domain in enumerate(domain_list, start=1):
-        print(f'Attempting to query {domain} ({index}/{total_domains})')
+        print_colored(f'{domain} ({index}/{total_domains})', 'bold')
 
         if user_choice != "7":
             if domain in ignored_domains:
-                print(f'{color_magenta}{domain} is an already ignored domain{color_reset}')
+                error_to_print = 'Previously ignored!'
+                print_colored(f'{error_to_print}', 'cyan')
                 delete_domain_if_known(domain)
                 continue
 
         if user_choice != "14":
             if domain in failed_domains:
-                print(f'{color_red}{domain} is an already failed domain{color_reset}')
+                error_to_print = 'Previously failed!'
+                print_colored(f'{error_to_print}', 'cyan')
                 delete_domain_if_known(domain)
                 continue
 
         loopback = False  # Reset the loopback variable
         for junk_domain in junk_domains:
             if junk_domain in domain:
-                print(f'{color_magenta}{domain} is known junk domain{color_reset}')
+                error_to_print = 'Known junk domain, ignoring...'
+                print_colored(f'{error_to_print}', 'magenta')
                 mark_failed_domain(domain)
                 delete_domain_if_known(domain)
                 loopback = True
@@ -447,7 +450,8 @@ def check_and_record_domains(domain_list, ignored_domains, failed_domains, user_
         loopback = False  # Reset the loopback variable
         for bad_tld in bad_tlds:
             if domain.endswith(bad_tld):
-                print(f'{color_magenta}{domain} has known bad TLD{color_reset}')
+                error_to_print = 'Known bad TLD, ignoring...'
+                print_colored(f'{error_to_print}', 'magenta')
                 mark_failed_domain(domain)
                 delete_domain_if_known(domain)
                 loopback = True
@@ -457,15 +461,15 @@ def check_and_record_domains(domain_list, ignored_domains, failed_domains, user_
 
         dns_result = perform_dns_query(domain)
         if dns_result is False:
-            error_to_print = 'DNS query returned NXDOMAIN'
-            print(f'{color_red}{error_to_print}{color_reset}')
+            error_to_print = 'DNS query returned NXDOMAIN, marking as failed...'
+            print_colored(f'{error_to_print}', 'red')
             mark_failed_domain(domain)
             delete_domain_if_known(domain)
             continue
         elif dns_result is None:
             error_to_print = 'DNS query failed to resolve'
             error_reason = 'DNS'
-            print(f'{color_orange}{error_to_print}{color_reset}')
+            print_colored(f'{error_to_print}', 'yellow')
             log_error(domain, error_to_print)
             increment_domain_error(domain, error_reason)
             continue
@@ -476,9 +480,9 @@ def check_and_record_domains(domain_list, ignored_domains, failed_domains, user_
             with requests.get(robots_url, headers=custom_headers, timeout=5) as robots_response:
                 if robots_response.status_code == 200:
                     if robots_response.headers.get('Content-Type', '') == 'application/octet-stream':
-                        error_to_print = f'{domain} returned binary file'
+                        error_to_print = f'Responded with binary data to robots.txt request'
                         error_reason = 'BIN'
-                        print(f'{color_yellow}{error_to_print}{color_reset}')
+                        print_colored(f'{error_to_print}', 'yellow')
                         log_error(domain, error_to_print)
                         increment_domain_error(domain, error_reason)
                         continue
@@ -500,15 +504,16 @@ def check_and_record_domains(domain_list, ignored_domains, failed_domains, user_
                             disallow.append(disallow_path)
 
                     if disallow_found is True:
-                        error_to_print = f'{domain} is blocked by robots.txt'
+                        error_to_print = f'Crawling is prohibited by robots.txt'
                         error_reason = 'TXT'
-                        print(f'{color_orange}{error_to_print}{color_reset}')
+                        print_colored(f'{error_to_print}', 'yellow')
                         log_error(domain, error_to_print)
                         increment_domain_error(domain, error_reason)
                         continue
                 elif robots_response.status_code == 202:
                     if 'sgcaptcha' in robots_response.text:
-                        print(f'{color_magenta}{domain} returned CAPTCHA{color_reset}')
+                        error_to_print = f'Responded with CAPTCHA to robots.txt request, marking as ignored...'
+                        print_colored(f'{error_to_print}', 'magenta')
                         mark_ignore_domain(domain)
                         delete_domain_if_known(domain)
                         continue
@@ -517,7 +522,8 @@ def check_and_record_domains(domain_list, ignored_domains, failed_domains, user_
                         'User-Agent': default_user_agent,
                     }
                 elif robots_response.status_code == 410:
-                    print(f'{color_red}{domain} returned HTTP {robots_response.status_code}{color_reset}')
+                    error_to_print = f'Responded with HTTP {robots_response.status_code} to robots.txt request, marking as failed...'
+                    print_colored(f'{error_to_print}', 'red')
                     mark_failed_domain(domain)
                     delete_domain_if_known(domain)
                     continue
@@ -534,8 +540,8 @@ def check_and_record_domains(domain_list, ignored_domains, failed_domains, user_
                     )
                     if any(ct in content_type for ct in json_content_types):
                         if content == '':
-                            error_to_print = f'{domain} is not using Mastodon'
-                            print(f'{color_magenta}{error_to_print}{color_reset}')
+                            error_to_print = f'Not using Mastodon, marking as ignored...'
+                            print_colored(f'{error_to_print}', 'magenta')
                             mark_ignore_domain(domain)
                             delete_domain_if_known(domain)
                             continue
@@ -545,41 +551,41 @@ def check_and_record_domains(domain_list, ignored_domains, failed_domains, user_
                                 data = json.loads(webfinger_response.text)
                                 data = webfinger_response.json()
 
-                                error_to_print = f'{domain} is not using Mastodon'
-                                print(f'{color_magenta}{error_to_print}{color_reset}')
+                                error_to_print = f'Not using Mastodon, marking as ignored...'
+                                print_colored(f'{error_to_print}', 'magenta')
                                 mark_ignore_domain(domain)
                                 delete_domain_if_known(domain)
                                 continue
                             except json.JSONDecodeError:
-                                error_to_print = f'{domain} JSON from HTTP {webfinger_response.status_code} is invalid (webfinger)'
+                                error_to_print = f'JSON response to webfinger request was invalid (HTTP {webfinger_response.status_code})'
                                 error_reason = 'JSON'
-                                print(f'{color_yellow}{error_to_print}{color_reset}')
+                                print_colored(f'{error_to_print}', 'yellow')
                                 log_error(domain, error_to_print)
                                 increment_domain_error(domain, error_reason)
                                 continue
                     if 'text/plain' in content_type:
-                        error_to_print = f'{domain} is not using Mastodon'
-                        print(f'{color_magenta}{error_to_print}{color_reset}')
+                        error_to_print = f'Not using Mastodon, marking as ignored...'
+                        print_colored(f'{error_to_print}', 'magenta')
                         mark_ignore_domain(domain)
                         delete_domain_if_known(domain)
                         continue
                     if 'text/html' in content_type:
                         if content == '':
-                            error_to_print = f'{domain} is not using Mastodon'
-                            print(f'{color_magenta}{error_to_print}{color_reset}')
+                            error_to_print = f'Not using Mastodon, marking as ignored...'
+                            print_colored(f'{error_to_print}', 'magenta')
                             mark_ignore_domain(domain)
                             delete_domain_if_known(domain)
                             continue
                     if content_length == '0':
-                        error_to_print = f'{domain} is not using Mastodon'
-                        print(f'{color_magenta}{error_to_print}{color_reset}')
+                        error_to_print = f'Not using Mastodon, marking as ignored...'
+                        print_colored(f'{error_to_print}', 'magenta')
                         mark_ignore_domain(domain)
                         delete_domain_if_known(domain)
                         continue
                     else:
-                        error_to_print = f'{domain} returned HTTP {webfinger_response.status_code} (webfinger)'
+                        error_to_print = f'HTTP {webfinger_response.status_code} returned to webfinger request'
                         error_reason = webfinger_response.status_code
-                        print(f'{color_cyan}{error_to_print}{color_reset}')
+                        print_colored(f'{error_to_print}', 'yellow')
                         log_error(domain, error_to_print)
                         increment_domain_error(domain, error_reason)
                         continue
@@ -596,31 +602,31 @@ def check_and_record_domains(domain_list, ignored_domains, failed_domains, user_
                             'application/activitypub+json'
                         )
                         if any(ct in content_type for ct in json_content_types):
-                            error_to_print = f'{domain} JSON is invalid (webfinger)'
+                            error_to_print = f'JSON response to webfinger was invalid (HTTP {webfinger_response.status_code})'
                             error_reason = 'JSON'
-                            print(f'{color_yellow}{error_to_print}{color_reset}')
+                            print_colored(f'{error_to_print}', 'yellow')
                             log_error(domain, error_to_print)
                             increment_domain_error(domain, error_reason)
                             continue
                         elif not webfinger_response.content:
-                            error_to_print = f'{domain} JSON is empty (webfinger)'
+                            error_to_print = f'JSON response to webfinger was empty (HTTP {webfinger_response.status_code})'
                             error_reason = 'JSON'
-                            print(f'{color_yellow}{error_to_print}{color_reset}')
+                            print_colored(f'{error_to_print}', 'yellow')
                             log_error(domain, error_to_print)
                             increment_domain_error(domain, error_reason)
                             continue
                         elif content_type != '':
                             content_type_strip = content_type.split(';')[0].strip()
-                            error_to_print = f'{domain} JSON is {content_type_strip} (webfinger)'
+                            error_to_print = f'JSON response to webfinger was {content_type_strip} (HTTP {webfinger_response.status_code})'
                             error_reason = 'JSON'
-                            print(f'{color_yellow}{error_to_print}{color_reset}')
+                            print_colored(f'{error_to_print}', 'yellow')
                             log_error(domain, error_to_print)
                             increment_domain_error(domain, error_reason)
                             continue
                         else:
-                            error_to_print = f'{domain} JSON is fucked (webfinger)'
+                            error_to_print = f'JSON response to webfinger was all jacked up (HTTP {webfinger_response.status_code})'
                             error_reason = 'JSON'
-                            print(f'{color_yellow}{error_to_print}{color_reset}')
+                            print_colored(f'{error_to_print}', 'yellow')
                             log_error(domain, error_to_print)
                             increment_domain_error(domain, error_reason)
                             continue
@@ -632,31 +638,34 @@ def check_and_record_domains(domain_list, ignored_domains, failed_domains, user_
                         webfinger_domain = urlparse(first_webfinger_alias)
                         backend_domain = webfinger_domain.netloc
                     else:
-                        print(f'{color_magenta}{domain} is not using Mastodon{color_reset}')
+                        error_to_print = f'Not using Mastodon, marking as ignored...'
+                        print_colored(f'{error_to_print}', 'magenta')
                         mark_ignore_domain(domain)
                         delete_domain_if_known(domain)
                         continue
 
                 elif webfinger_response.status_code == 202:
                     if 'sgcaptcha' in webfinger_response.text:
-                        print(f'{color_magenta}{domain} returned CAPTCHA{color_reset}')
+                        error_to_print = f'Responded with CAPTCHA to webfinger request, marking as ignored...'
+                        print_colored(f'{error_to_print}', 'magenta')
                         mark_ignore_domain(domain)
                         delete_domain_if_known(domain)
                         continue
                 elif webfinger_response.status_code == 403:
-                    error_to_print = f'{domain} is HTTP {webfinger_response.status_code} restricted'
-                    print(f'{color_magenta}{error_to_print}{color_reset}')
+                    error_to_print = f'Responded HTTP {webfinger_response.status_code} to webfinger request, marking as ignored...'
+                    print_colored(f'{error_to_print}', 'magenta')
                     mark_ignore_domain(domain)
                     delete_domain_if_known(domain)
                     continue
                 elif webfinger_response.status_code == 410:
-                    print(f'{color_red}{domain} returned HTTP {webfinger_response.status_code}{color_reset}')
+                    error_to_print = f'Responded HTTP {webfinger_response.status_code} to webfinger request, marking as failed...'
+                    print_colored(f'{error_to_print}', 'red')
                     mark_failed_domain(domain)
                     delete_domain_if_known(domain)
                     continue
                 else:
-                    error_to_print = f'{domain} returned HTTP {webfinger_response.status_code} (webfinger)'
-                    print(f'{color_cyan}{error_to_print}{color_reset}')
+                    error_to_print = f'Responded HTTP {webfinger_response.status_code} to webfinger request'
+                    print_colored(f'{error_to_print}', 'yellow')
                     log_error(domain, error_to_print)
                     error_reason = webfinger_response.status_code
                     increment_domain_error(domain, error_reason)
@@ -676,68 +685,70 @@ def check_and_record_domains(domain_list, ignored_domains, failed_domains, user_
                             'application/activitypub+json'
                         )
                         if any(ct in content_type for ct in json_content_types):
-                            error_to_print = f'{domain} JSON is invalid (nodeinfo)'
+                            error_to_print = f'JSON response at {nodeinfo_url} was invalid (HTTP {nodeinfo_response.status_code})'
                             error_reason = 'JSON'
-                            print(f'{color_yellow}{error_to_print}{color_reset}')
+                            print_colored(f'{error_to_print}', 'yellow')
                             log_error(domain, error_to_print)
                             increment_domain_error(domain, error_reason)
                             continue
                         elif not nodeinfo_response.content:
-                            error_to_print = f'{domain} JSON is empty (nodeinfo)'
+                            error_to_print = f'JSON response at {nodeinfo_url} was empty (HTTP {nodeinfo_response.status_code})'
                             error_reason = 'JSON'
-                            print(f'{color_yellow}{error_to_print}{color_reset}')
+                            print_colored(f'{error_to_print}', 'yellow')
                             log_error(domain, error_to_print)
                             increment_domain_error(domain, error_reason)
                             continue
                         elif content_type != '':
                             content_type_strip = content_type.split(';')[0].strip()
-                            error_to_print = f'{domain} JSON is {content_type_strip} (nodeinfo)'
+                            error_to_print = f'JSON response at {nodeinfo_url} was {content_type_strip} (HTTP {nodeinfo_response.status_code})'
                             error_reason = 'JSON'
-                            print(f'{color_yellow}{error_to_print}{color_reset}')
+                            print_colored(f'{error_to_print}', 'yellow')
                             log_error(domain, error_to_print)
                             increment_domain_error(domain, error_reason)
                             continue
                         else:
-                            error_to_print = f'{domain} JSON is fucked (nodeinfo)'
+                            error_to_print = f'JSON response at {nodeinfo_url} was all jacked up (HTTP {nodeinfo_response.status_code})'
                             error_reason = 'JSON'
-                            print(f'{color_yellow}{error_to_print}{color_reset}')
+                            print_colored(f'{error_to_print}', 'yellow')
                             log_error(domain, error_to_print)
                             increment_domain_error(domain, error_reason)
                             continue
                 elif nodeinfo_response.status_code == 202:
                     if 'sgcaptcha' in nodeinfo_response.text:
-                        print(f'{color_magenta}{domain} returned CAPTCHA{color_reset}')
+                        error_to_print = f'Responded with CAPTCHA to nodeinfo request, marking as ignored...'
+                        print_colored(f'{error_to_print}', 'magenta')
                         mark_ignore_domain(domain)
                         delete_domain_if_known(domain)
                         continue
                 elif nodeinfo_response.status_code == 403:
-                    error_to_print = f'{domain} is HTTP {nodeinfo_response.status_code} restricted'
-                    print(f'{color_magenta}{error_to_print}{color_reset}')
+                    error_to_print = f'Responded HTTP {nodeinfo_response.status_code} at {nodeinfo_url}, marking as ignored...'
+                    print_colored(f'{error_to_print}', 'magenta')
                     mark_ignore_domain(domain)
                     delete_domain_if_known(domain)
                     continue
                 elif nodeinfo_response.status_code == 404:
-                    error_to_print = f'{domain} is not using Mastodon'
-                    print(f'{color_magenta}{error_to_print}{color_reset}')
+                    error_to_print = f'Not using Mastodon, marking as ignored...'
+                    print_colored(f'{error_to_print}', 'magenta')
                     mark_ignore_domain(domain)
                     delete_domain_if_known(domain)
                     continue
                 elif nodeinfo_response.status_code == 410:
-                    print(f'{color_red}{domain} returned HTTP {nodeinfo_response.status_code}{color_reset}')
+                    error_to_print = f'Responded HTTP {nodeinfo_response.status_code} at {nodeinfo_url}, marking as failed...'
+                    print_colored(f'{error_to_print}', 'red')
                     mark_failed_domain(domain)
                     delete_domain_if_known(domain)
                     continue
                 else:
-                    error_to_print = f'{domain} returned HTTP {nodeinfo_response.status_code} (nodeinfo)'
+                    error_to_print = f'Responded HTTP {nodeinfo_response.status_code} at {nodeinfo_url}'
                     error_reason = nodeinfo_response.status_code
-                    print(f'{color_cyan}{error_to_print}{color_reset}')
+                    print_colored(f'{error_to_print}', 'yellow')
                     log_error(domain, error_to_print)
                     increment_domain_error(domain, error_reason)
                     continue
 
                 if ('code' in data and data['code'] in ['rest_no_route', 'rest_not_logged_in', 'rest_forbidden', 'rest_user_invalid', 'rest_login_required']) or ('error' in data and data['error'] == 'Restricted'):
-                    error_to_print = f'{domain} is JSON restricted (nodeinfo)'
-                    print(f'{color_magenta}{error_to_print}{color_reset}')
+                    error_to_print = f'Not using Mastodon, marking as ignored...'
+                    print_colored(f'{error_to_print}', 'magenta')
                     mark_ignore_domain(domain)
                     delete_domain_if_known(domain)
                     continue
@@ -746,8 +757,8 @@ def check_and_record_domains(domain_list, ignored_domains, failed_domains, user_
                     linked_nodeinfo_url = data['links'][0]['href']
 
                     if 'wp-json' in linked_nodeinfo_url:
-                        error_to_print = f'{domain} is not using Mastodon'
-                        print(f'{color_magenta}{error_to_print}{color_reset}')
+                        error_to_print = f'Not using Mastodon, marking as ignored...'
+                        print_colored(f'{error_to_print}', 'magenta')
                         mark_ignore_domain(domain)
                         delete_domain_if_known(domain)
                         continue
@@ -757,15 +768,15 @@ def check_and_record_domains(domain_list, ignored_domains, failed_domains, user_
                             content_type = linked_nodeinfo_response.headers.get('Content-Type', '')
                             if 'application/json' not in content_type:
                                 if 'application/activity+json' in content_type:
-                                    error_to_print = f'{domain} is not using Mastodon'
-                                    print(f'{color_magenta}{error_to_print}{color_reset}')
+                                    error_to_print = f'Not using Mastodon, marking as ignored...'
+                                    print_colored(f'{error_to_print}', 'magenta')
                                     mark_ignore_domain(domain)
                                     delete_domain_if_known(domain)
                                     continue
                                 else:
-                                    error_to_print = f'{domain} did not return application/activity+json @ {linked_nodeinfo_url}'
+                                    error_to_print = f'JSON response at {linked_nodeinfo_url} was invalid (HTTP {linked_nodeinfo_response.status_code})'
                                     error_reason = 'JSON'
-                                    print(f'{color_yellow}{error_to_print}{color_reset}')
+                                    print_colored(f'{error_to_print}', 'yellow')
                                     log_error(domain, error_to_print)
                                     increment_domain_error(domain, error_reason)
                                     continue
@@ -793,9 +804,9 @@ def check_and_record_domains(domain_list, ignored_domains, failed_domains, user_
                                 active_month_users = linked_nodeinfo_data['usage']['users']['activeMonth']
 
                                 if active_month_users > max(total_users + 6, total_users + (total_users * 0.25)):
-                                    error_to_print = f'{domain} is running Mastodon v{software_version} with invalid counts ({active_month_users}:{total_users})'
+                                    error_to_print = f'Running Mastodon v{software_version} with invalid counts ({active_month_users}:{total_users})'
                                     error_reason = '###'
-                                    print(f'{color_yellow}{error_to_print}{color_reset}')
+                                    print_colored(f'{error_to_print}', 'pink')
                                     log_error(domain, error_to_print)
                                     increment_domain_error(domain, error_reason)
                                     delete_domain_if_known(domain)
@@ -810,29 +821,30 @@ def check_and_record_domains(domain_list, ignored_domains, failed_domains, user_
                                     content_type = instance_api_response.headers.get('Content-Type', '')
                                     if 'application/json' not in content_type:
                                         if instance_api_response.status_code != 200 and instance_api_response.status_code != 410:
-                                            error_to_print = f'{domain} returned HTTP {instance_api_response.status_code} (API)'
+                                            error_to_print = f'Responded HTTP {instance_api_response.status_code} to instance API request'
                                             error_reason = 'API'
-                                            print(f'{color_cyan}{error_to_print}{color_reset}')
+                                            print_colored(f'{error_to_print}', 'yellow')
                                             log_error(domain, error_to_print)
                                             increment_domain_error(domain, error_reason)
                                             continue
                                         elif instance_api_response.status_code == 410:
-                                            print(f'{color_red}{domain} returned HTTP {instance_api_response.status_code} (API){color_reset}')
+                                            error_to_print = f'Responded HTTP {instance_api_response.status_code} to instance API request, marking as failed...'
+                                            print_colored(f'{error_to_print}', 'red')
                                             mark_failed_domain(domain)
                                             delete_domain_if_known(domain)
                                             continue
 
-                                        error_to_print = f'{domain} did not return JSON (API)'
+                                        error_to_print = f'JSON response to instance API request was invalid (HTTP {instance_api_response.status_code})'
                                         error_reason = 'JSON'
-                                        print(f'{color_yellow}{error_to_print}{color_reset}')
+                                        print_colored(f'{error_to_print}', 'yellow')
                                         log_error(domain, error_to_print)
                                         increment_domain_error(domain, error_reason)
                                         continue
                                     backend_data = instance_api_response.json()
                                     if 'error' in backend_data:
                                         if backend_data['error'] == "This method requires an authenticated user":
-                                            error_to_print = f'{domain} requires authentication (API)'
-                                            print(f'{color_magenta}{error_to_print}{color_reset}')
+                                            error_to_print = f'Instance API requires authentication, marking as ignored...'
+                                            print_colored(f'{error_to_print}', 'magenta')
                                             mark_ignore_domain(domain)
                                             delete_domain_if_known(domain)
                                             continue
@@ -864,7 +876,10 @@ def check_and_record_domains(domain_list, ignored_domains, failed_domains, user_
                                     if actual_domain == "gc2.jp":
                                         source_url = "https://github.com/gc2-jp/freespeech"
 
-                                print(f'{color_green}{actual_domain} is running Mastodon v{software_version}{color_reset}')
+                                if software_version == software_version_full:
+                                    print_colored(f'Mastodon v{software_version}', 'green')
+                                else:
+                                    print_colored(f'Mastodon v{software_version} ({software_version_full})', 'green')
 
                                 cursor = conn.cursor()
                                 try:
@@ -876,7 +891,7 @@ def check_and_record_domains(domain_list, ignored_domains, failed_domains, user_
                                             record_exists = cursor.fetchone()[0] > 0
 
                                             if record_exists:
-                                                print(f'{color_magenta}Deleting duplicate record for {domain} which is really {actual_domain}{color_reset}')
+                                                print_colored(f'Deleting duplicate record for {domain} which is really {actual_domain}', 'pink')
                                                 # Delete the record associated with the initial domain
                                                 delete_domain_if_known(domain)
 
@@ -900,28 +915,32 @@ def check_and_record_domains(domain_list, ignored_domains, failed_domains, user_
                                     cursor.close()
                                 clear_domain_error(domain)
                             else:
-                                print(f'{color_magenta}{domain} is not using Mastodon{color_reset}')
+                                error_to_print = f'Not using Mastodon, marking as ignored...'
+                                print_colored(f'{error_to_print}', 'magenta')
                                 mark_ignore_domain(domain)
                                 delete_domain_if_known(domain)
+                                continue
                         else:
-                            error_to_print = f'{domain} returned HTTP {linked_nodeinfo_response.status_code} @ {linked_nodeinfo_url}'
+                            error_to_print = f'Responded HTTP {linked_nodeinfo_response.status_code} at {linked_nodeinfo_url}'
                             if linked_nodeinfo_response.status_code == 403:
-                                print(f'{color_magenta}{error_to_print}{color_reset}')
+                                print_colored(f'{error_to_print}', 'magenta')
                                 mark_ignore_domain(domain)
                                 delete_domain_if_known(domain)
                             elif linked_nodeinfo_response.status_code == 410:
-                                print(f'{color_red}{error_to_print}{color_reset}')
+                                print_colored(f'{error_to_print}', 'red')
                                 mark_failed_domain(domain)
                                 delete_domain_if_known(domain)
                             else:
                                 error_reason = linked_nodeinfo_response.status_code
-                                print(f'{color_cyan}{error_to_print}{color_reset}')
+                                print_colored(f'{error_to_print}', 'yellow')
                                 log_error(domain, error_to_print)
                                 increment_domain_error(domain, error_reason)
                 else:
-                    print(f'{color_magenta}{domain} is not using Mastodon{color_reset}')
+                    error_to_print = f'Not using Mastodon, marking as ignored...'
+                    print_colored(f'{error_to_print}', 'magenta')
                     mark_ignore_domain(domain)
                     delete_domain_if_known(domain)
+                    continue
 
         except requests.exceptions.ConnectionError as e:
             error_message = str(e)
