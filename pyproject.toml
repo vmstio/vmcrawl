@@ -1,0 +1,12 @@
+[project]
+name = "vmcrawl"
+version = "0.1"
+description = "Mastodon-focused version reporting crawler"
+requires-python = ">=3.7"
+
+dependencies = [
+    "dnspython",
+    "requests",
+    "beautifulsoup4",
+    "python-dotenv",
+]
