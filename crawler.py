@@ -517,7 +517,7 @@ def check_and_record_domains(domain_list, ignored_domains, failed_domains, user_
                         mark_ignore_domain(domain)
                         delete_domain_if_known(domain)
                         continue
-                elif robots_response.status_code == 403:
+                elif robots_response.status_code in [403, 418]:
                     custom_headers = {
                         'User-Agent': default_user_agent,
                     }
@@ -528,18 +528,19 @@ def check_and_record_domains(domain_list, ignored_domains, failed_domains, user_
                     delete_domain_if_known(domain)
                     continue
 
+            json_content_types = (
+                'application/jrd+json', 'application/json', 'application/activity+json',
+                'application/problem+json', 'application/ld+json', 'application/activitystreams+json',
+                'application/activitypub+json'
+            )
+
             with requests.get(webfinger_url, headers=custom_headers, timeout=5) as webfinger_response:
-                if webfinger_response.status_code == 405 or webfinger_response.status_code == 404 or webfinger_response.status_code == 400:
-                    content_type = webfinger_response.headers.get('Content-Type', '')
-                    content_length = webfinger_response.headers.get('Content-Length', '')
-                    content = webfinger_response.text
-                    json_content_types = (
-                        'application/jrd+json', 'application/json', 'application/activity+json',
-                        'application/problem+json', 'application/ld+json', 'application/activitystreams+json',
-                        'application/activitypub+json'
-                    )
-                    if any(ct in content_type for ct in json_content_types):
-                        if content == '':
+                webfinger_content_type = webfinger_response.headers.get('Content-Type', '')
+                webfinger_content_length = webfinger_response.headers.get('Content-Length', '')
+                webfinger_content = webfinger_response.text
+                if webfinger_response.status_code in [405, 404, 400]:
+                    if any(ct in webfinger_content_type for ct in json_content_types):
+                        if webfinger_content == '':
                             error_to_print = f'Not using Mastodon, marking as ignored...'
                             print_colored(f'{error_to_print}', 'magenta')
                             mark_ignore_domain(domain)
@@ -563,27 +564,33 @@ def check_and_record_domains(domain_list, ignored_domains, failed_domains, user_
                                 log_error(domain, error_to_print)
                                 increment_domain_error(domain, error_reason)
                                 continue
-                    if 'text/plain' in content_type:
+                    if 'text/plain' in webfinger_content_type:
                         error_to_print = f'Not using Mastodon, marking as ignored...'
                         print_colored(f'{error_to_print}', 'magenta')
                         mark_ignore_domain(domain)
                         delete_domain_if_known(domain)
                         continue
-                    if 'text/html' in content_type:
-                        if content == '':
+                    if 'text/html' in webfinger_content_type:
+                        if webfinger_content == '' or 'Bad Request' in webfinger_content or 'Bad request' in webfinger_content or 'Not Found' in webfinger_content or 'Nextcloud' in webfinger_content:
                             error_to_print = f'Not using Mastodon, marking as ignored...'
                             print_colored(f'{error_to_print}', 'magenta')
                             mark_ignore_domain(domain)
                             delete_domain_if_known(domain)
                             continue
-                    if content_length == '0':
+                    if webfinger_content_type is None or webfinger_content_type == '':
+                        error_to_print = f'Not using Mastodon, marking as ignored...'
+                        print_colored(f'{error_to_print}', 'magenta')
+                        mark_ignore_domain(domain)
+                        delete_domain_if_known(domain)
+                        continue
+                    if webfinger_content_length == '0':
                         error_to_print = f'Not using Mastodon, marking as ignored...'
                         print_colored(f'{error_to_print}', 'magenta')
                         mark_ignore_domain(domain)
                         delete_domain_if_known(domain)
                         continue
                     else:
-                        error_to_print = f'HTTP {webfinger_response.status_code} returned to WebFinger request'
+                        error_to_print = f'Responded HTTP {webfinger_response.status_code} to WebFinger request'
                         error_reason = webfinger_response.status_code
                         print_colored(f'{error_to_print}', 'yellow')
                         log_error(domain, error_to_print)
@@ -595,13 +602,7 @@ def check_and_record_domains(domain_list, ignored_domains, failed_domains, user_
                         data = json.loads(webfinger_response.text)
                         data = webfinger_response.json()
                     except json.JSONDecodeError:
-                        content_type = webfinger_response.headers.get('Content-Type', '')
-                        json_content_types = (
-                            'application/jrd+json', 'application/json', 'application/activity+json',
-                            'application/problem+json', 'application/ld+json', 'application/activitystreams+json',
-                            'application/activitypub+json'
-                        )
-                        if any(ct in content_type for ct in json_content_types):
+                        if any(ct in webfinger_content_type for ct in json_content_types):
                             error_to_print = f'JSON response to WebFinger was invalid (HTTP {webfinger_response.status_code})'
                             error_reason = 'JSON'
                             print_colored(f'{error_to_print}', 'yellow')
@@ -615,9 +616,9 @@ def check_and_record_domains(domain_list, ignored_domains, failed_domains, user_
                             log_error(domain, error_to_print)
                             increment_domain_error(domain, error_reason)
                             continue
-                        elif content_type != '':
-                            content_type_strip = content_type.split(';')[0].strip()
-                            error_to_print = f'JSON response to WebFinger was {content_type_strip} (HTTP {webfinger_response.status_code})'
+                        elif webfinger_content_type != '':
+                            webfinger_content_type_strip = webfinger_content_type.split(';')[0].strip()
+                            error_to_print = f'JSON response to WebFinger was {webfinger_content_type_strip} (HTTP {webfinger_response.status_code})'
                             error_reason = 'JSON'
                             print_colored(f'{error_to_print}', 'yellow')
                             log_error(domain, error_to_print)
@@ -651,7 +652,7 @@ def check_and_record_domains(domain_list, ignored_domains, failed_domains, user_
                         mark_ignore_domain(domain)
                         delete_domain_if_known(domain)
                         continue
-                elif webfinger_response.status_code == 403:
+                elif webfinger_response.status_code in [451, 422, 418, 401, 402, 403]:
                     error_to_print = f'Responded HTTP {webfinger_response.status_code} to WebFinger request, marking as ignored...'
                     print_colored(f'{error_to_print}', 'magenta')
                     mark_ignore_domain(domain)
@@ -679,11 +680,6 @@ def check_and_record_domains(domain_list, ignored_domains, failed_domains, user_
                         data = nodeinfo_response.json()
                     except json.JSONDecodeError:
                         content_type = nodeinfo_response.headers.get('Content-Type', '')
-                        json_content_types = (
-                            'application/jrd+json', 'application/json', 'application/activity+json',
-                            'application/problem+json', 'application/ld+json', 'application/activitystreams+json',
-                            'application/activitypub+json'
-                        )
                         if any(ct in content_type for ct in json_content_types):
                             error_to_print = f'JSON response at {nodeinfo_url} was invalid (HTTP {nodeinfo_response.status_code})'
                             error_reason = 'JSON'
@@ -949,7 +945,7 @@ def check_and_record_domains(domain_list, ignored_domains, failed_domains, user_
             if 'SSLError' in error_message:
                 error_reason = 'SSL'
                 delete_domain_if_known(domain)
-            elif 'HTTPSConnectionPool' in error_message:
+            elif 'HTTPSConnectionPool' in error_message or 'RemoteDisconnected' in error_message or 'ConnectionResetError' in error_message:
                 error_reason = 'HTTP'
             else:
                 error_reason = '???'
@@ -1102,33 +1098,43 @@ def get_user_choice() -> str:
     print_colored("\nDefaulting to standard crawl", "cyan")
     return "1"
 
-print_menu()
-user_choice = get_user_choice()
-print_colored(f"Choice selected: {user_choice}", "magenta")
-
-domain_list_file = sys.argv[1] if len(sys.argv) > 1 else None
+# Main program starts here
 
 try:
-    if domain_list_file:  # File name provided as argument
-        domain_list = load_from_file(domain_list_file)
-    else:  # Load from database by default
-        domain_list = load_from_database(user_choice)
+    while True:
+        print_menu()
+        user_choice = get_user_choice()
+        print_colored(f"Choice selected: {user_choice}", "magenta")
 
-    if user_choice == "2":
-        domain_list.reverse()
-    elif user_choice == "3":  # Assuming "3" is the option for randomizing
-        random.shuffle(domain_list)
+        domain_list_file = sys.argv[1] if len(sys.argv) > 1 else None
 
-except FileNotFoundError:
-    print(f"File not found: {domain_list_file}")
-    sys.exit(1)
-except sqlite3.Error as e:
-    print(f"Database error: {e}")
-    sys.exit(1)
+        try:
+            if domain_list_file:  # File name provided as argument
+                domain_list = load_from_file(domain_list_file)
+            else:  # Load from database by default
+                domain_list = load_from_database(user_choice)
 
-junk_domains = get_junk_keywords()
-bad_tlds = get_bad_tld()
-failed_domains = get_failed_domains()
-ignored_domains = get_ignored_domains()
+            if user_choice == "2":
+                domain_list.reverse()
+            elif user_choice == "3":  # Assuming "3" is the option for randomizing
+                random.shuffle(domain_list)
 
-check_and_record_domains(domain_list, ignored_domains, failed_domains, user_choice, junk_domains, bad_tlds, custom_headers)
+        except FileNotFoundError:
+            print(f"File not found: {domain_list_file}")
+            sys.exit(1)
+        except sqlite3.Error as e:
+            print(f"Database error: {e}")
+            sys.exit(1)
+
+        junk_domains = get_junk_keywords()
+        bad_tlds = get_bad_tld()
+        failed_domains = get_failed_domains()
+        ignored_domains = get_ignored_domains()
+
+        check_and_record_domains(domain_list, ignored_domains, failed_domains, user_choice, junk_domains, bad_tlds, custom_headers)
+        pass
+except KeyboardInterrupt:
+    conn.close()
+    print(f"\n{appname} interrupted by user. Exiting gracefully...")
+finally:
+    print("Goodbye!")
