@@ -42,12 +42,7 @@ else:
 print(f"Choice selected: {user_choice}")
 
 db_path = os.getenv("db_path")
-
-# timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
-# error_directory = 'error'  # Name of the error subfolder
-# if not os.path.exists(error_directory):
-#     os.makedirs(error_directory)
-# error_file = os.path.join(error_directory, f'errors_{timestamp}.txt')
+conn = sqlite3.connect(db_path)
 
 def resolve_dns_with_dnspython(domain):
     record_types = ['A', 'AAAA', 'CNAME']
@@ -81,7 +76,7 @@ def normalize_email(email):
     email = re.sub(r'(\[dot\]|\(dot\)|\{dot\}| dot | \[dot\] | \(dot\) | \{dot\} )', '.', email, flags=re.IGNORECASE)
     return email
 
-def log_error(domain, conn, error_to_print):
+def log_error(domain, error_to_print):
     cursor = conn.cursor()
     try:
         cursor.execute('''
@@ -95,7 +90,7 @@ def log_error(domain, conn, error_to_print):
     finally:
         cursor.close()
 
-def increment_domain_error(domain, conn, error_reason):
+def increment_domain_error(domain, error_reason):
     cursor = conn.cursor()
     try:
         cursor.execute('SELECT Errors FROM RawDomains WHERE Domain = ?', (domain,))
@@ -124,7 +119,7 @@ def increment_domain_error(domain, conn, error_reason):
     finally:
         cursor.close()
 
-def clear_domain_error(domain, conn):
+def clear_domain_error(domain):
     cursor = conn.cursor()
     try:
         # Insert or update the domain with the new errors count
@@ -144,8 +139,7 @@ def clear_domain_error(domain, conn):
     finally:
         cursor.close()
 
-def mark_ignore_domain(domain, conn):
-    cursor = conn.cursor()
+def mark_ignore_domain(domain):
     try:
         # Insert or update the domain with the new errors count
         cursor.execute('''
@@ -164,7 +158,7 @@ def mark_ignore_domain(domain, conn):
     finally:
         cursor.close()
 
-def mark_failed_domain(domain, conn):
+def mark_failed_domain(domain):
     cursor = conn.cursor()
     try:
         # Insert or update the domain with the new errors count
@@ -219,7 +213,7 @@ def limit_url_depth(source_url, depth=2):
     new_url = urlunparse(parsed_url._replace(path=limited_path))
     return new_url
 
-def delete_domain_if_known(domain, conn):
+def delete_domain_if_known(domain):
     cursor = conn.cursor()
     try:
         cursor.execute('''
@@ -360,7 +354,7 @@ def clean_version_nightly(software_version):
 
     return software_version
 
-def get_junk_keywords(conn):
+def get_junk_keywords():
     cursor = conn.cursor()
     try:
         cursor.execute("SELECT Keywords FROM JunkWords")
@@ -374,7 +368,7 @@ def get_junk_keywords(conn):
         cursor.close()
     return []
 
-def get_bad_tld(conn):
+def get_bad_tld():
     cursor = conn.cursor()
     try:
         cursor.execute("SELECT TLD FROM BadTLD")
@@ -389,9 +383,6 @@ def get_bad_tld(conn):
     return []
 
 def check_and_record_domains(domain_list, ignored_domains, failed_domains, user_choice):
-    conn = sqlite3.connect(db_path)
-    cursor = conn.cursor()
-
     default_user_agent = requests.utils.default_user_agent()
     appended_user_agent = '{appname}/{appversion} (https://docs.vmst.io/projects/crawler)'
     custom_headers = {
@@ -407,33 +398,33 @@ def check_and_record_domains(domain_list, ignored_domains, failed_domains, user_
         if user_choice != "7":
             if domain in ignored_domains:
                 print(f'{color_magenta}{domain} is an already ignored domain{color_reset}')
-                delete_domain_if_known(domain, conn)
+                delete_domain_if_known(domain)
                 continue
 
         if user_choice != "14":
             if domain in failed_domains:
                 print(f'{color_red}{domain} is an already failed domain{color_reset}')
-                delete_domain_if_known(domain, conn)
+                delete_domain_if_known(domain)
                 continue
 
         loopback = False  # Reset the loopback variable
-        junk_domains = get_junk_keywords(conn)
+        junk_domains = get_junk_keywords()
         for junk_domain in junk_domains:
             if junk_domain in domain:
                 print(f'{color_magenta}{domain} is known junk domain{color_reset}')
-                mark_failed_domain(domain, conn)
-                delete_domain_if_known(domain, conn)
+                mark_failed_domain(domain)
+                delete_domain_if_known(domain)
                 loopback = True
                 continue
         if loopback is True:
             continue
 
         loopback = False  # Reset the loopback variable
-        for bad_tld in get_bad_tld(conn):
+        for bad_tld in get_bad_tld():
             if domain.endswith(bad_tld):
                 print(f'{color_magenta}{domain} has known bad TLD{color_reset}')
-                mark_failed_domain(domain, conn)
-                delete_domain_if_known(domain, conn)
+                mark_failed_domain(domain)
+                delete_domain_if_known(domain)
                 loopback = True
                 continue
         if loopback is True:
@@ -447,9 +438,9 @@ def check_and_record_domains(domain_list, ignored_domains, failed_domains, user_
                     if robots_response.headers.get('Content-Type', '') == 'application/octet-stream':
                         error_to_print = f'{domain} returned binary file'
                         print(f'{color_yellow}{error_to_print}{color_reset}')
-                        log_error(domain, conn, error_to_print)
+                        log_error(domain, error_to_print)
                         error_reason = 'BIN'
-                        increment_domain_error(domain, conn, error_reason)
+                        increment_domain_error(domain, error_reason)
                         continue
 
                     robots_txt = robots_response.text
@@ -471,15 +462,15 @@ def check_and_record_domains(domain_list, ignored_domains, failed_domains, user_
                     if disallow_found is True:
                         error_to_print = f'{domain} is blocked by robots.txt'
                         print(f'{color_orange}{error_to_print}{color_reset}')
-                        log_error(domain, conn, error_to_print)
+                        log_error(domain, error_to_print)
                         error_reason = 'TXT'
-                        increment_domain_error(domain, conn, error_reason)
+                        increment_domain_error(domain, error_reason)
                         continue
                 elif robots_response.status_code == 202:
                     if 'sgcaptcha' in robots_response.text:
                         print(f'{color_magenta}{domain} returned CAPTCHA{color_reset}')
-                        mark_ignore_domain(domain, conn)
-                        delete_domain_if_known(domain, conn)
+                        mark_ignore_domain(domain)
+                        delete_domain_if_known(domain)
                         continue
                 elif robots_response.status_code == 403:
                     custom_headers = {
@@ -487,8 +478,8 @@ def check_and_record_domains(domain_list, ignored_domains, failed_domains, user_
                     }
                 elif robots_response.status_code == 410:
                     print(f'{color_red}{domain} returned HTTP {robots_response.status_code}{color_reset}')
-                    mark_failed_domain(domain, conn)
-                    delete_domain_if_known(domain, conn)
+                    mark_failed_domain(domain)
+                    delete_domain_if_known(domain)
                     continue
 
             with requests.get(webfinger_url, headers=custom_headers, timeout=5) as webfinger_response:
@@ -505,8 +496,8 @@ def check_and_record_domains(domain_list, ignored_domains, failed_domains, user_
                         if content == '':
                             error_to_print = f'{domain} is not using Mastodon'
                             print(f'{color_magenta}{error_to_print}{color_reset}')
-                            mark_ignore_domain(domain, conn)
-                            delete_domain_if_known(domain, conn)
+                            mark_ignore_domain(domain)
+                            delete_domain_if_known(domain)
                             continue
                         else:
                             try:
@@ -516,41 +507,41 @@ def check_and_record_domains(domain_list, ignored_domains, failed_domains, user_
 
                                 error_to_print = f'{domain} is not using Mastodon'
                                 print(f'{color_magenta}{error_to_print}{color_reset}')
-                                mark_ignore_domain(domain, conn)
-                                delete_domain_if_known(domain, conn)
+                                mark_ignore_domain(domain)
+                                delete_domain_if_known(domain)
                                 continue
                             except json.JSONDecodeError:
                                 error_to_print = f'{domain} JSON from HTTP {webfinger_response.status_code} is invalid (webfinger)'
                                 print(f'{color_yellow}{error_to_print}{color_reset}')
-                                log_error(domain, conn, error_to_print)
+                                log_error(domain, error_to_print)
                                 error_reason = 'JSON'
-                                increment_domain_error(domain, conn, error_reason)
+                                increment_domain_error(domain, error_reason)
                                 continue
                     if 'text/plain' in content_type:
                         error_to_print = f'{domain} is not using Mastodon'
                         print(f'{color_magenta}{error_to_print}{color_reset}')
-                        mark_ignore_domain(domain, conn)
-                        delete_domain_if_known(domain, conn)
+                        mark_ignore_domain(domain)
+                        delete_domain_if_known(domain)
                         continue
                     if 'text/html' in content_type:
                         if content == '':
                             error_to_print = f'{domain} is not using Mastodon'
                             print(f'{color_magenta}{error_to_print}{color_reset}')
-                            mark_ignore_domain(domain, conn)
-                            delete_domain_if_known(domain, conn)
+                            mark_ignore_domain(domain)
+                            delete_domain_if_known(domain)
                             continue
                     if content_length == '0':
                         error_to_print = f'{domain} is not using Mastodon'
                         print(f'{color_magenta}{error_to_print}{color_reset}')
-                        mark_ignore_domain(domain, conn)
-                        delete_domain_if_known(domain, conn)
+                        mark_ignore_domain(domain)
+                        delete_domain_if_known(domain)
                         continue
                     else:
                         error_to_print = f'{domain} returned HTTP {webfinger_response.status_code} (webfinger)'
                         print(f'{color_cyan}{error_to_print}{color_reset}')
-                        log_error(domain, conn, error_to_print)
+                        log_error(domain, error_to_print)
                         error_reason = webfinger_response.status_code
-                        increment_domain_error(domain, conn, error_reason)
+                        increment_domain_error(domain, error_reason)
                         continue
                 elif webfinger_response.status_code == 200:
                     try:
@@ -567,31 +558,31 @@ def check_and_record_domains(domain_list, ignored_domains, failed_domains, user_
                         if any(ct in content_type for ct in json_content_types):
                             error_to_print = f'{domain} JSON is invalid (webfinger)'
                             print(f'{color_yellow}{error_to_print}{color_reset}')
-                            log_error(domain, conn, error_to_print)
+                            log_error(domain, error_to_print)
                             error_reason = 'JSON'
-                            increment_domain_error(domain, conn, error_reason)
+                            increment_domain_error(domain, error_reason)
                             continue
                         elif not webfinger_response.content:
                             error_to_print = f'{domain} JSON is empty (webfinger)'
                             print(f'{color_yellow}{error_to_print}{color_reset}')
-                            log_error(domain, conn, error_to_print)
+                            log_error(domain, error_to_print)
                             error_reason = 'JSON'
-                            increment_domain_error(domain, conn, error_reason)
+                            increment_domain_error(domain, error_reason)
                             continue
                         elif content_type != '':
                             content_type_strip = content_type.split(';')[0].strip()
                             error_to_print = f'{domain} JSON is {content_type_strip} (webfinger)'
                             print(f'{color_yellow}{error_to_print}{color_reset}')
-                            log_error(domain, conn, error_to_print)
+                            log_error(domain, error_to_print)
                             error_reason = 'JSON'
-                            increment_domain_error(domain, conn, error_reason)
+                            increment_domain_error(domain, error_reason)
                             continue
                         else:
                             error_to_print = f'{domain} JSON is fucked (webfinger)'
                             print(f'{color_yellow}{error_to_print}{color_reset}')
-                            log_error(domain, conn, error_to_print)
+                            log_error(domain, error_to_print)
                             error_reason = 'JSON'
-                            increment_domain_error(domain, conn, error_reason)
+                            increment_domain_error(domain, error_reason)
                             continue
 
                     webfinger_data = webfinger_response.json()
@@ -602,33 +593,33 @@ def check_and_record_domains(domain_list, ignored_domains, failed_domains, user_
                         backend_domain = webfinger_domain.netloc
                     else:
                         print(f'{color_magenta}{domain} is not using Mastodon{color_reset}')
-                        mark_ignore_domain(domain, conn)
-                        delete_domain_if_known(domain, conn)
+                        mark_ignore_domain(domain)
+                        delete_domain_if_known(domain)
                         continue
 
                 elif webfinger_response.status_code == 202:
                     if 'sgcaptcha' in webfinger_response.text:
                         print(f'{color_magenta}{domain} returned CAPTCHA{color_reset}')
-                        mark_ignore_domain(domain, conn)
-                        delete_domain_if_known(domain, conn)
+                        mark_ignore_domain(domain)
+                        delete_domain_if_known(domain)
                         continue
                 elif webfinger_response.status_code == 403:
                     error_to_print = f'{domain} is HTTP {webfinger_response.status_code} restricted'
                     print(f'{color_magenta}{error_to_print}{color_reset}')
-                    mark_ignore_domain(domain, conn)
-                    delete_domain_if_known(domain, conn)
+                    mark_ignore_domain(domain)
+                    delete_domain_if_known(domain)
                     continue
                 elif webfinger_response.status_code == 410:
                     print(f'{color_red}{domain} returned HTTP {webfinger_response.status_code}{color_reset}')
-                    mark_failed_domain(domain, conn)
-                    delete_domain_if_known(domain, conn)
+                    mark_failed_domain(domain)
+                    delete_domain_if_known(domain)
                     continue
                 else:
                     error_to_print = f'{domain} returned HTTP {webfinger_response.status_code} (webfinger)'
                     print(f'{color_cyan}{error_to_print}{color_reset}')
-                    log_error(domain, conn, error_to_print)
+                    log_error(domain, error_to_print)
                     error_reason = webfinger_response.status_code
-                    increment_domain_error(domain, conn, error_reason)
+                    increment_domain_error(domain, error_reason)
                     continue
 
             nodeinfo_url = f'https://{backend_domain}/.well-known/nodeinfo'
@@ -647,68 +638,68 @@ def check_and_record_domains(domain_list, ignored_domains, failed_domains, user_
                         if any(ct in content_type for ct in json_content_types):
                             error_to_print = f'{domain} JSON is invalid (nodeinfo)'
                             print(f'{color_yellow}{error_to_print}{color_reset}')
-                            log_error(domain, conn, error_to_print)
+                            log_error(domain, error_to_print)
                             error_reason = 'JSON'
-                            increment_domain_error(domain, conn, error_reason)
+                            increment_domain_error(domain, error_reason)
                             continue
                         elif not nodeinfo_response.content:
                             error_to_print = f'{domain} JSON is empty (nodeinfo)'
                             print(f'{color_yellow}{error_to_print}{color_reset}')
-                            log_error(domain, conn, error_to_print)
+                            log_error(domain, error_to_print)
                             error_reason = 'JSON'
-                            increment_domain_error(domain, conn, error_reason)
+                            increment_domain_error(domain, error_reason)
                             continue
                         elif content_type != '':
                             content_type_strip = content_type.split(';')[0].strip()
                             error_to_print = f'{domain} JSON is {content_type_strip} (nodeinfo)'
                             print(f'{color_yellow}{error_to_print}{color_reset}')
-                            log_error(domain, conn, error_to_print)
+                            log_error(domain, error_to_print)
                             error_reason = 'JSON'
-                            increment_domain_error(domain, conn, error_reason)
+                            increment_domain_error(domain, error_reason)
                             continue
                         else:
                             error_to_print = f'{domain} JSON is fucked (nodeinfo)'
                             print(f'{color_yellow}{error_to_print}{color_reset}')
-                            log_error(domain, conn, error_to_print)
+                            log_error(domain, error_to_print)
                             error_reason = 'JSON'
-                            increment_domain_error(domain, conn, error_reason)
+                            increment_domain_error(domain, error_reason)
                             continue
                 elif nodeinfo_response.status_code == 202:
                     if 'sgcaptcha' in nodeinfo_response.text:
                         print(f'{color_magenta}{domain} returned CAPTCHA{color_reset}')
-                        mark_ignore_domain(domain, conn)
-                        delete_domain_if_known(domain, conn)
+                        mark_ignore_domain(domain)
+                        delete_domain_if_known(domain)
                         continue
                 elif nodeinfo_response.status_code == 403:
                     error_to_print = f'{domain} is HTTP {nodeinfo_response.status_code} restricted'
                     print(f'{color_magenta}{error_to_print}{color_reset}')
-                    mark_ignore_domain(domain, conn)
-                    delete_domain_if_known(domain, conn)
+                    mark_ignore_domain(domain)
+                    delete_domain_if_known(domain)
                     continue
                 elif nodeinfo_response.status_code == 404:
                     error_to_print = f'{domain} is not using Mastodon'
                     print(f'{color_magenta}{error_to_print}{color_reset}')
-                    mark_ignore_domain(domain, conn)
-                    delete_domain_if_known(domain, conn)
+                    mark_ignore_domain(domain)
+                    delete_domain_if_known(domain)
                     continue
                 elif nodeinfo_response.status_code == 410:
                     print(f'{color_red}{domain} returned HTTP {nodeinfo_response.status_code}{color_reset}')
-                    mark_failed_domain(domain, conn)
-                    delete_domain_if_known(domain, conn)
+                    mark_failed_domain(domain)
+                    delete_domain_if_known(domain)
                     continue
                 else:
                     error_to_print = f'{domain} returned HTTP {nodeinfo_response.status_code} (nodeinfo)'
                     print(f'{color_cyan}{error_to_print}{color_reset}')
-                    log_error(domain, conn, error_to_print)
+                    log_error(domain, error_to_print)
                     error_reason = nodeinfo_response.status_code
-                    increment_domain_error(domain, conn, error_reason)
+                    increment_domain_error(domain, error_reason)
                     continue
 
                 if ('code' in data and data['code'] in ['rest_no_route', 'rest_not_logged_in', 'rest_forbidden', 'rest_user_invalid', 'rest_login_required']) or ('error' in data and data['error'] == 'Restricted'):
                     error_to_print = f'{domain} is JSON restricted (nodeinfo)'
                     print(f'{color_magenta}{error_to_print}{color_reset}')
-                    mark_ignore_domain(domain, conn)
-                    delete_domain_if_known(domain, conn)
+                    mark_ignore_domain(domain)
+                    delete_domain_if_known(domain)
                     continue
 
                 if 'links' in data and len(data['links']) > 0 and 'href' in data['links'][0]:
@@ -717,8 +708,8 @@ def check_and_record_domains(domain_list, ignored_domains, failed_domains, user_
                     if 'wp-json' in linked_nodeinfo_url:
                         error_to_print = f'{domain} is not using Mastodon'
                         print(f'{color_magenta}{error_to_print}{color_reset}')
-                        mark_ignore_domain(domain, conn)
-                        delete_domain_if_known(domain, conn)
+                        mark_ignore_domain(domain)
+                        delete_domain_if_known(domain)
                         continue
 
                     with requests.get(linked_nodeinfo_url, headers=custom_headers, timeout=5) as linked_nodeinfo_response:
@@ -728,15 +719,15 @@ def check_and_record_domains(domain_list, ignored_domains, failed_domains, user_
                                 if 'application/activity+json' in content_type:
                                     error_to_print = f'{domain} is not using Mastodon'
                                     print(f'{color_magenta}{error_to_print}{color_reset}')
-                                    mark_ignore_domain(domain, conn)
-                                    delete_domain_if_known(domain, conn)
+                                    mark_ignore_domain(domain)
+                                    delete_domain_if_known(domain)
                                     continue
                                 else:
                                     error_to_print = f'{domain} did not return application/activity+json @ {linked_nodeinfo_url}'
                                     print(f'{color_yellow}{error_to_print}{color_reset}')
-                                    log_error(domain, conn, error_to_print)
+                                    log_error(domain, error_to_print)
                                     error_reason = 'JSON'
-                                    increment_domain_error(domain, conn, error_reason)
+                                    increment_domain_error(domain, error_reason)
                                     continue
                             linked_nodeinfo_data = linked_nodeinfo_response.json()
 
@@ -764,10 +755,10 @@ def check_and_record_domains(domain_list, ignored_domains, failed_domains, user_
                                 if active_month_users > max(total_users + 6, total_users + (total_users * 0.25)):
                                     error_to_print = f'{domain} is running Mastodon v{software_version} with invalid counts ({active_month_users}:{total_users})'
                                     print(f'{color_yellow}{error_to_print}{color_reset}')
-                                    log_error(domain, conn, error_to_print)
+                                    log_error(domain, error_to_print)
                                     error_reason = '###'
-                                    increment_domain_error(domain, conn, error_reason)
-                                    delete_domain_if_known(domain, conn)
+                                    increment_domain_error(domain, error_reason)
+                                    delete_domain_if_known(domain)
                                     continue
 
                                 if software_version.startswith("4"):
@@ -781,29 +772,29 @@ def check_and_record_domains(domain_list, ignored_domains, failed_domains, user_
                                         if instance_api_response.status_code != 200 and instance_api_response.status_code != 410:
                                             error_to_print = f'{domain} returned HTTP {instance_api_response.status_code} (API)'
                                             print(f'{color_cyan}{error_to_print}{color_reset}')
-                                            log_error(domain, conn, error_to_print)
+                                            log_error(domain, error_to_print)
                                             error_reason = 'API'
-                                            increment_domain_error(domain, conn, error_reason)
+                                            increment_domain_error(domain, error_reason)
                                             continue
                                         elif instance_api_response.status_code == 410:
                                             print(f'{color_red}{domain} returned HTTP {instance_api_response.status_code} (API){color_reset}')
-                                            mark_failed_domain(domain, conn)
-                                            delete_domain_if_known(domain, conn)
+                                            mark_failed_domain(domain)
+                                            delete_domain_if_known(domain)
                                             continue
 
                                         error_to_print = f'{domain} did not return JSON (API)'
                                         print(f'{color_yellow}{error_to_print}{color_reset}')
-                                        log_error(domain, conn, error_to_print)
+                                        log_error(domain, error_to_print)
                                         error_reason = 'JSON'
-                                        increment_domain_error(domain, conn, error_reason)
+                                        increment_domain_error(domain, error_reason)
                                         continue
                                     backend_data = instance_api_response.json()
                                     if 'error' in backend_data:
                                         if backend_data['error'] == "This method requires an authenticated user":
                                             error_to_print = f'{domain} requires authentication (API)'
                                             print(f'{color_magenta}{error_to_print}{color_reset}')
-                                            mark_ignore_domain(domain, conn)
-                                            delete_domain_if_known(domain, conn)
+                                            mark_ignore_domain(domain)
+                                            delete_domain_if_known(domain)
                                             continue
                                     if software_version.startswith("4"):
                                         actual_domain_raw = backend_data['domain']
@@ -835,131 +826,137 @@ def check_and_record_domains(domain_list, ignored_domains, failed_domains, user_
 
                                 print(f'{color_green}{actual_domain} is running Mastodon v{software_version}{color_reset}')
 
-                                if domain != actual_domain:
-                                        # First, check if a record exists for the initial domain
-                                        cursor.execute('''
-                                            SELECT COUNT(*) FROM MastodonDomains WHERE "Domain" = ?
-                                        ''', (domain,))
-                                        record_exists = cursor.fetchone()[0] > 0
+                                cursor = conn.cursor()
+                                try:
+                                    if domain != actual_domain:
+                                            # First, check if a record exists for the initial domain
+                                            cursor.execute('''
+                                                SELECT COUNT(*) FROM MastodonDomains WHERE "Domain" = ?
+                                            ''', (domain,))
+                                            record_exists = cursor.fetchone()[0] > 0
 
-                                        if record_exists:
-                                            print(f'{color_magenta}Deleting duplicate record for {domain} which is really {actual_domain}{color_reset}')
-                                            # Delete the record associated with the initial domain
-                                            delete_domain_if_known(domain, conn)
+                                            if record_exists:
+                                                print(f'{color_magenta}Deleting duplicate record for {domain} which is really {actual_domain}{color_reset}')
+                                                # Delete the record associated with the initial domain
+                                                delete_domain_if_known(domain)
 
-                                cursor.execute('''
-                                    INSERT INTO MastodonDomains ("Domain", "Software Version", "Total Users", "Active Users (Monthly)", "Timestamp", "Contact", "Source", "Full Version")
-                                    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-                                    ON CONFLICT("Domain") DO UPDATE SET
-                                    "Software Version" = excluded."Software Version",
-                                    "Total Users" = excluded."Total Users",
-                                    "Active Users (Monthly)" = excluded."Active Users (Monthly)",
-                                    "Timestamp" = excluded."Timestamp",
-                                    "Contact" = excluded."Contact",
-                                    "Source" = excluded."Source",
-                                    "Full Version" = excluded."Full Version"
-                                ''', (actual_domain, software_version, total_users, active_month_users, datetime.now().strftime('%Y-%m-%d %H:%M:%S'), contact_account, source_url, software_version_full))
-                                conn.commit()
-                                clear_domain_error(domain, conn)
+                                    cursor.execute('''
+                                        INSERT INTO MastodonDomains ("Domain", "Software Version", "Total Users", "Active Users (Monthly)", "Timestamp", "Contact", "Source", "Full Version")
+                                        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                                        ON CONFLICT("Domain") DO UPDATE SET
+                                        "Software Version" = excluded."Software Version",
+                                        "Total Users" = excluded."Total Users",
+                                        "Active Users (Monthly)" = excluded."Active Users (Monthly)",
+                                        "Timestamp" = excluded."Timestamp",
+                                        "Contact" = excluded."Contact",
+                                        "Source" = excluded."Source",
+                                        "Full Version" = excluded."Full Version"
+                                    ''', (actual_domain, software_version, total_users, active_month_users, datetime.now().strftime('%Y-%m-%d %H:%M:%S'), contact_account, source_url, software_version_full))
+                                except Exception as e:
+                                    print(f"Failed to write domain data: {e}")
+                                    conn.rollback()
+                                finally:
+                                    cursor.close()
+                                clear_domain_error(domain)
                             else:
                                 print(f'{color_magenta}{domain} is not using Mastodon{color_reset}')
-                                mark_ignore_domain(domain, conn)
-                                delete_domain_if_known(domain, conn)
+                                mark_ignore_domain(domain)
+                                delete_domain_if_known(domain)
                         else:
                             error_to_print = f'{domain} returned HTTP {linked_nodeinfo_response.status_code} @ {linked_nodeinfo_url}'
                             if linked_nodeinfo_response.status_code == 403:
                                 print(f'{color_magenta}{error_to_print}{color_reset}')
-                                mark_ignore_domain(domain, conn)
-                                delete_domain_if_known(domain, conn)
+                                mark_ignore_domain(domain)
+                                delete_domain_if_known(domain)
                             elif linked_nodeinfo_response.status_code == 410:
                                 print(f'{color_red}{error_to_print}{color_reset}')
-                                mark_failed_domain(domain, conn)
-                                delete_domain_if_known(domain, conn)
+                                mark_failed_domain(domain)
+                                delete_domain_if_known(domain)
                             else:
                                 print(f'{color_cyan}{error_to_print}{color_reset}')
-                                log_error(domain, conn, error_to_print)
+                                log_error(domain, error_to_print)
                                 error_reason = linked_nodeinfo_response.status_code
-                                increment_domain_error(domain, conn, error_reason)
+                                increment_domain_error(domain, error_reason)
                 else:
                     print(f'{color_magenta}{domain} is not using Mastodon{color_reset}')
-                    mark_ignore_domain(domain, conn)
-                    delete_domain_if_known(domain, conn)
+                    mark_ignore_domain(domain)
+                    delete_domain_if_known(domain)
 
         except requests.exceptions.ConnectionError as e:
             dns_result = resolve_dns_with_dnspython(domain)
             if dns_result is False:
                 error_to_print = f'{domain} DNS query returned NXDOMAIN'
                 print(f'{color_red}{error_to_print}{color_reset}')
-                mark_failed_domain(domain, conn)
-                delete_domain_if_known(domain, conn)
+                mark_failed_domain(domain)
+                delete_domain_if_known(domain)
                 continue
             elif dns_result is None:
                 error_to_print = f'{domain} DNS query failed'
                 print(f'{color_orange}{error_to_print}{color_reset}')
-                log_error(domain, conn, error_to_print)
+                log_error(domain, error_to_print)
                 error_reason = 'DNS'
-                increment_domain_error(domain, conn, error_reason)
+                increment_domain_error(domain, error_reason)
             else:
                 error_message = str(e)
                 if 'SSLError' in error_message and 'Hostname mismatch' in error_message:
                     error_to_print = f'{domain} SSL certfificate does not match hostname'
                     print(f'{color_orange}{error_to_print}{color_reset}')
                     error_reason = 'SSL'
-                    delete_domain_if_known(domain, conn)
+                    delete_domain_if_known(domain)
                 elif 'SSLError' in error_message and 'self-signed' in error_message:
                     error_to_print = f'{domain} SSL certificate is self signed'
                     print(f'{color_orange}{error_to_print}{color_reset}')
                     error_reason = 'SSL'
-                    delete_domain_if_known(domain, conn)
+                    delete_domain_if_known(domain)
                 elif 'SSLError' in error_message and 'certificate key too weak' in error_message:
                     error_to_print = f'{domain} SSL certificate has a weak key'
                     print(f'{color_orange}{error_to_print}{color_reset}')
                     error_reason = 'SSL'
-                    delete_domain_if_known(domain, conn)
+                    delete_domain_if_known(domain)
                 elif 'SSLError' in error_message and 'certificate has expired' in error_message:
                     error_to_print = f'{domain} SSL certificate has expired'
                     print(f'{color_orange}{error_to_print}{color_reset}')
                     error_reason = 'SSL'
-                    delete_domain_if_known(domain, conn)
+                    delete_domain_if_known(domain)
                 elif 'SSLError' in error_message and 'tlsv1' in error_message:
                     error_to_print = f'{domain} SSL returned was TLSV1'
                     print(f'{color_orange}{error_to_print}{color_reset}')
                     error_reason = 'SSL'
-                    delete_domain_if_known(domain, conn)
+                    delete_domain_if_known(domain)
                 elif 'SSLError' in error_message and 'SSLV3_ALERT_HANDSHAKE_FAILURE' in error_message:
                     error_to_print = f'{domain} SSL returned was SSLV3'
                     print(f'{color_orange}{error_to_print}{color_reset}')
                     error_reason = 'SSL'
-                    delete_domain_if_known(domain, conn)
+                    delete_domain_if_known(domain)
                 elif 'SSLError' in error_message and 'UNEXPECTED_EOF_WHILE_READING' in error_message:
                     error_to_print = f'{domain} SSL returned an unexpected EOF'
                     print(f'{color_orange}{error_to_print}{color_reset}')
                     error_reason = 'SSL'
-                    delete_domain_if_known(domain, conn)
+                    delete_domain_if_known(domain)
                 elif 'SSLError' in error_message and 'unable to get local issuer certificate' in error_message:
                     error_to_print = f'{domain} SSL returned with untrusted CA'
                     print(f'{color_orange}{error_to_print}{color_reset}')
                     error_reason = 'SSL'
-                    delete_domain_if_known(domain, conn)
+                    delete_domain_if_known(domain)
                 elif 'SSLError' in error_message and 'record layer failure' in error_message:
                     error_to_print = f'{domain} SSL returned with record layer failure'
                     print(f'{color_orange}{error_to_print}{color_reset}')
                     error_reason = 'SSL'
-                    delete_domain_if_known(domain, conn)
+                    delete_domain_if_known(domain)
                 elif 'SSLError' in error_message and 'UNSAFE_LEGACY_RENEGOTIATION_DISABLED' in error_message:
                     error_to_print = f'{domain} SSL returned with unsafe legacy renegotiation'
                     print(f'{color_orange}{error_to_print}{color_reset}')
                     error_reason = 'SSL'
-                    delete_domain_if_known(domain, conn)
+                    delete_domain_if_known(domain)
                 elif 'SSLError' in error_message and 'IP address mismatch' in error_message:
                     error_to_print = f'{domain} SSL returned with IP address mismatch'
                     print(f'{color_orange}{error_to_print}{color_reset}')
                     error_reason = 'SSL'
-                    delete_domain_if_known(domain, conn)
+                    delete_domain_if_known(domain)
                 elif 'Exceeded 30 redirects' in error_message:
                     print(f'{color_red}{error_to_print}{color_reset}')
-                    mark_failed_domain(domain, conn)
-                    delete_domain_if_known(domain, conn)
+                    mark_failed_domain(domain)
+                    delete_domain_if_known(domain)
                 elif 'ConnectTimeoutError' in error_message or 'ConnectionResetError' in error_message:
                     error_to_print = f'{domain} HTTP connection was reset'
                     print(f'{color_cyan}{error_to_print}{color_reset}')
@@ -988,34 +985,34 @@ def check_and_record_domains(domain_list, ignored_domains, failed_domains, user_
                     error_to_print = f'{domain} failed with unhandled error: {e}'
                     print(f'{color_orange}{error_to_print}{color_reset}')
                     error_reason = '???'
-                log_error(domain, conn, error_to_print)
-                increment_domain_error(domain, conn, error_reason)
+                log_error(domain, error_to_print)
+                increment_domain_error(domain, error_reason)
 
         except requests.exceptions.ReadTimeout:
             error_to_print = f'{domain} HTTP connection timed out'
             print(f'{color_cyan}{error_to_print}{color_reset}')
-            log_error(domain, conn, error_to_print)
+            log_error(domain, error_to_print)
             error_reason = 'HTTP'
-            increment_domain_error(domain, conn, error_reason)
+            increment_domain_error(domain, error_reason)
         except requests.exceptions.RequestException:
             error_to_print = f'{domain} HTTP connection had an exception'
             print(f'{color_cyan}{error_to_print}{color_reset}')
-            log_error(domain, conn, error_to_print)
+            log_error(domain, error_to_print)
             error_reason = 'HTTP'
-            increment_domain_error(domain, conn, error_reason)
+            increment_domain_error(domain, error_reason)
 
         except Exception as e:
             if 'Exceeded 30 redirects' in str(e):
                 error_to_print = f'{domain} exceeded 30 redirects'
                 print(f'{color_red}{error_to_print}{color_reset}')
-                mark_failed_domain(domain, conn)
-                delete_domain_if_known(domain, conn)
+                mark_failed_domain(domain)
+                delete_domain_if_known(domain)
             else:
                 error_to_print = f'{domain} encountered an unexpected error: {e}'
                 print(f'{color_yellow}{error_to_print}{color_reset}')
-                log_error(domain, conn, error_to_print)
+                log_error(domain, error_to_print)
                 error_reason = '???'
-                increment_domain_error(domain, conn, error_reason)
+                increment_domain_error(domain, error_reason)
 
 def read_domain_list(file_path):
     with open(file_path, 'r') as file:
@@ -1025,74 +1022,79 @@ default_source = 'database'  # Default source is set to 'database'
 domain_list_file = sys.argv[1] if len(sys.argv) > 1 else None
 
 def load_from_database(user_choice):
-    conn = sqlite3.connect(db_path)  # Connect to your SQLite database
     cursor = conn.cursor()
-    if user_choice == "4":
-        cursor.execute("SELECT Domain FROM RawDomains WHERE Errors > 7 ORDER BY LENGTH(DOMAIN) ASC")
-    elif user_choice == "5":
-        cursor.execute("SELECT Domain FROM RawDomains WHERE Errors < 6 ORDER BY LENGTH(DOMAIN) ASC")
-    elif user_choice == "6":
-        cursor.execute('SELECT Domain FROM MastodonDomains WHERE Timestamp < datetime("now", "-3 days") ORDER BY Timestamp ASC')
-    elif user_choice == "7":
-        cursor.execute("SELECT Domain FROM RawDomains WHERE Ignore = '1' ORDER BY Domain")
-    elif user_choice == "8":
-        query = """
-        SELECT Domain
-        FROM MastodonDomains
-        WHERE
-            "Software Version" NOT LIKE '4.4.0%' AND
-            "Software Version" NOT LIKE '4.3.0'
-        ORDER BY "Total Users" DESC
-        ;
-        """
-        cursor.execute(query)
-    elif user_choice == "9":
-        cursor.execute("SELECT Domain FROM RawDomains WHERE Reason = 'SSL' ORDER BY Errors ASC")
-    elif user_choice == "10":
-        cursor.execute("SELECT Domain FROM RawDomains WHERE Reason = 'DNS' ORDER BY Errors ASC")
-    elif user_choice == "11":
-        cursor.execute("SELECT Domain FROM RawDomains WHERE Reason = '###' ORDER BY Errors ASC")
-    elif user_choice == "12":
-        cursor.execute("SELECT Domain FROM RawDomains WHERE Reason = 'HTTP' ORDER BY Errors ASC")
-    elif user_choice == "13":
-        cursor.execute("SELECT Domain FROM RawDomains WHERE Reason > 399 AND Reason < 500 ORDER BY Errors ASC;")
-    elif user_choice == "14":
-        cursor.execute("SELECT Domain FROM RawDomains WHERE Failed = '1' ORDER BY Domain")
-    elif user_choice == "15":
-        cursor.execute("SELECT Domain FROM RawDomains WHERE Reason = '???' ORDER BY Errors ASC")
-    elif user_choice == "16":
-        cursor.execute("SELECT Domain FROM RawDomains WHERE Reason = 'API' ORDER BY Errors ASC")
-    elif user_choice == "17":
-        cursor.execute("SELECT Domain FROM RawDomains WHERE Reason = 'JSON' ORDER BY Errors ASC")
-    elif user_choice == "18":
-        cursor.execute("SELECT Domain FROM RawDomains WHERE Reason > 499 AND Reason < 600 ORDER BY Errors ASC;")
-    elif user_choice == "21":
-        cursor.execute('SELECT Domain FROM MastodonDomains WHERE "Active Users (Monthly)" = 0 ORDER BY Timestamp ASC')
-    elif user_choice == "22":
-        query = """
-        SELECT Domain
-        FROM MastodonDomains
-        WHERE
-            "Software Version" LIKE '4.4%'
-        ORDER BY "Total Users" DESC
-        ;
-        """
-        cursor.execute(query)
-    elif user_choice == "23":
-        cursor.execute("SELECT Domain FROM RawDomains WHERE Reason = 'TXT' ORDER BY Errors ASC")
-    elif user_choice == "400":
-        cursor.execute("SELECT Domain FROM RawDomains WHERE Reason LIKE '%400%' ORDER BY Errors ASC")
-    elif user_choice == "404":
-        cursor.execute("SELECT Domain FROM RawDomains WHERE Reason LIKE '%404%' ORDER BY Errors ASC")
-    elif user_choice == "406":
-        cursor.execute("SELECT Domain FROM RawDomains WHERE Reason LIKE '%406%' ORDER BY Errors ASC")
-    else:
-        cursor.execute("SELECT Domain FROM RawDomains WHERE (Failed IS NULL OR Failed = '' OR Failed = '0') AND (Ignore IS NULL OR Ignore = '' OR Ignore = '0') AND (Errors < 6 OR Errors IS NULL) ORDER BY Domain ASC")
-    domain_list = [row[0].strip() for row in cursor.fetchall() if row[0].strip()]
-    conn.close()
+    try:
+        if user_choice == "4":
+            cursor.execute("SELECT Domain FROM RawDomains WHERE Errors > 7 ORDER BY LENGTH(DOMAIN) ASC")
+        elif user_choice == "5":
+            cursor.execute("SELECT Domain FROM RawDomains WHERE Errors < 6 ORDER BY LENGTH(DOMAIN) ASC")
+        elif user_choice == "6":
+            cursor.execute('SELECT Domain FROM MastodonDomains WHERE Timestamp < datetime("now", "-3 days") ORDER BY Timestamp ASC')
+        elif user_choice == "7":
+            cursor.execute("SELECT Domain FROM RawDomains WHERE Ignore = '1' ORDER BY Domain")
+        elif user_choice == "8":
+            query = """
+            SELECT Domain
+            FROM MastodonDomains
+            WHERE
+                "Software Version" NOT LIKE '4.4.0%' AND
+                "Software Version" NOT LIKE '4.3.0'
+            ORDER BY "Total Users" DESC
+            ;
+            """
+            cursor.execute(query)
+        elif user_choice == "9":
+            cursor.execute("SELECT Domain FROM RawDomains WHERE Reason = 'SSL' ORDER BY Errors ASC")
+        elif user_choice == "10":
+            cursor.execute("SELECT Domain FROM RawDomains WHERE Reason = 'DNS' ORDER BY Errors ASC")
+        elif user_choice == "11":
+            cursor.execute("SELECT Domain FROM RawDomains WHERE Reason = '###' ORDER BY Errors ASC")
+        elif user_choice == "12":
+            cursor.execute("SELECT Domain FROM RawDomains WHERE Reason = 'HTTP' ORDER BY Errors ASC")
+        elif user_choice == "13":
+            cursor.execute("SELECT Domain FROM RawDomains WHERE Reason > 399 AND Reason < 500 ORDER BY Errors ASC;")
+        elif user_choice == "14":
+            cursor.execute("SELECT Domain FROM RawDomains WHERE Failed = '1' ORDER BY Domain")
+        elif user_choice == "15":
+            cursor.execute("SELECT Domain FROM RawDomains WHERE Reason = '???' ORDER BY Errors ASC")
+        elif user_choice == "16":
+            cursor.execute("SELECT Domain FROM RawDomains WHERE Reason = 'API' ORDER BY Errors ASC")
+        elif user_choice == "17":
+            cursor.execute("SELECT Domain FROM RawDomains WHERE Reason = 'JSON' ORDER BY Errors ASC")
+        elif user_choice == "18":
+            cursor.execute("SELECT Domain FROM RawDomains WHERE Reason > 499 AND Reason < 600 ORDER BY Errors ASC;")
+        elif user_choice == "21":
+            cursor.execute('SELECT Domain FROM MastodonDomains WHERE "Active Users (Monthly)" = 0 ORDER BY Timestamp ASC')
+        elif user_choice == "22":
+            query = """
+            SELECT Domain
+            FROM MastodonDomains
+            WHERE
+                "Software Version" LIKE '4.4%'
+            ORDER BY "Total Users" DESC
+            ;
+            """
+            cursor.execute(query)
+        elif user_choice == "23":
+            cursor.execute("SELECT Domain FROM RawDomains WHERE Reason = 'TXT' ORDER BY Errors ASC")
+        elif user_choice == "400":
+            cursor.execute("SELECT Domain FROM RawDomains WHERE Reason LIKE '%400%' ORDER BY Errors ASC")
+        elif user_choice == "404":
+            cursor.execute("SELECT Domain FROM RawDomains WHERE Reason LIKE '%404%' ORDER BY Errors ASC")
+        elif user_choice == "406":
+            cursor.execute("SELECT Domain FROM RawDomains WHERE Reason LIKE '%406%' ORDER BY Errors ASC")
+        else:
+            cursor.execute("SELECT Domain FROM RawDomains WHERE (Failed IS NULL OR Failed = '' OR Failed = '0') AND (Ignore IS NULL OR Ignore = '' OR Ignore = '0') AND (Errors < 6 OR Errors IS NULL) ORDER BY Domain ASC")
+        domain_list = [row[0].strip() for row in cursor.fetchall() if row[0].strip()]
+    except Exception as e:
+        print(f"Failed to obtain selected domain list: {e}")
+        conn.rollback()
+    finally:
+        cursor.close()
     return domain_list
 
 def load_from_file(file_name):
+    cursor = conn.cursor()
     domain_list = []
     with open(file_name, 'r') as file:
         for line in file:
@@ -1100,15 +1102,13 @@ def load_from_file(file_name):
             if domain:  # Ensure the domain is not empty
                 domain_list.append(domain)
                 # Check if the domain already exists in the database
-                conn = sqlite3.connect(db_path)
-                cursor = conn.cursor()
                 cursor.execute('SELECT COUNT(*) FROM RawDomains WHERE Domain = ?', (domain,))
                 exists = cursor.fetchone()[0] > 0
 
                 # If not, insert the new domain into the database
                 if not exists:
                     cursor.execute('INSERT INTO RawDomains (Domain, Errors) VALUES (?, ?)', (domain, None))
-                    conn.commit()
+                    cursor.close()
     return domain_list
 
 try:
@@ -1129,16 +1129,16 @@ except sqlite3.Error as e:
     print(f"Database error: {e}")
     sys.exit(1)
 
-conn = sqlite3.connect(db_path)  # Connect to your SQLite database
 cursor = conn.cursor()
-cursor.execute("SELECT Domain FROM RawDomains WHERE Failed = '1'")  # Replace 'domains_table' and 'domain' with your actual table and column names
-failed_domains = [row[0].strip() for row in cursor.fetchall() if row[0].strip()]
-conn.close()
-
-conn = sqlite3.connect(db_path)  # Connect to your SQLite database
-cursor = conn.cursor()
-cursor.execute("SELECT Domain FROM RawDomains WHERE Ignore = '1'")  # Replace 'domains_table' and 'domain' with your actual table and column names
-ignored_domains = [row[0].strip() for row in cursor.fetchall() if row[0].strip()]
-conn.close()
+try:
+    cursor.execute("SELECT Domain FROM RawDomains WHERE Failed = '1'")  # Replace 'domains_table' and 'domain' with your actual table and column names
+    failed_domains = [row[0].strip() for row in cursor.fetchall() if row[0].strip()]
+    cursor.execute("SELECT Domain FROM RawDomains WHERE Ignore = '1'")  # Replace 'domains_table' and 'domain' with your actual table and column names
+    ignored_domains = [row[0].strip() for row in cursor.fetchall() if row[0].strip()]
+except Exception as e:
+    print(f"Failed to obtain excluded domains: {e}")
+    conn.rollback()
+finally:
+    cursor.close()
 
 check_and_record_domains(domain_list, ignored_domains, failed_domains, user_choice)
