@@ -679,8 +679,8 @@ def check_and_record_domains(domain_list, ignored_domains, failed_domains, user_
                         data = json.loads(nodeinfo_response.text)
                         data = nodeinfo_response.json()
                     except json.JSONDecodeError:
-                        content_type = nodeinfo_response.headers.get('Content-Type', '')
-                        if any(ct in content_type for ct in json_content_types):
+                        nodeinfo_content_type = nodeinfo_response.headers.get('Content-Type', '')
+                        if any(ct in nodeinfo_content_type for ct in json_content_types):
                             error_to_print = f'JSON response at {nodeinfo_url} was invalid (HTTP {nodeinfo_response.status_code})'
                             error_reason = 'JSON'
                             print_colored(f'{error_to_print}', 'yellow')
@@ -694,9 +694,9 @@ def check_and_record_domains(domain_list, ignored_domains, failed_domains, user_
                             log_error(domain, error_to_print)
                             increment_domain_error(domain, error_reason)
                             continue
-                        elif content_type != '':
-                            content_type_strip = content_type.split(';')[0].strip()
-                            error_to_print = f'JSON response at {nodeinfo_url} was {content_type_strip} (HTTP {nodeinfo_response.status_code})'
+                        elif nodeinfo_content_type != '':
+                            nodeinfo_content_type_strip = nodeinfo_content_type.split(';')[0].strip()
+                            error_to_print = f'JSON response at {nodeinfo_url} was {nodeinfo_content_type_strip} (HTTP {nodeinfo_response.status_code})'
                             error_reason = 'JSON'
                             print_colored(f'{error_to_print}', 'yellow')
                             log_error(domain, error_to_print)
@@ -761,9 +761,9 @@ def check_and_record_domains(domain_list, ignored_domains, failed_domains, user_
 
                     with requests.get(linked_nodeinfo_url, headers=custom_headers, timeout=5) as linked_nodeinfo_response:
                         if linked_nodeinfo_response.status_code == 200:
-                            content_type = linked_nodeinfo_response.headers.get('Content-Type', '')
-                            if 'application/json' not in content_type:
-                                if 'application/activity+json' in content_type:
+                            linked_nodeinfo_content_type = linked_nodeinfo_response.headers.get('Content-Type', '')
+                            if 'application/json' not in linked_nodeinfo_content_type:
+                                if 'application/activity+json' in linked_nodeinfo_content_type:
                                     error_to_print = f'Not using Mastodon, marking as ignored...'
                                     print_colored(f'{error_to_print}', 'magenta')
                                     mark_ignore_domain(domain)
@@ -805,8 +805,8 @@ def check_and_record_domains(domain_list, ignored_domains, failed_domains, user_
                                     instance_api_url = f'https://{backend_domain}/api/v1/instance'
 
                                 with requests.get(instance_api_url, headers=custom_headers, timeout=5) as instance_api_response:
-                                    content_type = instance_api_response.headers.get('Content-Type', '')
-                                    if 'application/json' not in content_type:
+                                    instance_api_content_type = instance_api_response.headers.get('Content-Type', '')
+                                    if 'application/json' not in instance_api_content_type:
                                         if instance_api_response.status_code != 200 and instance_api_response.status_code != 410:
                                             error_to_print = f'Responded HTTP {instance_api_response.status_code} to instance API request'
                                             error_reason = 'API'
@@ -827,24 +827,24 @@ def check_and_record_domains(domain_list, ignored_domains, failed_domains, user_
                                         log_error(domain, error_to_print)
                                         increment_domain_error(domain, error_reason)
                                         continue
-                                    backend_data = instance_api_response.json()
-                                    if 'error' in backend_data:
-                                        if backend_data['error'] == "This method requires an authenticated user":
+                                    instance_api_data = instance_api_response.json()
+                                    if 'error' in instance_api_data:
+                                        if instance_api_data['error'] == "This method requires an authenticated user":
                                             error_to_print = f'Instance API requires authentication, marking as ignored...'
                                             print_colored(f'{error_to_print}', 'magenta')
                                             mark_ignore_domain(domain)
                                             delete_domain_if_known(domain)
                                             continue
                                     if software_version.startswith("4"):
-                                        actual_domain_raw = backend_data['domain']
+                                        actual_domain_raw = instance_api_data['domain']
                                         actual_domain = actual_domain_raw.lower()
-                                        contact_account_raw = backend_data['contact']['email']
+                                        contact_account_raw = instance_api_data['contact']['email']
                                         contact_account = normalize_email(contact_account_raw).lower()
-                                        source_url = backend_data['source_url']
+                                        source_url = instance_api_data['source_url']
                                     else:
-                                        actual_domain_raw = backend_data['uri']
+                                        actual_domain_raw = instance_api_data['uri']
                                         actual_domain = actual_domain_raw.lower()
-                                        contact_account_raw = backend_data['email']
+                                        contact_account_raw = instance_api_data['email']
                                         contact_account = normalize_email(contact_account_raw).lower()
                                         source_url = find_code_repository(backend_domain)
                                     if not is_valid_email(contact_account):
