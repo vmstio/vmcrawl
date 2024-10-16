@@ -219,18 +219,13 @@ def clean_version_date(software_version):
     return software_version
 
 def clean_version_development(software_version):
-    if "rc1" in software_version:
-        software_version = software_version.replace("rc1", "-rc.1")
-    elif "rc2" in software_version:
-        software_version = software_version.replace("rc2", "-rc.2")
-    elif "rc3" in software_version:
-        software_version = software_version.replace("rc3", "-rc.3")
-    elif "beta1" in software_version:
-        software_version = software_version.replace("beta1", "-beta.1")
-    elif "beta2" in software_version:
-        software_version = software_version.replace("beta2", "-beta.2")
-    elif "beta3" in software_version:
-        software_version = software_version.replace("beta3", "-beta.3")
+    patterns = {
+        r'rc(\d+)': r'-rc.\1',
+        r'beta(\d+)': r'-beta.\1'
+    }
+
+    for pattern, replacement in patterns.items():
+        software_version = re.sub(pattern, replacement, software_version)
 
     return software_version
 
