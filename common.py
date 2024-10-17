@@ -36,3 +36,6 @@ colors = {
 http_custom_user_agent = f'{appname}/{appversion} (https://docs.vmst.io/projects/{appname})'
 http_custom_headers = {'User-Agent': http_custom_user_agent}
 http_client = httpx.Client(http2=True, follow_redirects=True, headers=http_custom_headers, timeout=5)
+
+# Common variables
+error_threshold = int(5)

@@ -596,6 +596,7 @@ def check_nodeinfo(domain, backend_domain, httpx_client):
                 print_colored(f'{error_message}', 'yellow')
                 log_error(domain, error_message)
                 increment_domain_error(domain, 'JSON')
+                return None
             data = response.json()
             if 'links' in data and len(data['links']) > 0:
                 nodeinfo_2_url = next((link['href'] for link in data['links'] if link.get('rel') == 'http://nodeinfo.diaspora.software/ns/schema/2.0'), None)
@@ -794,28 +795,25 @@ def read_domain_list(file_path):
 def load_from_database(user_choice):
     query_map = {
         "1": "SELECT Domain FROM RawDomains WHERE (Failed IS NULL OR Failed = '' OR Failed = '0') AND (Ignore IS NULL OR Ignore = '' OR Ignore = '0') AND (Errors < 6 OR Errors IS NULL) ORDER BY Domain ASC",
-        "4": "SELECT Domain FROM RawDomains WHERE Errors > 7 ORDER BY LENGTH(DOMAIN) ASC",
-        "5": "SELECT Domain FROM RawDomains WHERE Errors < 6 ORDER BY LENGTH(DOMAIN) ASC",
-        "6": "SELECT Domain FROM MastodonDomains WHERE Timestamp < datetime('now', '-3 days') ORDER BY Timestamp ASC",
-        "7": "SELECT Domain FROM RawDomains WHERE Ignore = '1' ORDER BY Domain",
-        "8": "SELECT Domain FROM MastodonDomains WHERE \"Software Version\" NOT LIKE '4.4.0%' AND \"Software Version\" NOT LIKE '4.3.0' ORDER BY \"Total Users\" DESC",
-        "9": "SELECT Domain FROM RawDomains WHERE Reason = 'SSL' ORDER BY Errors ASC",
-        "10": "SELECT Domain FROM RawDomains WHERE Reason = 'DNS' ORDER BY Errors ASC",
-        "11": "SELECT Domain FROM RawDomains WHERE Reason = '###' ORDER BY Errors ASC",
+        "4": f"SELECT Domain FROM RawDomains WHERE Errors >= {error_threshold + 1} ORDER BY LENGTH(DOMAIN) ASC",
+        "5": f"SELECT Domain FROM RawDomains WHERE Errors <= {error_threshold} ORDER BY LENGTH(DOMAIN) ASC",
+        "6": "SELECT Domain FROM RawDomains WHERE Ignore = '1' ORDER BY Domain",
+        "7": "SELECT Domain FROM RawDomains WHERE Failed = '1' ORDER BY Domain",
+        "10": "SELECT Domain FROM RawDomains WHERE Reason = 'SSL' ORDER BY Errors ASC",
+        "11": "SELECT Domain FROM RawDomains WHERE Reason = 'DNS' ORDER BY Errors ASC",
         "12": "SELECT Domain FROM RawDomains WHERE Reason = 'HTTP' ORDER BY Errors ASC",
-        "13": "SELECT Domain FROM RawDomains WHERE Reason > 399 AND Reason < 500 ORDER BY Errors ASC",
-        "14": "SELECT Domain FROM RawDomains WHERE Failed = '1' ORDER BY Domain",
-        "15": "SELECT Domain FROM RawDomains WHERE Reason = '???' ORDER BY Errors ASC",
-        "16": "SELECT Domain FROM RawDomains WHERE Reason = 'API' ORDER BY Errors ASC",
-        "17": "SELECT Domain FROM RawDomains WHERE Reason = 'JSON' ORDER BY Errors ASC",
-        "18": "SELECT Domain FROM RawDomains WHERE Reason > 499 AND Reason < 600 ORDER BY Errors ASC",
-        "19": "SELECT Domain FROM RawDomains WHERE Reason > 299 AND Reason < 400 ORDER BY Errors ASC",
-        "21": "SELECT Domain FROM MastodonDomains WHERE \"Active Users (Monthly)\" = 0 ORDER BY Timestamp ASC",
-        "22": "SELECT Domain FROM MastodonDomains WHERE \"Software Version\" LIKE '4.4%' ORDER BY \"Total Users\" DESC",
-        "23": "SELECT Domain FROM RawDomains WHERE Reason = 'TXT' ORDER BY Errors ASC",
-        "400": "SELECT Domain FROM RawDomains WHERE Reason LIKE '%400%' ORDER BY Errors ASC",
-        "404": "SELECT Domain FROM RawDomains WHERE Reason LIKE '%404%' ORDER BY Errors ASC",
-        "406": "SELECT Domain FROM RawDomains WHERE Reason LIKE '%406%' ORDER BY Errors ASC"
+        "20": "SELECT Domain FROM RawDomains WHERE Reason > 299 AND Reason < 400 ORDER BY Errors ASC",
+        "21": "SELECT Domain FROM RawDomains WHERE Reason > 399 AND Reason < 500 ORDER BY Errors ASC",
+        "22": "SELECT Domain FROM RawDomains WHERE Reason > 499 AND Reason < 600 ORDER BY Errors ASC",
+        "30": "SELECT Domain FROM RawDomains WHERE Reason = '###' ORDER BY Errors ASC",
+        "31": "SELECT Domain FROM RawDomains WHERE Reason = '???' ORDER BY Errors ASC",
+        "32": "SELECT Domain FROM RawDomains WHERE Reason = 'API' ORDER BY Errors ASC",
+        "33": "SELECT Domain FROM RawDomains WHERE Reason = 'JSON' ORDER BY Errors ASC",
+        "34": "SELECT Domain FROM RawDomains WHERE Reason = 'TXT' ORDER BY Errors ASC",
+        "40": f"SELECT Domain FROM MastodonDomains WHERE Timestamp < datetime('now', '-{error_threshold} days') ORDER BY Timestamp ASC",
+        "41": "SELECT Domain FROM MastodonDomains WHERE \"Software Version\" NOT LIKE '4.4.0%' AND \"Software Version\" NOT LIKE '4.3.0' ORDER BY \"Total Users\" DESC",
+        "42": "SELECT Domain FROM MastodonDomains WHERE \"Active Users (Monthly)\" = 0 ORDER BY Timestamp ASC",
+        "43": "SELECT Domain FROM MastodonDomains WHERE \"Software Version\" LIKE '4.4%' ORDER BY \"Total Users\" DESC",
     }
 
     query = query_map.get(user_choice)
@@ -861,18 +859,20 @@ def print_colored(text: str, color: str, **kwargs) -> None:
 
 def print_menu() -> None:
     menu_options = {
-        "Alter direction": {"2": "Reverse", "3": "Random"},
-        "Retry general errors": {"4": "Overflow", "5": "Underflow"},
-        "Retry specific errors": {"9": "SSL", "10": "DNS", "11": "###", "15": "???", "16": "API", "17": "JSON", "23": "TXT"},
-        "Retry HTTP errors": {"12": "HTTP", "19": "300s", "13": "400s", "18": "500s", "400": "400", "404": "404", "406": "406"},
-        "Retry fatal errors": {"7": "Ignored", "14": "Failed"},
-        "Retry good data": {"6": "Stale", "8": "Outdated", "21": "Inactive", "22": "Main"},
+        "Change process direction": {"1": "Standard", "2": "Reverse", "3": "Random"},
+        "Retry general errors": {"4": f"Errors >={error_threshold + 1}", "5": f"Errors <={error_threshold}"},
+        "Retry fatal errors": {"6": "Ignored", "7": "Failed"},
+        "Retry connection errors": {"10": "SSL", "11": "DNS", "12": "HTTP"},
+        "Retry HTTP errors": {"20": "300s", "21": "400s", "22": "500s"},
+        "Retry specific errors": {"30": "###", "31": "???", "32": "API", "33": "JSON", "34": "TXT"},
+        "Retry good data": {"40": f"Beyond {error_threshold} Days", "41": "Out of Date", "42": "Active Zero", "43": "Main Runners"},
     }
 
     print_colored(f"{appname} v{appversion}", "bold")
     for category, options in menu_options.items():
-        options_str = " ".join(f"{key}={value}" for key, value in options.items())
-        print_colored(f"{category}: {options_str}", "bold")
+        options_str = " ".join(f"({key}) {value}" for key, value in options.items())
+        print_colored(f"{category}: ", "bold", end="")
+        print_colored(options_str, "")  # Print options without bold
     print_colored("Enter your choice (1, 2, 3, etc):", "bold", end=" ")
     sys.stdout.flush()
 
