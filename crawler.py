@@ -7,7 +7,6 @@ try:
     import os
     import random
     import re
-    import requests
     import httpx
     import select
     import sqlite3
@@ -24,7 +23,7 @@ from common import *
 load_dotenv()
 
 db_path = os.getenv("db_path")
-conn = sqlite3.connect(db_path)
+conn = sqlite3.connect(db_path) # type: ignore
 
 httpx_version = httpx.__version__
 default_user_agent = 'python-httpx/{httpx_version}'
