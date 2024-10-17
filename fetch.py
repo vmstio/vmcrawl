@@ -13,27 +13,28 @@ except ImportError as e:
 from common import *
 load_dotenv()
 
-# Path to your SQLite database file
 db_path = os.getenv("db_path")
+conn = sqlite3.connect(db_path) # type: ignore
 
 db_limit = 250
 db_offset = 0
 
 def fetch_exclude_domains(conn):
-    """Fetch the list of excluded domains from the NoPeers table."""
+    cursor = conn.cursor()
     try:
-        cursor = conn.cursor()
         cursor.execute("SELECT GROUP_CONCAT('''' || Domain || '''', ',') FROM NoPeers")
         exclude_domains_sql = cursor.fetchone()[0]
         return exclude_domains_sql if exclude_domains_sql else ""
-    except sqlite3.Error as e:
-        print(f"Error fetching excluded domains from SQLite database: {e}")
+    except Exception as e:
+        print(f"Failed to obtain excluded domain list: {e}")
+        conn.rollback()
         return None
+    finally:
+        cursor.close()
 
 def fetch_domain_list(conn, exclude_domains_sql):
-    """Fetch the list of domains excluding those in NoPeers."""
+    cursor = conn.cursor()
     try:
-        cursor = conn.cursor()
         query = f"""
             SELECT Domain FROM MastodonDomains
             WHERE Domain NOT IN ({exclude_domains_sql})
@@ -42,18 +43,18 @@ def fetch_domain_list(conn, exclude_domains_sql):
         """
         cursor.execute(query)
         return [row[0] for row in cursor.fetchall()]
-    except sqlite3.Error as e:
-        print(f"Error fetching domains from SQLite database: {e}")
+    except Exception as e:
+        print(f"Failed to obtain primary domain list: {e}")
+        conn.rollback()
         return None
+    finally:
+        cursor.close()
 
 def process_domain(domain, counter, total):
-    """Process each domain by running peerapi.py and crawler.py."""
     print(f"{color_bold}Processing {domain} ({counter}/{total})...{color_reset}")
 
-    # Execute peerapi.py for the domain
     subprocess.run(["python3", "peerapi.py", domain])
 
-    # If target/import_<domain>.txt exists, process it with crawler.py
     import_file = f"target/import_{domain}.txt"
     if os.path.isfile(import_file):
         subprocess.run(["python3", "crawler.py", import_file])
@@ -62,31 +63,33 @@ def process_domain(domain, counter, total):
         print(f"Finished processing {domain}")
 
 def main():
-    # Connect to the SQLite database
-    conn = sqlite3.connect(db_path)
+    try:
+        print(f"{color_bold}Fetching list of excluded domains from SQLite database...{color_reset}")
+        exclude_domains_sql = fetch_exclude_domains(conn)
 
-    print(f"{color_bold}Fetching list of excluded domains from SQLite database...{color_reset}")
-    exclude_domains_sql = fetch_exclude_domains(conn)
+        if exclude_domains_sql is None:
+            print("Exiting due to error.")
+            return
 
-    if exclude_domains_sql is None:
-        print("Exiting due to error.")
-        return
+        print(f"{color_bold}Fetching top peers from the database...{color_reset}")
+        domain_list = fetch_domain_list(conn, exclude_domains_sql)
 
-    print(f"{color_bold}Fetching top peers from the database...{color_reset}")
-    domain_list = fetch_domain_list(conn, exclude_domains_sql)
+        if not domain_list:
+            print("No instances found in the database. Exiting...")
+            return
 
-    if not domain_list:
-        print("No instances found in the database. Exiting...")
-        return
+        print(f"Number of instances fetched: {len(domain_list)}")
 
-    print(f"Number of instances fetched: {len(domain_list)}")
+        total = len(domain_list)
+        for counter, domain in enumerate(domain_list, start=1):
+            process_domain(domain, counter, total)
 
-    # Process each domain
-    total = len(domain_list)
-    for counter, domain in enumerate(domain_list, start=1):
-        process_domain(domain, counter, total)
-
-    print(f"{color_bold}All domains processed!{color_reset}")
+        print(f"{color_bold}All domains processed!{color_reset}")
+    except KeyboardInterrupt:
+        conn.close()
+        print(f"\n{appname} interrupted by user. Exiting gracefully...")
+    finally:
+        print("Goodbye!")
 
 if __name__ == "__main__":
     main()
