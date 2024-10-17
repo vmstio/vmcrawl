@@ -1,5 +1,5 @@
 try:
-    import requests
+    import httpx
     import sys
     import sqlite3
     import ipaddress
@@ -13,78 +13,75 @@ except ImportError as e:
 from common import *
 load_dotenv()
 
-def is_valid_domain(domain):
-    # Regular expression pattern for valid domain format (case-insensitive)
-    domain_pattern = re.compile(r'^[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$', re.IGNORECASE)
+db_path = os.getenv("db_path")
+conn = sqlite3.connect(db_path) # type: ignore
 
-    # Check if the domain matches the valid domain format or contains "xn--"
-    # Also, check if it's not an IP address
+def is_valid_domain(domain):
+    domain_pattern = re.compile(r'^[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$', re.IGNORECASE)
     return (domain_pattern.match(domain) or "xn--" in domain) and not is_ip_address(domain)
 
 def is_ip_address(domain):
     try:
         ipaddress.ip_address(domain)
-        return True  # It's an IP address
+        return True
     except ValueError:
-        return False  # It's not an IP address
+        return False
 
-def import_domains(domains, db_path):
+def import_domains(domains):
+    cursor = conn.cursor()
     try:
-        conn = sqlite3.connect(db_path)
-        cursor = conn.cursor()
         for domain in domains:
-            # Force domain to lowercase before inserting into the database
             lowercase_domain = domain.lower()
             cursor.execute("INSERT INTO RawDomains (Domain) VALUES (?)", (lowercase_domain,))
         conn.commit()
-        conn.close()
         print(f"{len(domains)} domains imported successfully")
-    except sqlite3.Error as e:
-        print(f"Database error: {e}")
     except Exception as e:
-        print(f"An unexpected error occurred: {e}")
+        print(f"Failed to import domain list: {e}")
+        conn.rollback()
+        return None
+    finally:
+        cursor.close()
 
-def get_junk_keywords(db_path):
+def get_junk_keywords():
+    cursor = conn.cursor()
     try:
-        conn = sqlite3.connect(db_path)
-        cursor = conn.cursor()
         cursor.execute("SELECT Keywords FROM JunkWords")
         keywords = [row[0] for row in cursor.fetchall()]
-        conn.close()
+        conn.commit()
         return keywords
-    except sqlite3.Error as e:
-        print(f"Database error: {e}")
     except Exception as e:
-        print(f"An unexpected error occurred: {e}")
-    return []
+        print(f"Failed to obtain junk domain list: {e}")
+        conn.rollback()
+        return None
+    finally:
+        cursor.close()
 
-def get_bad_tld(db_path):
+def get_bad_tld():
+    cursor = conn.cursor()
     try:
-        conn = sqlite3.connect(db_path)
-        cursor = conn.cursor()
         cursor.execute("SELECT TLD FROM BadTLD")
-        keywords = [row[0] for row in cursor.fetchall()]
-        conn.close()
-        return keywords
-    except sqlite3.Error as e:
-        print(f"Database error: {e}")
+        tlds = [row[0] for row in cursor.fetchall()]
+        conn.commit()
+        return tlds
     except Exception as e:
-        print(f"An unexpected error occurred: {e}")
-    return []
+        print(f"Failed to obtain bad TLD list: {e}")
+        conn.rollback()
+        return None
+    finally:
+        cursor.close()
 
-def add_to_no_peers(domain, db_path):
+def add_to_no_peers(domain):
+    cursor = conn.cursor()
     try:
-        conn = sqlite3.connect(db_path)
-        cursor = conn.cursor()
-        # Insert the domain into the NoPeers table
         cursor.execute("INSERT INTO NoPeers (Domain) VALUES (?)", (domain,))
         conn.commit()
-        conn.close()
         print(f"{domain} added to NoPeers table")
-    except sqlite3.Error as e:
-        print(f"Database error while adding to NoPeers: {e}")
     except Exception as e:
-        print(f"An unexpected error occurred while adding to NoPeers: {e}")
+        print(f"Failed to add domain to NoPeers list: {e}")
+        conn.rollback()
+        return None
+    finally:
+        cursor.close()
 
 def write_to_file(domains, output_file):
     try:
@@ -95,45 +92,36 @@ def write_to_file(domains, output_file):
     except Exception as e:
         print(f"An error occurred while writing to the file: {e}")
 
-def get_existing_domains(db_path):
+def get_existing_domains():
+    cursor = conn.cursor()
     try:
-        conn = sqlite3.connect(db_path)
-        cursor = conn.cursor()
         cursor.execute("SELECT Domain FROM RawDomains")
         existing_domains = [row[0] for row in cursor.fetchall()]
-        conn.close()
+        conn.commit()
         return existing_domains
-    except sqlite3.Error as e:
-        print(f"Database error: {e}")
     except Exception as e:
-        print(f"An unexpected error occurred: {e}")
+        print(f"Failed to get list of existing domains: {e}")
+        conn.rollback()
+        return None
+    finally:
+        cursor.close()
 
-def get_domains(api_url, domain, db_path):
-    keywords = get_junk_keywords(db_path)
-    bad_tlds = get_bad_tld(db_path)
+def get_domains(api_url, domain):
+    keywords = get_junk_keywords() or []
+    bad_tlds = get_bad_tld() or []
 
     try:
-        response = requests.get(api_url, timeout=5)
-        response.raise_for_status()  # Raises an HTTPError if the response status code is 4XX or 5XX
-        data = response.json()
+        api_response = http_client.get(api_url)
+        data = api_response.json()
         filtered_domains = [
             item for item in data
             if is_valid_domain(item) and not any(keyword in item for keyword in keywords)
             and not any(item.endswith(tld) for tld in bad_tlds)
         ]
         return filtered_domains
-    except requests.HTTPError as e:
-        print(f"HTTP error occurred while making the request: {e}")
-        add_to_no_peers(domain, db_path)  # Add domain to NoPeers if HTTP error occurs
-    except requests.RequestException as e:
-        print(f"Non-HTTP error occurred while making the request: {e}")
-        add_to_no_peers(domain, db_path)  # Add domain to NoPeers if request error occurs
-    except ValueError as e:
-        print(f"An error occurred while decoding the JSON response: {e}")
-        add_to_no_peers(domain, db_path)  # Add domain to NoPeers if JSON decoding fails
     except Exception as e:
-        print(f"An unexpected error occurred: {e}")
-        add_to_no_peers(domain, db_path)  # Add domain to NoPeers if any other error occurs
+        print(f"{e}")
+        add_to_no_peers(domain)  # Add domain to NoPeers if any other error occurs
     return []
 
 if __name__ == "__main__":
@@ -146,8 +134,8 @@ if __name__ == "__main__":
     db_path = os.getenv("db_path")
     output_file = f"target/import_{domain}.txt"
 
-    existing_domains = get_existing_domains(db_path)
-    domains = get_domains(api_url, domain, db_path)  # Pass the domain and db_path to get_domains
+    existing_domains = get_existing_domains()
+    domains = get_domains(api_url, domain)  # Pass the domain and db_path to get_domains
     unique_domains = [domain for domain in domains if domain not in existing_domains and domain.isascii()]
 
     if unique_domains == []:
@@ -155,4 +143,4 @@ if __name__ == "__main__":
         sys.exit(0)
 
     write_to_file(unique_domains, output_file)
-    import_domains(unique_domains, db_path)
+    import_domains(unique_domains)
