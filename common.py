@@ -43,3 +43,5 @@ http_client = httpx.Client(http2=True, follow_redirects=True, headers=http_custo
 error_threshold = int(5)
 version_main_branch = "4.4"
 version_latest_release = "4.3.0"
+
+domain_endings_url = 'http://data.iana.org/TLD/tlds-alpha-by-domain.txt'

@@ -2,7 +2,6 @@
 
 try:
     import sqlite3
-    import requests
     import httpx
     import sys
     import os
@@ -16,8 +15,6 @@ load_dotenv()
 
 db_path = os.getenv("db_path")
 conn = sqlite3.connect(db_path) # type: ignore
-
-domain_endings_url = 'http://data.iana.org/TLD/tlds-alpha-by-domain.txt'
 
 domain_endings_response = http_client.get(domain_endings_url)
 if domain_endings_response.status_code == 200:
