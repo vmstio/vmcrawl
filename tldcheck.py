@@ -1,28 +1,34 @@
 #!/usr/bin/env python3
 
-import sqlite3
-import requests
+try:
+    import sqlite3
+    import requests
+    import httpx
+    import sys
+    import os
+    from dotenv import load_dotenv
+except ImportError as e:
+    print(f"Error importing module: {e}")
+    sys.exit(1)
 
-# Path to your SQLite database
-db_path = '/Users/vmstan/Documents/MastodonDomains.sqlite'
+from common import *
+load_dotenv()
 
-# URL for domain endings from IANA
+db_path = os.getenv("db_path")
+conn = sqlite3.connect(db_path) # type: ignore
+
 domain_endings_url = 'http://data.iana.org/TLD/tlds-alpha-by-domain.txt'
 
-# Fetch domain endings from the URL and convert to lowercase
-response = requests.get(domain_endings_url)
-if response.status_code == 200:
-    domain_endings = [line.strip().lower() for line in response.text.splitlines() if not line.startswith('#')]
+domain_endings_response = http_client.get(domain_endings_url)
+if domain_endings_response.status_code == 200:
+    domain_endings = [line.strip().lower() for line in domain_endings_response.text.splitlines() if not line.startswith('#')]
 else:
-    raise Exception(f"Failed to fetch domain endings. HTTP Status Code: {response.status_code}")
+    raise Exception(f"Failed to fetch domain endings. HTTP Status Code: {domain_endings_response.status_code}")
 
-# Connect to the database
-conn = sqlite3.connect(db_path)
 cursor = conn.cursor()
 
 def chunked_query(domain_endings, chunk_size=50):
-    """Run queries in chunks to avoid hitting SQLite expression tree limits and to properly exclude domains."""
-    results = []
+    # results = []
     all_domains_query = "SELECT Domain FROM RawDomains"
     cursor.execute(all_domains_query)
     all_domains = set(cursor.fetchall())
