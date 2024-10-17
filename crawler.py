@@ -28,23 +28,19 @@ conn = sqlite3.connect(db_path) # type: ignore
 
 def perform_dns_query(domain):
     record_types = ['A', 'AAAA', 'CNAME']
+    resolver = dns.resolver.Resolver()
+    resolver.lifetime = common_timeout  # Set the timeout for the resolver
+
     for record_type in record_types:
         try:
-            answers = dns.resolver.resolve(domain, record_type, lifetime=5)
+            answers = resolver.resolve(domain, record_type)
             if answers:
                 return True  # Record of type record_type found
-        except dns.resolver.NoAnswer:
+        except (dns.resolver.NoAnswer, dns.resolver.NXDOMAIN):
             continue  # No record of this type, try the next one
-        except dns.resolver.NXDOMAIN:
-            return False  # Domain does not exist
-        except dns.resolver.NoNameservers:
-            return None  # No nameservers available for this domain
-        except dns.resolver.NoRootSOA:
-            return None  # No root SOA available for this domain
-        except dns.resolver.Timeout:
-            return None  # DNS query failed due to timeout or other DNS issues
+        except (dns.resolver.NoNameservers, dns.resolver.Timeout):
+            return None  # DNS query failed due to no nameservers or timeout
 
-    # If the loop completes without finding a record or encountering a DNS issue, then no desired records were found
     return False  # Neither A, AAAA, nor CNAME records found
 
 def is_valid_email(email):
