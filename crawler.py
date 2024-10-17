@@ -11,6 +11,7 @@ try:
     import select
     import sqlite3
     import sys
+    import mimetypes
     from bs4 import BeautifulSoup
     from urllib.parse import urlparse, urlunparse
     from dotenv import load_dotenv
@@ -217,6 +218,17 @@ def delete_domain_if_known(domain):
     finally:
         cursor.close()
 
+def clean_version(software_version_full):
+    software_version = clean_version_suffix(software_version_full)
+    software_version = clean_version_date(software_version)
+    software_version = clean_version_suffix_more(software_version)
+    software_version = clean_version_hometown(software_version)
+    software_version = clean_version_development(software_version)
+    software_version = clean_version_wrongpatch(software_version)
+    software_version = clean_version_doubledash(software_version)
+    software_version = clean_version_nightly(software_version)
+    return software_version
+
 def clean_version_suffix(software_version_full):
     # Remove any unwanted or invalid suffixes from the version string
     software_version = software_version_full \
@@ -406,624 +418,423 @@ def get_ignored_domains():
     return ignored_domains
 
 def check_and_record_domains(domain_list, ignored_domains, failed_domains, user_choice, junk_domains, bad_tlds, httpx_client):
-    total_domains = len(domain_list)
     for index, domain in enumerate(domain_list, start=1):
-        print_colored(f'{domain} ({index}/{total_domains})', 'bold')
+        print_colored(f'{domain} ({index}/{len(domain_list)})', 'bold')
 
-        if user_choice != "7":
-            if domain in ignored_domains:
-                error_to_print = 'Previously ignored!'
-                print_colored(f'{error_to_print}', 'cyan')
-                delete_domain_if_known(domain)
-                continue
-
-        if user_choice != "14":
-            if domain in failed_domains:
-                error_to_print = 'Previously failed!'
-                print_colored(f'{error_to_print}', 'cyan')
-                delete_domain_if_known(domain)
-                continue
-
-        loopback = False  # Reset the loopback variable
-        for junk_domain in junk_domains:
-            if junk_domain in domain:
-                error_to_print = 'Known junk domain, ignoring...'
-                print_colored(f'{error_to_print}', 'magenta')
-                mark_failed_domain(domain)
-                delete_domain_if_known(domain)
-                loopback = True
-                continue
-        if loopback is True:
+        if should_skip_domain(domain, ignored_domains, failed_domains, user_choice):
             continue
 
-        loopback = False  # Reset the loopback variable
-        for bad_tld in bad_tlds:
-            if domain.endswith(bad_tld):
-                error_to_print = 'Known bad TLD, ignoring...'
-                print_colored(f'{error_to_print}', 'magenta')
-                mark_failed_domain(domain)
-                delete_domain_if_known(domain)
-                loopback = True
-                continue
-        if loopback is True:
+        if is_junk_or_bad_tld(domain, junk_domains, bad_tlds):
             continue
 
-        dns_result = perform_dns_query(domain)
-        if dns_result is False:
-            error_to_print = 'DNS query returned NXDOMAIN, marking as failed...'
-            print_colored(f'{error_to_print}', 'red')
+        if not check_dns(domain):
+            continue
+
+        try:
+            process_domain(domain, httpx_client)
+        except Exception as e:
+            handle_http_exception(domain, e)
+
+def should_skip_domain(domain, ignored_domains, failed_domains, user_choice):
+    if user_choice != "7" and domain in ignored_domains:
+        print_colored('Previously ignored!', 'cyan')
+        delete_domain_if_known(domain)
+        return True
+    if user_choice != "14" and domain in failed_domains:
+        print_colored('Previously failed!', 'cyan')
+        delete_domain_if_known(domain)
+        return True
+    return False
+
+def is_junk_or_bad_tld(domain, junk_domains, bad_tlds):
+    if any(junk in domain for junk in junk_domains):
+        print_colored('Known junk domain, ignoring...', 'magenta')
+        mark_failed_domain(domain)
+        delete_domain_if_known(domain)
+        return True
+    if any(domain.endswith(tld) for tld in bad_tlds):
+        print_colored('Known bad TLD, ignoring...', 'magenta')
+        mark_failed_domain(domain)
+        delete_domain_if_known(domain)
+        return True
+    return False
+
+def check_dns(domain):
+    dns_result = perform_dns_query(domain)
+    if dns_result is False:
+        print_colored('DNS query returned NXDOMAIN, marking as failed...', 'red')
+        mark_failed_domain(domain)
+        delete_domain_if_known(domain)
+        return False
+    elif dns_result is None:
+        print_colored('DNS query failed to resolve', 'yellow')
+        log_error(domain, 'DNS query failed to resolve')
+        increment_domain_error(domain, 'DNS')
+        return False
+    return True
+
+def process_domain(domain, httpx_client):
+    if not check_robots_txt(domain, httpx_client):
+        return  # Stop processing this domain
+
+    webfinger_data = check_webfinger(domain, httpx_client)
+    if not webfinger_data:
+        return
+
+    nodeinfo_data = check_nodeinfo(domain, webfinger_data['backend_domain'], httpx_client)
+    if not nodeinfo_data:
+        return
+
+    if is_mastodon_instance(nodeinfo_data):
+        process_mastodon_instance(domain, webfinger_data, nodeinfo_data, httpx_client)
+    else:
+        mark_as_non_mastodon(domain)
+
+def check_robots_txt(domain, httpx_client):
+    robots_url = f'https://{domain}/robots.txt'
+    try:
+        response = httpx_client.get(robots_url)
+        # Check for valid HTTP status code
+        if response.status_code in [200]:
+            content_type = response.headers.get('Content-Type', '')
+            if content_type in mimetypes.types_map.values() and not content_type.startswith('text/'):
+                error_message = 'robots.txt is not a text file'
+                print_colored(f'{error_message}', 'yellow')
+                log_error(domain, error_message)
+                increment_domain_error(domain, 'TXT')
+                return False
+
+            robots_txt = response.text
+            lines = robots_txt.split('\n')
+            user_agent = None
+            for line in lines:
+                line = line.strip().lower()
+                if line.startswith('user-agent:'):
+                    user_agent = line.split(':', 1)[1].strip()
+                elif line.startswith('disallow:'):
+                    disallow_path = line.split(':', 1)[1].strip()
+                    if user_agent in ['*', appname.lower()] and (disallow_path == '/' or disallow_path == '*'):
+                        print_colored('Crawling is prohibited by robots.txt, marking as ignored...', 'magenta')
+                        mark_ignore_domain(domain)
+                        delete_domain_if_known(domain)
+                        return False
+        # Check for specific HTTP status codes
+        elif response.status_code in [202]:
+            if 'sgcaptcha' in response.text:
+                print_colored('Responded with CAPTCHA to robots.txt request, marking as ignored...', 'magenta')
+                mark_ignore_domain(domain)
+                delete_domain_if_known(domain)
+                return False
+        elif response.status_code in [410]:
+            print_colored(f'Responded HTTP {response.status_code} to robots.txt request, marking as failed...', 'red')
             mark_failed_domain(domain)
             delete_domain_if_known(domain)
-            continue
-        elif dns_result is None:
-            error_to_print = 'DNS query failed to resolve'
-            error_reason = 'DNS'
-            print_colored(f'{error_to_print}', 'yellow')
-            log_error(domain, error_to_print)
-            increment_domain_error(domain, error_reason)
-            continue
+            return False
 
-        webfinger_url = f'https://{domain}/.well-known/webfinger?resource=acct:{domain}@{domain}'
-        robots_url = f'https://{domain}/robots.txt'
-        try:
-            robots_response = http_client.get(robots_url)
-            if robots_response.status_code == 200:
-                if robots_response.headers.get('Content-Type', '') == 'application/octet-stream':
-                    error_to_print = f'Responded with binary data to robots.txt request'
-                    error_reason = 'BIN'
-                    print_colored(f'{error_to_print}', 'yellow')
-                    log_error(domain, error_to_print)
-                    increment_domain_error(domain, error_reason)
-                    continue
+    except httpx.RequestError as e:
+        handle_http_exception(domain, e)
+        return False
 
-                robots_txt = robots_response.text
-                lines = robots_txt.split('\n')
-                user_agent = None
-                disallow = []
-                disallow_found = False
+    return True
 
-                for line in lines:
-                    line = line.strip()
-                    if line.lower().startswith('user-agent:'):
-                        user_agent = line.split(':', 1)[1].strip().lower()
-                    if user_agent == appname and line.lower().startswith('disallow:'):
-                        disallow_path = line.split(':', 1)[1].strip()
-                        if disallow_path == '/' or disallow_path == '*':
-                            disallow_found = True  # Bot is disallowed
-                        disallow.append(disallow_path)
-
-                if disallow_found is True:
-                    error_to_print = f'Crawling is prohibited by robots.txt'
-                    error_reason = 'TXT'
-                    print_colored(f'{error_to_print}', 'yellow')
-                    log_error(domain, error_to_print)
-                    increment_domain_error(domain, error_reason)
-                    continue
-            elif robots_response.status_code == 202:
-                if 'sgcaptcha' in robots_response.text:
-                    error_to_print = f'Responded with CAPTCHA to robots.txt request, marking as ignored...'
-                    print_colored(f'{error_to_print}', 'magenta')
-                    mark_ignore_domain(domain)
-                    delete_domain_if_known(domain)
-                    continue
-            elif robots_response.status_code in [403, 418]:
-                custom_headers = {
-                    'User-Agent': default_user_agent,
-                }
-            elif robots_response.status_code == 410:
-                error_to_print = f'Responded with HTTP {robots_response.status_code} to robots.txt request, marking as failed...'
-                print_colored(f'{error_to_print}', 'red')
-                mark_failed_domain(domain)
-                delete_domain_if_known(domain)
-                continue
-
-            json_content_types = (
-                'application/jrd+json', 'application/json', 'application/activity+json',
-                'application/problem+json', 'application/ld+json', 'application/activitystreams+json',
-                'application/activitypub+json'
-            )
-
-            webfinger_response = http_client.get(webfinger_url)
-
-            webfinger_content_type = webfinger_response.headers.get('Content-Type', '')
-            webfinger_content_length = webfinger_response.headers.get('Content-Length', '')
-            webfinger_content = webfinger_response.text
-            if webfinger_response.status_code in [405, 404, 400]:
-                if any(ct in webfinger_content_type for ct in json_content_types):
-                    if webfinger_content == '':
-                        error_to_print = f'Not using Mastodon, marking as ignored...'
-                        print_colored(f'{error_to_print}', 'magenta')
-                        mark_ignore_domain(domain)
-                        delete_domain_if_known(domain)
-                        continue
-                    else:
-                        try:
-                            # Try to parse the webfinger_response content as JSON
-                            data = json.loads(webfinger_response.text)
-                            data = webfinger_response.json()
-
-                            error_to_print = f'Not using Mastodon, marking as ignored...'
-                            print_colored(f'{error_to_print}', 'magenta')
-                            mark_ignore_domain(domain)
-                            delete_domain_if_known(domain)
-                            continue
-                        except json.JSONDecodeError:
-                            error_to_print = f'JSON response to WebFinger request was invalid (HTTP {webfinger_response.status_code})'
-                            error_reason = 'JSON'
-                            print_colored(f'{error_to_print}', 'yellow')
-                            log_error(domain, error_to_print)
-                            increment_domain_error(domain, error_reason)
-                            continue
-                if 'text/plain' in webfinger_content_type:
-                    error_to_print = f'Not using Mastodon, marking as ignored...'
-                    print_colored(f'{error_to_print}', 'magenta')
-                    mark_ignore_domain(domain)
-                    delete_domain_if_known(domain)
-                    continue
-                if 'text/html' in webfinger_content_type:
-                    if webfinger_content == '' or 'Bad Request' in webfinger_content or 'Bad request' in webfinger_content or 'Not Found' in webfinger_content or 'Nextcloud' in webfinger_content:
-                        error_to_print = f'Not using Mastodon, marking as ignored...'
-                        print_colored(f'{error_to_print}', 'magenta')
-                        mark_ignore_domain(domain)
-                        delete_domain_if_known(domain)
-                        continue
-                if webfinger_content_type is None or webfinger_content_type == '':
-                    error_to_print = f'Not using Mastodon, marking as ignored...'
-                    print_colored(f'{error_to_print}', 'magenta')
-                    mark_ignore_domain(domain)
-                    delete_domain_if_known(domain)
-                    continue
-                if webfinger_content_length == '0':
-                    error_to_print = f'Not using Mastodon, marking as ignored...'
-                    print_colored(f'{error_to_print}', 'magenta')
-                    mark_ignore_domain(domain)
-                    delete_domain_if_known(domain)
-                    continue
-                else:
-                    error_to_print = f'Responded HTTP {webfinger_response.status_code} to WebFinger request'
-                    error_reason = webfinger_response.status_code
-                    print_colored(f'{error_to_print}', 'yellow')
-                    log_error(domain, error_to_print)
-                    increment_domain_error(domain, error_reason)
-                    continue
-            elif webfinger_response.status_code == 200:
-                try:
-                    # Try to parse the webfinger_response content as JSON
-                    data = json.loads(webfinger_response.text)
-                    data = webfinger_response.json()
-                except json.JSONDecodeError:
-                    if any(ct in webfinger_content_type for ct in json_content_types):
-                        error_to_print = f'JSON response to WebFinger was invalid (HTTP {webfinger_response.status_code})'
-                        error_reason = 'JSON'
-                        print_colored(f'{error_to_print}', 'yellow')
-                        log_error(domain, error_to_print)
-                        increment_domain_error(domain, error_reason)
-                        continue
-                    elif not webfinger_response.content:
-                        error_to_print = f'JSON response to WebFinger was empty (HTTP {webfinger_response.status_code})'
-                        error_reason = 'JSON'
-                        print_colored(f'{error_to_print}', 'yellow')
-                        log_error(domain, error_to_print)
-                        increment_domain_error(domain, error_reason)
-                        continue
-                    elif webfinger_content_type != '':
-                        webfinger_content_type_strip = webfinger_content_type.split(';')[0].strip()
-                        error_to_print = f'JSON response to WebFinger was {webfinger_content_type_strip} (HTTP {webfinger_response.status_code})'
-                        error_reason = 'JSON'
-                        print_colored(f'{error_to_print}', 'yellow')
-                        log_error(domain, error_to_print)
-                        increment_domain_error(domain, error_reason)
-                        continue
-                    else:
-                        error_to_print = f'JSON response to WebFinger was all jacked up (HTTP {webfinger_response.status_code})'
-                        error_reason = 'JSON'
-                        print_colored(f'{error_to_print}', 'yellow')
-                        log_error(domain, error_to_print)
-                        increment_domain_error(domain, error_reason)
-                        continue
-
-                webfinger_data = webfinger_response.json()
-                if isinstance(webfinger_data, dict):
-                    webfinger_alias = webfinger_data.get('aliases', [])
-                    first_webfinger_alias = next((alias for alias in webfinger_alias if 'https' in alias), None)
-                    webfinger_domain = urlparse(first_webfinger_alias)
-                    backend_domain = webfinger_domain.netloc
-                else:
-                    error_to_print = f'Not using Mastodon, marking as ignored...'
-                    print_colored(f'{error_to_print}', 'magenta')
-                    mark_ignore_domain(domain)
-                    delete_domain_if_known(domain)
-                    continue
-
-            elif webfinger_response.status_code == 202:
-                if 'sgcaptcha' in webfinger_response.text:
-                    error_to_print = f'Responded with CAPTCHA to WebFinger request, marking as ignored...'
-                    print_colored(f'{error_to_print}', 'magenta')
-                    mark_ignore_domain(domain)
-                    delete_domain_if_known(domain)
-                    continue
-            elif webfinger_response.status_code in [451, 422, 418, 401, 402, 403]:
-                error_to_print = f'Responded HTTP {webfinger_response.status_code} to WebFinger request, marking as ignored...'
-                print_colored(f'{error_to_print}', 'magenta')
-                mark_ignore_domain(domain)
-                delete_domain_if_known(domain)
-                continue
-            elif webfinger_response.status_code == 410:
-                error_to_print = f'Responded HTTP {webfinger_response.status_code} to WebFinger request, marking as failed...'
-                print_colored(f'{error_to_print}', 'red')
-                mark_failed_domain(domain)
-                delete_domain_if_known(domain)
-                continue
+def check_webfinger(domain, httpx_client):
+    webfinger_url = f'https://{domain}/.well-known/webfinger?resource=acct:{domain}@{domain}'
+    try:
+        response = httpx_client.get(webfinger_url)
+        if response.status_code in [200]:
+            content_type = response.headers.get('Content-Type', '')
+            content = response.content
+            if 'json' not in content_type:
+                error_message = 'WebFinger reply is not a JSON file'
+                print_colored(f'{error_message}', 'yellow')
+                log_error(domain, error_message)
+                increment_domain_error(domain, 'JSON')
+                return None
+            if not content:
+                error_message = 'WebFinger reply is empty'
+                print_colored(f'{error_message}', 'yellow')
+                log_error(domain, error_message)
+                increment_domain_error(domain, 'JSON')
+                return None
             else:
-                error_to_print = f'Responded HTTP {webfinger_response.status_code} to WebFinger request'
-                print_colored(f'{error_to_print}', 'yellow')
+                data = response.json()
+            aliases = data.get('aliases', [])
+            if not aliases:
+                mark_as_non_mastodon(domain)
+                return None
+            first_alias = next((alias for alias in aliases if 'https' in alias), None)
+            if first_alias:
+                backend_domain = urlparse(first_alias).netloc
+                return {'backend_domain': backend_domain}
+        elif response.status_code in [429, 418, 405, 404, 403, 400, 300]:
+            print_colored(f'Responded HTTP {response.status_code} to WebFinger request, marking as ignored...', 'magenta')
+            mark_ignore_domain(domain)
+            delete_domain_if_known(domain)
+        elif response.status_code in [410]:
+            print_colored(f'Responded HTTP {response.status_code} to WebFinger request, marking as failed...', 'red')
+            mark_failed_domain(domain)
+            delete_domain_if_known(domain)
+        else:
+            error_message = f'Responded HTTP {response.status_code} to WebFinger request'
+            print_colored(f'{error_message}', 'yellow')
+            log_error(domain, f'{error_message}')
+            increment_domain_error(domain, str(response.status_code))
+    except httpx.RequestError as e:
+        handle_http_exception(domain, e)
+    except json.JSONDecodeError as e:
+        handle_json_exception(domain, e)
+    return None
+
+def check_nodeinfo(domain, backend_domain, httpx_client):
+    nodeinfo_url = f'https://{backend_domain}/.well-known/nodeinfo'
+    try:
+        response = httpx_client.get(nodeinfo_url)
+        if response.status_code in [200]:
+            content_type = response.headers.get('Content-Type', '')
+            if 'json' not in content_type:
+                error_message = 'NodeInfo reply is not a JSON file'
+                print_colored(f'{error_message}', 'yellow')
+                log_error(domain, error_message)
+                increment_domain_error(domain, 'JSON')
+            data = response.json()
+            if 'links' in data and len(data['links']) > 0:
+                nodeinfo_2_url = next((link['href'] for link in data['links'] if link.get('rel') == 'http://nodeinfo.diaspora.software/ns/schema/2.0'), None)
+                if nodeinfo_2_url:
+                    nodeinfo_response = httpx_client.get(nodeinfo_2_url)
+                    if nodeinfo_response.status_code in [200]:
+                        nodeinfo_response_content_type = nodeinfo_response.headers.get('Content-Type', '')
+                        if 'json' not in nodeinfo_response_content_type:
+                            error_message = 'NodeInfo V2 reply is not a JSON file'
+                            print_colored(f'{error_message}', 'yellow')
+                            log_error(domain, error_message)
+                            increment_domain_error(domain, 'JSON')
+                            return None
+                        return nodeinfo_response.json()
+                    else:
+                        error_message = f'Responded HTTP {nodeinfo_response.status_code} @ {nodeinfo_2_url}'
+                        print_colored(f'{error_message}', 'yellow')
+                        log_error(domain, f'{error_message}')
+                        increment_domain_error(domain, str(nodeinfo_response.status_code))
+                else:
+                    mark_as_non_mastodon(domain)
+        elif response.status_code in [429, 418, 405, 404, 403, 400, 300]:
+            print_colored(f'Responded HTTP {response.status_code} to NodeInfo request, marking as ignored...', 'magenta')
+            mark_ignore_domain(domain)
+            delete_domain_if_known(domain)
+        elif response.status_code in [410]:
+            print_colored(f'Responded HTTP {response.status_code} to NodeInfo request, marking as failed...', 'red')
+            mark_failed_domain(domain)
+            delete_domain_if_known(domain)
+        else:
+            error_message = f'Responded HTTP {response.status_code} to NodeInfo request'
+            print_colored(f'{error_message}', 'yellow')
+            log_error(domain, f'{error_message}')
+            increment_domain_error(domain, str(response.status_code))
+    except httpx.RequestError as e:
+        handle_http_exception(domain, e)
+    except json.JSONDecodeError as e:
+        handle_json_exception(domain, e)
+    return None
+
+def is_mastodon_instance(nodeinfo_data):
+    software_name = nodeinfo_data.get('software', {}).get('name', '').lower()
+    return software_name in ['mastodon', 'hometown', 'kmyblue', 'glitchcafe']
+
+def process_mastodon_instance(domain, webfinger_data, nodeinfo_data, httpx_client):
+    software_name = nodeinfo_data['software']['name'].lower()
+    software_version = clean_version(nodeinfo_data['software']['version'])
+    total_users = nodeinfo_data['usage']['users']['total']
+    active_month_users = nodeinfo_data['usage']['users']['activeMonth']
+
+    if software_version.startswith("4"):
+        instance_api_url = f'https://{webfinger_data["backend_domain"]}/api/v2/instance'
+    else:
+        instance_api_url = f'https://{webfinger_data["backend_domain"]}/api/v1/instance'
+
+    try:
+        response = httpx_client.get(instance_api_url)
+        if response.status_code in [200]:
+            content_type = response.headers.get('Content-Type', '')
+            if 'json' not in content_type:
+                error_message = 'Instance reply is not a JSON file'
+                print_colored(f'{error_message}', 'yellow')
+                log_error(domain, error_message)
+                increment_domain_error(domain, 'JSON')
+                return None
+            instance_api_data = response.json()
+
+            if 'error' in instance_api_data:
+                if instance_api_data['error'] == "This method requires an authenticated user":
+                    print_colored('Instance API requires authentication, marking as ignored...', 'magenta')
+                    mark_ignore_domain(domain)
+                    delete_domain_if_known(domain)
+                    return
+
+            if software_version.startswith("4"):
+                actual_domain = instance_api_data['domain'].lower()
+                contact_account = normalize_email(instance_api_data['contact']['email']).lower()
+                source_url = instance_api_data['source_url']
+            else:
+                actual_domain = instance_api_data['uri'].lower()
+                contact_account = normalize_email(instance_api_data['email']).lower()
+                source_url = find_code_repository(webfinger_data["backend_domain"])
+
+            if not is_valid_email(contact_account):
+                contact_account = None
+
+            if source_url:
+                source_url = limit_url_depth(source_url)
+
+            if source_url == '/source.tar.gz':
+                source_url = f'https://{actual_domain}{source_url}'
+
+            if software_name == 'hometown':
+                source_url = 'https://github.com/hometown-fork/hometown'
+
+            if actual_domain == "gc2.jp":
+                source_url = "https://github.com/gc2-jp/freespeech"
+
+            # Check for invalid user counts
+            if active_month_users > max(total_users + 6, total_users + (total_users * 0.25)):
+                error_to_print = f'Mastodon v{software_version} with invalid counts ({active_month_users}:{total_users})'
+                print_colored(error_to_print, 'pink')
                 log_error(domain, error_to_print)
-                error_reason = webfinger_response.status_code
-                increment_domain_error(domain, error_reason)
-                continue
+                increment_domain_error(domain, '###')
+                delete_domain_if_known(domain)
+                return
 
-            nodeinfo_url = f'https://{backend_domain}/.well-known/nodeinfo'
-            nodeinfo_response = http_client.get(nodeinfo_url)
-            if nodeinfo_response.status_code == 200:
-                try:
-                    data = json.loads(nodeinfo_response.text)
-                    data = nodeinfo_response.json()
-                except json.JSONDecodeError:
-                    nodeinfo_content_type = nodeinfo_response.headers.get('Content-Type', '')
-                    if any(ct in nodeinfo_content_type for ct in json_content_types):
-                        error_to_print = f'JSON response at {nodeinfo_url} was invalid (HTTP {nodeinfo_response.status_code})'
-                        error_reason = 'JSON'
-                        print_colored(f'{error_to_print}', 'yellow')
-                        log_error(domain, error_to_print)
-                        increment_domain_error(domain, error_reason)
-                        continue
-                    elif not nodeinfo_response.content:
-                        error_to_print = f'JSON response at {nodeinfo_url} was empty (HTTP {nodeinfo_response.status_code})'
-                        error_reason = 'JSON'
-                        print_colored(f'{error_to_print}', 'yellow')
-                        log_error(domain, error_to_print)
-                        increment_domain_error(domain, error_reason)
-                        continue
-                    elif nodeinfo_content_type != '':
-                        nodeinfo_content_type_strip = nodeinfo_content_type.split(';')[0].strip()
-                        error_to_print = f'JSON response at {nodeinfo_url} was {nodeinfo_content_type_strip} (HTTP {nodeinfo_response.status_code})'
-                        error_reason = 'JSON'
-                        print_colored(f'{error_to_print}', 'yellow')
-                        log_error(domain, error_to_print)
-                        increment_domain_error(domain, error_reason)
-                        continue
-                    else:
-                        error_to_print = f'JSON response at {nodeinfo_url} was all jacked up (HTTP {nodeinfo_response.status_code})'
-                        error_reason = 'JSON'
-                        print_colored(f'{error_to_print}', 'yellow')
-                        log_error(domain, error_to_print)
-                        increment_domain_error(domain, error_reason)
-                        continue
-            elif nodeinfo_response.status_code == 202:
-                if 'sgcaptcha' in nodeinfo_response.text:
-                    error_to_print = f'Responded with CAPTCHA to nodeinfo request, marking as ignored...'
-                    print_colored(f'{error_to_print}', 'magenta')
-                    mark_ignore_domain(domain)
-                    delete_domain_if_known(domain)
-                    continue
-            elif nodeinfo_response.status_code == 403:
-                error_to_print = f'Responded HTTP {nodeinfo_response.status_code} at {nodeinfo_url}, marking as ignored...'
-                print_colored(f'{error_to_print}', 'magenta')
-                mark_ignore_domain(domain)
-                delete_domain_if_known(domain)
-                continue
-            elif nodeinfo_response.status_code == 404:
-                error_to_print = f'Not using Mastodon, marking as ignored...'
-                print_colored(f'{error_to_print}', 'magenta')
-                mark_ignore_domain(domain)
-                delete_domain_if_known(domain)
-                continue
-            elif nodeinfo_response.status_code == 410:
-                error_to_print = f'Responded HTTP {nodeinfo_response.status_code} at {nodeinfo_url}, marking as failed...'
-                print_colored(f'{error_to_print}', 'red')
-                mark_failed_domain(domain)
-                delete_domain_if_known(domain)
-                continue
+            # Update database
+            update_mastodon_domain(actual_domain, software_version, total_users, active_month_users, contact_account, source_url)
+
+            clear_domain_error(domain)
+
+            if software_version == nodeinfo_data['software']['version']:
+                print_colored(f'Mastodon v{software_version}', 'green')
             else:
-                error_to_print = f'Responded HTTP {nodeinfo_response.status_code} at {nodeinfo_url}'
-                error_reason = nodeinfo_response.status_code
-                print_colored(f'{error_to_print}', 'yellow')
-                log_error(domain, error_to_print)
-                increment_domain_error(domain, error_reason)
-                continue
+                print_colored(f'Mastodon v{software_version} ({nodeinfo_data["software"]["version"]})', 'green')
 
-            if ('code' in data and data['code'] in ['rest_no_route', 'rest_not_logged_in', 'rest_forbidden', 'rest_user_invalid', 'rest_login_required']) or ('error' in data and data['error'] == 'Restricted'):
-                error_to_print = f'Not using Mastodon, marking as ignored...'
-                print_colored(f'{error_to_print}', 'magenta')
-                mark_ignore_domain(domain)
-                delete_domain_if_known(domain)
-                continue
+        elif response.status_code in [429, 418, 405, 404, 403, 400, 300]:
+            print_colored(f'Responded HTTP {response.status_code} to API request, marking as ignored...', 'magenta')
+            mark_ignore_domain(domain)
+            delete_domain_if_known(domain)
+        elif response.status_code in [410]:
+            print_colored(f'Responded HTTP {response.status_code} to API request, marking as failed...', 'red')
+            mark_failed_domain(domain)
+            delete_domain_if_known(domain)
+        elif response.status_code in [500]:
+            error_message = f'Responded HTTP {response.status_code} to API request'
+            print_colored(f'{error_message}', 'yellow')
+            log_error(domain, f'{error_message}')
+            increment_domain_error(domain, str(response.status_code))
+        else:
+            error_message = f'Responded HTTP {response.status_code} to API request'
+            print_colored(f'{error_message}', 'yellow')
+            log_error(domain, f'{error_message}')
+            increment_domain_error(domain, str(response.status_code))
 
-            if 'links' in data and len(data['links']) > 0 and 'href' in data['links'][0]:
-                linked_nodeinfo_url = data['links'][0]['href']
+    except httpx.RequestError as e:
+        handle_http_exception(domain, e)
+    except json.JSONDecodeError as e:
+        handle_json_exception(domain, e)
 
-                if 'wp-json' in linked_nodeinfo_url:
-                    error_to_print = f'Not using Mastodon, marking as ignored...'
-                    print_colored(f'{error_to_print}', 'magenta')
-                    mark_ignore_domain(domain)
-                    delete_domain_if_known(domain)
-                    continue
+def update_mastodon_domain(domain, software_version, total_users, active_month_users, contact_account, source_url):
+    cursor = conn.cursor()
+    try:
+        cursor.execute('''
+            INSERT INTO MastodonDomains
+            ("Domain", "Software Version", "Total Users", "Active Users (Monthly)", "Timestamp", "Contact", "Source", "Full Version")
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            ON CONFLICT("Domain") DO UPDATE SET
+            "Software Version" = excluded."Software Version",
+            "Total Users" = excluded."Total Users",
+            "Active Users (Monthly)" = excluded."Active Users (Monthly)",
+            "Timestamp" = excluded."Timestamp",
+            "Contact" = excluded."Contact",
+            "Source" = excluded."Source",
+            "Full Version" = excluded."Full Version"
+        ''', (domain, software_version, total_users, active_month_users,
+              datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
+              contact_account, source_url, software_version))
+        conn.commit()
+    except Exception as e:
+        print(f"Failed to update Mastodon domain data: {e}")
+        conn.rollback()
+    finally:
+        cursor.close()
 
-                linked_nodeinfo_response = http_client.get(linked_nodeinfo_url)
-                if linked_nodeinfo_response.status_code == 200:
-                    linked_nodeinfo_content_type = linked_nodeinfo_response.headers.get('Content-Type', '')
-                    if 'application/json' not in linked_nodeinfo_content_type:
-                        if 'application/activity+json' in linked_nodeinfo_content_type:
-                            error_to_print = f'Not using Mastodon, marking as ignored...'
-                            print_colored(f'{error_to_print}', 'magenta')
-                            mark_ignore_domain(domain)
-                            delete_domain_if_known(domain)
-                            continue
-                        else:
-                            error_to_print = f'JSON response at {linked_nodeinfo_url} was invalid (HTTP {linked_nodeinfo_response.status_code})'
-                            error_reason = 'JSON'
-                            print_colored(f'{error_to_print}', 'yellow')
-                            log_error(domain, error_to_print)
-                            increment_domain_error(domain, error_reason)
-                            continue
-                    linked_nodeinfo_data = linked_nodeinfo_response.json()
+def mark_as_non_mastodon(domain):
+    print_colored('Not using Mastodon, marking as ignored...', 'magenta')
+    mark_ignore_domain(domain)
+    delete_domain_if_known(domain)
 
-                    if linked_nodeinfo_data['software']['name'].lower() == 'mastodon' or linked_nodeinfo_data['software']['name'].lower() == 'hometown' or linked_nodeinfo_data['software']['name'].lower() == 'kmyblue' or linked_nodeinfo_data['software']['name'].lower() == 'glitchcafe':
-                        software_version_full = linked_nodeinfo_data['software']['version']
-                        if isinstance(software_version_full, str):
-                            # Remove any unwanted or invalid suffixes from the version string
-                            software_version = clean_version_suffix(software_version_full)
+def handle_http_exception(domain, exception):
+    error_message = str(exception)
+    if error_message in ['SSL', 'ssl']:
+        error_reason = 'SSL'
+        delete_domain_if_known(domain)
+    else:
+        error_reason = 'HTTP'
+    print_colored(error_message, 'orange')
+    log_error(domain, error_message)
+    increment_domain_error(domain, error_reason)
 
-                        software_version = clean_version_date(software_version)
-                        software_version = clean_version_suffix_more(software_version)
-                        software_version = clean_version_hometown(software_version)
-                        software_version = clean_version_development(software_version)
-                        software_version = clean_version_wrongpatch(software_version)
-                        software_version = clean_version_doubledash(software_version)
-                        software_version = clean_version_oddballs(domain, software_version)
-                        software_version = clean_version_nightly(software_version)
-                        # rewrite dumb data
-                        # if software_version.startswith("4.2.10"):
-                        #     software_version = "4.2.10"
+def handle_json_exception(domain, exception):
+    error_message = str(exception)
+    error_reason = 'JSON'
+    print_colored(error_message, 'orange')
+    log_error(domain, error_message)
+    increment_domain_error(domain, error_reason)
 
-                        total_users = linked_nodeinfo_data['usage']['users']['total']
-                        active_month_users = linked_nodeinfo_data['usage']['users']['activeMonth']
-
-                        if software_version.startswith("4"):
-                            instance_api_url = f'https://{backend_domain}/api/v2/instance'
-                        else:
-                            instance_api_url = f'https://{backend_domain}/api/v1/instance'
-
-                        instance_api_response = http_client.get(instance_api_url)
-                        instance_api_content_type = instance_api_response.headers.get('Content-Type', '')
-                        if 'application/json' not in instance_api_content_type:
-                            if instance_api_response.status_code != 200 and instance_api_response.status_code != 410:
-                                error_to_print = f'Responded HTTP {instance_api_response.status_code} to instance API request'
-                                error_reason = 'API'
-                                print_colored(f'{error_to_print}', 'yellow')
-                                log_error(domain, error_to_print)
-                                increment_domain_error(domain, error_reason)
-                                continue
-                            elif instance_api_response.status_code == 410:
-                                error_to_print = f'Responded HTTP {instance_api_response.status_code} to instance API request, marking as failed...'
-                                print_colored(f'{error_to_print}', 'red')
-                                mark_failed_domain(domain)
-                                delete_domain_if_known(domain)
-                                continue
-
-                            error_to_print = f'JSON response to instance API request was invalid (HTTP {instance_api_response.status_code})'
-                            error_reason = 'JSON'
-                            print_colored(f'{error_to_print}', 'yellow')
-                            log_error(domain, error_to_print)
-                            increment_domain_error(domain, error_reason)
-                            continue
-                        instance_api_data = instance_api_response.json()
-                        if 'error' in instance_api_data:
-                            if instance_api_data['error'] == "This method requires an authenticated user":
-                                error_to_print = f'Instance API requires authentication, marking as ignored...'
-                                print_colored(f'{error_to_print}', 'magenta')
-                                mark_ignore_domain(domain)
-                                delete_domain_if_known(domain)
-                                continue
-                        if software_version.startswith("4"):
-                            actual_domain_raw = instance_api_data['domain']
-                            actual_domain = actual_domain_raw.lower()
-                            contact_account_raw = instance_api_data['contact']['email']
-                            contact_account = normalize_email(contact_account_raw).lower()
-                            source_url = instance_api_data['source_url']
-                        else:
-                            actual_domain_raw = instance_api_data['uri']
-                            actual_domain = actual_domain_raw.lower()
-                            contact_account_raw = instance_api_data['email']
-                            contact_account = normalize_email(contact_account_raw).lower()
-                            source_url = find_code_repository(backend_domain)
-                        if not is_valid_email(contact_account):
-                            # Discard the value since it's not valid
-                            contact_account = None
-
-                        if source_url:
-                            source_url = limit_url_depth(source_url)
-
-                        if source_url == '/source.tar.gz':
-                            source_url = 'https://' + actual_domain + source_url
-
-                        if linked_nodeinfo_data['software']['name'].lower() == 'hometown':
-                            source_url = 'https://github.com/hometown-fork/hometown'
-
-                        if actual_domain == "gc2.jp":
-                            source_url = "https://github.com/gc2-jp/freespeech"
-
-                        cursor = conn.cursor()
-                        try:
-                            if domain != actual_domain:
-                                    # First, check if a record exists for the initial domain
-                                    cursor.execute('''
-                                        SELECT COUNT(*) FROM MastodonDomains WHERE "Domain" = ?
-                                    ''', (domain,))
-                                    record_exists = cursor.fetchone()[0] > 0
-
-                                    if record_exists:
-                                        print_colored(f'Deleting duplicate record for {domain} which is really {actual_domain}', 'pink')
-                                        # Delete the record associated with the initial domain
-                                        delete_domain_if_known(domain)
-
-                            cursor.execute('''
-                                INSERT INTO MastodonDomains ("Domain", "Software Version", "Total Users", "Active Users (Monthly)", "Timestamp", "Contact", "Source", "Full Version")
-                                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-                                ON CONFLICT("Domain") DO UPDATE SET
-                                "Software Version" = excluded."Software Version",
-                                "Total Users" = excluded."Total Users",
-                                "Active Users (Monthly)" = excluded."Active Users (Monthly)",
-                                "Timestamp" = excluded."Timestamp",
-                                "Contact" = excluded."Contact",
-                                "Source" = excluded."Source",
-                                "Full Version" = excluded."Full Version"
-                            ''', (actual_domain, software_version, total_users, active_month_users, datetime.now().strftime('%Y-%m-%d %H:%M:%S'), contact_account, source_url, software_version_full))
-                            conn.commit()
-                        except Exception as e:
-                            print(f"Failed to write domain data: {e}")
-                            conn.rollback()
-                        finally:
-                            cursor.close()
-
-                        if active_month_users > max(total_users + 6, total_users + (total_users * 0.25)):
-                            error_to_print = f'Mastodon v{software_version} with invalid counts ({active_month_users}:{total_users})'
-                            error_reason = '###'
-                            print_colored(f'{error_to_print}', 'pink')
-                            log_error(domain, error_to_print)
-                            increment_domain_error(domain, error_reason)
-                            delete_domain_if_known(domain)
-                            continue
-
-                        clear_domain_error(domain)
-
-                        if software_version == software_version_full:
-                            print_colored(f'Mastodon v{software_version}', 'green')
-                        else:
-                            print_colored(f'Mastodon v{software_version} ({software_version_full})', 'green')
-
-                    else:
-                        error_to_print = f'Not using Mastodon, marking as ignored...'
-                        print_colored(f'{error_to_print}', 'magenta')
-                        mark_ignore_domain(domain)
-                        delete_domain_if_known(domain)
-                        continue
-                else:
-                    error_to_print = f'Responded HTTP {linked_nodeinfo_response.status_code} at {linked_nodeinfo_url}'
-                    if linked_nodeinfo_response.status_code == 403:
-                        print_colored(f'{error_to_print}', 'magenta')
-                        mark_ignore_domain(domain)
-                        delete_domain_if_known(domain)
-                    elif linked_nodeinfo_response.status_code == 410:
-                        print_colored(f'{error_to_print}', 'red')
-                        mark_failed_domain(domain)
-                        delete_domain_if_known(domain)
-                    else:
-                        error_reason = linked_nodeinfo_response.status_code
-                        print_colored(f'{error_to_print}', 'yellow')
-                        log_error(domain, error_to_print)
-                        increment_domain_error(domain, error_reason)
-            else:
-                error_to_print = f'Not using Mastodon, marking as ignored...'
-                print_colored(f'{error_to_print}', 'magenta')
-                mark_ignore_domain(domain)
-                delete_domain_if_known(domain)
-                continue
-
-        except httpx.RequestError or httpx.HTTPStatusError as e:
-            error_message = str(e)
-            if error_message in ['SSL', 'ssl']:
-                error_reason = 'SSL'
-                delete_domain_if_known(domain)
-            else:
-                error_reason = 'HTTP'
-            error_to_print = error_message
-            print_colored(f'{error_message}', 'orange')
-            log_error(domain, error_to_print)
-            increment_domain_error(domain, error_reason)
-        except Exception as e:
-            error_message = str(e)
-            error_to_print = error_message
-            error_reason = '???'
-            print_colored(f'{error_message}', 'orange')
-            log_error(domain, error_to_print)
-            increment_domain_error(domain, error_reason)
+# Other helper functions (like delete_domain_if_known, mark_failed_domain, etc.) remain unchanged
 
 def read_domain_list(file_path):
     with open(file_path, 'r') as file:
         return [line.strip() for line in file]
 
 def load_from_database(user_choice):
+    query_map = {
+        "1": "SELECT Domain FROM RawDomains WHERE (Failed IS NULL OR Failed = '' OR Failed = '0') AND (Ignore IS NULL OR Ignore = '' OR Ignore = '0') AND (Errors < 6 OR Errors IS NULL) ORDER BY Domain ASC",
+        "4": "SELECT Domain FROM RawDomains WHERE Errors > 7 ORDER BY LENGTH(DOMAIN) ASC",
+        "5": "SELECT Domain FROM RawDomains WHERE Errors < 6 ORDER BY LENGTH(DOMAIN) ASC",
+        "6": "SELECT Domain FROM MastodonDomains WHERE Timestamp < datetime('now', '-3 days') ORDER BY Timestamp ASC",
+        "7": "SELECT Domain FROM RawDomains WHERE Ignore = '1' ORDER BY Domain",
+        "8": "SELECT Domain FROM MastodonDomains WHERE \"Software Version\" NOT LIKE '4.4.0%' AND \"Software Version\" NOT LIKE '4.3.0' ORDER BY \"Total Users\" DESC",
+        "9": "SELECT Domain FROM RawDomains WHERE Reason = 'SSL' ORDER BY Errors ASC",
+        "10": "SELECT Domain FROM RawDomains WHERE Reason = 'DNS' ORDER BY Errors ASC",
+        "11": "SELECT Domain FROM RawDomains WHERE Reason = '###' ORDER BY Errors ASC",
+        "12": "SELECT Domain FROM RawDomains WHERE Reason = 'HTTP' ORDER BY Errors ASC",
+        "13": "SELECT Domain FROM RawDomains WHERE Reason > 399 AND Reason < 500 ORDER BY Errors ASC",
+        "14": "SELECT Domain FROM RawDomains WHERE Failed = '1' ORDER BY Domain",
+        "15": "SELECT Domain FROM RawDomains WHERE Reason = '???' ORDER BY Errors ASC",
+        "16": "SELECT Domain FROM RawDomains WHERE Reason = 'API' ORDER BY Errors ASC",
+        "17": "SELECT Domain FROM RawDomains WHERE Reason = 'JSON' ORDER BY Errors ASC",
+        "18": "SELECT Domain FROM RawDomains WHERE Reason > 499 AND Reason < 600 ORDER BY Errors ASC",
+        "19": "SELECT Domain FROM RawDomains WHERE Reason > 299 AND Reason < 400 ORDER BY Errors ASC",
+        "21": "SELECT Domain FROM MastodonDomains WHERE \"Active Users (Monthly)\" = 0 ORDER BY Timestamp ASC",
+        "22": "SELECT Domain FROM MastodonDomains WHERE \"Software Version\" LIKE '4.4%' ORDER BY \"Total Users\" DESC",
+        "23": "SELECT Domain FROM RawDomains WHERE Reason = 'TXT' ORDER BY Errors ASC",
+        "400": "SELECT Domain FROM RawDomains WHERE Reason LIKE '%400%' ORDER BY Errors ASC",
+        "404": "SELECT Domain FROM RawDomains WHERE Reason LIKE '%404%' ORDER BY Errors ASC",
+        "406": "SELECT Domain FROM RawDomains WHERE Reason LIKE '%406%' ORDER BY Errors ASC"
+    }
+
+    query = query_map.get(user_choice)
+    if not query:
+        print(f"Invalid choice: {user_choice}. Using default query.")
+        query = query_map["1"]  # Default query
+
     cursor = conn.cursor()
     try:
-        if user_choice == "4":
-            cursor.execute("SELECT Domain FROM RawDomains WHERE Errors > 7 ORDER BY LENGTH(DOMAIN) ASC")
-        elif user_choice == "5":
-            cursor.execute("SELECT Domain FROM RawDomains WHERE Errors < 6 ORDER BY LENGTH(DOMAIN) ASC")
-        elif user_choice == "6":
-            cursor.execute('SELECT Domain FROM MastodonDomains WHERE Timestamp < datetime("now", "-3 days") ORDER BY Timestamp ASC')
-        elif user_choice == "7":
-            cursor.execute("SELECT Domain FROM RawDomains WHERE Ignore = '1' ORDER BY Domain")
-        elif user_choice == "8":
-            query = """
-            SELECT Domain
-            FROM MastodonDomains
-            WHERE
-                "Software Version" NOT LIKE '4.4.0%' AND
-                "Software Version" NOT LIKE '4.3.0'
-            ORDER BY "Total Users" DESC
-            ;
-            """
-            cursor.execute(query)
-        elif user_choice == "9":
-            cursor.execute("SELECT Domain FROM RawDomains WHERE Reason = 'SSL' ORDER BY Errors ASC")
-        elif user_choice == "10":
-            cursor.execute("SELECT Domain FROM RawDomains WHERE Reason = 'DNS' ORDER BY Errors ASC")
-        elif user_choice == "11":
-            cursor.execute("SELECT Domain FROM RawDomains WHERE Reason = '###' ORDER BY Errors ASC")
-        elif user_choice == "12":
-            cursor.execute("SELECT Domain FROM RawDomains WHERE Reason = 'HTTP' ORDER BY Errors ASC")
-        elif user_choice == "13":
-            cursor.execute("SELECT Domain FROM RawDomains WHERE Reason > 399 AND Reason < 500 ORDER BY Errors ASC;")
-        elif user_choice == "14":
-            cursor.execute("SELECT Domain FROM RawDomains WHERE Failed = '1' ORDER BY Domain")
-        elif user_choice == "15":
-            cursor.execute("SELECT Domain FROM RawDomains WHERE Reason = '???' ORDER BY Errors ASC")
-        elif user_choice == "16":
-            cursor.execute("SELECT Domain FROM RawDomains WHERE Reason = 'API' ORDER BY Errors ASC")
-        elif user_choice == "17":
-            cursor.execute("SELECT Domain FROM RawDomains WHERE Reason = 'JSON' ORDER BY Errors ASC")
-        elif user_choice == "18":
-            cursor.execute("SELECT Domain FROM RawDomains WHERE Reason > 499 AND Reason < 600 ORDER BY Errors ASC;")
-        elif user_choice == "21":
-            cursor.execute('SELECT Domain FROM MastodonDomains WHERE "Active Users (Monthly)" = 0 ORDER BY Timestamp ASC')
-        elif user_choice == "22":
-            query = """
-            SELECT Domain
-            FROM MastodonDomains
-            WHERE
-                "Software Version" LIKE '4.4%'
-            ORDER BY "Total Users" DESC
-            ;
-            """
-            cursor.execute(query)
-        elif user_choice == "23":
-            cursor.execute("SELECT Domain FROM RawDomains WHERE Reason = 'TXT' ORDER BY Errors ASC")
-        elif user_choice == "400":
-            cursor.execute("SELECT Domain FROM RawDomains WHERE Reason LIKE '%400%' ORDER BY Errors ASC")
-        elif user_choice == "404":
-            cursor.execute("SELECT Domain FROM RawDomains WHERE Reason LIKE '%404%' ORDER BY Errors ASC")
-        elif user_choice == "406":
-            cursor.execute("SELECT Domain FROM RawDomains WHERE Reason LIKE '%406%' ORDER BY Errors ASC")
-        else:
-            cursor.execute("SELECT Domain FROM RawDomains WHERE (Failed IS NULL OR Failed = '' OR Failed = '0') AND (Ignore IS NULL OR Ignore = '' OR Ignore = '0') AND (Errors < 6 OR Errors IS NULL) ORDER BY Domain ASC")
+        cursor.execute(query)
         domain_list = [row[0].strip() for row in cursor.fetchall() if row[0].strip()]
         conn.commit()
     except Exception as e:
         print(f"Failed to obtain selected domain list: {e}")
         conn.rollback()
+        domain_list = []
     finally:
         cursor.close()
+
     return domain_list
 
 def load_from_file(file_name):
@@ -1053,7 +864,7 @@ def print_menu() -> None:
         "Alter direction": {"2": "Reverse", "3": "Random"},
         "Retry general errors": {"4": "Overflow", "5": "Underflow"},
         "Retry specific errors": {"9": "SSL", "10": "DNS", "11": "###", "15": "???", "16": "API", "17": "JSON", "23": "TXT"},
-        "Retry HTTP errors": {"12": "HTTP", "13": "400s", "18": "500s", "400": "400", "404": "404", "406": "406"},
+        "Retry HTTP errors": {"12": "HTTP", "19": "300s", "13": "400s", "18": "500s", "400": "400", "404": "404", "406": "406"},
         "Retry fatal errors": {"7": "Ignored", "14": "Failed"},
         "Retry good data": {"6": "Stale", "8": "Outdated", "21": "Inactive", "22": "Main"},
     }
@@ -1110,4 +921,4 @@ except KeyboardInterrupt:
     http_client.close()  # Close the httpx client
     print(f"\n{appname} interrupted by user. Exiting gracefully...")
 finally:
-    print("Goodbye!")
+    print("Crawling complete!")

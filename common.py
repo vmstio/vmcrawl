@@ -4,7 +4,7 @@ except ImportError as e:
     print(f"Error importing module: {e}")
 
 appname = 'vmcrawl'
-appversion = '0.1'
+appversion = '0.2'
 
 # Add your color constants here
 color_bold = '\033[1m'
@@ -33,11 +33,6 @@ colors = {
 }
 
 # HTTP client configuration
-httpx_version = httpx.__version__
-default_user_agent = 'python-httpx/{httpx_version}'
-appended_user_agent = '{appname}/{appversion} (https://docs.vmst.io/projects/{appname})'
-custom_headers = {
-    'User-Agent': appended_user_agent,
-}
-
-http_client = httpx.Client(http2=True, follow_redirects=True, headers=custom_headers, timeout=5)
+http_custom_user_agent = '{appname}/{appversion} (https://docs.vmst.io/projects/{appname})'
+http_custom_headers = {'User-Agent': http_custom_user_agent}
+http_client = httpx.Client(http2=True, follow_redirects=True, headers=http_custom_headers, timeout=5)

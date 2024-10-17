@@ -89,7 +89,7 @@ def main():
         conn.close()
         print(f"\n{appname} interrupted by user. Exiting gracefully...")
     finally:
-        print("Goodbye!")
+        print("Fetching complete!")
 
 if __name__ == "__main__":
     main()
