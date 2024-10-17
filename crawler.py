@@ -806,11 +806,9 @@ def load_from_database(user_choice):
         "21": "SELECT Domain FROM RawDomains WHERE Reason > 399 AND Reason < 500 ORDER BY Errors ASC",
         "22": "SELECT Domain FROM RawDomains WHERE Reason > 499 AND Reason < 600 ORDER BY Errors ASC",
         "30": "SELECT Domain FROM RawDomains WHERE Reason = '###' ORDER BY Errors ASC",
-        "31": "SELECT Domain FROM RawDomains WHERE Reason = '???' ORDER BY Errors ASC",
-        "32": "SELECT Domain FROM RawDomains WHERE Reason = 'API' ORDER BY Errors ASC",
-        "33": "SELECT Domain FROM RawDomains WHERE Reason = 'JSON' ORDER BY Errors ASC",
-        "34": "SELECT Domain FROM RawDomains WHERE Reason = 'TXT' ORDER BY Errors ASC",
-        "40": f"SELECT Domain FROM MastodonDomains WHERE Timestamp < datetime('now', '-{error_threshold} days') ORDER BY Timestamp ASC",
+        "31": "SELECT Domain FROM RawDomains WHERE Reason = 'JSON' ORDER BY Errors ASC",
+        "32": "SELECT Domain FROM RawDomains WHERE Reason = 'TXT' ORDER BY Errors ASC",
+        "40": f"SELECT Domain FROM MastodonDomains WHERE Timestamp < datetime('now', '-{error_threshold} days') ORDER BY Timestamp DESC",
         "41": "SELECT Domain FROM MastodonDomains WHERE \"Software Version\" NOT LIKE '4.4.0%' AND \"Software Version\" NOT LIKE '4.3.0' ORDER BY \"Total Users\" DESC",
         "42": "SELECT Domain FROM MastodonDomains WHERE \"Active Users (Monthly)\" = 0 ORDER BY Timestamp ASC",
         "43": "SELECT Domain FROM MastodonDomains WHERE \"Software Version\" LIKE '4.4%' ORDER BY \"Total Users\" DESC",
@@ -864,8 +862,8 @@ def print_menu() -> None:
         "Retry fatal errors": {"6": "Ignored", "7": "Failed"},
         "Retry connection errors": {"10": "SSL", "11": "DNS", "12": "HTTP"},
         "Retry HTTP errors": {"20": "300s", "21": "400s", "22": "500s"},
-        "Retry specific errors": {"30": "###", "31": "???", "32": "API", "33": "JSON", "34": "TXT"},
-        "Retry good data": {"40": f"Beyond {error_threshold} Days", "41": "Out of Date", "42": "Active Zero", "43": "Main Runners"},
+        "Retry specific errors": {"30": "###", "31": "JSON", "32": "TXT"},
+        "Retry good data": {"40": f"Last Contacted >{error_threshold} Days Ago", "41": "Old Versions", "42": "Active Zero", "43": "Main Runners"},
     }
 
     print_colored(f"{appname} v{appversion}", "bold")
@@ -919,6 +917,6 @@ try:
 except KeyboardInterrupt:
     conn.close()
     http_client.close()  # Close the httpx client
-    print(f"\n{appname} interrupted by user. Exiting gracefully...")
+    print_colored(f"\n{appname} interrupted by user", "bold")
 finally:
-    print("Crawling complete!")
+    print_colored("Crawling complete!", "bold")
