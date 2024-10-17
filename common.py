@@ -1,3 +1,8 @@
+try:
+    import httpx
+except ImportError as e:
+    print(f"Error importing module: {e}")
+
 appname = 'vmcrawl'
 appversion = '0.1'
 
@@ -26,3 +31,13 @@ colors = {
     "magenta": "\033[95m",
     "purple": "\033[94m",
 }
+
+# HTTP client configuration
+httpx_version = httpx.__version__
+default_user_agent = 'python-httpx/{httpx_version}'
+appended_user_agent = '{appname}/{appversion} (https://docs.vmst.io/projects/{appname})'
+custom_headers = {
+    'User-Agent': appended_user_agent,
+}
+
+http_client = httpx.Client(http2=True, follow_redirects=True, headers=custom_headers, timeout=5)

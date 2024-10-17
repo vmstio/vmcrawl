@@ -25,15 +25,6 @@ load_dotenv()
 db_path = os.getenv("db_path")
 conn = sqlite3.connect(db_path) # type: ignore
 
-httpx_version = httpx.__version__
-default_user_agent = 'python-httpx/{httpx_version}'
-appended_user_agent = '{appname}/{appversion} (https://docs.vmst.io/projects/{appname})'
-custom_headers = {
-    'User-Agent': appended_user_agent,
-}
-
-http_client = httpx.Client(http2=True, follow_redirects=True, headers=custom_headers, timeout=5)
-
 def perform_dns_query(domain):
     record_types = ['A', 'AAAA', 'CNAME']
     for record_type in record_types:
