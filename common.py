@@ -3,6 +3,7 @@ try:
 except ImportError as e:
     print(f"Error importing module: {e}")
 
+# Versioning information
 appname = 'vmcrawl'
 appversion = '0.2'
 
@@ -39,3 +40,5 @@ http_client = httpx.Client(http2=True, follow_redirects=True, headers=http_custo
 
 # Common variables
 error_threshold = int(5)
+version_main_branch = "4.4"
+version_latest_release = "4.3.0"

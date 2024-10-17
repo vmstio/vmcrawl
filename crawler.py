@@ -809,9 +809,9 @@ def load_from_database(user_choice):
         "31": "SELECT Domain FROM RawDomains WHERE Reason = 'JSON' ORDER BY Errors ASC",
         "32": "SELECT Domain FROM RawDomains WHERE Reason = 'TXT' ORDER BY Errors ASC",
         "40": f"SELECT Domain FROM MastodonDomains WHERE Timestamp < datetime('now', '-{error_threshold} days') ORDER BY Timestamp DESC",
-        "41": "SELECT Domain FROM MastodonDomains WHERE \"Software Version\" NOT LIKE '4.4.0%' AND \"Software Version\" NOT LIKE '4.3.0' ORDER BY \"Total Users\" DESC",
+        "41": f"SELECT Domain FROM MastodonDomains WHERE \"Software Version\" NOT LIKE '{version_main_branch}%' AND \"Software Version\" NOT LIKE '{version_latest_release}' ORDER BY \"Total Users\" DESC",
         "42": "SELECT Domain FROM MastodonDomains WHERE \"Active Users (Monthly)\" = 0 ORDER BY Timestamp ASC",
-        "43": "SELECT Domain FROM MastodonDomains WHERE \"Software Version\" LIKE '4.4%' ORDER BY \"Total Users\" DESC",
+        "43": f"SELECT Domain FROM MastodonDomains WHERE \"Software Version\" LIKE '{version_main_branch}%' ORDER BY \"Total Users\" DESC",
     }
 
     query = query_map.get(user_choice)
