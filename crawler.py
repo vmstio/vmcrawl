@@ -32,13 +32,13 @@ custom_headers = {
     'User-Agent': appended_user_agent,
 }
 
-http_client = httpx.Client(http2=True, headers=custom_headers, timeout=5)
+http_client = httpx.Client(http2=True, follow_redirects=True, headers=custom_headers, timeout=5)
 
 def perform_dns_query(domain):
     record_types = ['A', 'AAAA', 'CNAME']
     for record_type in record_types:
         try:
-            answers = dns.resolver.resolve(domain, record_type, lifetime=10)
+            answers = dns.resolver.resolve(domain, record_type, lifetime=5)
             if answers:
                 return True  # Record of type record_type found
         except dns.resolver.NoAnswer:
@@ -51,8 +51,6 @@ def perform_dns_query(domain):
             return None  # No root SOA available for this domain
         except dns.resolver.Timeout:
             return None  # DNS query failed due to timeout or other DNS issues
-        except dns.exception.DNSException:
-            return None
 
     # If the loop completes without finding a record or encountering a DNS issue, then no desired records were found
     return False  # Neither A, AAAA, nor CNAME records found
@@ -943,7 +941,7 @@ def check_and_record_domains(domain_list, ignored_domains, failed_domains, user_
 
         except httpx.RequestError or httpx.HTTPStatusError as e:
             error_message = str(e)
-            if 'SSL' in error_message:
+            if error_message in ['SSL', 'ssl']:
                 error_reason = 'SSL'
                 delete_domain_if_known(domain)
             else:
