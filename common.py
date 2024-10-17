@@ -1,11 +1,26 @@
 try:
     import httpx
+    import toml
 except ImportError as e:
     print(f"Error importing module: {e}")
 
 # Versioning information
-appname = 'vmcrawl'
-appversion = '0.2'
+toml_file_path='pyproject.toml'
+try:
+    # Read the TOML file
+    project_info = toml.load(toml_file_path)
+
+    # Extract project information
+    appname = project_info['project']['name']
+    appversion = project_info['project']['version']
+    appdescription = project_info['project']['description']
+
+except FileNotFoundError:
+    print(f"Error: {toml_file_path} not found.")
+except toml.TomlDecodeError:
+    print(f"Error: {toml_file_path} is not a valid TOML file.")
+except KeyError as e:
+    print(f"Error: Missing expected key in TOML file: {e}")
 
 # Add your color constants here
 color_bold = '\033[1m'
