@@ -415,7 +415,7 @@ def get_ignored_domains():
 
 def check_and_record_domains(domain_list, ignored_domains, failed_domains, user_choice, junk_domains, bad_tlds, domain_endings, httpx_client):
     for index, domain in enumerate(domain_list, start=1):
-        print_colored(f'{domain} ({index}/{len(domain_list)})', 'bold')
+        print_colored(f'Crawling @ {domain} ({index}/{len(domain_list)})', 'bold')
 
         if should_skip_domain(domain, ignored_domains, failed_domains, user_choice):
             continue
@@ -815,9 +815,13 @@ def load_from_database(user_choice):
         "43": f"SELECT Domain FROM MastodonDomains WHERE \"Software Version\" LIKE '{version_main_branch}%' ORDER BY \"Total Users\" DESC",
     }
 
-    query = query_map.get(user_choice)
+    if user_choice in ["2", "3"]: # Reverse or Random
+        query = query_map["1"]  # Default query
+    else:
+        query = query_map.get(user_choice)
+
     if not query:
-        print(f"Invalid choice: {user_choice}. Using default query.")
+        print_colored(f"Choice {user_choice} was not available, using default query...", "yellow")
         query = query_map["1"]  # Default query
 
     cursor = conn.cursor()

@@ -52,7 +52,7 @@ def fetch_domain_list(conn, exclude_domains_sql):
         cursor.close()
 
 def process_domain(domain, counter, total):
-    print(f"{color_bold}Processing {domain} ({counter}/{total})...{color_reset}")
+    print(f"{color_bold}Fetching peers @ {domain} ({counter}/{total})...{color_reset}")
 
     subprocess.run(["python3", "peerapi.py", domain])
 
@@ -60,8 +60,6 @@ def process_domain(domain, counter, total):
     if os.path.isfile(import_file):
         subprocess.run(["python3", "crawler.py", import_file])
         os.remove(import_file)
-    else:
-        print(f"Finished processing {domain}")
 
 def main():
     print_colored(f"{appname} v{appversion} ({current_filename})", "bold")
