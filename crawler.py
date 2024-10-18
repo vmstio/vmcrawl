@@ -867,7 +867,6 @@ def print_menu() -> None:
         "Retry good data": {"40": f"Last Contacted >{error_threshold} Days Ago", "41": "Old Versions", "42": "Active Zero", "43": "Main Runners"},
     }
 
-    print_colored(f"{appname} v{appversion}", "bold")
     for category, options in menu_options.items():
         options_str = " ".join(f"({key}) {value}" for key, value in options.items())
         print_colored(f"{category}: ", "bold", end="")
@@ -876,25 +875,21 @@ def print_menu() -> None:
     sys.stdout.flush()
 
 def get_user_choice() -> str:
-    ready, _, _ = select.select([sys.stdin], [], [], 5)  # Wait for input for 5 seconds
-    if ready:
-        return sys.stdin.readline().strip()
-    print_colored("\nDefaulting to standard crawl", "cyan")
-    return "1"
+    return sys.stdin.readline().strip()
 
 # Main program starts here
-
+print_colored(f"{appname} v{appversion}", "bold")
 try:
-    print_menu()
-    user_choice = get_user_choice()
-    print_colored(f"Choice selected: {user_choice}", "magenta")
-
     domain_list_file = sys.argv[1] if len(sys.argv) > 1 else None
-
     try:
         if domain_list_file:  # File name provided as argument
+            user_choice = 1
             domain_list = load_from_file(domain_list_file)
+            print_colored("Crawling domains from file...", "pink")
         else:  # Load from database by default
+            print_menu()
+            user_choice = get_user_choice()
+            print_colored(f"Crawling domains from database choice {user_choice}...", "pink")
             domain_list = load_from_database(user_choice)
 
         if user_choice == "2":
