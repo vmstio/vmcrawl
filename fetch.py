@@ -16,7 +16,7 @@ load_dotenv()
 db_path = os.getenv("db_path")
 conn = sqlite3.connect(db_path) # type: ignore
 
-db_limit = 250
+db_limit = 500
 db_offset = 0
 
 def fetch_exclude_domains(conn):

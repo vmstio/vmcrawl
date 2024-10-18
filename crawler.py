@@ -448,7 +448,7 @@ def is_junk_or_bad_tld(domain, junk_domains, bad_tlds, domain_endings):
         mark_failed_domain(domain)
         delete_domain_if_known(domain)
         return True
-    if any(domain.endswith(tld) for tld in bad_tlds):
+    if any(domain.endswith(f'.{tld}') for tld in bad_tlds):
         print_colored('Known bad TLD, marking as failed...', 'red')
         mark_failed_domain(domain)
         delete_domain_if_known(domain)

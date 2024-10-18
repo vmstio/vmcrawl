@@ -116,7 +116,7 @@ def get_domains(api_url, domain):
         filtered_domains = [
             item for item in data
             if is_valid_domain(item) and not any(keyword in item for keyword in keywords)
-            and not any(item.endswith(tld) for tld in bad_tlds)
+            and not any(item.endswith(f'.{tld}') for tld in bad_tlds)
             and any(item.endswith(f'.{domain_ending}') for domain_ending in domain_endings)
         ]
         return filtered_domains
