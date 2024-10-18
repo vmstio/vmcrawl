@@ -413,14 +413,14 @@ def get_ignored_domains():
         cursor.close()
     return ignored_domains
 
-def check_and_record_domains(domain_list, ignored_domains, failed_domains, user_choice, junk_domains, bad_tlds, httpx_client):
+def check_and_record_domains(domain_list, ignored_domains, failed_domains, user_choice, junk_domains, bad_tlds, domain_endings, httpx_client):
     for index, domain in enumerate(domain_list, start=1):
         print_colored(f'{domain} ({index}/{len(domain_list)})', 'bold')
 
         if should_skip_domain(domain, ignored_domains, failed_domains, user_choice):
             continue
 
-        if is_junk_or_bad_tld(domain, junk_domains, bad_tlds):
+        if is_junk_or_bad_tld(domain, junk_domains, bad_tlds, domain_endings):
             continue
 
         if not check_dns(domain):
@@ -442,14 +442,19 @@ def should_skip_domain(domain, ignored_domains, failed_domains, user_choice):
         return True
     return False
 
-def is_junk_or_bad_tld(domain, junk_domains, bad_tlds):
+def is_junk_or_bad_tld(domain, junk_domains, bad_tlds, domain_endings):
     if any(junk in domain for junk in junk_domains):
-        print_colored('Known junk domain, ignoring...', 'magenta')
+        print_colored('Known junk domain, marking as failed...', 'red')
         mark_failed_domain(domain)
         delete_domain_if_known(domain)
         return True
     if any(domain.endswith(tld) for tld in bad_tlds):
-        print_colored('Known bad TLD, ignoring...', 'magenta')
+        print_colored('Known bad TLD, marking as failed...', 'red')
+        mark_failed_domain(domain)
+        delete_domain_if_known(domain)
+        return True
+    if not any(domain.endswith(f'.{domain_ending}') for domain_ending in domain_endings):
+        print_colored('Unknown TLD, marking as failed...', 'red')
         mark_failed_domain(domain)
         delete_domain_if_known(domain)
         return True
@@ -906,10 +911,11 @@ try:
 
     junk_domains = get_junk_keywords()
     bad_tlds = get_bad_tld()
+    domain_endings = get_domain_endings()
     failed_domains = get_failed_domains()
     ignored_domains = get_ignored_domains()
 
-    check_and_record_domains(domain_list, ignored_domains, failed_domains, user_choice, junk_domains, bad_tlds, http_client)
+    check_and_record_domains(domain_list, ignored_domains, failed_domains, user_choice, junk_domains, bad_tlds, domain_endings, http_client)
 except KeyboardInterrupt:
     conn.close()
     http_client.close()  # Close the httpx client

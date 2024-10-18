@@ -117,6 +117,7 @@ def get_domains(api_url, domain):
             item for item in data
             if is_valid_domain(item) and not any(keyword in item for keyword in keywords)
             and not any(item.endswith(tld) for tld in bad_tlds)
+            and any(item.endswith(f'.{domain_ending}') for domain_ending in domain_endings)
         ]
         return filtered_domains
     except Exception as e:
@@ -133,6 +134,7 @@ if __name__ == "__main__":
     api_url = f"https://{domain}/api/v1/instance/peers"
     db_path = os.getenv("db_path")
     output_file = f"target/import_{domain}.txt"
+    domain_endings = get_domain_endings()
 
     existing_domains = get_existing_domains()
     domains = get_domains(api_url, domain)  # Pass the domain and db_path to get_domains
