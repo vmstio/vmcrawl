@@ -34,9 +34,8 @@ def import_domains(domains):
             lowercase_domain = domain.lower()
             cursor.execute("INSERT INTO RawDomains (Domain) VALUES (?)", (lowercase_domain,))
         conn.commit()
-        print(f"{len(domains)} domains imported successfully")
     except Exception as e:
-        print(f"Failed to import domain list: {e}")
+        print_colored(f"Failed to import domain list: {e}", "orange")
         conn.rollback()
         return None
     finally:
@@ -50,7 +49,7 @@ def get_junk_keywords():
         conn.commit()
         return keywords
     except Exception as e:
-        print(f"Failed to obtain junk domain list: {e}")
+        print_colored(f"Failed to obtain junk domain list: {e}", "orange")
         conn.rollback()
         return None
     finally:
@@ -64,7 +63,7 @@ def get_bad_tld():
         conn.commit()
         return tlds
     except Exception as e:
-        print(f"Failed to obtain bad TLD list: {e}")
+        print_colored(f"Failed to obtain bad TLD list: {e}", "orange")
         conn.rollback()
         return None
     finally:
@@ -75,9 +74,9 @@ def add_to_no_peers(domain):
     try:
         cursor.execute("INSERT INTO NoPeers (Domain) VALUES (?)", (domain,))
         conn.commit()
-        print(f"{domain} added to NoPeers table")
+        print_colored(f"{domain} added to NoPeers table", "red")
     except Exception as e:
-        print(f"Failed to add domain to NoPeers list: {e}")
+        print_colored(f"Failed to add domain to NoPeers list: {e}", "orange")
         conn.rollback()
         return None
     finally:
@@ -88,9 +87,9 @@ def write_to_file(domains, output_file):
         with open(output_file, "w") as file:
             for domain in domains:
                 file.write(f"{domain}\n")
-        print(f"{len(domains)} unique domains written to {output_file}")
+        print_colored(f"{len(domains)} unique domains written to {output_file}", "green")
     except Exception as e:
-        print(f"An error occurred while writing to the file: {e}")
+        print_colored(f"An error occurred while writing to the file: {e}", "orange")
 
 def get_existing_domains():
     cursor = conn.cursor()
@@ -100,7 +99,7 @@ def get_existing_domains():
         conn.commit()
         return existing_domains
     except Exception as e:
-        print(f"Failed to get list of existing domains: {e}")
+        print_colored(f"Failed to get list of existing domains: {e}", "orange")
         conn.rollback()
         return None
     finally:
@@ -121,7 +120,7 @@ def get_domains(api_url, domain):
         ]
         return filtered_domains
     except Exception as e:
-        print(f"{e}")
+        print_colored(f"{e}", "orange")
         add_to_no_peers(domain)  # Add domain to NoPeers if any other error occurs
     return []
 
@@ -141,7 +140,7 @@ if __name__ == "__main__":
     unique_domains = [domain for domain in domains if domain not in existing_domains and domain.isascii()]
 
     if unique_domains == []:
-        print("No new unique domains found")
+        print_colored("No new unique domains found", "cyan")
         sys.exit(0)
 
     write_to_file(unique_domains, output_file)

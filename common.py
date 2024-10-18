@@ -26,6 +26,7 @@ except KeyError as e:
 color_bold = '\033[1m'
 color_reset = '\033[0m'
 color_cyan = '\033[96m'
+color_dark_green = '\033[32m'
 color_green = '\033[92m'
 color_magenta = '\033[95m'
 color_orange = '\033[38;5;208m'
@@ -39,6 +40,7 @@ colors = {
     "bold": f"{color_bold}",
     "reset": f"{color_reset}",
     "cyan": f"{color_cyan}",
+    "dark_green": f"{color_dark_green}",
     "green": f"{color_green}",
     "magenta": f"{color_magenta}",
     "orange": f"{color_orange}",
@@ -58,6 +60,9 @@ http_client = httpx.Client(http2=True, follow_redirects=True, headers=http_custo
 error_threshold = int(5)
 version_main_branch = "4.4"
 version_latest_release = "4.3.0"
+
+def print_colored(text: str, color: str, **kwargs) -> None:
+    print(f"{colors.get(color, '')}{text}{colors['reset']}", **kwargs)
 
 def get_domain_endings():
     # Obtain the list of domain endings

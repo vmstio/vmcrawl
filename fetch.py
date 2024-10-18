@@ -13,6 +13,7 @@ except ImportError as e:
 from common import *
 load_dotenv()
 
+current_filename = os.path.basename(__file__)
 db_path = os.getenv("db_path")
 conn = sqlite3.connect(db_path) # type: ignore
 
@@ -63,28 +64,28 @@ def process_domain(domain, counter, total):
         print(f"Finished processing {domain}")
 
 def main():
+    print_colored(f"{appname} v{appversion} ({current_filename})", "bold")
+
     try:
-        print(f"{color_bold}Fetching list of excluded domains from SQLite database...{color_reset}")
         exclude_domains_sql = fetch_exclude_domains(conn)
 
         if exclude_domains_sql is None:
-            print("Exiting due to error.")
+            print_colored("Failed to fetch excluded list, exiting...", "red")
             return
 
-        print(f"{color_bold}Fetching top peers from the database...{color_reset}")
         domain_list = fetch_domain_list(conn, exclude_domains_sql)
 
         if not domain_list:
-            print("No instances found in the database. Exiting...")
+            print_colored("No domains fetched, exiting...", "red")
             return
 
-        print(f"Number of instances fetched: {len(domain_list)}")
+        print_colored(f"Fetching peer data from {len(domain_list)} instances...", "pink")
 
         total = len(domain_list)
         for counter, domain in enumerate(domain_list, start=1):
             process_domain(domain, counter, total)
 
-        print(f"{color_bold}All domains processed!{color_reset}")
+        print_colored(f"Fetching complete!", "green")
     except KeyboardInterrupt:
         conn.close()
         print(f"\n{appname} interrupted by user. Exiting gracefully...")

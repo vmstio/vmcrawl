@@ -23,6 +23,7 @@ except ImportError as e:
 from common import *
 load_dotenv()
 
+current_filename = os.path.basename(__file__)
 db_path = os.getenv("db_path")
 conn = sqlite3.connect(db_path) # type: ignore
 
@@ -699,7 +700,7 @@ def process_mastodon_instance(domain, webfinger_data, nodeinfo_data, httpx_clien
             # Check for invalid user counts
             if active_month_users > max(total_users + 6, total_users + (total_users * 0.25)):
                 error_to_print = f'Mastodon v{software_version} with invalid counts ({active_month_users}:{total_users})'
-                print_colored(error_to_print, 'pink')
+                print_colored(error_to_print, 'dark_green')
                 log_error(domain, error_to_print)
                 increment_domain_error(domain, '###')
                 delete_domain_if_known(domain)
@@ -853,9 +854,6 @@ def load_from_file(file_name):
                 conn.commit()
     return domain_list
 
-def print_colored(text: str, color: str, **kwargs) -> None:
-    print(f"{colors.get(color, '')}{text}{colors['reset']}", **kwargs)
-
 def print_menu() -> None:
     menu_options = {
         "Change process direction": {"1": "Standard", "2": "Reverse", "3": "Random"},
@@ -878,7 +876,7 @@ def get_user_choice() -> str:
     return sys.stdin.readline().strip()
 
 # Main program starts here
-print_colored(f"{appname} v{appversion}", "bold")
+print_colored(f"{appname} v{appversion} ({current_filename})", "bold")
 try:
     domain_list_file = sys.argv[1] if len(sys.argv) > 1 else None
     try:
@@ -916,4 +914,4 @@ except KeyboardInterrupt:
     http_client.close()  # Close the httpx client
     print_colored(f"\n{appname} interrupted by user", "bold")
 finally:
-    print_colored("Crawling complete!", "bold")
+    print_colored("Crawling complete!", "green")

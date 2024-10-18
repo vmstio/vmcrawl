@@ -12,6 +12,7 @@ except ImportError as e:
 from common import *
 load_dotenv()
 
+current_filename = os.path.basename(__file__)
 db_path = os.getenv("db_path")
 conn = sqlite3.connect(db_path) # type: ignore
 
@@ -38,12 +39,15 @@ def chunked_query(domain_endings, chunk_size=50):
 
     return list(all_domains)
 
-# Execute the query in chunks
-results = chunked_query(domain_endings)
+# Print the application information
+print_colored(f"{appname} v{appversion} ({current_filename})", "bold")
 
-# Close the connection
+# Execute the query in chunks
+print_colored(f"Querying {len(domain_endings)} domain endings...", "pink")
+results = chunked_query(domain_endings)
 conn.close()
 
 # Print or process the results as needed
+print(f"Domains without valid TLDs:")
 for result in results:
     print(result[0])
