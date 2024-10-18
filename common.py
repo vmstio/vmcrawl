@@ -59,4 +59,12 @@ error_threshold = int(5)
 version_main_branch = "4.4"
 version_latest_release = "4.3.0"
 
-domain_endings_url = 'http://data.iana.org/TLD/tlds-alpha-by-domain.txt'
+def get_domain_endings():
+    # Obtain the list of domain endings
+    domain_endings_url = 'http://data.iana.org/TLD/tlds-alpha-by-domain.txt'
+    domain_endings_response = http_client.get(domain_endings_url)
+    if domain_endings_response.status_code in [200]:
+        domain_endings = [line.strip().lower() for line in domain_endings_response.text.splitlines() if not line.startswith('#')]
+        return domain_endings
+    else:
+        raise Exception(f"Failed to fetch domain endings. HTTP Status Code: {domain_endings_response.status_code}")

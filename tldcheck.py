@@ -2,7 +2,6 @@
 
 try:
     import sqlite3
-    import httpx
     import sys
     import os
     from dotenv import load_dotenv
@@ -16,13 +15,9 @@ load_dotenv()
 db_path = os.getenv("db_path")
 conn = sqlite3.connect(db_path) # type: ignore
 
-domain_endings_response = http_client.get(domain_endings_url)
-if domain_endings_response.status_code == 200:
-    domain_endings = [line.strip().lower() for line in domain_endings_response.text.splitlines() if not line.startswith('#')]
-else:
-    raise Exception(f"Failed to fetch domain endings. HTTP Status Code: {domain_endings_response.status_code}")
-
 cursor = conn.cursor()
+
+domain_endings = get_domain_endings()
 
 def chunked_query(domain_endings, chunk_size=50):
     # results = []
