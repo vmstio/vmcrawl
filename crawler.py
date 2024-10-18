@@ -8,7 +8,6 @@ try:
     import random
     import re
     import httpx
-    import select
     import sqlite3
     import sys
     import mimetypes
