@@ -18,13 +18,22 @@ conn = sqlite3.connect(db_path) # type: ignore
 
 def is_valid_domain(domain):
     domain_pattern = re.compile(r'^[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$', re.IGNORECASE)
-    return (domain_pattern.match(domain) or "xn--" in domain) and not is_ip_address(domain)
+    return (domain_pattern.match(domain) or "xn--" in domain) and not is_ip_address(domain) and not detect_vowels(domain)
 
 def is_ip_address(domain):
     try:
         ipaddress.ip_address(domain)
         return True
     except ValueError:
+        return False
+
+def detect_vowels(domain):
+    try:
+        pattern = r'\.[aeiou]{4}'
+        matches = re.findall(pattern, domain)
+        return True if len(matches) > 0 else False
+    except Exception as e:
+        print_colored(f"Error detecting vowels: {e}", "orange")
         return False
 
 def import_domains(domains):
