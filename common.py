@@ -55,9 +55,10 @@ common_timeout = 5
 http_custom_user_agent = f'{appname}/{appversion} (https://docs.vmst.io/projects/{appname})'
 http_custom_headers = {'User-Agent': http_custom_user_agent}
 http_client = httpx.Client(http2=True, follow_redirects=True, headers=http_custom_headers, timeout=common_timeout)
+http_codes_to_ignore = [451, 429, 422, 418, 405, 404, 403, 402, 401, 400, 300]
 
 # Common variables
-error_threshold = int(5)
+error_threshold = int(7)
 version_main_branch = "4.4"
 version_latest_release = "4.3.0"
 
