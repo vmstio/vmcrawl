@@ -3,11 +3,12 @@
 try:
     from datetime import datetime, timedelta
     import dns.resolver
+    import httpx
     import json
     import os
     import random
     import re
-    import httpx
+    import select
     import sqlite3
     import sys
     import mimetypes
@@ -544,14 +545,13 @@ def check_webfinger(domain, httpx_client):
         response = httpx_client.get(webfinger_url)
         if response.status_code in [200]:
             content_type = response.headers.get('Content-Type', '')
-            content = response.content
             if 'json' not in content_type:
-                error_message = 'WebFinger reply is not a JSON file'
-                print_colored(f'{error_message}', 'yellow')
-                log_error(domain, error_message)
-                increment_domain_error(domain, 'JSON')
+                error_message = 'WebFinger reply is not a JSON file, marking as ignored...'
+                print_colored(f'{error_message}', 'magenta')
+                mark_ignore_domain(domain)
+                delete_domain_if_known(domain)
                 return None
-            if not content:
+            if not response.content:
                 error_message = 'WebFinger reply is empty'
                 print_colored(f'{error_message}', 'yellow')
                 log_error(domain, error_message)
@@ -567,7 +567,7 @@ def check_webfinger(domain, httpx_client):
             if first_alias:
                 backend_domain = urlparse(first_alias).netloc
                 return {'backend_domain': backend_domain}
-        elif response.status_code in [429, 418, 405, 404, 403, 400, 300]:
+        elif response.status_code in http_codes_to_ignore:
             print_colored(f'Responded HTTP {response.status_code} to WebFinger request, marking as ignored...', 'magenta')
             mark_ignore_domain(domain)
             delete_domain_if_known(domain)
@@ -593,12 +593,19 @@ def check_nodeinfo(domain, backend_domain, httpx_client):
         if response.status_code in [200]:
             content_type = response.headers.get('Content-Type', '')
             if 'json' not in content_type:
-                error_message = 'NodeInfo reply is not a JSON file'
+                error_message = 'NodeInfo reply is not a JSON file, marking as ignored...'
+                print_colored(f'{error_message}', 'magenta')
+                mark_ignore_domain(domain)
+                delete_domain_if_known(domain)
+                return None
+            if not response.content:
+                error_message = 'NodeInfo reply is empty'
                 print_colored(f'{error_message}', 'yellow')
                 log_error(domain, error_message)
                 increment_domain_error(domain, 'JSON')
                 return None
-            data = response.json()
+            else:
+                data = response.json()
             if 'links' in data and len(data['links']) > 0:
                 nodeinfo_2_url = next((link['href'] for link in data['links'] if link.get('rel') == 'http://nodeinfo.diaspora.software/ns/schema/2.0'), None)
                 if nodeinfo_2_url:
@@ -606,12 +613,23 @@ def check_nodeinfo(domain, backend_domain, httpx_client):
                     if nodeinfo_response.status_code in [200]:
                         nodeinfo_response_content_type = nodeinfo_response.headers.get('Content-Type', '')
                         if 'json' not in nodeinfo_response_content_type:
-                            error_message = 'NodeInfo V2 reply is not a JSON file'
+                            error_message = 'NodeInfo V2 reply is not a JSON file, marking as ignored...'
+                            print_colored(f'{error_message}', 'magenta')
+                            mark_ignore_domain(domain)
+                            delete_domain_if_known(domain)
+                            return None
+                        if not nodeinfo_response.content:
+                            error_message = 'NodeInfo V2 reply is empty'
                             print_colored(f'{error_message}', 'yellow')
                             log_error(domain, error_message)
                             increment_domain_error(domain, 'JSON')
                             return None
-                        return nodeinfo_response.json()
+                        else:
+                            return nodeinfo_response.json()
+                    elif nodeinfo_response.status_code in http_codes_to_ignore:
+                        print_colored(f'Responded HTTP {nodeinfo_response.status_code} @ {nodeinfo_2_url}, marking as ignored...', 'magenta')
+                        mark_ignore_domain(domain)
+                        delete_domain_if_known(domain)
                     else:
                         error_message = f'Responded HTTP {nodeinfo_response.status_code} @ {nodeinfo_2_url}'
                         print_colored(f'{error_message}', 'yellow')
@@ -619,7 +637,7 @@ def check_nodeinfo(domain, backend_domain, httpx_client):
                         increment_domain_error(domain, str(nodeinfo_response.status_code))
                 else:
                     mark_as_non_mastodon(domain)
-        elif response.status_code in [429, 418, 405, 404, 403, 400, 300]:
+        elif response.status_code in http_codes_to_ignore:
             print_colored(f'Responded HTTP {response.status_code} to NodeInfo request, marking as ignored...', 'magenta')
             mark_ignore_domain(domain)
             delete_domain_if_known(domain)
@@ -658,12 +676,19 @@ def process_mastodon_instance(domain, webfinger_data, nodeinfo_data, httpx_clien
         if response.status_code in [200]:
             content_type = response.headers.get('Content-Type', '')
             if 'json' not in content_type:
-                error_message = 'Instance reply is not a JSON file'
+                error_message = 'Instance API reply is not a JSON file, marking as ignored...'
+                print_colored(f'{error_message}', 'magenta')
+                mark_ignore_domain(domain)
+                delete_domain_if_known(domain)
+                return None
+            if not response.content:
+                error_message = 'Instance API reply is empty'
                 print_colored(f'{error_message}', 'yellow')
                 log_error(domain, error_message)
                 increment_domain_error(domain, 'JSON')
                 return None
-            instance_api_data = response.json()
+            else:
+                instance_api_data = response.json()
 
             if 'error' in instance_api_data:
                 if instance_api_data['error'] == "This method requires an authenticated user":
@@ -715,7 +740,7 @@ def process_mastodon_instance(domain, webfinger_data, nodeinfo_data, httpx_clien
             else:
                 print_colored(f'Mastodon v{software_version} ({nodeinfo_data["software"]["version"]})', 'green')
 
-        elif response.status_code in [429, 418, 405, 404, 403, 400, 300]:
+        elif response.status_code in [429, 422, 418, 405, 404, 403, 401, 400, 300]:
             print_colored(f'Responded HTTP {response.status_code} to API request, marking as ignored...', 'magenta')
             mark_ignore_domain(domain)
             delete_domain_if_known(domain)
@@ -771,12 +796,16 @@ def mark_as_non_mastodon(domain):
 
 def handle_http_exception(domain, exception):
     error_message = str(exception)
-    if error_message in ['SSL', 'ssl']:
+    if 'ssl' in error_message.casefold():
         error_reason = 'SSL'
+        print_colored(f'{error_message}', 'orange')
         delete_domain_if_known(domain)
     else:
-        error_reason = 'HTTP'
-    print_colored(error_message, 'orange')
+        if 'timed out' in error_message.casefold():
+            error_reason = 'TIMEOUT'
+        else:
+            error_reason = 'HTTP'
+        print_colored(f'HTTPX failure: {error_message}', 'orange')
     log_error(domain, error_message)
     increment_domain_error(domain, error_reason)
 
@@ -795,7 +824,7 @@ def read_domain_list(file_path):
 
 def load_from_database(user_choice):
     query_map = {
-        "1": "SELECT Domain FROM RawDomains WHERE (Failed IS NULL OR Failed = '' OR Failed = '0') AND (Ignore IS NULL OR Ignore = '' OR Ignore = '0') AND (Errors < 6 OR Errors IS NULL) ORDER BY Domain ASC",
+        "1": "SELECT Domain FROM RawDomains WHERE (Failed IS NULL OR Failed = '' OR Failed = '0') AND (Ignore IS NULL OR Ignore = '' OR Ignore = '0') AND (Errors <= {error_threshold} OR Errors IS NULL) ORDER BY Domain ASC",
         "4": f"SELECT Domain FROM RawDomains WHERE Errors >= {error_threshold + 1} ORDER BY LENGTH(DOMAIN) ASC",
         "5": f"SELECT Domain FROM RawDomains WHERE Errors <= {error_threshold} ORDER BY LENGTH(DOMAIN) ASC",
         "6": "SELECT Domain FROM RawDomains WHERE Ignore = '1' ORDER BY Domain",
@@ -803,9 +832,11 @@ def load_from_database(user_choice):
         "10": "SELECT Domain FROM RawDomains WHERE Reason = 'SSL' ORDER BY Errors ASC",
         "11": "SELECT Domain FROM RawDomains WHERE Reason = 'DNS' ORDER BY Errors ASC",
         "12": "SELECT Domain FROM RawDomains WHERE Reason = 'HTTP' ORDER BY Errors ASC",
-        "20": "SELECT Domain FROM RawDomains WHERE Reason > 299 AND Reason < 400 ORDER BY Errors ASC",
-        "21": "SELECT Domain FROM RawDomains WHERE Reason > 399 AND Reason < 500 ORDER BY Errors ASC",
-        "22": "SELECT Domain FROM RawDomains WHERE Reason > 499 AND Reason < 600 ORDER BY Errors ASC",
+        "13": "SELECT Domain FROM RawDomains WHERE Reason = 'TIMEOUT' ORDER BY Errors ASC",
+        "20": "SELECT Domain FROM RawDomains WHERE Reason GLOB '[2][0-9][0-9]*' ORDER BY Errors ASC",
+        "21": "SELECT Domain FROM RawDomains WHERE Reason GLOB '[3][0-9][0-9]*' ORDER BY Errors ASC",
+        "22": "SELECT Domain FROM RawDomains WHERE Reason GLOB '[4][0-9][0-9]*' ORDER BY Errors ASC",
+        "23": "SELECT Domain FROM RawDomains WHERE Reason GLOB '[5][0-9][0-9]*' ORDER BY Errors ASC",
         "30": "SELECT Domain FROM RawDomains WHERE Reason = '###' ORDER BY Errors ASC",
         "31": "SELECT Domain FROM RawDomains WHERE Reason = 'JSON' ORDER BY Errors ASC",
         "32": "SELECT Domain FROM RawDomains WHERE Reason = 'TXT' ORDER BY Errors ASC",
@@ -862,8 +893,8 @@ def print_menu() -> None:
         "Change process direction": {"1": "Standard", "2": "Reverse", "3": "Random"},
         "Retry general errors": {"4": f"Errors >={error_threshold + 1}", "5": f"Errors <={error_threshold}"},
         "Retry fatal errors": {"6": "Ignored", "7": "Failed"},
-        "Retry connection errors": {"10": "SSL", "11": "DNS", "12": "HTTP"},
-        "Retry HTTP errors": {"20": "300s", "21": "400s", "22": "500s"},
+        "Retry connection errors": {"10": "SSL", "11": "DNS", "12": "HTTP", "13": "TIMEOUT"},
+        "Retry HTTP errors": {"20": "200s", "21": "300s", "22": "400s", "23": "500s"},
         "Retry specific errors": {"30": "###", "31": "JSON", "32": "TXT"},
         "Retry good data": {"40": f"Last Contacted >{error_threshold} Days Ago", "41": "Old Versions", "42": "Active Zero", "43": "Main Runners"},
     }
@@ -876,7 +907,11 @@ def print_menu() -> None:
     sys.stdout.flush()
 
 def get_user_choice() -> str:
-    return sys.stdin.readline().strip()
+    ready, _, _ = select.select([sys.stdin], [], [], 10)
+    if ready:
+        return sys.stdin.readline().strip()
+    print_colored("\nAutomatically loading to random crawl", "cyan")
+    return "1"
 
 # Main program starts here
 print_colored(f"{appname} v{appversion} ({current_filename})", "bold")
