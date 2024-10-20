@@ -824,7 +824,7 @@ def read_domain_list(file_path):
 
 def load_from_database(user_choice):
     query_map = {
-        "1": "SELECT Domain FROM RawDomains WHERE (Failed IS NULL OR Failed = '' OR Failed = '0') AND (Ignore IS NULL OR Ignore = '' OR Ignore = '0') AND (Errors <= {error_threshold} OR Errors IS NULL) ORDER BY Domain ASC",
+        "1": f"SELECT Domain FROM RawDomains WHERE (Failed IS NULL OR Failed = '' OR Failed = '0') AND (Ignore IS NULL OR Ignore = '' OR Ignore = '0') AND (Errors <= {error_threshold} OR Errors IS NULL) ORDER BY Domain ASC",
         "4": f"SELECT Domain FROM RawDomains WHERE Errors >= {error_threshold + 1} ORDER BY LENGTH(DOMAIN) ASC",
         "5": f"SELECT Domain FROM RawDomains WHERE Errors <= {error_threshold} ORDER BY LENGTH(DOMAIN) ASC",
         "6": "SELECT Domain FROM RawDomains WHERE Ignore = '1' ORDER BY Domain",
