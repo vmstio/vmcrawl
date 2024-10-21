@@ -585,8 +585,11 @@ def check_webfinger(domain, httpx_client):
     webfinger_url = f'https://{domain}/.well-known/webfinger?resource=acct:{domain}@{domain}'
     try:
         response = httpx_client.get(webfinger_url)
-        if response.status_code in [200]:
-            content_type = response.headers.get('Content-Type', '')
+        content_type = response.headers.get('Content-Type', '')
+        if response.status_code in [404, 400] and 'json' in content_type:
+            mark_as_non_mastodon(domain)
+            return None
+        elif response.status_code in [200]:
             if 'json' not in content_type:
                 error_message = 'WebFinger reply is not a JSON file, marking as failed...'
                 print_colored(f'{error_message}', 'pink')
