@@ -328,29 +328,27 @@ def clean_version_oddballs(domain, software_version):
     return software_version
 
 def clean_version_wrongpatch(software_version):
-    # Regular expression to match the version format X.Y.Z optionally followed by a dash and additional data
     match = re.match(r'^(\d+)\.(\d+)\.(\d+)(-.+)?$', software_version)
 
     if match:
-        # Extract X, Y, Z from the version, and additional data if present
         x, y, z = int(match.group(1)), int(match.group(2)), int(match.group(3))
         additional_data = match.group(4)  # This will be None if no dash and additional data is present
 
         if x == 4:
-            # Check if Y is 3 or 4
-            if y in (3, 4):
-                # If Z is not 0, change it to 0
+            if y == 3:
+                if z not in (0, 1):
+                    z = 0
+                    return f"{x}.{y}.{z}{additional_data or ''}"
+                return software_version
+            elif y == 4:
                 if z != 0:
                     z = 0
-                    # Rebuild the version string with the modified Z and preserve the additional data if present
                     return f"{x}.{y}.{z}{additional_data or ''}"
-                return software_version  # Return original version if no change needed
             else:
-                return software_version  # Return original version if Y is not 3 or 4
+                return software_version
         else:
             return software_version
     else:
-        # If version format doesn't match
         return software_version
 
 def clean_version_nightly(software_version):
@@ -443,20 +441,20 @@ def get_nxdomain_domains():
     cursor = conn.cursor()
     try:
         cursor.execute("SELECT Domain FROM RawDomains WHERE NXDOMAIN = '1'")
-        ignored_domains = [row[0].strip() for row in cursor.fetchall() if row[0].strip()]
+        nxdomain_domains = [row[0].strip() for row in cursor.fetchall() if row[0].strip()]
         conn.commit()
     except Exception as e:
         print(f"Failed to obtain NXDOMAIN domains: {e}")
         conn.rollback()
     finally:
         cursor.close()
-    return ignored_domains
+    return nxdomain_domains
 
-def check_and_record_domains(domain_list, ignored_domains, failed_domains, user_choice, junk_domains, bad_tlds, domain_endings, httpx_client):
+def check_and_record_domains(domain_list, ignored_domains, failed_domains, user_choice, junk_domains, bad_tlds, domain_endings, httpx_client, nxdomain_domains):
     for index, domain in enumerate(domain_list, start=1):
         print_colored(f'Crawling @ {domain} ({index}/{len(domain_list)})', 'bold')
 
-        if should_skip_domain(domain, ignored_domains, failed_domains, user_choice):
+        if should_skip_domain(domain, ignored_domains, failed_domains, nxdomain_domains, user_choice):
             continue
 
         if is_junk_or_bad_tld(domain, junk_domains, bad_tlds, domain_endings):
@@ -470,7 +468,7 @@ def check_and_record_domains(domain_list, ignored_domains, failed_domains, user_
         except Exception as e:
             handle_http_exception(domain, e)
 
-def should_skip_domain(domain, ignored_domains, failed_domains, user_choice):
+def should_skip_domain(domain, ignored_domains, failed_domains, nxdomain_domains, user_choice):
     if user_choice != "6" and domain in ignored_domains:
         print_colored('Previously ignored!', 'cyan')
         delete_domain_if_known(domain)
@@ -479,7 +477,7 @@ def should_skip_domain(domain, ignored_domains, failed_domains, user_choice):
         print_colored('Previously failed!', 'cyan')
         delete_domain_if_known(domain)
         return True
-    if user_choice == "8" and domain in nxdomain_domains:
+    if user_choice != "8" and domain in nxdomain_domains:
         print_colored('Previously NXDOMAIN!', 'cyan')
         delete_domain_if_known(domain)
         return True
@@ -487,7 +485,7 @@ def should_skip_domain(domain, ignored_domains, failed_domains, user_choice):
 
 def is_junk_or_bad_tld(domain, junk_domains, bad_tlds, domain_endings):
     if any(junk in domain for junk in junk_domains):
-        print_colored('Known junk domain, marking as failed...', 'red')
+        print_colored('Known junk domain, marking as failed...', 'magenta')
         mark_failed_domain(domain)
         delete_domain_if_known(domain)
         return True
@@ -865,11 +863,12 @@ def read_domain_list(file_path):
 
 def load_from_database(user_choice):
     query_map = {
-        "1": f"SELECT Domain FROM RawDomains WHERE (Failed IS NULL OR Failed = '' OR Failed = '0') AND (Ignore IS NULL OR Ignore = '' OR Ignore = '0') AND (Errors <= {error_threshold} OR Errors IS NULL) ORDER BY Domain ASC",
+        "1": f"SELECT Domain FROM RawDomains WHERE (Failed IS NULL OR Failed = '' OR Failed = '0') AND (Ignore IS NULL OR Ignore = '' OR Ignore = '0') AND (NXDOMAIN IS NULL OR NXDOMAIN = '' OR NXDOMAIN = '0') AND (Errors <= {error_threshold} OR Errors IS NULL) ORDER BY Domain ASC",
         "4": f"SELECT Domain FROM RawDomains WHERE Errors >= {error_threshold + 1} ORDER BY LENGTH(DOMAIN) ASC",
         "5": f"SELECT Domain FROM RawDomains WHERE Errors <= {error_threshold} ORDER BY LENGTH(DOMAIN) ASC",
         "6": "SELECT Domain FROM RawDomains WHERE Ignore = '1' ORDER BY Domain",
         "7": "SELECT Domain FROM RawDomains WHERE Failed = '1' ORDER BY Domain",
+        "8": "SELECT Domain FROM RawDomains WHERE NXDOMAIN = '1' ORDER BY Domain",
         "10": "SELECT Domain FROM RawDomains WHERE Reason = 'SSL' ORDER BY Errors ASC",
         "11": "SELECT Domain FROM RawDomains WHERE Reason = 'DNS' ORDER BY Errors ASC",
         "12": "SELECT Domain FROM RawDomains WHERE Reason = 'HTTP' ORDER BY Errors ASC",
@@ -988,7 +987,7 @@ try:
     ignored_domains = get_ignored_domains()
     nxdomain_domains = get_nxdomain_domains()
 
-    check_and_record_domains(domain_list, ignored_domains, failed_domains, user_choice, junk_domains, bad_tlds, domain_endings, http_client)
+    check_and_record_domains(domain_list, ignored_domains, failed_domains, user_choice, junk_domains, bad_tlds, domain_endings, http_client, nxdomain_domains)
 except KeyboardInterrupt:
     conn.close()
     http_client.close()  # Close the httpx client

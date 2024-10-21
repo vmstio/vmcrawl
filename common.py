@@ -60,7 +60,7 @@ http_codes_to_fail = [451, 429, 422, 418, 410, 405, 404, 403, 402, 401, 400, 300
 # Common variables
 error_threshold = int(7)
 version_main_branch = "4.4"
-version_latest_release = "4.3.0"
+version_latest_release = "4.3.1"
 
 def print_colored(text: str, color: str, **kwargs) -> None:
     print(f"{colors.get(color, '')}{text}{colors['reset']}", **kwargs)
