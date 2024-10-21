@@ -81,14 +81,15 @@ def increment_domain_error(domain, error_reason):
 
         # Insert or update the domain with the new errors count
         cursor.execute('''
-            INSERT INTO RawDomains (Domain, Failed, Ignore, Errors, Reason)
-            VALUES (?, ?, ?, ?, ?)
+            INSERT INTO RawDomains (Domain, Failed, Ignore, Errors, Reason, NXDOMAIN)
+            VALUES (?, ?, ?, ?, ?, ?)
             ON CONFLICT(Domain) DO UPDATE SET
             Failed = excluded.Failed,
             Ignore = excluded.Ignore,
             Errors = excluded.Errors,
-            Reason = excluded.Reason
-        ''', (domain, None, None, new_errors, error_reason))
+            Reason = excluded.Reason,
+            NXDOMAIN = excluded.NXDOMAIN
+        ''', (domain, None, None, new_errors, error_reason, None))
         conn.commit()
     except Exception as e:
         print(f"Failed to increment domain error: {e}")
@@ -101,14 +102,15 @@ def clear_domain_error(domain):
     try:
         # Insert or update the domain with the new errors count
         cursor.execute('''
-            INSERT INTO RawDomains (Domain, Failed, Ignore, Errors, Reason)
-            VALUES (?, ?, ?, ?, ?)
+            INSERT INTO RawDomains (Domain, Failed, Ignore, Errors, Reason, NXDOMAIN)
+            VALUES (?, ?, ?, ?, ?, ?)
             ON CONFLICT(Domain) DO UPDATE SET
             Failed = excluded.Failed,
             Ignore = excluded.Ignore,
             Errors = excluded.Errors,
-            Reason = excluded.Reason
-        ''', (domain, None, None, None, None))
+            Reason = excluded.Reason,
+            NXDOMAIN = excluded.NXDOMAIN
+        ''', (domain, None, None, None, None, None))
         conn.commit()
     except Exception as e:
         print(f"Failed to clear domain error: {e}")
@@ -121,14 +123,15 @@ def mark_ignore_domain(domain):
     try:
         # Insert or update the domain with the new errors count
         cursor.execute('''
-            INSERT INTO RawDomains (Domain, Failed, Ignore, Errors, Reason)
-            VALUES (?, ?, ?, ?, ?)
+            INSERT INTO RawDomains (Domain, Failed, Ignore, Errors, Reason, NXDOMAIN)
+            VALUES (?, ?, ?, ?, ?, ?)
             ON CONFLICT(Domain) DO UPDATE SET
             Failed = excluded.Failed,
             Ignore = excluded.Ignore,
             Errors = excluded.Errors,
-            Reason = excluded.Reason
-        ''', (domain, None, 1, None, None))
+            Reason = excluded.Reason,
+            NXDOMAIN = excluded.NXDOMAIN
+        ''', (domain, None, 1, None, None, None))
         conn.commit()
     except Exception as e:
         print(f"Failed to mark domain ignored: {e}")
@@ -141,17 +144,39 @@ def mark_failed_domain(domain):
     try:
         # Insert or update the domain with the new errors count
         cursor.execute('''
-            INSERT INTO RawDomains (Domain, Failed, Ignore, Errors, Reason)
-            VALUES (?, ?, ?, ?, ?)
+            INSERT INTO RawDomains (Domain, Failed, Ignore, Errors, Reason, NXDOMAIN)
+            VALUES (?, ?, ?, ?, ?, ?)
             ON CONFLICT(Domain) DO UPDATE SET
             Failed = excluded.Failed,
             Ignore = excluded.Ignore,
             Errors = excluded.Errors,
-            Reason = excluded.Reason
-        ''', (domain, 1, None, None, None))
+            Reason = excluded.Reason,
+            NXDOMAIN = excluded.NXDOMAIN
+        ''', (domain, 1, None, None, None, None))
         conn.commit()
     except Exception as e:
         print(f"Failed to mark domain failed: {e}")
+        conn.rollback()
+    finally:
+        cursor.close()
+
+def mark_nxdomain_domain(domain):
+    cursor = conn.cursor()
+    try:
+        # Insert or update the domain with the new errors count
+        cursor.execute('''
+            INSERT INTO RawDomains (Domain, Failed, Ignore, Errors, Reason, NXDOMAIN)
+            VALUES (?, ?, ?, ?, ?, ?)
+            ON CONFLICT(Domain) DO UPDATE SET
+            Failed = excluded.Failed,
+            Ignore = excluded.Ignore,
+            Errors = excluded.Errors,
+            Reason = excluded.Reason,
+            NXDOMAIN = excluded.NXDOMAIN
+        ''', (domain, None, None, None, None, 1))
+        conn.commit()
+    except Exception as e:
+        print(f"Failed to mark domain NXDOMAIN: {e}")
         conn.rollback()
     finally:
         cursor.close()
@@ -414,6 +439,19 @@ def get_ignored_domains():
         cursor.close()
     return ignored_domains
 
+def get_nxdomain_domains():
+    cursor = conn.cursor()
+    try:
+        cursor.execute("SELECT Domain FROM RawDomains WHERE NXDOMAIN = '1'")
+        ignored_domains = [row[0].strip() for row in cursor.fetchall() if row[0].strip()]
+        conn.commit()
+    except Exception as e:
+        print(f"Failed to obtain NXDOMAIN domains: {e}")
+        conn.rollback()
+    finally:
+        cursor.close()
+    return ignored_domains
+
 def check_and_record_domains(domain_list, ignored_domains, failed_domains, user_choice, junk_domains, bad_tlds, domain_endings, httpx_client):
     for index, domain in enumerate(domain_list, start=1):
         print_colored(f'Crawling @ {domain} ({index}/{len(domain_list)})', 'bold')
@@ -433,12 +471,16 @@ def check_and_record_domains(domain_list, ignored_domains, failed_domains, user_
             handle_http_exception(domain, e)
 
 def should_skip_domain(domain, ignored_domains, failed_domains, user_choice):
-    if user_choice != "7" and domain in ignored_domains:
+    if user_choice != "6" and domain in ignored_domains:
         print_colored('Previously ignored!', 'cyan')
         delete_domain_if_known(domain)
         return True
-    if user_choice != "14" and domain in failed_domains:
+    if user_choice != "7" and domain in failed_domains:
         print_colored('Previously failed!', 'cyan')
+        delete_domain_if_known(domain)
+        return True
+    if user_choice == "8" and domain in nxdomain_domains:
+        print_colored('Previously NXDOMAIN!', 'cyan')
         delete_domain_if_known(domain)
         return True
     return False
@@ -450,13 +492,13 @@ def is_junk_or_bad_tld(domain, junk_domains, bad_tlds, domain_endings):
         delete_domain_if_known(domain)
         return True
     if any(domain.endswith(f'.{tld}') for tld in bad_tlds):
-        print_colored('Known bad TLD, marking as failed...', 'red')
-        mark_failed_domain(domain)
+        print_colored('Prohibited TLD, marking as NXDOMAIN...', 'red')
+        mark_nxdomain_domain(domain)
         delete_domain_if_known(domain)
         return True
     if not any(domain.endswith(f'.{domain_ending}') for domain_ending in domain_endings):
-        print_colored('Unknown TLD, marking as failed...', 'red')
-        mark_failed_domain(domain)
+        print_colored('Unknown TLD, marking as NXDOMAIN...', 'red')
+        mark_nxdomain_domain(domain)
         delete_domain_if_known(domain)
         return True
     return False
@@ -464,8 +506,8 @@ def is_junk_or_bad_tld(domain, junk_domains, bad_tlds, domain_endings):
 def check_dns(domain):
     dns_result = perform_dns_query(domain)
     if dns_result is False:
-        print_colored('DNS query returned NXDOMAIN, marking as failed...', 'red')
-        mark_failed_domain(domain)
+        print_colored('DNS query returned NXDOMAIN, marking as such...', 'red')
+        mark_nxdomain_domain(domain)
         delete_domain_if_known(domain)
         return False
     elif dns_result is None:
@@ -516,19 +558,19 @@ def check_robots_txt(domain, httpx_client):
                 elif line.startswith('disallow:'):
                     disallow_path = line.split(':', 1)[1].strip()
                     if user_agent in ['*', appname.lower()] and (disallow_path == '/' or disallow_path == '*'):
-                        print_colored('Crawling is prohibited by robots.txt, marking as ignored...', 'magenta')
-                        mark_ignore_domain(domain)
+                        print_colored('Crawling is prohibited by robots.txt, marking as ignored...', 'pink')
+                        mark_failed_domain(domain)
                         delete_domain_if_known(domain)
                         return False
         # Check for specific HTTP status codes
         elif response.status_code in [202]:
             if 'sgcaptcha' in response.text:
-                print_colored('Responded with CAPTCHA to robots.txt request, marking as ignored...', 'magenta')
-                mark_ignore_domain(domain)
+                print_colored('Responded with CAPTCHA to robots.txt request, marking as failed...', 'pink')
+                mark_failed_domain(domain)
                 delete_domain_if_known(domain)
                 return False
         elif response.status_code in [410]:
-            print_colored(f'Responded HTTP {response.status_code} to robots.txt request, marking as failed...', 'red')
+            print_colored(f'Responded HTTP {response.status_code} to robots.txt request, marking as failed...', 'pink')
             mark_failed_domain(domain)
             delete_domain_if_known(domain)
             return False
@@ -546,9 +588,9 @@ def check_webfinger(domain, httpx_client):
         if response.status_code in [200]:
             content_type = response.headers.get('Content-Type', '')
             if 'json' not in content_type:
-                error_message = 'WebFinger reply is not a JSON file, marking as ignored...'
-                print_colored(f'{error_message}', 'magenta')
-                mark_ignore_domain(domain)
+                error_message = 'WebFinger reply is not a JSON file, marking as failed...'
+                print_colored(f'{error_message}', 'pink')
+                mark_failed_domain(domain)
                 delete_domain_if_known(domain)
                 return None
             if not response.content:
@@ -567,12 +609,15 @@ def check_webfinger(domain, httpx_client):
             if first_alias:
                 backend_domain = urlparse(first_alias).netloc
                 return {'backend_domain': backend_domain}
-        elif response.status_code in http_codes_to_ignore:
-            print_colored(f'Responded HTTP {response.status_code} to WebFinger request, marking as ignored...', 'magenta')
-            mark_ignore_domain(domain)
-            delete_domain_if_known(domain)
-        elif response.status_code in [410]:
-            print_colored(f'Responded HTTP {response.status_code} to WebFinger request, marking as failed...', 'red')
+                # Check for specific HTTP status codes
+        elif response.status_code in [202]:
+            if 'sgcaptcha' in response.text:
+                print_colored('Responded with CAPTCHA to Webfinger request, marking as failed...', 'pink')
+                mark_failed_domain(domain)
+                delete_domain_if_known(domain)
+                return False
+        elif response.status_code in http_codes_to_fail:
+            print_colored(f'Responded HTTP {response.status_code} to WebFinger request, marking as failed...', 'pink')
             mark_failed_domain(domain)
             delete_domain_if_known(domain)
         else:
@@ -593,9 +638,9 @@ def check_nodeinfo(domain, backend_domain, httpx_client):
         if response.status_code in [200]:
             content_type = response.headers.get('Content-Type', '')
             if 'json' not in content_type:
-                error_message = 'NodeInfo reply is not a JSON file, marking as ignored...'
-                print_colored(f'{error_message}', 'magenta')
-                mark_ignore_domain(domain)
+                error_message = 'NodeInfo reply is not a JSON file, marking as failed...'
+                print_colored(f'{error_message}', 'pink')
+                mark_failed_domain(domain)
                 delete_domain_if_known(domain)
                 return None
             if not response.content:
@@ -613,9 +658,9 @@ def check_nodeinfo(domain, backend_domain, httpx_client):
                     if nodeinfo_response.status_code in [200]:
                         nodeinfo_response_content_type = nodeinfo_response.headers.get('Content-Type', '')
                         if 'json' not in nodeinfo_response_content_type:
-                            error_message = 'NodeInfo V2 reply is not a JSON file, marking as ignored...'
-                            print_colored(f'{error_message}', 'magenta')
-                            mark_ignore_domain(domain)
+                            error_message = 'NodeInfo V2 reply is not a JSON file, marking as failed...'
+                            print_colored(f'{error_message}', 'pink')
+                            mark_failed_domain(domain)
                             delete_domain_if_known(domain)
                             return None
                         if not nodeinfo_response.content:
@@ -626,9 +671,9 @@ def check_nodeinfo(domain, backend_domain, httpx_client):
                             return None
                         else:
                             return nodeinfo_response.json()
-                    elif nodeinfo_response.status_code in http_codes_to_ignore:
-                        print_colored(f'Responded HTTP {nodeinfo_response.status_code} @ {nodeinfo_2_url}, marking as ignored...', 'magenta')
-                        mark_ignore_domain(domain)
+                    elif nodeinfo_response.status_code in http_codes_to_fail:
+                        print_colored(f'Responded HTTP {nodeinfo_response.status_code} @ {nodeinfo_2_url}, marking as failed...', 'pink')
+                        mark_failed_domain(domain)
                         delete_domain_if_known(domain)
                     else:
                         error_message = f'Responded HTTP {nodeinfo_response.status_code} @ {nodeinfo_2_url}'
@@ -637,12 +682,14 @@ def check_nodeinfo(domain, backend_domain, httpx_client):
                         increment_domain_error(domain, str(nodeinfo_response.status_code))
                 else:
                     mark_as_non_mastodon(domain)
-        elif response.status_code in http_codes_to_ignore:
-            print_colored(f'Responded HTTP {response.status_code} to NodeInfo request, marking as ignored...', 'magenta')
-            mark_ignore_domain(domain)
-            delete_domain_if_known(domain)
-        elif response.status_code in [410]:
-            print_colored(f'Responded HTTP {response.status_code} to NodeInfo request, marking as failed...', 'red')
+        elif response.status_code in [202]:
+            if 'sgcaptcha' in response.text:
+                print_colored('Responded with CAPTCHA to NodeInfo request, marking as failed...', 'pink')
+                mark_failed_domain(domain)
+                delete_domain_if_known(domain)
+                return False
+        elif response.status_code in http_codes_to_fail:
+            print_colored(f'Responded HTTP {response.status_code} to NodeInfo request, marking as failed...', 'pink')
             mark_failed_domain(domain)
             delete_domain_if_known(domain)
         else:
@@ -676,9 +723,9 @@ def process_mastodon_instance(domain, webfinger_data, nodeinfo_data, httpx_clien
         if response.status_code in [200]:
             content_type = response.headers.get('Content-Type', '')
             if 'json' not in content_type:
-                error_message = 'Instance API reply is not a JSON file, marking as ignored...'
+                error_message = 'Instance API reply is not a JSON file, marking as failed...'
                 print_colored(f'{error_message}', 'magenta')
-                mark_ignore_domain(domain)
+                mark_failed_domain(domain)
                 delete_domain_if_known(domain)
                 return None
             if not response.content:
@@ -740,19 +787,10 @@ def process_mastodon_instance(domain, webfinger_data, nodeinfo_data, httpx_clien
             else:
                 print_colored(f'Mastodon v{software_version} ({nodeinfo_data["software"]["version"]})', 'green')
 
-        elif response.status_code in [429, 422, 418, 405, 404, 403, 401, 400, 300]:
-            print_colored(f'Responded HTTP {response.status_code} to API request, marking as ignored...', 'magenta')
+        elif response.status_code in http_codes_to_fail:
+            print_colored(f'Responded HTTP {response.status_code} to API request, marking as failed...', 'pink')
             mark_ignore_domain(domain)
             delete_domain_if_known(domain)
-        elif response.status_code in [410]:
-            print_colored(f'Responded HTTP {response.status_code} to API request, marking as failed...', 'red')
-            mark_failed_domain(domain)
-            delete_domain_if_known(domain)
-        elif response.status_code in [500]:
-            error_message = f'Responded HTTP {response.status_code} to API request'
-            print_colored(f'{error_message}', 'yellow')
-            log_error(domain, f'{error_message}')
-            increment_domain_error(domain, str(response.status_code))
         else:
             error_message = f'Responded HTTP {response.status_code} to API request'
             print_colored(f'{error_message}', 'yellow')
@@ -892,7 +930,7 @@ def print_menu() -> None:
     menu_options = {
         "Change process direction": {"1": "Standard", "2": "Reverse", "3": "Random"},
         "Retry general errors": {"4": f"Errors >={error_threshold + 1}", "5": f"Errors <={error_threshold}"},
-        "Retry fatal errors": {"6": "Ignored", "7": "Failed"},
+        "Retry fatal errors": {"6": "Ignored", "7": "Failed", "8": "NXDOMAIN"},
         "Retry connection errors": {"10": "SSL", "11": "DNS", "12": "HTTP", "13": "TIMEOUT"},
         "Retry HTTP errors": {"20": "200s", "21": "300s", "22": "400s", "23": "500s"},
         "Retry specific errors": {"30": "###", "31": "JSON", "32": "TXT"},
@@ -945,6 +983,7 @@ try:
     domain_endings = get_domain_endings()
     failed_domains = get_failed_domains()
     ignored_domains = get_ignored_domains()
+    nxdomain_domains = get_nxdomain_domains()
 
     check_and_record_domains(domain_list, ignored_domains, failed_domains, user_choice, junk_domains, bad_tlds, domain_endings, http_client)
 except KeyboardInterrupt:
