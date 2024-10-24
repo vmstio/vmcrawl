@@ -37,9 +37,9 @@ def perform_dns_query(domain):
             answers = resolver.resolve(domain, record_type)
             if answers:
                 return True  # Record of type record_type found
-        except (dns.resolver.NoAnswer, dns.resolver.NXDOMAIN):
+        except (dns.resolver.NoAnswer, dns.resolver.NXDOMAIN, dns.resolver.NoNameservers):
             continue  # No record of this type, try the next one
-        except (dns.resolver.NoNameservers, dns.resolver.Timeout):
+        except (dns.resolver.Timeout):
             return None  # DNS query failed due to no nameservers or timeout
 
     return False  # Neither A, AAAA, nor CNAME records found
@@ -314,19 +314,6 @@ def clean_version_doubledash(software_version):
 
     return software_version
 
-def clean_version_oddballs(domain, software_version):
-    oddballs = [
-        'bark.lgbt',
-        'drk.st',
-        'exquisite.social',
-        'glitch.taks.garden',
-        'sharlayan.in'
-    ]
-    if domain in oddballs:
-        software_version = software_version + "-odd.0"
-
-    return software_version
-
 def clean_version_wrongpatch(software_version):
     match = re.match(r'^(\d+)\.(\d+)\.(\d+)(-.+)?$', software_version)
 
@@ -344,6 +331,7 @@ def clean_version_wrongpatch(software_version):
                 if z != 0:
                     z = 0
                     return f"{x}.{y}.{z}{additional_data or ''}"
+                return software_version
             else:
                 return software_version
         else:
@@ -504,12 +492,12 @@ def is_junk_or_bad_tld(domain, junk_domains, bad_tlds, domain_endings):
 def check_dns(domain):
     dns_result = perform_dns_query(domain)
     if dns_result is False:
-        print_colored('DNS query returned NXDOMAIN, marking as such...', 'red')
+        print_colored('DNS query did not return any records, marking as NXDOMAIN...', 'red')
         mark_nxdomain_domain(domain)
         delete_domain_if_known(domain)
         return False
     elif dns_result is None:
-        print_colored('DNS query failed to resolve', 'yellow')
+        print_colored(f'DNS query exceeded the {common_timeout} second timeout', 'yellow')
         log_error(domain, 'DNS query failed to resolve')
         increment_domain_error(domain, 'DNS')
         return False
@@ -556,7 +544,7 @@ def check_robots_txt(domain, httpx_client):
                 elif line.startswith('disallow:'):
                     disallow_path = line.split(':', 1)[1].strip()
                     if user_agent in ['*', appname.lower()] and (disallow_path == '/' or disallow_path == '*'):
-                        print_colored('Crawling is prohibited by robots.txt, marking as ignored...', 'pink')
+                        print_colored('Crawling is prohibited by robots.txt, marking as failed...', 'pink')
                         mark_failed_domain(domain)
                         delete_domain_if_known(domain)
                         return False
@@ -584,10 +572,8 @@ def check_webfinger(domain, httpx_client):
     try:
         response = httpx_client.get(webfinger_url)
         content_type = response.headers.get('Content-Type', '')
-        if response.status_code in [404, 400] and 'json' in content_type:
-            mark_as_non_mastodon(domain)
-            return None
-        elif response.status_code in [200]:
+        content_length = response.headers.get('Content-Length', '')
+        if response.status_code in [200]:
             if 'json' not in content_type:
                 error_message = 'WebFinger reply is not a JSON file, marking as failed...'
                 print_colored(f'{error_message}', 'pink')
@@ -618,9 +604,16 @@ def check_webfinger(domain, httpx_client):
                 delete_domain_if_known(domain)
                 return False
         elif response.status_code in http_codes_to_fail:
-            print_colored(f'Responded HTTP {response.status_code} to WebFinger request, marking as failed...', 'pink')
-            mark_failed_domain(domain)
-            delete_domain_if_known(domain)
+            if 'json' in content_type or ('plain' in content_type and content_type in mimetypes.types_map.values()) or content_length == '0':
+                mark_as_non_mastodon(domain)
+                return None
+            elif 'html' in content_type and content_type in mimetypes.types_map.values() and (response.text == '' or 'bad request' in response.text.lower()):
+                mark_as_non_mastodon(domain)
+                return None
+            else:
+                print_colored(f'Responded HTTP {response.status_code} to WebFinger request, marking as failed...', 'pink')
+                mark_failed_domain(domain)
+                delete_domain_if_known(domain)
         else:
             error_message = f'Responded HTTP {response.status_code} to WebFinger request'
             print_colored(f'{error_message}', 'yellow')
@@ -710,6 +703,7 @@ def is_mastodon_instance(nodeinfo_data):
 
 def process_mastodon_instance(domain, webfinger_data, nodeinfo_data, httpx_client):
     software_name = nodeinfo_data['software']['name'].lower()
+    software_version_full = nodeinfo_data['software']['version']
     software_version = clean_version(nodeinfo_data['software']['version'])
     total_users = nodeinfo_data['usage']['users']['total']
     active_month_users = nodeinfo_data['usage']['users']['activeMonth']
@@ -770,8 +764,8 @@ def process_mastodon_instance(domain, webfinger_data, nodeinfo_data, httpx_clien
                 source_url = "https://github.com/gc2-jp/freespeech"
 
             # Check for invalid user counts
-            if active_month_users > max(total_users + 6, total_users + (total_users * 0.25)):
-                error_to_print = f'Mastodon v{software_version} with invalid counts ({active_month_users}:{total_users})'
+            if active_month_users > max(total_users + 6, total_users + (total_users * 0.25)) or active_month_users == 0:
+                error_to_print = f'Mastodon v{software_version} with invalid/zero counts ({active_month_users}:{total_users})'
                 print_colored(error_to_print, 'dark_green')
                 log_error(domain, error_to_print)
                 increment_domain_error(domain, '###')
@@ -779,7 +773,7 @@ def process_mastodon_instance(domain, webfinger_data, nodeinfo_data, httpx_clien
                 return
 
             # Update database
-            update_mastodon_domain(actual_domain, software_version, total_users, active_month_users, contact_account, source_url)
+            update_mastodon_domain(actual_domain, software_version, software_version_full, total_users, active_month_users, contact_account, source_url)
 
             clear_domain_error(domain)
 
@@ -803,7 +797,7 @@ def process_mastodon_instance(domain, webfinger_data, nodeinfo_data, httpx_clien
     except json.JSONDecodeError as e:
         handle_json_exception(domain, e)
 
-def update_mastodon_domain(domain, software_version, total_users, active_month_users, contact_account, source_url):
+def update_mastodon_domain(domain, software_version, software_version_full, total_users, active_month_users, contact_account, source_url):
     cursor = conn.cursor()
     try:
         cursor.execute('''
@@ -820,7 +814,7 @@ def update_mastodon_domain(domain, software_version, total_users, active_month_u
             "Full Version" = excluded."Full Version"
         ''', (domain, software_version, total_users, active_month_users,
               datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
-              contact_account, source_url, software_version))
+              contact_account, source_url, software_version_full))
         conn.commit()
     except Exception as e:
         print(f"Failed to update Mastodon domain data: {e}")
@@ -835,7 +829,7 @@ def mark_as_non_mastodon(domain):
 
 def handle_http_exception(domain, exception):
     error_message = str(exception)
-    if 'ssl' in error_message.casefold():
+    if 'ssl' in error_message.casefold() and 'timed out' not in error_message.casefold():
         error_reason = 'SSL'
         print_colored(f'{error_message}', 'orange')
         delete_domain_if_known(domain)
@@ -882,8 +876,8 @@ def load_from_database(user_choice):
         "32": "SELECT Domain FROM RawDomains WHERE Reason = 'TXT' ORDER BY Errors ASC",
         "40": f"SELECT Domain FROM MastodonDomains WHERE Timestamp < datetime('now', '-{error_threshold} days') ORDER BY Timestamp DESC",
         "41": f"SELECT Domain FROM MastodonDomains WHERE \"Software Version\" NOT LIKE '{version_main_branch}%' AND \"Software Version\" NOT LIKE '{version_latest_release}' ORDER BY \"Total Users\" DESC",
-        "42": "SELECT Domain FROM MastodonDomains WHERE \"Active Users (Monthly)\" = 0 ORDER BY Timestamp ASC",
-        "43": f"SELECT Domain FROM MastodonDomains WHERE \"Software Version\" LIKE '{version_main_branch}%' ORDER BY \"Total Users\" DESC",
+        "42": f"SELECT Domain FROM MastodonDomains WHERE \"Software Version\" LIKE '{version_main_branch}%' ORDER BY \"Total Users\" DESC",
+        "43": f"SELECT Domain FROM MastodonDomains ORDER BY \"Total Users\" DESC",
     }
 
     if user_choice in ["2", "3"]: # Reverse or Random
@@ -936,7 +930,7 @@ def print_menu() -> None:
         "Retry connection errors": {"10": "SSL", "11": "DNS", "12": "HTTP", "13": "TIMEOUT"},
         "Retry HTTP errors": {"20": "200s", "21": "300s", "22": "400s", "23": "500s"},
         "Retry specific errors": {"30": "###", "31": "JSON", "32": "TXT"},
-        "Retry good data": {"40": f"Last Contacted >{error_threshold} Days Ago", "41": "Old Versions", "42": "Active Zero", "43": "Main Runners"},
+        "Retry good data": {"40": f"Last Contacted >{error_threshold} Days Ago", "41": "Old Versions", "42": "Main Runners", "43": "All Good"},
     }
 
     for category, options in menu_options.items():

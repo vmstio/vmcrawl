@@ -51,7 +51,7 @@ colors = {
 }
 
 # HTTP client configuration
-common_timeout = 5
+common_timeout = 7
 http_custom_user_agent = f'{appname}/{appversion} (https://docs.vmst.io/projects/{appname})'
 http_custom_headers = {'User-Agent': http_custom_user_agent}
 http_client = httpx.Client(http2=True, follow_redirects=True, headers=http_custom_headers, timeout=common_timeout)
