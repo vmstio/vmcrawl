@@ -55,7 +55,7 @@ common_timeout = 7
 http_custom_user_agent = f'{appname}/{appversion} (https://docs.vmst.io/projects/{appname})'
 http_custom_headers = {'User-Agent': http_custom_user_agent}
 http_client = httpx.Client(http2=True, follow_redirects=True, headers=http_custom_headers, timeout=common_timeout)
-http_codes_to_fail = [451, 429, 422, 418, 410, 405, 404, 403, 402, 401, 400, 300]
+http_codes_to_fail = [451, 429, 423, 422, 418, 410, 405, 404, 403, 402, 401, 400, 300]
 
 # Common variables
 error_threshold = int(7)

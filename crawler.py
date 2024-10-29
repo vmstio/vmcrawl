@@ -15,6 +15,7 @@ try:
     from bs4 import BeautifulSoup
     from urllib.parse import urlparse, urlunparse
     from dotenv import load_dotenv
+    from lxml import etree
     import os
 except ImportError as e:
     print(f"Error importing module: {e}")
@@ -81,18 +82,36 @@ def increment_domain_error(domain, error_reason):
 
         # Insert or update the domain with the new errors count
         cursor.execute('''
-            INSERT INTO RawDomains (Domain, Failed, Ignore, Errors, Reason, NXDOMAIN)
-            VALUES (?, ?, ?, ?, ?, ?)
+            INSERT INTO RawDomains (Domain, Failed, Ignore, Errors, Reason, NXDOMAIN, Robots)
+            VALUES (?, ?, ?, ?, ?, ?, ?)
             ON CONFLICT(Domain) DO UPDATE SET
             Failed = excluded.Failed,
             Ignore = excluded.Ignore,
             Errors = excluded.Errors,
             Reason = excluded.Reason,
-            NXDOMAIN = excluded.NXDOMAIN
-        ''', (domain, None, None, new_errors, error_reason, None))
+            NXDOMAIN = excluded.NXDOMAIN,
+            Robots = excluded.Robots
+        ''', (domain, None, None, new_errors, error_reason, None, None))
         conn.commit()
     except Exception as e:
         print(f"Failed to increment domain error: {e}")
+        conn.rollback()
+    finally:
+        cursor.close()
+
+def delete_if_error_max(domain):
+    cursor = conn.cursor()
+    try:
+        cursor.execute('SELECT Errors FROM RawDomains WHERE Domain = ?', (domain,))
+        result = cursor.fetchone()
+        if result and result[0] >= error_threshold:
+            cursor.execute('SELECT Timestamp FROM MastodonDomains WHERE Domain = ?', (domain,))
+            timestamp = cursor.fetchone()
+            if timestamp and (datetime.now() - datetime.strptime(timestamp[0], '%Y-%m-%d %H:%M:%S')).days >= error_threshold:
+                delete_domain_if_known(domain)
+
+    except Exception as e:
+        print(f"Failed to delete maxed out domain: {e}")
         conn.rollback()
     finally:
         cursor.close()
@@ -102,15 +121,16 @@ def clear_domain_error(domain):
     try:
         # Insert or update the domain with the new errors count
         cursor.execute('''
-            INSERT INTO RawDomains (Domain, Failed, Ignore, Errors, Reason, NXDOMAIN)
-            VALUES (?, ?, ?, ?, ?, ?)
+            INSERT INTO RawDomains (Domain, Failed, Ignore, Errors, Reason, NXDOMAIN, Robots)
+            VALUES (?, ?, ?, ?, ?, ?, ?)
             ON CONFLICT(Domain) DO UPDATE SET
             Failed = excluded.Failed,
             Ignore = excluded.Ignore,
             Errors = excluded.Errors,
             Reason = excluded.Reason,
-            NXDOMAIN = excluded.NXDOMAIN
-        ''', (domain, None, None, None, None, None))
+            NXDOMAIN = excluded.NXDOMAIN,
+            Robots = excluded.Robots
+        ''', (domain, None, None, None, None, None, None))
         conn.commit()
     except Exception as e:
         print(f"Failed to clear domain error: {e}")
@@ -123,15 +143,16 @@ def mark_ignore_domain(domain):
     try:
         # Insert or update the domain with the new errors count
         cursor.execute('''
-            INSERT INTO RawDomains (Domain, Failed, Ignore, Errors, Reason, NXDOMAIN)
-            VALUES (?, ?, ?, ?, ?, ?)
+            INSERT INTO RawDomains (Domain, Failed, Ignore, Errors, Reason, NXDOMAIN, Robots)
+            VALUES (?, ?, ?, ?, ?, ?, ?)
             ON CONFLICT(Domain) DO UPDATE SET
             Failed = excluded.Failed,
             Ignore = excluded.Ignore,
             Errors = excluded.Errors,
             Reason = excluded.Reason,
-            NXDOMAIN = excluded.NXDOMAIN
-        ''', (domain, None, 1, None, None, None))
+            NXDOMAIN = excluded.NXDOMAIN,
+            Robots = excluded.Robots
+        ''', (domain, None, 1, None, None, None, None))
         conn.commit()
     except Exception as e:
         print(f"Failed to mark domain ignored: {e}")
@@ -144,15 +165,16 @@ def mark_failed_domain(domain):
     try:
         # Insert or update the domain with the new errors count
         cursor.execute('''
-            INSERT INTO RawDomains (Domain, Failed, Ignore, Errors, Reason, NXDOMAIN)
-            VALUES (?, ?, ?, ?, ?, ?)
+            INSERT INTO RawDomains (Domain, Failed, Ignore, Errors, Reason, NXDOMAIN, Robots)
+            VALUES (?, ?, ?, ?, ?, ?, ?)
             ON CONFLICT(Domain) DO UPDATE SET
             Failed = excluded.Failed,
             Ignore = excluded.Ignore,
             Errors = excluded.Errors,
             Reason = excluded.Reason,
-            NXDOMAIN = excluded.NXDOMAIN
-        ''', (domain, 1, None, None, None, None))
+            NXDOMAIN = excluded.NXDOMAIN,
+            Robots = excluded.Robots
+        ''', (domain, 1, None, None, None, None, None))
         conn.commit()
     except Exception as e:
         print(f"Failed to mark domain failed: {e}")
@@ -165,18 +187,41 @@ def mark_nxdomain_domain(domain):
     try:
         # Insert or update the domain with the new errors count
         cursor.execute('''
-            INSERT INTO RawDomains (Domain, Failed, Ignore, Errors, Reason, NXDOMAIN)
-            VALUES (?, ?, ?, ?, ?, ?)
+            INSERT INTO RawDomains (Domain, Failed, Ignore, Errors, Reason, NXDOMAIN, Robots)
+            VALUES (?, ?, ?, ?, ?, ?, ?)
             ON CONFLICT(Domain) DO UPDATE SET
             Failed = excluded.Failed,
             Ignore = excluded.Ignore,
             Errors = excluded.Errors,
             Reason = excluded.Reason,
-            NXDOMAIN = excluded.NXDOMAIN
-        ''', (domain, None, None, None, None, 1))
+            NXDOMAIN = excluded.NXDOMAIN,
+            Robots = excluded.Robots
+        ''', (domain, None, None, None, None, 1, None))
         conn.commit()
     except Exception as e:
         print(f"Failed to mark domain NXDOMAIN: {e}")
+        conn.rollback()
+    finally:
+        cursor.close()
+
+def mark_norobots_domain(domain):
+    cursor = conn.cursor()
+    try:
+        # Insert or update the domain with the new errors count
+        cursor.execute('''
+            INSERT INTO RawDomains (Domain, Failed, Ignore, Errors, Reason, NXDOMAIN, Robots)
+            VALUES (?, ?, ?, ?, ?, ?, ?)
+            ON CONFLICT(Domain) DO UPDATE SET
+            Failed = excluded.Failed,
+            Ignore = excluded.Ignore,
+            Errors = excluded.Errors,
+            Reason = excluded.Reason,
+            NXDOMAIN = excluded.NXDOMAIN,
+            Robots = excluded.Robots
+        ''', (domain, None, None, None, None, None, 1))
+        conn.commit()
+    except Exception as e:
+        print(f"Failed to mark domain NoRobots: {e}")
         conn.rollback()
     finally:
         cursor.close()
@@ -232,6 +277,19 @@ def delete_domain_if_known(domain):
     try:
         cursor.execute('''
             DELETE FROM MastodonDomains WHERE "Domain" = ?
+            ''', (domain,))
+        conn.commit()
+    except Exception as e:
+        print(f"Failed to delete known domain: {e}")
+        conn.rollback()
+    finally:
+        cursor.close()
+
+def delete_domain_from_raw(domain):
+    cursor = conn.cursor()
+    try:
+        cursor.execute('''
+            DELETE FROM RawDomains WHERE "Domain" = ?
             ''', (domain,))
         conn.commit()
     except Exception as e:
@@ -438,11 +496,24 @@ def get_nxdomain_domains():
         cursor.close()
     return nxdomain_domains
 
-def check_and_record_domains(domain_list, ignored_domains, failed_domains, user_choice, junk_domains, bad_tlds, domain_endings, httpx_client, nxdomain_domains):
+def get_norobots_domains():
+    cursor = conn.cursor()
+    try:
+        cursor.execute("SELECT Domain FROM RawDomains WHERE Robots = '1'")
+        norobots_domains = [row[0].strip() for row in cursor.fetchall() if row[0].strip()]
+        conn.commit()
+    except Exception as e:
+        print(f"Failed to obtain NoRobots domains: {e}")
+        conn.rollback()
+    finally:
+        cursor.close()
+    return norobots_domains
+
+def check_and_record_domains(domain_list, ignored_domains, failed_domains, user_choice, junk_domains, bad_tlds, domain_endings, httpx_client, nxdomain_domains, norobots_domains):
     for index, domain in enumerate(domain_list, start=1):
         print_colored(f'Crawling @ {domain} ({index}/{len(domain_list)})', 'bold')
 
-        if should_skip_domain(domain, ignored_domains, failed_domains, nxdomain_domains, user_choice):
+        if should_skip_domain(domain, ignored_domains, failed_domains, nxdomain_domains, norobots_domains, user_choice):
             continue
 
         if is_junk_or_bad_tld(domain, junk_domains, bad_tlds, domain_endings):
@@ -456,7 +527,7 @@ def check_and_record_domains(domain_list, ignored_domains, failed_domains, user_
         except Exception as e:
             handle_http_exception(domain, e)
 
-def should_skip_domain(domain, ignored_domains, failed_domains, nxdomain_domains, user_choice):
+def should_skip_domain(domain, ignored_domains, failed_domains, nxdomain_domains, norobots_domains, user_choice):
     if user_choice != "6" and domain in ignored_domains:
         print_colored('Previously ignored!', 'cyan')
         delete_domain_if_known(domain)
@@ -469,6 +540,10 @@ def should_skip_domain(domain, ignored_domains, failed_domains, nxdomain_domains
         print_colored('Previously NXDOMAIN!', 'cyan')
         delete_domain_if_known(domain)
         return True
+    if user_choice != "9" and domain in norobots_domains:
+        print_colored('Previously NoRobots!', 'cyan')
+        delete_domain_if_known(domain)
+        return True
     return False
 
 def is_junk_or_bad_tld(domain, junk_domains, bad_tlds, domain_endings):
@@ -476,16 +551,19 @@ def is_junk_or_bad_tld(domain, junk_domains, bad_tlds, domain_endings):
         print_colored('Known junk domain, marking as failed...', 'magenta')
         mark_failed_domain(domain)
         delete_domain_if_known(domain)
+        delete_domain_from_raw(domain)
         return True
     if any(domain.endswith(f'.{tld}') for tld in bad_tlds):
         print_colored('Prohibited TLD, marking as NXDOMAIN...', 'red')
         mark_nxdomain_domain(domain)
         delete_domain_if_known(domain)
+        delete_domain_from_raw(domain)
         return True
     if not any(domain.endswith(f'.{domain_ending}') for domain_ending in domain_endings):
         print_colored('Unknown TLD, marking as NXDOMAIN...', 'red')
         mark_nxdomain_domain(domain)
         delete_domain_if_known(domain)
+        delete_domain_from_raw(domain)
         return True
     return False
 
@@ -500,6 +578,7 @@ def check_dns(domain):
         print_colored(f'DNS query exceeded the {common_timeout} second timeout', 'yellow')
         log_error(domain, 'DNS query failed to resolve')
         increment_domain_error(domain, 'DNS')
+        delete_if_error_max(domain)
         return False
     return True
 
@@ -532,6 +611,7 @@ def check_robots_txt(domain, httpx_client):
                 print_colored(f'{error_message}', 'yellow')
                 log_error(domain, error_message)
                 increment_domain_error(domain, 'TXT')
+                delete_if_error_max(domain)
                 return False
 
             robots_txt = response.text
@@ -544,8 +624,8 @@ def check_robots_txt(domain, httpx_client):
                 elif line.startswith('disallow:'):
                     disallow_path = line.split(':', 1)[1].strip()
                     if user_agent in ['*', appname.lower()] and (disallow_path == '/' or disallow_path == '*'):
-                        print_colored('Crawling is prohibited by robots.txt, marking as failed...', 'pink')
-                        mark_failed_domain(domain)
+                        print_colored('Crawling is prohibited by robots.txt, marking as NoRobots...', 'red')
+                        mark_norobots_domain(domain)
                         delete_domain_if_known(domain)
                         return False
         # Check for specific HTTP status codes
@@ -585,6 +665,7 @@ def check_webfinger(domain, httpx_client):
                 print_colored(f'{error_message}', 'yellow')
                 log_error(domain, error_message)
                 increment_domain_error(domain, 'JSON')
+                delete_if_error_max(domain)
                 return None
             else:
                 data = response.json()
@@ -611,19 +692,69 @@ def check_webfinger(domain, httpx_client):
                 mark_as_non_mastodon(domain)
                 return None
             else:
-                print_colored(f'Responded HTTP {response.status_code} to WebFinger request, marking as failed...', 'pink')
-                mark_failed_domain(domain)
-                delete_domain_if_known(domain)
+                print(f'Responded HTTP {response.status_code} to WebFinger request, attempting host-meta lookup...')
+                hostmeta_result = check_hostmeta(domain, httpx_client)
+                if hostmeta_result:
+                    backend_domain = hostmeta_result['backend_domain']
+                    return {'backend_domain': backend_domain}
+                else:
+                    return None
         else:
-            error_message = f'Responded HTTP {response.status_code} to WebFinger request'
-            print_colored(f'{error_message}', 'yellow')
-            log_error(domain, f'{error_message}')
-            increment_domain_error(domain, str(response.status_code))
+            print(f'Responded HTTP {response.status_code} to WebFinger request, attempting host-meta lookup...')
+            hostmeta_result = check_hostmeta(domain, httpx_client)
+            if hostmeta_result:
+                backend_domain = hostmeta_result['backend_domain']
+                return {'backend_domain': backend_domain}
+            else:
+                return None
     except httpx.RequestError as e:
         handle_http_exception(domain, e)
     except json.JSONDecodeError as e:
         handle_json_exception(domain, e)
     return None
+
+def check_hostmeta(domain, httpx_client):
+    hostmeta_url = f'https://{domain}/.well-known/host-meta'
+    try:
+        response = httpx_client.get(hostmeta_url)
+        if response.status_code in [200]:
+            content_type = response.headers.get('Content-Type', '')
+            if 'xml' not in content_type:
+                error_message = 'HostMeta reply is not an XML file, marking as failed...'
+                print_colored(f'{error_message}', 'pink')
+                mark_failed_domain(domain)
+                delete_domain_if_known(domain)
+                return None
+            if not response.content:
+                error_message = 'HostMeta reply is empty'
+                print_colored(f'{error_message}', 'yellow')
+                log_error(domain, error_message)
+                increment_domain_error(domain, 'XML')
+                delete_if_error_max(domain)
+                return None
+            else:
+                content = response.content.strip()
+                parser = etree.XMLParser(recover=True)
+                xmldata = etree.fromstring(content, parser=parser)
+                ns = {'xrd': 'http://docs.oasis-open.org/ns/xri/xrd-1.0'}  # Namespace
+                link = xmldata.find(".//xrd:Link[@rel='lrdd']", namespaces=ns)
+                parsed_link = urlparse(link.get('template'))
+                backend_domain = parsed_link.netloc
+                return {'backend_domain': backend_domain}
+        elif response.status_code in http_codes_to_fail:
+            print_colored(f'Responded HTTP {response.status_code} to HostMeta request, marking as failed...', 'pink')
+            mark_failed_domain(domain)
+            delete_domain_if_known(domain)
+        else:
+            error_message = f'Responded HTTP {response.status_code} to HostMeta request'
+            print_colored(f'{error_message}', 'yellow')
+            log_error(domain, f'{error_message}')
+            increment_domain_error(domain, str(response.status_code))
+            delete_if_error_max(domain)
+    except httpx.RequestError as e:
+        handle_http_exception(domain, e)
+    except etree.XMLSyntaxError as e:
+        handle_xml_exception(domain, e)
 
 def check_nodeinfo(domain, backend_domain, httpx_client):
     nodeinfo_url = f'https://{backend_domain}/.well-known/nodeinfo'
@@ -642,6 +773,7 @@ def check_nodeinfo(domain, backend_domain, httpx_client):
                 print_colored(f'{error_message}', 'yellow')
                 log_error(domain, error_message)
                 increment_domain_error(domain, 'JSON')
+                delete_if_error_max(domain)
                 return None
             else:
                 data = response.json()
@@ -662,6 +794,7 @@ def check_nodeinfo(domain, backend_domain, httpx_client):
                             print_colored(f'{error_message}', 'yellow')
                             log_error(domain, error_message)
                             increment_domain_error(domain, 'JSON')
+                            delete_if_error_max(domain)
                             return None
                         else:
                             return nodeinfo_response.json()
@@ -674,6 +807,7 @@ def check_nodeinfo(domain, backend_domain, httpx_client):
                         print_colored(f'{error_message}', 'yellow')
                         log_error(domain, f'{error_message}')
                         increment_domain_error(domain, str(nodeinfo_response.status_code))
+                        delete_if_error_max(domain)
                 else:
                     mark_as_non_mastodon(domain)
         elif response.status_code in [202]:
@@ -691,6 +825,7 @@ def check_nodeinfo(domain, backend_domain, httpx_client):
             print_colored(f'{error_message}', 'yellow')
             log_error(domain, f'{error_message}')
             increment_domain_error(domain, str(response.status_code))
+            delete_if_error_max(domain)
     except httpx.RequestError as e:
         handle_http_exception(domain, e)
     except json.JSONDecodeError as e:
@@ -728,6 +863,7 @@ def process_mastodon_instance(domain, webfinger_data, nodeinfo_data, httpx_clien
                 print_colored(f'{error_message}', 'yellow')
                 log_error(domain, error_message)
                 increment_domain_error(domain, 'JSON')
+                delete_if_error_max(domain)
                 return None
             else:
                 instance_api_data = response.json()
@@ -791,6 +927,7 @@ def process_mastodon_instance(domain, webfinger_data, nodeinfo_data, httpx_clien
             print_colored(f'{error_message}', 'yellow')
             log_error(domain, f'{error_message}')
             increment_domain_error(domain, str(response.status_code))
+            delete_if_error_max(domain)
 
     except httpx.RequestError as e:
         handle_http_exception(domain, e)
@@ -841,6 +978,7 @@ def handle_http_exception(domain, exception):
         print_colored(f'HTTPX failure: {error_message}', 'orange')
     log_error(domain, error_message)
     increment_domain_error(domain, error_reason)
+    delete_if_error_max(domain)
 
 def handle_json_exception(domain, exception):
     error_message = str(exception)
@@ -848,8 +986,15 @@ def handle_json_exception(domain, exception):
     print_colored(error_message, 'orange')
     log_error(domain, error_message)
     increment_domain_error(domain, error_reason)
+    delete_if_error_max(domain)
 
-# Other helper functions (like delete_domain_if_known, mark_failed_domain, etc.) remain unchanged
+def handle_xml_exception(domain, exception):
+    error_message = str(exception)
+    error_reason = 'XML'
+    print_colored(error_message, 'orange')
+    log_error(domain, error_message)
+    increment_domain_error(domain, error_reason)
+    delete_if_error_max(domain)
 
 def read_domain_list(file_path):
     with open(file_path, 'r') as file:
@@ -863,6 +1008,7 @@ def load_from_database(user_choice):
         "6": "SELECT Domain FROM RawDomains WHERE Ignore = '1' ORDER BY Domain",
         "7": "SELECT Domain FROM RawDomains WHERE Failed = '1' ORDER BY Domain",
         "8": "SELECT Domain FROM RawDomains WHERE NXDOMAIN = '1' ORDER BY Domain",
+        "9": "SELECT Domain FROM RawDomains WHERE Robots = '1' ORDER BY Domain",
         "10": "SELECT Domain FROM RawDomains WHERE Reason = 'SSL' ORDER BY Errors ASC",
         "11": "SELECT Domain FROM RawDomains WHERE Reason = 'DNS' ORDER BY Errors ASC",
         "12": "SELECT Domain FROM RawDomains WHERE Reason = 'HTTP' ORDER BY Errors ASC",
@@ -874,6 +1020,7 @@ def load_from_database(user_choice):
         "30": "SELECT Domain FROM RawDomains WHERE Reason = '###' ORDER BY Errors ASC",
         "31": "SELECT Domain FROM RawDomains WHERE Reason = 'JSON' ORDER BY Errors ASC",
         "32": "SELECT Domain FROM RawDomains WHERE Reason = 'TXT' ORDER BY Errors ASC",
+        "33": "SELECT Domain FROM RawDomains WHERE Reason = 'XML' ORDER BY Errors ASC",
         "40": f"SELECT Domain FROM MastodonDomains WHERE Timestamp < datetime('now', '-{error_threshold} days') ORDER BY Timestamp DESC",
         "41": f"SELECT Domain FROM MastodonDomains WHERE \"Software Version\" NOT LIKE '{version_main_branch}%' AND \"Software Version\" NOT LIKE '{version_latest_release}' ORDER BY \"Total Users\" DESC",
         "42": f"SELECT Domain FROM MastodonDomains WHERE \"Software Version\" LIKE '{version_main_branch}%' ORDER BY \"Total Users\" DESC",
@@ -926,10 +1073,10 @@ def print_menu() -> None:
     menu_options = {
         "Change process direction": {"1": "Standard", "2": "Reverse", "3": "Random"},
         "Retry general errors": {"4": f"Errors >={error_threshold + 1}", "5": f"Errors <={error_threshold}"},
-        "Retry fatal errors": {"6": "Ignored", "7": "Failed", "8": "NXDOMAIN"},
+        "Retry fatal errors": {"6": "Ignored", "7": "Failed", "8": "NXDOMAIN", "9": "NoRobots"},
         "Retry connection errors": {"10": "SSL", "11": "DNS", "12": "HTTP", "13": "TIMEOUT"},
-        "Retry HTTP errors": {"20": "200s", "21": "300s", "22": "400s", "23": "500s"},
-        "Retry specific errors": {"30": "###", "31": "JSON", "32": "TXT"},
+        "Retry HTTP errors": {"20": "2xx", "21": "3xx", "22": "4xx", "23": "5xx"},
+        "Retry specific errors": {"30": "###", "31": "JSON", "32": "TXT", "33": "XML"},
         "Retry good data": {"40": f"Last Contacted >{error_threshold} Days Ago", "41": "Old Versions", "42": "Main Runners", "43": "All Good"},
     }
 
@@ -980,8 +1127,9 @@ try:
     failed_domains = get_failed_domains()
     ignored_domains = get_ignored_domains()
     nxdomain_domains = get_nxdomain_domains()
+    norobots_domains = get_norobots_domains()
 
-    check_and_record_domains(domain_list, ignored_domains, failed_domains, user_choice, junk_domains, bad_tlds, domain_endings, http_client, nxdomain_domains)
+    check_and_record_domains(domain_list, ignored_domains, failed_domains, user_choice, junk_domains, bad_tlds, domain_endings, http_client, nxdomain_domains, norobots_domains)
 except KeyboardInterrupt:
     conn.close()
     http_client.close()  # Close the httpx client
