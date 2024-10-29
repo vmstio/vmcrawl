@@ -631,13 +631,13 @@ def check_robots_txt(domain, httpx_client):
         # Check for specific HTTP status codes
         elif response.status_code in [202]:
             if 'sgcaptcha' in response.text:
-                print_colored('Responded with CAPTCHA to robots.txt request, marking as failed...', 'pink')
-                mark_failed_domain(domain)
+                print_colored('Responded with CAPTCHA to robots.txt request, marking as NoRobots...', 'red')
+                mark_norobots_domain(domain)
                 delete_domain_if_known(domain)
                 return False
         elif response.status_code in [410]:
-            print_colored(f'Responded HTTP {response.status_code} to robots.txt request, marking as failed...', 'pink')
-            mark_failed_domain(domain)
+            print_colored(f'Responded HTTP {response.status_code} to robots.txt request, marking as NoRobots...', 'red')
+            mark_norobots_domain(domain)
             delete_domain_if_known(domain)
             return False
 
@@ -655,11 +655,13 @@ def check_webfinger(domain, httpx_client):
         content_length = response.headers.get('Content-Length', '')
         if response.status_code in [200]:
             if 'json' not in content_type:
-                error_message = 'WebFinger reply is not a JSON file, marking as failed...'
-                print_colored(f'{error_message}', 'pink')
-                mark_failed_domain(domain)
-                delete_domain_if_known(domain)
-                return None
+                print(f'WebFinger reply is not a JSON file, attempting HostMeta lookup...')
+                hostmeta_result = check_hostmeta(domain, httpx_client)
+                if hostmeta_result:
+                    backend_domain = hostmeta_result['backend_domain']
+                    return {'backend_domain': backend_domain}
+                else:
+                    return None
             if not response.content:
                 error_message = 'WebFinger reply is empty'
                 print_colored(f'{error_message}', 'yellow')
@@ -718,11 +720,8 @@ def check_hostmeta(domain, httpx_client):
         if response.status_code in [200]:
             content_type = response.headers.get('Content-Type', '')
             if 'xml' not in content_type:
-                error_message = 'HostMeta reply is not an XML file, marking as failed...'
-                print_colored(f'{error_message}', 'pink')
-                mark_failed_domain(domain)
-                delete_domain_if_known(domain)
-                return None
+                error_message = 'HostMeta reply is not an XML file, attempting raw NodeInfo lookup...'
+                return {'backend_domain': domain}
             if not response.content:
                 error_message = 'HostMeta reply is empty'
                 print_colored(f'{error_message}', 'yellow')
@@ -739,6 +738,12 @@ def check_hostmeta(domain, httpx_client):
                 parsed_link = urlparse(link.get('template'))
                 backend_domain = parsed_link.netloc
                 return {'backend_domain': backend_domain}
+        elif response.status_code in [202]:
+            if 'sgcaptcha' in response.text:
+                print_colored('Responded with CAPTCHA to HostMeta request, marking as failed...', 'pink')
+                mark_failed_domain(domain)
+                delete_domain_if_known(domain)
+                return False
         elif response.status_code in http_codes_to_fail:
             print(f'Responded HTTP {response.status_code} to HostMeta request, attempting raw NodeInfo lookup...')
             return {'backend_domain': domain}
