@@ -692,7 +692,7 @@ def check_webfinger(domain, httpx_client):
                 mark_as_non_mastodon(domain)
                 return None
             else:
-                print(f'Responded HTTP {response.status_code} to WebFinger request, attempting host-meta lookup...')
+                print(f'Responded HTTP {response.status_code} to WebFinger request, attempting HostMeta lookup...')
                 hostmeta_result = check_hostmeta(domain, httpx_client)
                 if hostmeta_result:
                     backend_domain = hostmeta_result['backend_domain']
@@ -700,13 +700,11 @@ def check_webfinger(domain, httpx_client):
                 else:
                     return None
         else:
-            print(f'Responded HTTP {response.status_code} to WebFinger request, attempting host-meta lookup...')
-            hostmeta_result = check_hostmeta(domain, httpx_client)
-            if hostmeta_result:
-                backend_domain = hostmeta_result['backend_domain']
-                return {'backend_domain': backend_domain}
-            else:
-                return None
+            error_message = f'Responded HTTP {response.status_code} to WebFinger request'
+            print_colored(f'{error_message}', 'yellow')
+            log_error(domain, error_message)
+            increment_domain_error(domain, str(response.status_code))
+            delete_if_error_max(domain)
     except httpx.RequestError as e:
         handle_http_exception(domain, e)
     except json.JSONDecodeError as e:
@@ -742,9 +740,8 @@ def check_hostmeta(domain, httpx_client):
                 backend_domain = parsed_link.netloc
                 return {'backend_domain': backend_domain}
         elif response.status_code in http_codes_to_fail:
-            print_colored(f'Responded HTTP {response.status_code} to HostMeta request, marking as failed...', 'pink')
-            mark_failed_domain(domain)
-            delete_domain_if_known(domain)
+            print(f'Responded HTTP {response.status_code} to HostMeta request, attempting raw NodeInfo lookup...')
+            return {'backend_domain': domain}
         else:
             error_message = f'Responded HTTP {response.status_code} to HostMeta request'
             print_colored(f'{error_message}', 'yellow')
@@ -779,7 +776,7 @@ def check_nodeinfo(domain, backend_domain, httpx_client):
                 data = response.json()
             if 'links' in data and len(data['links']) > 0:
                 nodeinfo_2_url = next((link['href'] for link in data['links'] if link.get('rel') == 'http://nodeinfo.diaspora.software/ns/schema/2.0'), None)
-                if nodeinfo_2_url:
+                if nodeinfo_2_url and 'wp-json' not in nodeinfo_2_url:
                     nodeinfo_response = httpx_client.get(nodeinfo_2_url)
                     if nodeinfo_response.status_code in [200]:
                         nodeinfo_response_content_type = nodeinfo_response.headers.get('Content-Type', '')
