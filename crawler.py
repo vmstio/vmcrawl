@@ -687,10 +687,7 @@ def check_webfinger(domain, httpx_client):
                 delete_domain_if_known(domain)
                 return False
         elif response.status_code in http_codes_to_fail:
-            if 'json' in content_type or ('plain' in content_type and content_type in mimetypes.types_map.values()) or content_length == '0':
-                mark_as_non_mastodon(domain)
-                return None
-            elif 'html' in content_type and content_type in mimetypes.types_map.values() and (response.text == '' or 'bad request' in response.text.lower()):
+            if 'json' in content_type:
                 mark_as_non_mastodon(domain)
                 return None
             else:
@@ -732,13 +729,18 @@ def check_hostmeta(domain, httpx_client):
                 return None
             else:
                 content = response.content.strip()
+                content = content.lower()
                 parser = etree.XMLParser(recover=True)
                 xmldata = etree.fromstring(content, parser=parser)
                 ns = {'xrd': 'http://docs.oasis-open.org/ns/xri/xrd-1.0'}  # Namespace
-                link = xmldata.find(".//xrd:Link[@rel='lrdd']", namespaces=ns)
-                parsed_link = urlparse(link.get('template'))
-                backend_domain = parsed_link.netloc
-                return {'backend_domain': backend_domain}
+                link = xmldata.find(".//xrd:link[@rel='lrdd']", namespaces=ns)
+                if link is None:
+                    print('Unable to find lrdd link in HostMeta, attempting raw NodeInfo lookup...')
+                    return {'backend_domain': domain}
+                else:
+                    parsed_link = urlparse(link.get('template'))
+                    backend_domain = parsed_link.netloc
+                    return {'backend_domain': backend_domain}
         elif response.status_code in [202]:
             if 'sgcaptcha' in response.text:
                 print_colored('Responded with CAPTCHA to HostMeta request, marking as failed!', 'pink')
@@ -1005,7 +1007,7 @@ def read_domain_list(file_path):
 
 def load_from_database(user_choice):
     query_map = {
-        "1": f"SELECT Domain FROM RawDomains WHERE (Failed IS NULL OR Failed = '' OR Failed = '0') AND (Ignore IS NULL OR Ignore = '' OR Ignore = '0') AND (NXDOMAIN IS NULL OR NXDOMAIN = '' OR NXDOMAIN = '0') AND (Errors <= {error_threshold} OR Errors IS NULL) ORDER BY Domain ASC",
+        "1": f"SELECT Domain FROM RawDomains WHERE (Failed IS NULL OR Failed = '' OR Failed = '0') AND (Ignore IS NULL OR Ignore = '' OR Ignore = '0') AND (NXDOMAIN IS NULL OR NXDOMAIN = '' OR NXDOMAIN = '0') AND (Robots IS NULL OR Robots = '' OR Robots = '0') AND (Errors <= {error_threshold} OR Errors IS NULL) ORDER BY Domain ASC",
         "4": f"SELECT Domain FROM RawDomains WHERE Errors >= {error_threshold + 1} ORDER BY LENGTH(DOMAIN) ASC",
         "5": f"SELECT Domain FROM RawDomains WHERE Errors <= {error_threshold} ORDER BY LENGTH(DOMAIN) ASC",
         "6": "SELECT Domain FROM RawDomains WHERE Ignore = '1' ORDER BY Domain",
