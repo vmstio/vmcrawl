@@ -1,6 +1,9 @@
 try:
     import httpx
     import toml
+    import os
+    import time
+    import hashlib
 except ImportError as e:
     print(f"Error importing module: {e}")
 
@@ -65,12 +68,34 @@ version_latest_release = "4.3.1"
 def print_colored(text: str, color: str, **kwargs) -> None:
     print(f"{colors.get(color, '')}{text}{colors['reset']}", **kwargs)
 
+def get_cache_file_path(url: str) -> str:
+    # Create a unique cache file path based on the URL
+    url_hash = hashlib.md5(url.encode()).hexdigest()
+    cache_dir = '/tmp/vmcrawl_cache'
+    os.makedirs(cache_dir, exist_ok=True)
+    return os.path.join(cache_dir, f"{url_hash}.cache")
+
+def is_cache_valid(cache_file_path: str, max_age_seconds: int) -> bool:
+    if not os.path.exists(cache_file_path):
+        return False
+    cache_age = time.time() - os.path.getmtime(cache_file_path)
+    return cache_age < max_age_seconds
+
 def get_domain_endings():
-    # Obtain the list of domain endings
     domain_endings_url = 'http://data.iana.org/TLD/tlds-alpha-by-domain.txt'
-    domain_endings_response = http_client.get(domain_endings_url)
-    if domain_endings_response.status_code in [200]:
-        domain_endings = [line.strip().lower() for line in domain_endings_response.text.splitlines() if not line.startswith('#')]
-        return domain_endings
+    cache_file_path = get_cache_file_path(domain_endings_url)
+    max_cache_age = 86400  # 1 day in seconds
+
+    if is_cache_valid(cache_file_path, max_cache_age):
+        with open(cache_file_path, 'r') as cache_file:
+            domain_endings = [line.strip().lower() for line in cache_file.readlines()]
     else:
-        raise Exception(f"Failed to fetch domain endings. HTTP Status Code: {domain_endings_response.status_code}")
+        domain_endings_response = http_client.get(domain_endings_url)
+        if domain_endings_response.status_code in [200]:
+            domain_endings = [line.strip().lower() for line in domain_endings_response.text.splitlines() if not line.startswith('#')]
+            with open(cache_file_path, 'w') as cache_file:
+                cache_file.write('\n'.join(domain_endings))
+        else:
+            raise Exception(f"Failed to fetch domain endings. HTTP Status Code: {domain_endings_response.status_code}")
+
+    return domain_endings
