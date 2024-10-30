@@ -2,7 +2,6 @@
 
 try:
     from datetime import datetime, timedelta
-    import dns.resolver
     import httpx
     import json
     import os
@@ -27,23 +26,6 @@ load_dotenv()
 current_filename = os.path.basename(__file__)
 db_path = os.getenv("db_path")
 conn = sqlite3.connect(db_path) # type: ignore
-
-def perform_dns_query(domain):
-    record_types = ['A', 'AAAA', 'CNAME']
-    resolver = dns.resolver.Resolver()
-    resolver.lifetime = common_timeout  # Set the timeout for the resolver
-
-    for record_type in record_types:
-        try:
-            answers = resolver.resolve(domain, record_type)
-            if answers:
-                return True  # Record of type record_type found
-        except (dns.resolver.NoAnswer, dns.resolver.NXDOMAIN, dns.resolver.NoNameservers):
-            continue  # No record of this type, try the next one
-        except (dns.resolver.Timeout):
-            return None  # DNS query failed due to no nameservers or timeout
-
-    return False  # Neither A, AAAA, nor CNAME records found
 
 def is_valid_email(email):
     pattern = r'^[\w\.-]+(?:\+[\w\.-]+)?@[\w\.-]+\.\w+$'
@@ -519,9 +501,6 @@ def check_and_record_domains(domain_list, ignored_domains, failed_domains, user_
         if is_junk_or_bad_tld(domain, junk_domains, bad_tlds, domain_endings):
             continue
 
-        if not check_dns(domain):
-            continue
-
         try:
             process_domain(domain, httpx_client)
         except Exception as e:
@@ -567,21 +546,6 @@ def is_junk_or_bad_tld(domain, junk_domains, bad_tlds, domain_endings):
         return True
     return False
 
-def check_dns(domain):
-    dns_result = perform_dns_query(domain)
-    if dns_result is False:
-        print_colored('DNS query did not return any records, marking as NXDOMAIN!', 'red')
-        mark_nxdomain_domain(domain)
-        delete_domain_if_known(domain)
-        return False
-    elif dns_result is None:
-        print_colored(f'DNS query exceeded the {common_timeout} second timeout', 'yellow')
-        log_error(domain, 'DNS query failed to resolve')
-        increment_domain_error(domain, 'DNS')
-        delete_if_error_max(domain)
-        return False
-    return True
-
 def process_domain(domain, httpx_client):
     if not check_robots_txt(domain, httpx_client):
         return  # Stop processing this domain
@@ -613,7 +577,6 @@ def check_robots_txt(domain, httpx_client):
                 increment_domain_error(domain, 'TXT')
                 delete_if_error_max(domain)
                 return False
-
             robots_txt = response.text
             lines = robots_txt.split('\n')
             user_agent = None
@@ -640,11 +603,9 @@ def check_robots_txt(domain, httpx_client):
             mark_norobots_domain(domain)
             delete_domain_if_known(domain)
             return False
-
     except httpx.RequestError as e:
         handle_http_exception(domain, e)
         return False
-
     return True
 
 def check_webfinger(domain, httpx_client):
@@ -663,12 +624,13 @@ def check_webfinger(domain, httpx_client):
                 else:
                     return None
             if not response.content:
-                error_message = 'WebFinger reply is empty'
-                print_colored(f'{error_message}', 'yellow')
-                log_error(domain, error_message)
-                increment_domain_error(domain, 'JSON')
-                delete_if_error_max(domain)
-                return None
+                print(f'WebFinger reply is empty, attempting HostMeta lookup...')
+                hostmeta_result = check_hostmeta(domain, httpx_client)
+                if hostmeta_result:
+                    backend_domain = hostmeta_result['backend_domain']
+                    return {'backend_domain': backend_domain}
+                else:
+                    return None
             else:
                 data = response.json()
             aliases = data.get('aliases', [])
@@ -680,6 +642,14 @@ def check_webfinger(domain, httpx_client):
                 backend_domain = urlparse(first_alias).netloc
                 return {'backend_domain': backend_domain}
                 # Check for specific HTTP status codes
+            else:
+                print(f'WebFinger reply does not contain a valid alias, attempting HostMeta lookup...')
+                hostmeta_result = check_hostmeta(domain, httpx_client)
+                if hostmeta_result:
+                    backend_domain = hostmeta_result['backend_domain']
+                    return {'backend_domain': backend_domain}
+                else:
+                    return None
         elif response.status_code in [202]:
             if 'sgcaptcha' in response.text:
                 print_colored('Responded with CAPTCHA to Webfinger request, marking as failed!', 'pink')
@@ -721,12 +691,9 @@ def check_hostmeta(domain, httpx_client):
                 print(f'{error_message}')
                 return {'backend_domain': domain}
             if not response.content:
-                error_message = 'HostMeta reply is empty'
-                print_colored(f'{error_message}', 'yellow')
-                log_error(domain, error_message)
-                increment_domain_error(domain, 'XML')
-                delete_if_error_max(domain)
-                return None
+                error_message = 'HostMeta reply is empty, attempting raw NodeInfo lookup...'
+                print(f'{error_message}')
+                return {'backend_domain': domain}
             else:
                 content = response.content.strip()
                 content = content.lower()
@@ -837,9 +804,20 @@ def check_nodeinfo(domain, backend_domain, httpx_client):
         handle_json_exception(domain, e)
     return None
 
-def is_mastodon_instance(nodeinfo_data):
-    software_name = nodeinfo_data.get('software', {}).get('name', '').lower()
-    return software_name in ['mastodon', 'hometown', 'kmyblue', 'glitchcafe']
+def is_mastodon_instance(nodeinfo_data: dict) -> bool:
+    """Check if the given NodeInfo response indicates a Mastodon instance."""
+    if not isinstance(nodeinfo_data, dict):
+        return False
+
+    software = nodeinfo_data.get('software')
+    if software is None:
+        return False
+
+    software_name = software.get('name')
+    if software_name is None:
+        return False
+
+    return software_name.lower() in {'mastodon', 'hometown', 'kmyblue', 'glitchcafe'}
 
 def process_mastodon_instance(domain, webfinger_data, nodeinfo_data, httpx_client):
     software_name = nodeinfo_data['software']['name'].lower()
@@ -905,7 +883,7 @@ def process_mastodon_instance(domain, webfinger_data, nodeinfo_data, httpx_clien
                 source_url = "https://github.com/gc2-jp/freespeech"
 
             # Check for invalid user counts
-            if active_month_users > max(total_users + 6, total_users + (total_users * 0.25)) or active_month_users == 0:
+            if active_month_users > max(total_users + 6, total_users + (total_users * 0.25)):
                 error_to_print = f'Mastodon v{software_version} with invalid/zero counts ({active_month_users}:{total_users})'
                 print_colored(error_to_print, 'dark_green')
                 log_error(domain, error_to_print)
@@ -976,14 +954,22 @@ def handle_http_exception(domain, exception):
         print_colored(f'{error_message}', 'orange')
         delete_domain_if_known(domain)
     else:
-        if 'timed out' in error_message.casefold():
+        if 'Errno 8' in error_message:
+            print_colored('DNS query did not return valid results, marking as NXDOMAIN!', 'red')
+            mark_nxdomain_domain(domain)
+            delete_domain_if_known(domain)
+        elif 'timed out' in error_message.casefold():
             error_reason = 'TIMEOUT'
+            print_colored(f'HTTPX failure: {error_message}', 'orange')
+            log_error(domain, error_message)
+            increment_domain_error(domain, error_reason)
+            delete_if_error_max(domain)
         else:
             error_reason = 'HTTP'
-        print_colored(f'HTTPX failure: {error_message}', 'orange')
-    log_error(domain, error_message)
-    increment_domain_error(domain, error_reason)
-    delete_if_error_max(domain)
+            print_colored(f'HTTPX failure: {error_message}', 'orange')
+            log_error(domain, error_message)
+            increment_domain_error(domain, error_reason)
+            delete_if_error_max(domain)
 
 def handle_json_exception(domain, exception):
     error_message = str(exception)
