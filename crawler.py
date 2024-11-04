@@ -3,6 +3,7 @@
 try:
     from datetime import datetime, timedelta
     import httpx
+    import unicodedata
     import json
     import os
     import random
@@ -35,6 +36,22 @@ def normalize_email(email):
     email = re.sub(r'(\[at\]|\(at\)|\{at\}| at | @ |\[@\]| \[at\] | \(at\) | \{at\} )', '@', email, flags=re.IGNORECASE)
     email = re.sub(r'(\[dot\]|\(dot\)|\{dot\}| dot | \[dot\] | \(dot\) | \{dot\} )', '.', email, flags=re.IGNORECASE)
     return email
+
+def has_emoji_or_special_chars(domain):
+    if domain.startswith('xn--'):
+        try:
+            domain = domain.encode('ascii').decode('idna')
+        except Exception as e:
+            return True
+    try:
+        for char in domain:
+            if (unicodedata.category(char) in ['So', 'Cf'] or ord(char) >= 0x1F300):
+                return True
+            if not (char.isalnum() or char in '-_.'):
+                return True
+    except Exception as e:
+        return True
+    return False
 
 def log_error(domain, error_to_print):
     cursor = conn.cursor()
@@ -547,6 +564,12 @@ def is_junk_or_bad_tld(domain, junk_domains, bad_tlds, domain_endings):
     return False
 
 def process_domain(domain, httpx_client):
+    if has_emoji_or_special_chars(domain):
+        print_colored('Domain contains special characters, marking as failed!', 'pink')
+        mark_failed_domain(domain)
+        delete_domain_if_known(domain)
+        return
+
     if not check_robots_txt(domain, httpx_client):
         return  # Stop processing this domain
 
@@ -690,6 +713,10 @@ def check_hostmeta(domain, httpx_client):
                 error_message = 'HostMeta reply is not an XML file, attempting raw NodeInfo lookup...'
                 print(f'{error_message}')
                 return {'backend_domain': domain}
+            if 'xhtml' in content_type:
+                error_message = 'HostMeta reply is an XHTML file, attempting raw NodeInfo lookup...'
+                print(f'{error_message}')
+                return {'backend_domain': domain}
             if not response.content:
                 error_message = 'HostMeta reply is empty, attempting raw NodeInfo lookup...'
                 print(f'{error_message}')
@@ -770,7 +797,7 @@ def check_nodeinfo(domain, backend_domain, httpx_client):
                             return None
                         else:
                             return nodeinfo_response.json()
-                    elif nodeinfo_response.status_code in http_codes_to_fail:
+                    elif nodeinfo_response.status_code in http_codes_to_fail and response.status_code != 404:
                         print_colored(f'Responded HTTP {nodeinfo_response.status_code} @ {nodeinfo_2_url}, marking as failed!', 'pink')
                         mark_failed_domain(domain)
                         delete_domain_if_known(domain)
@@ -782,13 +809,15 @@ def check_nodeinfo(domain, backend_domain, httpx_client):
                         delete_if_error_max(domain)
                 else:
                     mark_as_non_mastodon(domain)
+            else:
+                mark_as_non_mastodon(domain)
         elif response.status_code in [202]:
             if 'sgcaptcha' in response.text:
                 print_colored('Responded with CAPTCHA to NodeInfo request, marking as failed!', 'pink')
                 mark_failed_domain(domain)
                 delete_domain_if_known(domain)
                 return False
-        elif response.status_code in http_codes_to_fail:
+        elif response.status_code in http_codes_to_fail and response.status_code != 404:
             print_colored(f'Responded HTTP {response.status_code} to NodeInfo request, marking as failed!', 'pink')
             mark_failed_domain(domain)
             delete_domain_if_known(domain)
@@ -958,6 +987,14 @@ def handle_http_exception(domain, exception):
             print_colored('DNS query did not return valid results, marking as NXDOMAIN!', 'red')
             mark_nxdomain_domain(domain)
             delete_domain_if_known(domain)
+        elif 'maximum allowed redirects' in error_message.casefold():
+            print_colored('Exceeded maximum allowed redirects, marking as failed!', 'pink')
+            mark_failed_domain(domain)
+            delete_domain_if_known(domain)
+        elif 'stream_id:7' in error_message.casefold() and 'error_code:2' in error_message.casefold():
+            print_colored('Received an empty response from the server, marking as failed!', 'pink')
+            mark_failed_domain(domain)
+            delete_domain_if_known(domain)
         elif 'timed out' in error_message.casefold():
             error_reason = 'TIMEOUT'
             print_colored(f'HTTPX failure: {error_message}', 'orange')
@@ -1001,9 +1038,8 @@ def load_from_database(user_choice):
         "8": "SELECT Domain FROM RawDomains WHERE NXDOMAIN = '1' ORDER BY Domain",
         "9": "SELECT Domain FROM RawDomains WHERE Robots = '1' ORDER BY Domain",
         "10": "SELECT Domain FROM RawDomains WHERE Reason = 'SSL' ORDER BY Errors ASC",
-        "11": "SELECT Domain FROM RawDomains WHERE Reason = 'DNS' ORDER BY Errors ASC",
-        "12": "SELECT Domain FROM RawDomains WHERE Reason = 'HTTP' ORDER BY Errors ASC",
-        "13": "SELECT Domain FROM RawDomains WHERE Reason = 'TIMEOUT' ORDER BY Errors ASC",
+        "11": "SELECT Domain FROM RawDomains WHERE Reason = 'HTTP' ORDER BY Errors ASC",
+        "12": "SELECT Domain FROM RawDomains WHERE Reason = 'TIMEOUT' ORDER BY Errors ASC",
         "20": "SELECT Domain FROM RawDomains WHERE Reason GLOB '[2][0-9][0-9]*' ORDER BY Errors ASC",
         "21": "SELECT Domain FROM RawDomains WHERE Reason GLOB '[3][0-9][0-9]*' ORDER BY Errors ASC",
         "22": "SELECT Domain FROM RawDomains WHERE Reason GLOB '[4][0-9][0-9]*' ORDER BY Errors ASC",
@@ -1012,10 +1048,11 @@ def load_from_database(user_choice):
         "31": "SELECT Domain FROM RawDomains WHERE Reason = 'JSON' ORDER BY Errors ASC",
         "32": "SELECT Domain FROM RawDomains WHERE Reason = 'TXT' ORDER BY Errors ASC",
         "33": "SELECT Domain FROM RawDomains WHERE Reason = 'XML' ORDER BY Errors ASC",
-        "40": f"SELECT Domain FROM MastodonDomains WHERE Timestamp < datetime('now', '-{error_threshold} days') ORDER BY Timestamp DESC",
+        "40": f"SELECT Domain FROM MastodonDomains WHERE Timestamp <= datetime('now', '-{error_threshold} days') ORDER BY Timestamp DESC",
         "41": f"SELECT Domain FROM MastodonDomains WHERE \"Software Version\" NOT LIKE '{version_main_branch}%' AND \"Software Version\" NOT LIKE '{version_latest_release}' ORDER BY \"Total Users\" DESC",
         "42": f"SELECT Domain FROM MastodonDomains WHERE \"Software Version\" LIKE '{version_main_branch}%' ORDER BY \"Total Users\" DESC",
-        "43": f"SELECT Domain FROM MastodonDomains ORDER BY \"Total Users\" DESC",
+        "43": f"SELECT Domain FROM MastodonDomains WHERE \"Active Users (Monthly)\" = '0' ORDER BY \"Total Users\" DESC",
+        "44": f"SELECT Domain FROM MastodonDomains ORDER BY \"Total Users\" DESC",
     }
 
     if user_choice in ["2", "3"]: # Reverse or Random
@@ -1063,12 +1100,12 @@ def load_from_file(file_name):
 def print_menu() -> None:
     menu_options = {
         "Change process direction": {"1": "Standard", "2": "Reverse", "3": "Random"},
-        "Retry general errors": {"4": f"Errors >={error_threshold + 1}", "5": f"Errors <={error_threshold}"},
-        "Retry fatal errors": {"6": "Ignored", "7": "Failed", "8": "NXDOMAIN", "9": "NoRobots"},
-        "Retry connection errors": {"10": "SSL", "11": "DNS", "12": "HTTP", "13": "TIMEOUT"},
+        "Retry general errors": {"4": f"Errors ≥{error_threshold + 1}", "5": f"Errors ≤{error_threshold}"},
+        "Retry fatal errors": {"6": "Not Mastodon", "7": "Failed", "8": "NXDOMAIN", "9": "NoRobots"},
+        "Retry connection errors": {"10": "SSL", "11": "HTTP", "12": "TIMEOUT"},
         "Retry HTTP errors": {"20": "2xx", "21": "3xx", "22": "4xx", "23": "5xx"},
         "Retry specific errors": {"30": "###", "31": "JSON", "32": "TXT", "33": "XML"},
-        "Retry good data": {"40": f"Last Contacted >{error_threshold} Days Ago", "41": "Old Versions", "42": "Main Runners", "43": "All Good"},
+        "Retry good data": {"40": f"Stale ≥{error_threshold}", "41": "Outdated", "42": "Main", "43": "Inactive", "44": "All Good"},
     }
 
     for category, options in menu_options.items():
