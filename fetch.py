@@ -52,7 +52,7 @@ def fetch_domain_list(conn, exclude_domains_sql):
         cursor.close()
 
 def process_domain(domain, counter, total):
-    print(f"{color_bold}Fetching peers @ {domain} ({counter}/{total})...{color_reset}")
+    print_colored(f"Fetching peers @ {domain} ({counter}/{total})...", "bold")
 
     subprocess.run(["python3", "peerapi.py", domain])
 
@@ -77,13 +77,11 @@ def main():
             print_colored("No domains fetched, exiting...", "red")
             return
 
-        print_colored(f"Fetching peer data from {len(domain_list)} instances...", "pink")
+        print(f"Fetching peer data from {len(domain_list)} instances...")
 
         total = len(domain_list)
         for counter, domain in enumerate(domain_list, start=1):
             process_domain(domain, counter, total)
-
-        print_colored(f"Fetching complete!", "green")
     except KeyboardInterrupt:
         conn.close()
         print(f"\n{appname} interrupted by user. Exiting gracefully...")

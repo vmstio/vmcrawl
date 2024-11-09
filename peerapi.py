@@ -96,7 +96,7 @@ def write_to_file(domains, output_file):
         with open(output_file, "w") as file:
             for domain in domains:
                 file.write(f"{domain}\n")
-        print_colored(f"{len(domains)} unique domains written to {output_file}", "green")
+        print(f"Unique domains written to {output_file}")
     except Exception as e:
         print_colored(f"An error occurred while writing to the file: {e}", "orange")
 
@@ -145,11 +145,13 @@ if __name__ == "__main__":
     domain_endings = get_domain_endings()
 
     existing_domains = get_existing_domains()
+    existing_domains_count = len(existing_domains)
     domains = get_domains(api_url, domain)  # Pass the domain and db_path to get_domains
     unique_domains = [domain for domain in domains if domain not in existing_domains and domain.isascii()]
 
+    print(f"Found {len(domains)} domains, {len(unique_domains)} new domains")
     if unique_domains == []:
-        print_colored("No new unique domains found", "cyan")
+        # print("No new unique domains found")
         sys.exit(0)
 
     write_to_file(unique_domains, output_file)

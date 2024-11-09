@@ -299,6 +299,7 @@ def delete_domain_from_raw(domain):
 
 def clean_version(software_version_full):
     software_version = clean_version_suffix(software_version_full)
+    software_version = clean_version_dumbstring(software_version)
     software_version = clean_version_date(software_version)
     software_version = clean_version_suffix_more(software_version)
     software_version = clean_version_hometown(software_version)
@@ -306,6 +307,14 @@ def clean_version(software_version_full):
     software_version = clean_version_wrongpatch(software_version)
     software_version = clean_version_doubledash(software_version)
     software_version = clean_version_nightly(software_version)
+    return software_version
+
+def clean_version_dumbstring(software_version):
+    unwanted_strings = ["-pre"]
+
+    for unwanted_string in unwanted_strings:
+        software_version = software_version.replace(unwanted_string, "")
+
     return software_version
 
 def clean_version_suffix(software_version_full):
@@ -1130,7 +1139,7 @@ try:
         if domain_list_file:  # File name provided as argument
             user_choice = 1
             domain_list = load_from_file(domain_list_file)
-            print_colored("Crawling domains from file...", "pink")
+            print("Crawling domains from file...")
         else:  # Load from database by default
             print_menu()
             user_choice = get_user_choice()
@@ -1163,4 +1172,4 @@ except KeyboardInterrupt:
     http_client.close()  # Close the httpx client
     print_colored(f"\n{appname} interrupted by user", "bold")
 finally:
-    print_colored("Crawling complete!", "green")
+    print("Crawling complete!")
