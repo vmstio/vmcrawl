@@ -648,7 +648,7 @@ def check_webfinger(domain, httpx_client):
         content_length = response.headers.get('Content-Length', '')
         if response.status_code in [200]:
             if 'json' not in content_type:
-                print(f'WebFinger reply is not a JSON file, attempting HostMeta lookup...')
+                print(f'WebFinger reply is not a JSON file, attempting HostMeta lookup…')
                 hostmeta_result = check_hostmeta(domain, httpx_client)
                 if hostmeta_result:
                     backend_domain = hostmeta_result['backend_domain']
@@ -656,7 +656,7 @@ def check_webfinger(domain, httpx_client):
                 else:
                     return None
             if not response.content:
-                print(f'WebFinger reply is empty, attempting HostMeta lookup...')
+                print(f'WebFinger reply is empty, attempting HostMeta lookup…')
                 hostmeta_result = check_hostmeta(domain, httpx_client)
                 if hostmeta_result:
                     backend_domain = hostmeta_result['backend_domain']
@@ -675,7 +675,7 @@ def check_webfinger(domain, httpx_client):
                 return {'backend_domain': backend_domain}
                 # Check for specific HTTP status codes
             else:
-                print(f'WebFinger reply does not contain a valid alias, attempting HostMeta lookup...')
+                print(f'WebFinger reply does not contain a valid alias, attempting HostMeta lookup…')
                 hostmeta_result = check_hostmeta(domain, httpx_client)
                 if hostmeta_result:
                     backend_domain = hostmeta_result['backend_domain']
@@ -693,7 +693,7 @@ def check_webfinger(domain, httpx_client):
                 mark_as_non_mastodon(domain)
                 return None
             else:
-                print(f'Responded HTTP {response.status_code} to WebFinger request, attempting HostMeta lookup...')
+                print(f'Responded HTTP {response.status_code} to WebFinger request, attempting HostMeta lookup…')
                 hostmeta_result = check_hostmeta(domain, httpx_client)
                 if hostmeta_result:
                     backend_domain = hostmeta_result['backend_domain']
@@ -719,15 +719,15 @@ def check_hostmeta(domain, httpx_client):
         if response.status_code in [200]:
             content_type = response.headers.get('Content-Type', '')
             if 'xml' not in content_type:
-                error_message = 'HostMeta reply is not an XML file, attempting raw NodeInfo lookup...'
+                error_message = 'HostMeta reply is not an XML file, attempting raw NodeInfo lookup…'
                 print(f'{error_message}')
                 return {'backend_domain': domain}
             if 'xhtml' in content_type:
-                error_message = 'HostMeta reply is an XHTML file, attempting raw NodeInfo lookup...'
+                error_message = 'HostMeta reply is an XHTML file, attempting raw NodeInfo lookup…'
                 print(f'{error_message}')
                 return {'backend_domain': domain}
             if not response.content:
-                error_message = 'HostMeta reply is empty, attempting raw NodeInfo lookup...'
+                error_message = 'HostMeta reply is empty, attempting raw NodeInfo lookup…'
                 print(f'{error_message}')
                 return {'backend_domain': domain}
             else:
@@ -738,7 +738,7 @@ def check_hostmeta(domain, httpx_client):
                 ns = {'xrd': 'http://docs.oasis-open.org/ns/xri/xrd-1.0'}  # Namespace
                 link = xmldata.find(".//xrd:link[@rel='lrdd']", namespaces=ns)
                 if link is None:
-                    print('Unable to find lrdd link in HostMeta, attempting raw NodeInfo lookup...')
+                    print('Unable to find lrdd link in HostMeta, attempting raw NodeInfo lookup…')
                     return {'backend_domain': domain}
                 else:
                     parsed_link = urlparse(link.get('template'))
@@ -751,7 +751,7 @@ def check_hostmeta(domain, httpx_client):
                 delete_domain_if_known(domain)
                 return False
         elif response.status_code in http_codes_to_fail:
-            print(f'Responded HTTP {response.status_code} to HostMeta request, attempting raw NodeInfo lookup...')
+            print(f'Responded HTTP {response.status_code} to HostMeta request, attempting raw NodeInfo lookup…')
             return {'backend_domain': domain}
         else:
             error_message = f'Responded HTTP {response.status_code} to HostMeta request'
@@ -1070,7 +1070,7 @@ def load_from_database(user_choice):
         query = query_map.get(user_choice)
 
     if not query:
-        print_colored(f"Choice {user_choice} was not available, using default query...", "yellow")
+        print_colored(f"Choice {user_choice} was not available, using default query…", "yellow")
         query = query_map["1"]  # Default query
 
     cursor = conn.cursor()
@@ -1139,11 +1139,11 @@ try:
         if domain_list_file:  # File name provided as argument
             user_choice = 1
             domain_list = load_from_file(domain_list_file)
-            print("Crawling domains from file...")
+            print("Crawling domains from file…")
         else:  # Load from database by default
             print_menu()
             user_choice = get_user_choice()
-            print_colored(f"Crawling domains from database choice {user_choice}...", "pink")
+            print_colored(f"Crawling domains from database choice {user_choice}…", "pink")
             domain_list = load_from_database(user_choice)
 
         if user_choice == "2":

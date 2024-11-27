@@ -43,7 +43,7 @@ def chunked_query(domain_endings, chunk_size=50):
 print_colored(f"{appname} v{appversion} ({current_filename})", "bold")
 
 # Execute the query in chunks
-print_colored(f"Querying {len(domain_endings)} domain endings...", "pink")
+print_colored(f"Querying {len(domain_endings)} domain endings…", "pink")
 results = chunked_query(domain_endings)
 conn.close()
 
