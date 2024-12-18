@@ -384,16 +384,18 @@ def clean_version_wrongpatch(software_version):
     match = re.match(r'^(\d+)\.(\d+)\.(\d+)(-.+)?$', software_version)
 
     if match:
+        a, b, c = int(version_latest_release.split('.')[0]), int(version_latest_release.split('.')[1]), int(version_latest_release.split('.')[2])
+        m = int(version_main_branch.split('.')[1])
         x, y, z = int(match.group(1)), int(match.group(2)), int(match.group(3))
         additional_data = match.group(4)  # This will be None if no dash and additional data is present
 
-        if x == 4:
-            if y == 3:
-                if z not in (0, 1):
+        if x == a:
+            if y == b:
+                if z > c:
                     z = 0
                     return f"{x}.{y}.{z}{additional_data or ''}"
                 return software_version
-            elif y == 4:
+            elif y == m:
                 if z != 0:
                     z = 0
                     return f"{x}.{y}.{z}{additional_data or ''}"
