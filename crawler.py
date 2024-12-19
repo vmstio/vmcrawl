@@ -16,7 +16,6 @@ try:
     from urllib.parse import urlparse, urlunparse
     from dotenv import load_dotenv
     from lxml import etree
-    import os
 except ImportError as e:
     print(f"Error importing module: {e}")
     sys.exit(1)
