@@ -383,7 +383,10 @@ def clean_version_wrongpatch(software_version):
     match = re.match(r'^(\d+)\.(\d+)\.(\d+)(-.+)?$', software_version)
 
     if match:
-        a, b, c = int(version_latest_release.split('.')[0]), int(version_latest_release.split('.')[1]), int(version_latest_release.split('.')[2])
+        if version_latest_release:
+            a, b, c = int(version_latest_release.split('.')[0]), int(version_latest_release.split('.')[1]), int(version_latest_release.split('.')[2])
+        else:
+            a, b, c = 0, 0, 0  # Default values or handle the case where version_latest_release is None
         m = int(version_main_branch.split('.')[1])
         x, y, z = int(match.group(1)), int(match.group(2)), int(match.group(3))
         additional_data = match.group(4)  # This will be None if no dash and additional data is present
@@ -518,7 +521,7 @@ def get_norobots_domains():
         cursor.close()
     return norobots_domains
 
-def check_and_record_domains(domain_list, ignored_domains, failed_domains, user_choice, junk_domains, bad_tlds, domain_endings, httpx_client, nxdomain_domains, norobots_domains):
+def check_and_record_domains(domain_list, ignored_domains, failed_domains, user_choice, junk_domains, bad_tlds, domain_endings, httpx_client, nxdomain_domains, norobots_domains, iftas_domains):
     for index, domain in enumerate(domain_list, start=1):
         print_colored(f'Crawling @ {domain} ({index}/{len(domain_list)})', 'bold')
 
@@ -526,6 +529,9 @@ def check_and_record_domains(domain_list, ignored_domains, failed_domains, user_
             continue
 
         if is_junk_or_bad_tld(domain, junk_domains, bad_tlds, domain_endings):
+            continue
+
+        if is_iftas_domain(domain, iftas_domains):
             continue
 
         try:
@@ -554,8 +560,8 @@ def should_skip_domain(domain, ignored_domains, failed_domains, nxdomain_domains
 
 def is_junk_or_bad_tld(domain, junk_domains, bad_tlds, domain_endings):
     if any(junk in domain for junk in junk_domains):
-        print_colored('Known junk domain, marking as failed!', 'magenta')
-        mark_failed_domain(domain)
+        print_colored('Known junk domain, purging!', 'magenta')
+        # mark_failed_domain(domain)
         delete_domain_if_known(domain)
         delete_domain_from_raw(domain)
         return True
@@ -570,6 +576,14 @@ def is_junk_or_bad_tld(domain, junk_domains, bad_tlds, domain_endings):
         mark_nxdomain_domain(domain)
         delete_domain_if_known(domain)
         delete_domain_from_raw(domain)
+        return True
+    return False
+
+def is_iftas_domain(domain, iftas_domains):
+    if any(domain.endswith(f'{dni}') for dni in iftas_domains):
+        print_colored('Known IFTAS DNI domain, marking as NXDOMAIN!', 'red')
+        mark_nxdomain_domain(domain)
+        delete_domain_if_known(domain)
         return True
     return False
 
@@ -1166,8 +1180,9 @@ try:
     ignored_domains = get_ignored_domains()
     nxdomain_domains = get_nxdomain_domains()
     norobots_domains = get_norobots_domains()
+    iftas_domains = get_iftas_dni()
 
-    check_and_record_domains(domain_list, ignored_domains, failed_domains, user_choice, junk_domains, bad_tlds, domain_endings, http_client, nxdomain_domains, norobots_domains)
+    check_and_record_domains(domain_list, ignored_domains, failed_domains, user_choice, junk_domains, bad_tlds, domain_endings, http_client, nxdomain_domains, norobots_domains, iftas_domains)
 except KeyboardInterrupt:
     conn.close()
     http_client.close()  # Close the httpx client

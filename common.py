@@ -6,6 +6,8 @@ try:
     import time
     import hashlib
     from packaging import version
+    import csv
+    from io import StringIO
 except ImportError as e:
     print(f"Error importing module: {e}")
 
@@ -159,3 +161,26 @@ def get_domain_endings():
             raise Exception(f"Failed to fetch domain endings. HTTP Status Code: {domain_endings_response.status_code}")
 
     return domain_endings
+
+def get_iftas_dni():
+    iftas_dns_url = "https://connect.iftas.org/wp-content/uploads/2024/04/dni.csv"
+    cache_file_path = get_cache_file_path(iftas_dns_url)
+    max_cache_age = 86400  # 1 day in seconds
+
+    if is_cache_valid(cache_file_path, max_cache_age):
+        with open(cache_file_path, 'r') as cache_file:
+            iftas_domains = [line.strip().lower() for line in cache_file.readlines()]
+    else:
+        iftas_dns_response = http_client.get(iftas_dns_url)
+        if iftas_dns_response.status_code in [200]:
+
+            csv_content = StringIO(iftas_dns_response.text)
+            reader = csv.DictReader(csv_content)
+            iftas_domains = [row['#domain'].strip().lower() for row in reader if '#domain' in row]
+
+            with open(cache_file_path, 'w') as cache_file:
+                cache_file.write('\n'.join(iftas_domains))
+        else:
+            raise Exception(f"Failed to fetch IFTAS DNS. HTTP Status Code: {iftas_dns_response.status_code}")
+
+    return iftas_domains
