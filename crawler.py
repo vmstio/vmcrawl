@@ -589,8 +589,8 @@ def is_iftas_domain(domain, iftas_domains):
 
 def process_domain(domain, httpx_client):
     if has_emoji_or_special_chars(domain):
-        print_colored('Domain contains special characters, marking as failed!', 'pink')
-        mark_failed_domain(domain)
+        print_colored('Domain contains special characters, marking as NXDOMAIN!', 'red')
+        mark_nxdomain_domain(domain)
         delete_domain_if_known(domain)
         return
 
