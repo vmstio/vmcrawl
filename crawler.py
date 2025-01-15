@@ -1011,14 +1011,24 @@ def handle_http_exception(domain, exception):
             print_colored('SSLv3 handshake detected, marking as failed!', 'pink')
             mark_failed_domain(domain)
             delete_domain_if_known(domain)
+        elif "CERTIFICATE_VERIFY_FAILED" in error_message and 'masto.host' in domain:
+            print_colored('Dead masto.host instance, marking as failed!', 'pink')
+            mark_failed_domain(domain)
+            delete_domain_if_known(domain)
         else:
             error_reason = 'SSL'
             print_colored(f'{error_message}', 'orange')
+            log_error(domain, error_message)
+            increment_domain_error(domain, error_reason)
             delete_domain_if_known(domain)
     else:
         if 'Errno 8' in error_message or 'Errno 61' in error_message:
             print_colored('DNS query did not return valid results, marking as NXDOMAIN!', 'red')
             mark_nxdomain_domain(domain)
+            delete_domain_if_known(domain)
+        elif 'Errno 51' in error_message:
+            print_colored('Network is unreachable, marking as failed!', 'pink')
+            mark_failed_domain(domain)
             delete_domain_if_known(domain)
         elif 'maximum allowed redirects' in error_message.casefold():
             print_colored('Exceeded maximum allowed redirects, marking as failed!', 'pink')
