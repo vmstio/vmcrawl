@@ -1003,11 +1003,20 @@ def mark_as_non_mastodon(domain):
 def handle_http_exception(domain, exception):
     error_message = str(exception)
     if 'ssl' in error_message.casefold() and 'timed out' not in error_message.casefold():
-        error_reason = 'SSL'
-        print_colored(f'{error_message}', 'orange')
-        delete_domain_if_known(domain)
+        if "TLSV1_ALERT_INTERNAL_ERROR" in error_message or "TLSV1_UNRECOGNIZED_NAME" in error_message:
+            print_colored('TLSv1 handshake detected, marking as failed!', 'pink')
+            mark_failed_domain(domain)
+            delete_domain_if_known(domain)
+        elif "SSLV3_ALERT_HANDSHAKE_FAILURE" in error_message:
+            print_colored('SSLv3 handshake detected, marking as failed!', 'pink')
+            mark_failed_domain(domain)
+            delete_domain_if_known(domain)
+        else:
+            error_reason = 'SSL'
+            print_colored(f'{error_message}', 'orange')
+            delete_domain_if_known(domain)
     else:
-        if 'Errno 8' in error_message:
+        if 'Errno 8' in error_message or 'Errno 61' in error_message:
             print_colored('DNS query did not return valid results, marking as NXDOMAIN!', 'red')
             mark_nxdomain_domain(domain)
             delete_domain_if_known(domain)
