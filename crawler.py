@@ -410,12 +410,8 @@ def clean_version_wrongpatch(software_version):
         return software_version
 
 def clean_version_nightly(software_version):
-    # Handle 4.4.0-nightly
-    if "4.4.0-nightly" in software_version:
-        return "4.4.0-alpha.1"
-
-    # Handle 4.3.0-nightly with date and -security suffix
-    match = re.match(r"4\.3\.0-nightly\.(\d{4}-\d{2}-\d{2})(-security)?", software_version)
+    # Handle -nightly with date and -security suffix
+    match = re.match(r"4\.[34]\.0-nightly\.(\d{4}-\d{2}-\d{2})(-security)?", software_version)
     if match:
         nightly_date_str, is_security = match.groups()
         nightly_date = datetime.strptime(nightly_date_str, "%Y-%m-%d")
@@ -424,6 +420,8 @@ def clean_version_nightly(software_version):
             nightly_date += timedelta(days=1)
 
         version_ranges = [
+            ("4.4.0-alpha.2", datetime(2025, 1, 16), datetime(2025, 12, 31)),
+            ("4.4.0-alpha.1", datetime(2024, 10, 8), datetime(2025, 1, 15)),
             ("4.3.0-rc.1", datetime(2024, 10, 2), datetime(2024, 10, 7)),
             ("4.3.0-beta.2", datetime(2024, 9, 18), datetime(2024, 10, 1)),
             ("4.3.0-beta.1", datetime(2024, 8, 23), datetime(2024, 9, 17)),
