@@ -942,12 +942,34 @@ def process_mastodon_instance(domain, webfinger_data, nodeinfo_data, httpx_clien
 
             # Check for invalid user counts
             if active_month_users > max(total_users + 6, total_users + (total_users * 0.25)):
-                error_to_print = f'Mastodon v{software_version} with invalid/zero counts ({active_month_users}:{total_users})'
+                error_to_print = f'Mastodon v{software_version} but contains invalid active user counts ({active_month_users}/{total_users})'
                 print_colored(error_to_print, 'dark_green')
                 log_error(domain, error_to_print)
                 increment_domain_error(domain, '###')
                 delete_domain_if_known(domain)
                 return
+
+            # Check for invalid software versions
+            # Split versions into components and convert to integers
+            split_software_version = software_version.split("-")[0]
+            int_software_version = [int(x) for x in split_software_version.split('.')]
+            int_version_main_branch = [int(x) for x in version_main_branch.split('.')]
+
+            # Pad with zeros if necessary to make lengths equal
+            while len(int_software_version) < len(int_version_main_branch):
+                int_software_version.append(0)
+            while len(int_version_main_branch) < len(int_software_version):
+                int_version_main_branch.append(0)
+
+            # Compare each component
+            for i in range(len(int_software_version)):
+                if int_software_version[i] > int_version_main_branch[i]:
+                    error_to_print = f'Mastodon v{software_version.split("-")[0]} is higher than main branch version v{version_main_branch}.0'
+                    print_colored(error_to_print, 'dark_green')
+                    log_error(domain, error_to_print)
+                    increment_domain_error(domain, '###')
+                    delete_domain_if_known(domain)
+                    return
 
             # Update database
             update_mastodon_domain(actual_domain, software_version, software_version_full, total_users, active_month_users, contact_account, source_url)
