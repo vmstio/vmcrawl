@@ -298,6 +298,7 @@ def delete_domain_from_raw(domain):
 
 def clean_version(software_version_full):
     software_version = clean_version_suffix(software_version_full)
+    software_version = clean_version_oddstring(software_version)
     software_version = clean_version_dumbstring(software_version)
     software_version = clean_version_date(software_version)
     software_version = clean_version_suffix_more(software_version)
@@ -376,6 +377,12 @@ def clean_version_doubledash(software_version):
         software_version = software_version.replace("--", "-")
     if software_version.endswith('-'):
         software_version = software_version[:-1]
+
+    return software_version
+
+def clean_version_oddstring(software_version):
+    if "mastau" in software_version:
+        software_version = software_version.replace("mastau", "alpha")
 
     return software_version
 
