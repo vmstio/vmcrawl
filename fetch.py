@@ -17,7 +17,7 @@ current_filename = os.path.basename(__file__)
 db_path = os.getenv("db_path")
 conn = sqlite3.connect(db_path) # type: ignore
 
-db_limit = 50
+db_limit = 10
 db_offset = 0
 
 def fetch_exclude_domains(conn):
