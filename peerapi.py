@@ -145,7 +145,7 @@ if __name__ == "__main__":
     domain_endings = get_domain_endings()
 
     existing_domains = get_existing_domains()
-    existing_domains_count = len(existing_domains)
+    existing_domains_count = len(existing_domains) if existing_domains is not None else 0
     domains = get_domains(api_url, domain)  # Pass the domain and db_path to get_domains
     unique_domains = [domain for domain in domains if domain not in existing_domains and domain.isascii()]
 
