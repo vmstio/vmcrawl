@@ -64,26 +64,18 @@ http_custom_headers = {'User-Agent': http_custom_user_agent}
 http_client = httpx.Client(http2=True, follow_redirects=True, headers=http_custom_headers, timeout=common_timeout)
 http_codes_to_fail = [451, 429, 423, 422, 418, 410, 405, 404, 403, 402, 401, 400]
 
-def get_highest_mastodon_version():
-  release_url = "https://api.github.com/repos/mastodon/mastodon/releases"
-  response = http_client.get(release_url)
+def get_cache_file_path(url: str) -> str:
+    # Create a unique cache file path based on the URL
+    url_hash = hashlib.md5(url.encode()).hexdigest()
+    cache_dir = '/tmp/vmcrawl_cache'
+    os.makedirs(cache_dir, exist_ok=True)
+    return os.path.join(cache_dir, f"{url_hash}.cache")
 
-  if response.status_code == 200:
-    releases = response.json()
-    highest_version = None
-    for release in releases:
-      release_version = release["tag_name"]
-
-      # Preprocess the version string to remove the 'v' symbol
-      if "v" in release_version:
-          release_version = release_version.split("v")[1]
-
-      if highest_version is None or version.parse(release_version) > version.parse(highest_version):
-        highest_version = release_version
-    return highest_version
-  else:
-    print("Failed to retrieve latest Mastodon release version. HTTP Status Code:", response.status_code)
-    return None
+def is_cache_valid(cache_file_path: str, max_age_seconds: int) -> bool:
+    if not os.path.exists(cache_file_path):
+        return False
+    cache_age = time.time() - os.path.getmtime(cache_file_path)
+    return cache_age < max_age_seconds
 
 def read_main_version_info(url):
     """
@@ -110,14 +102,57 @@ def read_main_version_info(url):
 
     return version_info
 
+def get_highest_mastodon_version():
+    release_url = "https://api.github.com/repos/mastodon/mastodon/releases"
+    cache_file_path = get_cache_file_path(release_url)
+    max_cache_age = 14400  # 4 hours in seconds
+
+    if is_cache_valid(cache_file_path, max_cache_age):
+        with open(cache_file_path, 'r') as cache_file:
+            highest_version = cache_file.read().strip()
+    else:
+        response = http_client.get(release_url)
+        if response.status_code == 200:
+            releases = response.json()
+            highest_version = None
+            for release in releases:
+                release_version = release["tag_name"]
+
+                # Preprocess the version string to remove the 'v' symbol
+                if "v" in release_version:
+                    release_version = release_version.split("v")[1]
+
+                if highest_version is None or version.parse(release_version) > version.parse(highest_version):
+                    highest_version = release_version
+
+            with open(cache_file_path, 'w') as cache_file:
+                if highest_version is not None:
+                    cache_file.write(highest_version)
+        else:
+            print("Failed to retrieve latest Mastodon release version. HTTP Status Code:", response.status_code)
+            return None
+
+    return highest_version
+
 def get_main_version_info():
     url = "https://raw.githubusercontent.com/mastodon/mastodon/refs/heads/main/lib/mastodon/version.rb"
-    version_info = read_main_version_info(url)
+    cache_file_path = get_cache_file_path(url)
+    max_cache_age = 14400  # 4 hours in seconds
+
+    if is_cache_valid(cache_file_path, max_cache_age):
+        with open(cache_file_path, 'r') as cache_file:
+            version_info = {}
+            for line in cache_file:
+                key, value = line.strip().split(':')
+                version_info[key] = value
+    else:
+        version_info = read_main_version_info(url)
+        with open(cache_file_path, 'w') as cache_file:
+            for key, value in version_info.items():
+                cache_file.write(f"{key}:{value}\n")
 
     major = version_info.get('major', '0')
     minor = version_info.get('minor', '0')
-    # patch = version_info.get('patch', '0')
-    # default_prerelease = version_info.get('default_prerelease', '')
 
     obtained_main_version = f"{major}.{minor}"
     return obtained_main_version
@@ -129,19 +164,6 @@ version_latest_release = get_highest_mastodon_version()
 
 def print_colored(text: str, color: str, **kwargs) -> None:
     print(f"{colors.get(color, '')}{text}{colors['reset']}", **kwargs)
-
-def get_cache_file_path(url: str) -> str:
-    # Create a unique cache file path based on the URL
-    url_hash = hashlib.md5(url.encode()).hexdigest()
-    cache_dir = '/tmp/vmcrawl_cache'
-    os.makedirs(cache_dir, exist_ok=True)
-    return os.path.join(cache_dir, f"{url_hash}.cache")
-
-def is_cache_valid(cache_file_path: str, max_age_seconds: int) -> bool:
-    if not os.path.exists(cache_file_path):
-        return False
-    cache_age = time.time() - os.path.getmtime(cache_file_path)
-    return cache_age < max_age_seconds
 
 def get_domain_endings():
     domain_endings_url = 'http://data.iana.org/TLD/tlds-alpha-by-domain.txt'
