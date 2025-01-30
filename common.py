@@ -105,7 +105,7 @@ def read_main_version_info(url):
 def get_highest_mastodon_version():
     release_url = "https://api.github.com/repos/mastodon/mastodon/releases"
     cache_file_path = get_cache_file_path(release_url)
-    max_cache_age = 14400  # 4 hours in seconds
+    max_cache_age = 3600  # 1 hour in seconds
 
     if is_cache_valid(cache_file_path, max_cache_age):
         with open(cache_file_path, 'r') as cache_file:
@@ -137,7 +137,7 @@ def get_highest_mastodon_version():
 def get_main_version_info():
     url = "https://raw.githubusercontent.com/mastodon/mastodon/refs/heads/main/lib/mastodon/version.rb"
     cache_file_path = get_cache_file_path(url)
-    max_cache_age = 14400  # 4 hours in seconds
+    max_cache_age = 3600  # 1 hour in seconds
 
     if is_cache_valid(cache_file_path, max_cache_age):
         with open(cache_file_path, 'r') as cache_file:
