@@ -59,7 +59,7 @@ def process_domain(domain, counter, total):
     venv_python = os.path.join(script_dir, ".venv", "bin", "python")
     subprocess.run([venv_python, peerapi_path, domain])
 
-    import_file = f"target/import_{domain}.txt"
+    import_file = os.path.join(script_dir, f"target/import_{domain}.txt")
     if os.path.isfile(import_file):
         crawler_path = os.path.join(script_dir, "crawler.py")
         subprocess.run([venv_python, crawler_path, import_file])
