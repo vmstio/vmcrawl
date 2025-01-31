@@ -41,7 +41,7 @@ def import_domains(domains):
     try:
         for domain in domains:
             lowercase_domain = domain.lower()
-            cursor.execute("INSERT INTO RawDomains (Domain) VALUES (?)", (lowercase_domain,))
+            cursor.execute("INSERT INTO RawDomains (Domain, Errors) VALUES (?, 0)", (lowercase_domain,))
         conn.commit()
     except Exception as e:
         print_colored(f"Failed to import domain list: {e}", "orange")
@@ -91,14 +91,14 @@ def add_to_no_peers(domain):
     finally:
         cursor.close()
 
-def write_to_file(domains, output_file):
-    try:
-        with open(output_file, "w") as file:
-            for domain in domains:
-                file.write(f"{domain}\n")
-        print(f"Unique domains written to {output_file}")
-    except Exception as e:
-        print_colored(f"An error occurred while writing to the file: {e}", "orange")
+# def write_to_file(domains, output_file):
+#     try:
+#         with open(output_file, "w") as file:
+#             for domain in domains:
+#                 file.write(f"{domain}\n")
+#         print(f"Unique domains written to {output_file}")
+#     except Exception as e:
+#         print_colored(f"An error occurred while writing to the file: {e}", "orange")
 
 def get_existing_domains():
     cursor = conn.cursor()
@@ -142,7 +142,8 @@ if __name__ == "__main__":
     domain = sys.argv[1]
     api_url = f"https://{domain}/api/v1/instance/peers"
     db_path = os.getenv("db_path")
-    output_file = f"target/import_{domain}.txt"
+    script_dir = os.path.dirname(os.path.abspath(__file__))
+    output_file = os.path.join(script_dir, f"target/import_{domain}.txt")
     domain_endings = get_domain_endings()
 
     existing_domains = get_existing_domains()
@@ -155,5 +156,5 @@ if __name__ == "__main__":
         # print("No new unique domains found")
         sys.exit(0)
 
-    write_to_file(unique_domains, output_file)
+    # write_to_file(unique_domains, output_file)
     import_domains(unique_domains)

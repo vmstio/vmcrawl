@@ -17,8 +17,8 @@ current_filename = os.path.basename(__file__)
 db_path = os.getenv("db_path")
 conn = sqlite3.connect(db_path) # type: ignore
 
-db_limit = 10
-db_offset = 0
+db_limit = 10000
+db_offset = 30
 
 def fetch_exclude_domains(conn):
     cursor = conn.cursor()
@@ -59,11 +59,11 @@ def process_domain(domain, counter, total):
     venv_python = os.path.join(script_dir, ".venv", "bin", "python")
     subprocess.run([venv_python, peerapi_path, domain])
 
-    import_file = os.path.join(script_dir, f"target/import_{domain}.txt")
-    if os.path.isfile(import_file):
-        crawler_path = os.path.join(script_dir, "crawler.py")
-        subprocess.run([venv_python, crawler_path, import_file])
-        os.remove(import_file)
+    # import_file = os.path.join(script_dir, f"target/import_{domain}.txt")
+    # if os.path.isfile(import_file):
+    #     crawler_path = os.path.join(script_dir, "crawler.py")
+    #     subprocess.run([venv_python, crawler_path, import_file])
+    #     os.remove(import_file)
 
 def main():
     print_colored(f"{appname} v{appversion} ({current_filename})", "bold")

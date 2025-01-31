@@ -1088,6 +1088,7 @@ def read_domain_list(file_path):
 
 def load_from_database(user_choice):
     query_map = {
+        "0": "SELECT Domain FROM RawDomains WHERE Errors = 0 ORDER BY LENGTH(DOMAIN) ASC",
         "1": f"SELECT Domain FROM RawDomains WHERE (Failed IS NULL OR Failed = '' OR Failed = '0') AND (Ignore IS NULL OR Ignore = '' OR Ignore = '0') AND (NXDOMAIN IS NULL OR NXDOMAIN = '' OR NXDOMAIN = '0') AND (Robots IS NULL OR Robots = '' OR Robots = '0') AND (Errors <= {error_threshold} OR Errors IS NULL) ORDER BY Domain ASC",
         "4": f"SELECT Domain FROM RawDomains WHERE Errors >= {error_threshold + 1} ORDER BY LENGTH(DOMAIN) ASC",
         "5": f"SELECT Domain FROM RawDomains WHERE Errors <= {error_threshold} ORDER BY LENGTH(DOMAIN) ASC",
@@ -1157,6 +1158,7 @@ def load_from_file(file_name):
 
 def print_menu() -> None:
     menu_options = {
+        "Process new domains": {"0": "Recently fetched"},
         "Change process direction": {"1": "Standard", "2": "Reverse", "3": "Random"},
         "Retry general errors": {"4": f"Errors ≥{error_threshold + 1}", "5": f"Errors ≤{error_threshold}"},
         "Retry fatal errors": {"6": "Not Mastodon", "7": "Failed", "8": "NXDOMAIN", "9": "NoRobots"},
