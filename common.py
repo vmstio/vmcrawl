@@ -12,7 +12,7 @@ except ImportError as e:
     print(f"Error importing module: {e}")
 
 # Versioning information
-toml_file_path='pyproject.toml'
+toml_file_path = os.path.join(os.path.dirname(__file__), 'pyproject.toml')
 try:
     # Read the TOML file
     project_info = toml.load(toml_file_path)

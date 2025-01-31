@@ -54,11 +54,15 @@ def fetch_domain_list(conn, exclude_domains_sql):
 def process_domain(domain, counter, total):
     print_colored(f"Fetching peers @ {domain} ({counter}/{total})…", "bold")
 
-    subprocess.run(["python3", "peerapi.py", domain])
+    script_dir = os.path.dirname(os.path.abspath(__file__))
+    peerapi_path = os.path.join(script_dir, "peerapi.py")
+    venv_python = os.path.join(script_dir, ".venv", "bin", "python")
+    subprocess.run([venv_python, peerapi_path, domain])
 
     import_file = f"target/import_{domain}.txt"
     if os.path.isfile(import_file):
-        subprocess.run(["python3", "crawler.py", import_file])
+        crawler_path = os.path.join(script_dir, "crawler.py")
+        subprocess.run([venv_python, crawler_path, import_file])
         os.remove(import_file)
 
 def main():
