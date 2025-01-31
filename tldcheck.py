@@ -48,6 +48,6 @@ results = chunked_query(domain_endings)
 conn.close()
 
 # Print or process the results as needed
-print(f"Domains without valid TLDs:")
+print("Domains without valid TLDs:")
 for result in results:
     print(result[0])

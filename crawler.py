@@ -41,7 +41,7 @@ def has_emoji_or_special_chars(domain):
     if domain.startswith('xn--'):
         try:
             domain = domain.encode('ascii').decode('idna')
-        except Exception as e:
+        except Exception:
             return True
     try:
         for char in domain:
@@ -49,7 +49,7 @@ def has_emoji_or_special_chars(domain):
                 return True
             if not (char.isalnum() or char in '-_.'):
                 return True
-    except Exception as e:
+    except Exception:
         return True
     return False
 
@@ -669,7 +669,7 @@ def check_webfinger(domain, httpx_client):
         content_length = response.headers.get('Content-Length', '')
         if response.status_code in [200]:
             if 'json' not in content_type:
-                print(f'WebFinger reply is not a JSON file, attempting HostMeta lookup…')
+                print('WebFinger reply is not a JSON file, attempting HostMeta lookup…')
                 hostmeta_result = check_hostmeta(domain, httpx_client)
                 if hostmeta_result:
                     backend_domain = hostmeta_result['backend_domain']
@@ -677,7 +677,7 @@ def check_webfinger(domain, httpx_client):
                 else:
                     return None
             if not response.content:
-                print(f'WebFinger reply is empty, attempting HostMeta lookup…')
+                print('WebFinger reply is empty, attempting HostMeta lookup…')
                 hostmeta_result = check_hostmeta(domain, httpx_client)
                 if hostmeta_result:
                     backend_domain = hostmeta_result['backend_domain']
@@ -696,7 +696,7 @@ def check_webfinger(domain, httpx_client):
                 return {'backend_domain': backend_domain}
                 # Check for specific HTTP status codes
             else:
-                print(f'WebFinger reply does not contain a valid alias, attempting HostMeta lookup…')
+                print('WebFinger reply does not contain a valid alias, attempting HostMeta lookup…')
                 hostmeta_result = check_hostmeta(domain, httpx_client)
                 if hostmeta_result:
                     backend_domain = hostmeta_result['backend_domain']
@@ -1109,8 +1109,8 @@ def load_from_database(user_choice):
         "40": f"SELECT Domain FROM MastodonDomains WHERE Timestamp <= datetime('now', '-{error_threshold} days') ORDER BY Timestamp DESC",
         "41": f"SELECT Domain FROM MastodonDomains WHERE \"Software Version\" NOT LIKE '{version_main_branch}%' AND \"Software Version\" NOT LIKE '{version_latest_release}' ORDER BY \"Total Users\" DESC",
         "42": f"SELECT Domain FROM MastodonDomains WHERE \"Software Version\" LIKE '{version_main_branch}%' ORDER BY \"Total Users\" DESC",
-        "43": f"SELECT Domain FROM MastodonDomains WHERE \"Active Users (Monthly)\" = '0' ORDER BY \"Total Users\" DESC",
-        "44": f"SELECT Domain FROM MastodonDomains ORDER BY \"Total Users\" DESC",
+        "43": "SELECT Domain FROM MastodonDomains WHERE \"Active Users (Monthly)\" = '0' ORDER BY \"Total Users\" DESC",
+        "44": "SELECT Domain FROM MastodonDomains ORDER BY \"Total Users\" DESC",
     }
 
     if user_choice in ["2", "3"]: # Reverse or Random
