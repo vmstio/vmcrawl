@@ -551,7 +551,7 @@ def should_skip_domain(domain, ignored_domains, failed_domains, nxdomain_domains
         delete_domain_if_known(domain)
         return True
     if user_choice != "7" and domain in failed_domains:
-        print_colored('Previously failed!', 'cyan')
+        print_colored('Previously FAIL!', 'cyan')
         delete_domain_if_known(domain)
         return True
     if user_choice != "8" and domain in nxdomain_domains:
@@ -559,26 +559,26 @@ def should_skip_domain(domain, ignored_domains, failed_domains, nxdomain_domains
         delete_domain_if_known(domain)
         return True
     if user_choice != "9" and domain in norobots_domains:
-        print_colored('Previously NoRobots!', 'cyan')
+        print_colored('Previously NOROBOTS!', 'cyan')
         delete_domain_if_known(domain)
         return True
     return False
 
 def is_junk_or_bad_tld(domain, junk_domains, bad_tlds, domain_endings):
     if any(junk in domain for junk in junk_domains):
-        print_colored('Known junk domain, purging!', 'magenta')
+        print_colored('Known junk domain - purging!', 'magenta')
         # mark_failed_domain(domain)
         delete_domain_if_known(domain)
         delete_domain_from_raw(domain)
         return True
     if any(domain.endswith(f'.{tld}') for tld in bad_tlds):
-        print_colored('Prohibited TLD, marking as NXDOMAIN!', 'red')
+        print_colored('Prohibited TLD - NXDOMAIN!', 'red')
         mark_nxdomain_domain(domain)
         delete_domain_if_known(domain)
         delete_domain_from_raw(domain)
         return True
     if not any(domain.endswith(f'.{domain_ending}') for domain_ending in domain_endings):
-        print_colored('Unknown TLD, marking as NXDOMAIN!', 'red')
+        print_colored('Unknown TLD - NXDOMAIN!', 'red')
         mark_nxdomain_domain(domain)
         delete_domain_if_known(domain)
         delete_domain_from_raw(domain)
@@ -587,7 +587,7 @@ def is_junk_or_bad_tld(domain, junk_domains, bad_tlds, domain_endings):
 
 def is_iftas_domain(domain, iftas_domains):
     if any(domain.endswith(f'{dni}') for dni in iftas_domains):
-        print_colored('Known IFTAS DNI domain, marking as NXDOMAIN!', 'red')
+        print_colored('Known IFTAS DNI domain - NXDOMAIN!', 'red')
         mark_nxdomain_domain(domain)
         delete_domain_if_known(domain)
         return True
@@ -595,7 +595,7 @@ def is_iftas_domain(domain, iftas_domains):
 
 def process_domain(domain, httpx_client):
     if has_emoji_or_special_chars(domain):
-        print_colored('Domain contains special characters, marking as NXDOMAIN!', 'red')
+        print_colored('Domain contains special characters - NXDOMAIN!', 'red')
         mark_nxdomain_domain(domain)
         delete_domain_if_known(domain)
         return
@@ -640,19 +640,19 @@ def check_robots_txt(domain, httpx_client):
                 elif line.startswith('disallow:'):
                     disallow_path = line.split(':', 1)[1].strip()
                     if user_agent in ['*', appname.lower()] and (disallow_path == '/' or disallow_path == '*'):
-                        print_colored('Crawling is prohibited by robots.txt, marking as NoRobots!', 'red')
+                        print_colored('Crawling prohibited by robots.txt - NOROBOTS!', 'red')
                         mark_norobots_domain(domain)
                         delete_domain_if_known(domain)
                         return False
         # Check for specific HTTP status codes
         elif response.status_code in [202]:
             if 'sgcaptcha' in response.text:
-                print_colored('Responded with CAPTCHA to robots.txt request, marking as NoRobots!', 'red')
+                print_colored('Provided CAPTCHA for robots.txt - NOROBOTS!', 'red')
                 mark_norobots_domain(domain)
                 delete_domain_if_known(domain)
                 return False
         elif response.status_code in [410]:
-            print_colored(f'Responded HTTP {response.status_code} to robots.txt request, marking as NoRobots!', 'red')
+            print_colored(f'Responded HTTP {response.status_code} to robots.txt request - NOROBOTS!', 'red')
             mark_norobots_domain(domain)
             delete_domain_if_known(domain)
             return False
@@ -669,7 +669,7 @@ def check_webfinger(domain, httpx_client):
         content_length = response.headers.get('Content-Length', '')
         if response.status_code in [200]:
             if 'json' not in content_type:
-                print('WebFinger reply is not a JSON file, attempting HostMeta lookup…')
+                print('WebFinger reply is not a JSON file…')
                 hostmeta_result = check_hostmeta(domain, httpx_client)
                 if hostmeta_result:
                     backend_domain = hostmeta_result['backend_domain']
@@ -677,7 +677,7 @@ def check_webfinger(domain, httpx_client):
                 else:
                     return None
             if not response.content:
-                print('WebFinger reply is empty, attempting HostMeta lookup…')
+                print('WebFinger reply is empty…')
                 hostmeta_result = check_hostmeta(domain, httpx_client)
                 if hostmeta_result:
                     backend_domain = hostmeta_result['backend_domain']
@@ -696,7 +696,7 @@ def check_webfinger(domain, httpx_client):
                 return {'backend_domain': backend_domain}
                 # Check for specific HTTP status codes
             else:
-                print('WebFinger reply does not contain a valid alias, attempting HostMeta lookup…')
+                print('WebFinger reply does not contain a valid alias…')
                 hostmeta_result = check_hostmeta(domain, httpx_client)
                 if hostmeta_result:
                     backend_domain = hostmeta_result['backend_domain']
@@ -705,7 +705,7 @@ def check_webfinger(domain, httpx_client):
                     return None
         elif response.status_code in [202]:
             if 'sgcaptcha' in response.text:
-                print_colored('Responded with CAPTCHA to Webfinger request, marking as failed!', 'pink')
+                print_colored('Responded with CAPTCHA to Webfinger request - FAIL!', 'red')
                 mark_failed_domain(domain)
                 delete_domain_if_known(domain)
                 return False
@@ -714,7 +714,7 @@ def check_webfinger(domain, httpx_client):
                 mark_as_non_mastodon(domain)
                 return None
             else:
-                print(f'Responded HTTP {response.status_code} to WebFinger request, attempting HostMeta lookup…')
+                print(f'Responded HTTP {response.status_code} to WebFinger request…')
                 hostmeta_result = check_hostmeta(domain, httpx_client)
                 if hostmeta_result:
                     backend_domain = hostmeta_result['backend_domain']
@@ -740,15 +740,15 @@ def check_hostmeta(domain, httpx_client):
         if response.status_code in [200]:
             content_type = response.headers.get('Content-Type', '')
             if 'xml' not in content_type:
-                error_message = 'HostMeta reply is not an XML file, attempting raw NodeInfo lookup…'
+                error_message = 'HostMeta reply is not an XML file…'
                 print(f'{error_message}')
                 return {'backend_domain': domain}
             if 'xhtml' in content_type:
-                error_message = 'HostMeta reply is an XHTML file, attempting raw NodeInfo lookup…'
+                error_message = 'HostMeta reply is an XHTML file…'
                 print(f'{error_message}')
                 return {'backend_domain': domain}
             if not response.content:
-                error_message = 'HostMeta reply is empty, attempting raw NodeInfo lookup…'
+                error_message = 'HostMeta reply is empty…'
                 print(f'{error_message}')
                 return {'backend_domain': domain}
             else:
@@ -759,7 +759,7 @@ def check_hostmeta(domain, httpx_client):
                 ns = {'xrd': 'http://docs.oasis-open.org/ns/xri/xrd-1.0'}  # Namespace
                 link = xmldata.find(".//xrd:link[@rel='lrdd']", namespaces=ns)
                 if link is None:
-                    print('Unable to find lrdd link in HostMeta, attempting raw NodeInfo lookup…')
+                    print('Unable to find lrdd link in HostMeta…')
                     return {'backend_domain': domain}
                 else:
                     parsed_link = urlparse(link.get('template'))
@@ -767,12 +767,12 @@ def check_hostmeta(domain, httpx_client):
                     return {'backend_domain': backend_domain}
         elif response.status_code in [202]:
             if 'sgcaptcha' in response.text:
-                print_colored('Responded with CAPTCHA to HostMeta request, marking as failed!', 'pink')
+                print_colored('Responded with CAPTCHA to HostMeta request - FAIL!', 'red')
                 mark_failed_domain(domain)
                 delete_domain_if_known(domain)
                 return False
         elif response.status_code in http_codes_to_fail:
-            print(f'Responded HTTP {response.status_code} to HostMeta request, attempting raw NodeInfo lookup…')
+            print(f'Responded HTTP {response.status_code} to HostMeta request…')
             return {'backend_domain': domain}
         else:
             error_message = f'Responded HTTP {response.status_code} to HostMeta request'
@@ -792,10 +792,11 @@ def check_nodeinfo(domain, backend_domain, httpx_client):
         if response.status_code in [200]:
             content_type = response.headers.get('Content-Type', '')
             if 'json' not in content_type:
-                error_message = 'NodeInfo reply is not a JSON file, marking as failed!'
-                print_colored(f'{error_message}', 'pink')
-                mark_failed_domain(domain)
-                delete_domain_if_known(domain)
+                error_message = 'NodeInfo reply is not a JSON file'
+                print_colored(f'{error_message}', 'yellow')
+                log_error(domain, error_message)
+                increment_domain_error(domain, 'JSON')
+                delete_if_error_max(domain)
                 return None
             if not response.content:
                 error_message = 'NodeInfo reply is empty'
@@ -813,8 +814,8 @@ def check_nodeinfo(domain, backend_domain, httpx_client):
                     if nodeinfo_response.status_code in [200]:
                         nodeinfo_response_content_type = nodeinfo_response.headers.get('Content-Type', '')
                         if 'json' not in nodeinfo_response_content_type:
-                            error_message = 'NodeInfo V2 reply is not a JSON file, marking as failed!'
-                            print_colored(f'{error_message}', 'pink')
+                            error_message = 'NodeInfo V2 reply is not a JSON file - FAIL!'
+                            print_colored(f'{error_message}', 'red')
                             mark_failed_domain(domain)
                             delete_domain_if_known(domain)
                             return None
@@ -828,7 +829,7 @@ def check_nodeinfo(domain, backend_domain, httpx_client):
                         else:
                             return nodeinfo_response.json()
                     elif nodeinfo_response.status_code in http_codes_to_fail and response.status_code != 404:
-                        print_colored(f'Responded HTTP {nodeinfo_response.status_code} @ {nodeinfo_2_url}, marking as failed!', 'pink')
+                        print_colored(f'Responded HTTP {nodeinfo_response.status_code} @ {nodeinfo_2_url} - FAIL!', 'red')
                         mark_failed_domain(domain)
                         delete_domain_if_known(domain)
                     else:
@@ -843,12 +844,12 @@ def check_nodeinfo(domain, backend_domain, httpx_client):
                 mark_as_non_mastodon(domain)
         elif response.status_code in [202]:
             if 'sgcaptcha' in response.text:
-                print_colored('Responded with CAPTCHA to NodeInfo request, marking as failed!', 'pink')
+                print_colored('Responded with CAPTCHA to NodeInfo request - FAIL!', 'red')
                 mark_failed_domain(domain)
                 delete_domain_if_known(domain)
                 return False
         elif response.status_code in http_codes_to_fail and response.status_code != 404:
-            print_colored(f'Responded HTTP {response.status_code} to NodeInfo request, marking as failed!', 'pink')
+            print_colored(f'Responded HTTP {response.status_code} to NodeInfo request - FAIL!', 'red')
             mark_failed_domain(domain)
             delete_domain_if_known(domain)
         else:
@@ -895,7 +896,7 @@ def process_mastodon_instance(domain, webfinger_data, nodeinfo_data, httpx_clien
         if response.status_code in [200]:
             content_type = response.headers.get('Content-Type', '')
             if 'json' not in content_type:
-                error_message = 'Instance API reply is not a JSON file, marking as failed!'
+                error_message = 'Instance API reply is not a JSON file - FAIL!'
                 print_colored(f'{error_message}', 'magenta')
                 mark_failed_domain(domain)
                 delete_domain_if_known(domain)
@@ -912,7 +913,7 @@ def process_mastodon_instance(domain, webfinger_data, nodeinfo_data, httpx_clien
 
             if 'error' in instance_api_data:
                 if instance_api_data['error'] == "This method requires an authenticated user":
-                    print_colored('Instance API requires authentication, marking as ignored!', 'magenta')
+                    print_colored('Instance API requires authentication - ignored!', 'magenta')
                     mark_ignore_domain(domain)
                     delete_domain_if_known(domain)
                     return
@@ -970,7 +971,7 @@ def process_mastodon_instance(domain, webfinger_data, nodeinfo_data, httpx_clien
                 print_colored(f'Mastodon v{software_version} ({nodeinfo_data["software"]["version"]})', 'green')
 
         elif response.status_code in http_codes_to_fail:
-            print_colored(f'Responded HTTP {response.status_code} to API request, marking as failed!', 'pink')
+            print_colored(f'Responded HTTP {response.status_code} to API request - FAIL!', 'red')
             mark_ignore_domain(domain)
             delete_domain_if_known(domain)
         else:
@@ -1011,7 +1012,7 @@ def update_mastodon_domain(domain, software_version, software_version_full, tota
         cursor.close()
 
 def mark_as_non_mastodon(domain):
-    print_colored('Not using Mastodon, marking as ignored!', 'magenta')
+    print_colored('Not using Mastodon - ignored!', 'magenta')
     mark_ignore_domain(domain)
     delete_domain_if_known(domain)
 
@@ -1019,15 +1020,15 @@ def handle_http_exception(domain, exception):
     error_message = str(exception)
     if 'ssl' in error_message.casefold() and 'timed out' not in error_message.casefold():
         if "TLSV1_ALERT_INTERNAL_ERROR" in error_message or "TLSV1_UNRECOGNIZED_NAME" in error_message:
-            print_colored('TLSv1 handshake detected, marking as failed!', 'pink')
+            print_colored('TLSv1 handshake detected - FAIL!', 'red')
             mark_failed_domain(domain)
             delete_domain_if_known(domain)
         elif "SSLV3_ALERT_HANDSHAKE_FAILURE" in error_message:
-            print_colored('SSLv3 handshake detected, marking as failed!', 'pink')
+            print_colored('SSLv3 handshake detected - FAIL!', 'red')
             mark_failed_domain(domain)
             delete_domain_if_known(domain)
         elif "CERTIFICATE_VERIFY_FAILED" in error_message and 'masto.host' in domain:
-            print_colored('Dead masto.host instance, marking as failed!', 'pink')
+            print_colored('Dead masto.host instance - FAIL!', 'red')
             mark_failed_domain(domain)
             delete_domain_if_known(domain)
         else:
@@ -1038,19 +1039,19 @@ def handle_http_exception(domain, exception):
             delete_domain_if_known(domain)
     else:
         if 'Errno 8' in error_message or 'Errno 61' in error_message:
-            print_colored('DNS query did not return valid results, marking as NXDOMAIN!', 'red')
+            print_colored('DNS query did not return valid results - NXDOMAIN!', 'red')
             mark_nxdomain_domain(domain)
             delete_domain_if_known(domain)
         elif 'Errno 51' in error_message:
-            print_colored('Network is unreachable, marking as failed!', 'pink')
+            print_colored('Network is unreachable - FAIL!', 'red')
             mark_failed_domain(domain)
             delete_domain_if_known(domain)
         elif 'maximum allowed redirects' in error_message.casefold():
-            print_colored('Exceeded maximum allowed redirects, marking as failed!', 'pink')
+            print_colored('Exceeded maximum allowed redirects - FAIL!', 'red')
             mark_failed_domain(domain)
             delete_domain_if_known(domain)
         elif 'stream_id:7' in error_message.casefold() and 'error_code:2' in error_message.casefold():
-            print_colored('Received an empty response from the server, marking as failed!', 'pink')
+            print_colored('Received an empty response - FAIL!', 'red')
             mark_failed_domain(domain)
             delete_domain_if_known(domain)
         elif 'timed out' in error_message.casefold():
