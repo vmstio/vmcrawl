@@ -2,7 +2,7 @@
 name = "vmcrawl"
 version = "0.2"
 description = "Mastodon-focused version reporting crawler"
-requires-python = ">=3.12"
+requires-python = ">=3.13"
 
 dependencies = [
     "dnspython",
