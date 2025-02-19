@@ -175,7 +175,7 @@ def get_main_version_info():
     return obtained_main_version
 
 # Common variables
-error_threshold = int(7)
+error_threshold = int(common_timeout)
 version_main_branch = get_main_version_info()
 version_latest_release = get_highest_mastodon_version()
 
