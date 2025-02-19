@@ -23,12 +23,15 @@ parser.add_argument('-t', '--target', type=str, help='target only a specific dom
 
 args = parser.parse_args()
 
-if args.target is None:
-    if args.limit is not None:
-        db_limit = args.limit
+if (args.limit or args.offset) and args.target:
+    print_colored("You cannot set both limit/offset and target arguments", "red")
+    sys.exit(1)
 
-    if args.offset is not None:
-        db_offset = args.offset
+if args.limit is not None:
+    db_limit = args.limit
+
+if args.offset is not None:
+    db_offset = args.offset
 
 def fetch_exclude_domains(conn):
     cursor = conn.cursor()
