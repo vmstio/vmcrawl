@@ -1,5 +1,4 @@
 try:
-    import httpx
     import sys
     import sqlite3
     import ipaddress
