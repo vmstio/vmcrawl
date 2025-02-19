@@ -5,6 +5,7 @@ from common import *
 # Import additional modules
 try:
     import ipaddress
+    import argparse
 except ImportError as e:
     print(f"Error importing module: {e}")
     sys.exit(1)
@@ -15,19 +16,19 @@ current_filename = os.path.basename(__file__)
 db_limit = 100
 db_offset = 0
 
-if len(sys.argv) > 1:
-    try:
-        db_limit = int(sys.argv[1])
-    except ValueError:
-        print(f"Invalid limit value provided. Must be a valid integer.")
-        sys.exit(1)
+parser = argparse.ArgumentParser(description="Fetch peer data from Mastodon instances.")
+parser.add_argument('-l', '--limit', type=int, help=f'limit the number of domains requested from database (default: {db_limit})')
+parser.add_argument('-o', '--offset', type=int, help=f'offset the top of the domains requested from database (default: {db_offset})')
+parser.add_argument('-t', '--target', type=str, help='target only a specific domain and ignore the database (ex: vmst.io)')
 
-if len(sys.argv) > 2:
-    try:
-        db_offset = int(sys.argv[2])
-    except ValueError:
-        print(f"Invalid offset value provided. Must be a valid integer.")
-        sys.exit(1)
+args = parser.parse_args()
+
+if args.target is None:
+    if args.limit is not None:
+        db_limit = args.limit
+
+    if args.offset is not None:
+        db_offset = args.offset
 
 def fetch_exclude_domains(conn):
     cursor = conn.cursor()
@@ -193,7 +194,10 @@ if __name__ == "__main__":
             print_colored("Failed to fetch excluded list, exiting…", "red")
             sys.exit(1)
 
-        domain_list = fetch_domain_list(conn, exclude_domains_sql)
+        if args.target is not None:
+            domain_list = [args.target]
+        else:
+            domain_list = fetch_domain_list(conn, exclude_domains_sql)
 
         if not domain_list:
             print_colored("No domains fetched, exiting…", "red")
