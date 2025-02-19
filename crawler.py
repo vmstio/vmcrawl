@@ -4,6 +4,7 @@
 from common import *
 # Import additional modules
 try:
+    import argparse
     import json
     import mimetypes
     import random
@@ -19,6 +20,16 @@ except ImportError as e:
 
 # Detect the current filename
 current_filename = os.path.basename(__file__)
+
+parser = argparse.ArgumentParser(description="Crawl version information from Mastodon instances.")
+parser.add_argument('-f', '--file', type=str, help='bypass database and use a file instead (ex: ~/domains.txt)')
+parser.add_argument('-t', '--target', type=str, help='target only a specific domain and ignore the database (ex: vmst.io)')
+
+args = parser.parse_args()
+
+if args.file and args.target:
+    print_colored("You cannot set both file and target arguments", "red")
+    sys.exit(1)
 
 def is_valid_email(email):
     pattern = r'^[\w\.-]+(?:\+[\w\.-]+)?@[\w\.-]+\.\w+$'
@@ -1180,12 +1191,17 @@ def get_user_choice() -> str:
 # Main program starts here
 print_colored(f"{appname} v{appversion} ({current_filename})", "bold")
 try:
-    domain_list_file = sys.argv[1] if len(sys.argv) > 1 else None
+    domain_list_file = args.file if args.file is not None else None
+    single_domain_target = args.target if args.target is not None else None
     try:
         if domain_list_file:  # File name provided as argument
             user_choice = 1
             domain_list = load_from_file(domain_list_file)
             print("Crawling domains from file…")
+        elif single_domain_target:  # Single domain provided as argument
+            user_choice = 1
+            domain_list = [single_domain_target]
+            print("Crawling single domain from target…")
         else:  # Load from database by default
             print_menu()
             user_choice = get_user_choice()
