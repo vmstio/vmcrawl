@@ -1,31 +1,24 @@
 #!/usr/bin/env python3
 
+# Import common modules
+from common import *
+# Import additional modules
 try:
-    from datetime import datetime, timedelta
-    import unicodedata
     import json
-    import os
-    import random
-    import re
-    import select
-    import sqlite3
-    import sys
     import mimetypes
-    from packaging import version
+    import random
+    import select
+    import unicodedata
     from bs4 import BeautifulSoup, Tag
-    from urllib.parse import urlparse, urlunparse
-    from dotenv import load_dotenv
+    from datetime import datetime, timedelta
     from lxml import etree
+    from urllib.parse import urlparse, urlunparse
 except ImportError as e:
     print(f"Error importing module: {e}")
     sys.exit(1)
 
-from common import *
-load_dotenv()
-
+# Detect the current filename
 current_filename = os.path.basename(__file__)
-db_path = os.getenv("db_path")
-conn = sqlite3.connect(db_path) # type: ignore
 
 def is_valid_email(email):
     pattern = r'^[\w\.-]+(?:\+[\w\.-]+)?@[\w\.-]+\.\w+$'

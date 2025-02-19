@@ -1,21 +1,16 @@
 #!/usr/bin/env python3
 
+# Import common modules
+from common import *
+# Import additional modules
 try:
-    import sqlite3
-    import os
     import subprocess
-    import sys
-    from dotenv import load_dotenv
 except ImportError as e:
     print(f"Error importing module: {e}")
     sys.exit(1)
 
-from common import *
-load_dotenv()
-
+# Detect the current filename
 current_filename = os.path.basename(__file__)
-db_path = os.getenv("db_path")
-conn = sqlite3.connect(db_path) # type: ignore
 
 db_limit = 100
 db_offset = 0

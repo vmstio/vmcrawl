@@ -1,19 +1,16 @@
+#!/usr/bin/env python3
+
+# Import common modules
+from common import *
+# Import additional modules
 try:
-    import sys
-    import sqlite3
     import ipaddress
-    import re
-    from dotenv import load_dotenv
-    import os
 except ImportError as e:
     print(f"Error importing module: {e}")
     sys.exit(1)
 
-from common import *
-load_dotenv()
-
-db_path = os.getenv("db_path")
-conn = sqlite3.connect(db_path) # type: ignore
+# Detect the current filename
+current_filename = os.path.basename(__file__)
 
 def is_valid_domain(domain):
     domain_pattern = re.compile(r'^[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$', re.IGNORECASE)

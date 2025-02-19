@@ -1,15 +1,32 @@
+#!/usr/bin/env python3
+
+# Import required modules
 try:
+    import csv
+    import hashlib
     import httpx
-    import toml
     import os
     import re
+    import sqlite3
+    import sys
     import time
-    import hashlib
-    from packaging import version
-    import csv
+    import toml
+    from dotenv import load_dotenv
     from io import StringIO
+    from packaging import version
 except ImportError as e:
     print(f"Error importing module: {e}")
+    sys.exit(1)
+
+# Import the dotenv file
+try:
+    load_dotenv()
+except Exception as e:
+    print(f"Error loading .env file: {e}")
+    sys.exit(1)
+
+db_path = os.getenv("db_path")
+conn = sqlite3.connect(db_path) # type: ignore
 
 # Versioning information
 toml_file_path = os.path.join(os.path.dirname(__file__), 'pyproject.toml')
