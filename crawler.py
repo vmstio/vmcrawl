@@ -1221,8 +1221,10 @@ try:
     iftas_domains = get_iftas_dni()
 
     check_and_record_domains(domain_list, ignored_domains, failed_domains, user_choice, junk_domains, bad_tlds, domain_endings, http_client, nxdomain_domains, norobots_domains, iftas_domains)
+
+    print_colored("Crawling complete!", "bold")
 except KeyboardInterrupt:
-    conn.close()
     print_colored(f"\n{appname} interrupted by user", "bold")
 finally:
-    print("Crawling complete!")
+    conn.close()
+    http_client.close()

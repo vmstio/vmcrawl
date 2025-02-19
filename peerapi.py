@@ -160,3 +160,4 @@ if __name__ == "__main__":
         import_domains(unique_domains)
     except KeyboardInterrupt:
         conn.close()
+        http_client.close()

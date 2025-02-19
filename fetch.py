@@ -100,11 +100,13 @@ def main():
     for counter, domain in enumerate(domain_list, start=1):
         process_domain(domain, counter, total)
 
+    print_colored("Fetching complete!", "bold")
+
 if __name__ == "__main__":
     try:
         main()
     except KeyboardInterrupt:
-        conn.close()
-        print(f"\n{appname} interrupted by user. Exiting gracefully…")
+        print_colored(f"\n{appname} interrupted by user", "bold")
     finally:
-        print("Fetching complete!")
+        conn.close()
+        http_client.close()
