@@ -135,26 +135,29 @@ def get_domains(api_url, domain):
     return []
 
 if __name__ == "__main__":
-    if len(sys.argv) < 2:
-        print("Usage: ./import.py [domain]")
-        sys.exit(1)
+    try:
+        if len(sys.argv) < 2:
+            print("Usage: ./import.py [domain]")
+            sys.exit(1)
 
-    domain = sys.argv[1]
-    api_url = f"https://{domain}/api/v1/instance/peers"
-    db_path = os.getenv("db_path")
-    script_dir = os.path.dirname(os.path.abspath(__file__))
-    output_file = os.path.join(script_dir, f"target/import_{domain}.txt")
-    domain_endings = get_domain_endings()
+        domain = sys.argv[1]
+        api_url = f"https://{domain}/api/v1/instance/peers"
+        db_path = os.getenv("db_path")
+        script_dir = os.path.dirname(os.path.abspath(__file__))
+        output_file = os.path.join(script_dir, f"target/import_{domain}.txt")
+        domain_endings = get_domain_endings()
 
-    existing_domains = get_existing_domains()
-    existing_domains_count = len(existing_domains) if existing_domains is not None else 0
-    domains = get_domains(api_url, domain)  # Pass the domain and db_path to get_domains
-    unique_domains = [domain for domain in domains if domain not in existing_domains and domain.isascii()]
+        existing_domains = get_existing_domains()
+        existing_domains_count = len(existing_domains) if existing_domains is not None else 0
+        domains = get_domains(api_url, domain)  # Pass the domain and db_path to get_domains
+        unique_domains = [domain for domain in domains if domain not in existing_domains and domain.isascii()]
 
-    print(f"Found {len(domains)} domains, {len(unique_domains)} new domains")
-    if unique_domains == []:
-        # print("No new unique domains found")
-        sys.exit(0)
+        print(f"Found {len(domains)} domains, {len(unique_domains)} new domains")
+        if unique_domains == []:
+            # print("No new unique domains found")
+            sys.exit(0)
 
-    # write_to_file(unique_domains, output_file)
-    import_domains(unique_domains)
+        # write_to_file(unique_domains, output_file)
+        import_domains(unique_domains)
+    except KeyboardInterrupt:
+        conn.close()
