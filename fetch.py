@@ -24,13 +24,15 @@ if len(sys.argv) > 1:
     try:
         db_limit = int(sys.argv[1])
     except ValueError:
-        print(f"Invalid limit value provided. Using default limit of {db_limit}.")
+        print(f"Invalid limit value provided. Must be a valid integer.")
+        sys.exit(1)
 
 if len(sys.argv) > 2:
     try:
         db_offset = int(sys.argv[2])
     except ValueError:
-        print(f"Invalid offset value provided. Using default offset of {db_offset}.")
+        print(f"Invalid offset value provided. Must be a valid integer.")
+        sys.exit(1)
 
 def fetch_exclude_domains(conn):
     cursor = conn.cursor()
