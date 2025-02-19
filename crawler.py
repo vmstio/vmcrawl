@@ -2,7 +2,6 @@
 
 try:
     from datetime import datetime, timedelta
-    import httpx
     import unicodedata
     import json
     import os
@@ -13,7 +12,7 @@ try:
     import sys
     import mimetypes
     from packaging import version
-    from bs4 import BeautifulSoup
+    from bs4 import BeautifulSoup, Tag
     from urllib.parse import urlparse, urlunparse
     from dotenv import load_dotenv
     from lxml import etree
@@ -256,8 +255,10 @@ def find_code_repository(backend_domain):
 
         # Iterate over each link and check if it contains any of the repo domains
         for link in links:
-            if any(domain in link['href'] for domain in repo_domains):
-                return link['href']
+            if isinstance(link, Tag):
+                href = link.get('href')
+                if href and any(domain in href for domain in repo_domains):
+                    return href
     else:
         return None
 
@@ -527,7 +528,7 @@ def get_norobots_domains():
         cursor.close()
     return norobots_domains
 
-def check_and_record_domains(domain_list, ignored_domains, failed_domains, user_choice, junk_domains, bad_tlds, domain_endings, httpx_client, nxdomain_domains, norobots_domains, iftas_domains):
+def check_and_record_domains(domain_list, ignored_domains, failed_domains, user_choice, junk_domains, bad_tlds, domain_endings, http_client, nxdomain_domains, norobots_domains, iftas_domains):
     for index, domain in enumerate(domain_list, start=1):
         print_colored(f'Crawling @ {domain} ({index}/{len(domain_list)})', 'bold')
 
@@ -541,7 +542,7 @@ def check_and_record_domains(domain_list, ignored_domains, failed_domains, user_
             continue
 
         try:
-            process_domain(domain, httpx_client)
+            process_domain(domain, http_client)
         except Exception as e:
             handle_http_exception(domain, e)
 
@@ -593,33 +594,33 @@ def is_iftas_domain(domain, iftas_domains):
         return True
     return False
 
-def process_domain(domain, httpx_client):
+def process_domain(domain, http_client):
     if has_emoji_or_special_chars(domain):
         print_colored('Domain contains special characters - NXDOMAIN!', 'red')
         mark_nxdomain_domain(domain)
         delete_domain_if_known(domain)
         return
 
-    if not check_robots_txt(domain, httpx_client):
+    if not check_robots_txt(domain, http_client):
         return  # Stop processing this domain
 
-    webfinger_data = check_webfinger(domain, httpx_client)
+    webfinger_data = check_webfinger(domain, http_client)
     if not webfinger_data:
         return
 
-    nodeinfo_data = check_nodeinfo(domain, webfinger_data['backend_domain'], httpx_client)
+    nodeinfo_data = check_nodeinfo(domain, webfinger_data['backend_domain'], http_client)
     if not nodeinfo_data:
         return
 
     if is_mastodon_instance(nodeinfo_data):
-        process_mastodon_instance(domain, webfinger_data, nodeinfo_data, httpx_client)
+        process_mastodon_instance(domain, webfinger_data, nodeinfo_data, http_client)
     else:
         mark_as_non_mastodon(domain)
 
-def check_robots_txt(domain, httpx_client):
+def check_robots_txt(domain, http_client):
     robots_url = f'https://{domain}/robots.txt'
     try:
-        response = httpx_client.get(robots_url)
+        response = http_client.get(robots_url)
         # Check for valid HTTP status code
         if response.status_code in [200]:
             content_type = response.headers.get('Content-Type', '')
@@ -661,16 +662,16 @@ def check_robots_txt(domain, httpx_client):
         return False
     return True
 
-def check_webfinger(domain, httpx_client):
+def check_webfinger(domain, http_client):
     webfinger_url = f'https://{domain}/.well-known/webfinger?resource=acct:{domain}@{domain}'
     try:
-        response = httpx_client.get(webfinger_url)
+        response = http_client.get(webfinger_url)
         content_type = response.headers.get('Content-Type', '')
         content_length = response.headers.get('Content-Length', '')
         if response.status_code in [200]:
             if 'json' not in content_type:
                 print('WebFinger reply is not a JSON file…')
-                hostmeta_result = check_hostmeta(domain, httpx_client)
+                hostmeta_result = check_hostmeta(domain, http_client)
                 if hostmeta_result:
                     backend_domain = hostmeta_result['backend_domain']
                     return {'backend_domain': backend_domain}
@@ -678,7 +679,7 @@ def check_webfinger(domain, httpx_client):
                     return None
             if not response.content:
                 print('WebFinger reply is empty…')
-                hostmeta_result = check_hostmeta(domain, httpx_client)
+                hostmeta_result = check_hostmeta(domain, http_client)
                 if hostmeta_result:
                     backend_domain = hostmeta_result['backend_domain']
                     return {'backend_domain': backend_domain}
@@ -697,7 +698,7 @@ def check_webfinger(domain, httpx_client):
                 # Check for specific HTTP status codes
             else:
                 print('WebFinger reply does not contain a valid alias…')
-                hostmeta_result = check_hostmeta(domain, httpx_client)
+                hostmeta_result = check_hostmeta(domain, http_client)
                 if hostmeta_result:
                     backend_domain = hostmeta_result['backend_domain']
                     return {'backend_domain': backend_domain}
@@ -715,7 +716,7 @@ def check_webfinger(domain, httpx_client):
                 return None
             else:
                 print(f'Responded HTTP {response.status_code} to WebFinger request…')
-                hostmeta_result = check_hostmeta(domain, httpx_client)
+                hostmeta_result = check_hostmeta(domain, http_client)
                 if hostmeta_result:
                     backend_domain = hostmeta_result['backend_domain']
                     return {'backend_domain': backend_domain}
@@ -733,10 +734,10 @@ def check_webfinger(domain, httpx_client):
         handle_json_exception(domain, e)
     return None
 
-def check_hostmeta(domain, httpx_client):
+def check_hostmeta(domain, http_client):
     hostmeta_url = f'https://{domain}/.well-known/host-meta'
     try:
-        response = httpx_client.get(hostmeta_url)
+        response = http_client.get(hostmeta_url)
         if response.status_code in [200]:
             content_type = response.headers.get('Content-Type', '')
             if 'xml' not in content_type:
@@ -785,10 +786,10 @@ def check_hostmeta(domain, httpx_client):
     except etree.XMLSyntaxError as e:
         handle_xml_exception(domain, e)
 
-def check_nodeinfo(domain, backend_domain, httpx_client):
+def check_nodeinfo(domain, backend_domain, http_client):
     nodeinfo_url = f'https://{backend_domain}/.well-known/nodeinfo'
     try:
-        response = httpx_client.get(nodeinfo_url)
+        response = http_client.get(nodeinfo_url)
         if response.status_code in [200]:
             content_type = response.headers.get('Content-Type', '')
             if 'json' not in content_type:
@@ -810,7 +811,7 @@ def check_nodeinfo(domain, backend_domain, httpx_client):
             if 'links' in data and len(data['links']) > 0:
                 nodeinfo_2_url = next((link['href'] for link in data['links'] if link.get('rel') == 'http://nodeinfo.diaspora.software/ns/schema/2.0'), None)
                 if nodeinfo_2_url and 'wp-json' not in nodeinfo_2_url:
-                    nodeinfo_response = httpx_client.get(nodeinfo_2_url)
+                    nodeinfo_response = http_client.get(nodeinfo_2_url)
                     if nodeinfo_response.status_code in [200]:
                         nodeinfo_response_content_type = nodeinfo_response.headers.get('Content-Type', '')
                         if 'json' not in nodeinfo_response_content_type:
@@ -879,7 +880,7 @@ def is_mastodon_instance(nodeinfo_data: dict) -> bool:
 
     return software_name.lower() in {'mastodon', 'hometown', 'kmyblue', 'glitchcafe'}
 
-def process_mastodon_instance(domain, webfinger_data, nodeinfo_data, httpx_client):
+def process_mastodon_instance(domain, webfinger_data, nodeinfo_data, http_client):
     software_name = nodeinfo_data['software']['name'].lower()
     software_version_full = nodeinfo_data['software']['version']
     software_version = clean_version(nodeinfo_data['software']['version'])
@@ -892,7 +893,7 @@ def process_mastodon_instance(domain, webfinger_data, nodeinfo_data, httpx_clien
         instance_api_url = f'https://{webfinger_data["backend_domain"]}/api/v1/instance'
 
     try:
-        response = httpx_client.get(instance_api_url)
+        response = http_client.get(instance_api_url)
         if response.status_code in [200]:
             content_type = response.headers.get('Content-Type', '')
             if 'json' not in content_type:
@@ -1222,7 +1223,6 @@ try:
     check_and_record_domains(domain_list, ignored_domains, failed_domains, user_choice, junk_domains, bad_tlds, domain_endings, http_client, nxdomain_domains, norobots_domains, iftas_domains)
 except KeyboardInterrupt:
     conn.close()
-    http_client.close()  # Close the httpx client
     print_colored(f"\n{appname} interrupted by user", "bold")
 finally:
     print("Crawling complete!")
