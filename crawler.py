@@ -1096,13 +1096,13 @@ def load_from_database(user_choice):
     # PostgreSQL uses SIMILAR TO instead of GLOB, and different timestamp functions
     query_map = {
         "0": "SELECT domain FROM raw_domains WHERE errors = 0 ORDER BY LENGTH(DOMAIN) ASC",
-        "1": f"SELECT domain FROM raw_domains WHERE (failed IS NULL OR failed = '' OR failed = '0') AND (ignore IS NULL OR ignore = '' OR ignore = '0') AND (nxdomain IS NULL OR nxdomain = '' OR nxdomain = '0') AND (norobots IS NULL OR norobots = '' OR norobots = '0') AND (errors <= %s OR errors IS NULL) ORDER BY domain ASC",
+        "1": f"SELECT domain FROM raw_domains WHERE (failed IS NULL OR failed = FALSE) AND (ignore IS NULL OR ignore = FALSE) AND (nxdomain IS NULL OR nxdomain = FALSE) AND (norobots IS NULL OR norobots = FALSE) AND (errors <= %s OR errors IS NULL) ORDER BY domain ASC",
         "4": f"SELECT domain FROM raw_domains WHERE errors >= %s ORDER BY LENGTH(DOMAIN) ASC",
         "5": f"SELECT domain FROM raw_domains WHERE errors <= %s ORDER BY LENGTH(DOMAIN) ASC",
-        "6": "SELECT domain FROM raw_domains WHERE ignore = '1' ORDER BY domain",
-        "7": "SELECT domain FROM raw_domains WHERE failed = '1' ORDER BY domain",
-        "8": "SELECT domain FROM raw_domains WHERE nxdomain = '1' ORDER BY domain",
-        "9": "SELECT domain FROM raw_domains WHERE norobots = '1' ORDER BY domain",
+        "6": "SELECT domain FROM raw_domains WHERE ignore = TRUE ORDER BY domain",
+        "7": "SELECT domain FROM raw_domains WHERE failed = TRUE ORDER BY domain",
+        "8": "SELECT domain FROM raw_domains WHERE nxdomain = TRUE ORDER BY domain",
+        "9": "SELECT domain FROM raw_domains WHERE norobots = TRUE ORDER BY domain",
         "10": "SELECT domain FROM raw_domains WHERE reason = 'SSL' ORDER BY errors ASC",
         "11": "SELECT domain FROM raw_domains WHERE reason = 'HTTP' ORDER BY errors ASC",
         "12": "SELECT domain FROM raw_domains WHERE reason = 'TIMEOUT' ORDER BY errors ASC",
