@@ -237,3 +237,6 @@ def get_iftas_dni():
             raise Exception(f"Failed to fetch IFTAS DNS. HTTP Status Code: {iftas_dns_response.status_code}")
 
     return iftas_domains
+
+def is_running_headless():
+    return not os.isatty(sys.stdout.fileno())

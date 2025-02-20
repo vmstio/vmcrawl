@@ -199,6 +199,10 @@ def process_domain(domain, counter, total):
 if __name__ == "__main__":
     try:
         print_colored(f"{appname} v{appversion} ({current_filename})", "bold")
+        if is_running_headless():
+            print_colored("Running in headless mode", "yellow")
+        else:
+            print_colored("Running in interactive mode", "green")
 
         exclude_domains_sql = fetch_exclude_domains(conn)
         domain_endings = get_domain_endings()

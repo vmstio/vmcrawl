@@ -23,7 +23,6 @@ current_filename = os.path.basename(__file__)
 
 parser = argparse.ArgumentParser(description="Crawl version information from Mastodon instances.")
 parser.add_argument('-f', '--file', type=str, help='bypass database and use a file instead (ex: ~/domains.txt)')
-parser.add_argument('-s', '--sort', type=str, help='change the sorting order of the domains (random, reverse, or standard)')
 parser.add_argument('-t', '--target', type=str, help='target only a specific domain and ignore the database (ex: vmst.io)')
 
 args = parser.parse_args()
@@ -1198,18 +1197,17 @@ def print_menu() -> None:
     sys.stdout.flush()
 
 def get_user_choice() -> str:
-    ready, _, _ = select.select([sys.stdin], [], [], 10)
-    if ready:
-        return sys.stdin.readline().strip()
-    print_colored("\nAutomatically loading to random crawl", "cyan")
-    return "1"
+    return sys.stdin.readline().strip()
 
 # Main program starts here
 print_colored(f"{appname} v{appversion} ({current_filename})", "bold")
+if is_running_headless():
+    print_colored("Running in headless mode", "yellow")
+else:
+    print_colored("Running in interactive mode", "green")
 try:
     domain_list_file = args.file if args.file is not None else None
     single_domain_target = args.target if args.target is not None else None
-    sort_mode = args.sort if args.sort is not None else None
     try:
         if domain_list_file:  # File name provided as argument
             user_choice = 1
@@ -1219,21 +1217,12 @@ try:
             user_choice = 1
             domain_list = single_domain_target.replace(' ', '').split(',')
             print("Crawling single domain from target…")
-        elif sort_mode:  # Sort mode provided as argument
-            if sort_mode == "random":
-                user_choice = "3"
-            elif sort_mode == "reverse":
-                user_choice = "2"
-            elif sort_mode == "standard":
-                user_choice = "1"
-            else:
-                print_colored(f"Sort mode {sort_mode} was not available, using default query…", "yellow")
-                user_choice = "1"
-            print_colored(f"Sorting domains by choice {user_choice}…", "bold")
-            domain_list = load_from_database(user_choice)
         else:  # Load from database by default
-            print_menu()
-            user_choice = get_user_choice()
+            if not is_running_headless():
+                print_menu()
+                user_choice = get_user_choice()
+            else:
+                user_choice = "3"  # Default to random crawl in headless mode
             print_colored(f"Crawling domains from database choice {user_choice}…", "pink")
             domain_list = load_from_database(user_choice)
 
