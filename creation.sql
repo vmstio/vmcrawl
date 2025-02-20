@@ -44,6 +44,7 @@ CREATE TABLE
 INSERT INTO
   bad_tld (tld)
 VALUES
+  ('arpa'),
   ('gov'),
   ('mil'),
   ('su');
