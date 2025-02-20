@@ -1043,11 +1043,7 @@ def handle_http_exception(domain, exception):
             increment_domain_error(domain, error_reason)
             delete_domain_if_known(domain)
     else:
-        if 'Errno 8' in error_message or 'Errno 61' in error_message:
-            print_colored('DNS query did not return valid results - NXDOMAIN!', 'red')
-            mark_nxdomain_domain(domain)
-            delete_domain_if_known(domain)
-        elif 'Errno 51' in error_message:
+        if 'Errno 51' in error_message:
             print_colored('Network is unreachable - FAIL!', 'red')
             mark_failed_domain(domain)
             delete_domain_if_known(domain)
