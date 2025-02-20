@@ -61,7 +61,7 @@ def log_error(domain, error_to_print):
     try:
         cursor.execute('''
             INSERT INTO error_log (domain, error)
-            VALUES (?, ?)
+            VALUES (%s, %s)
         ''', (domain, error_to_print))
         conn.commit()
     except Exception as e:
@@ -73,7 +73,7 @@ def log_error(domain, error_to_print):
 def increment_domain_error(domain, error_reason):
     cursor = conn.cursor()
     try:
-        cursor.execute('SELECT errors FROM raw_domains WHERE domain = ?', (domain,))
+        cursor.execute('SELECT errors FROM raw_domains WHERE domain = %s', (domain,))
         result = cursor.fetchone()
         if result:
             current_errors = result[0] if result[0] is not None else 0
@@ -85,7 +85,7 @@ def increment_domain_error(domain, error_reason):
         # Insert or update the domain with the new errors count
         cursor.execute('''
             INSERT INTO raw_domains (domain, failed, ignore, errors, reason, nxdomain, norobots)
-            VALUES (?, ?, ?, ?, ?, ?, ?)
+            VALUES (%s, %s, %s, %s, %s, %s, %s)
             ON CONFLICT(domain) DO UPDATE SET
             failed = excluded.failed,
             ignore = excluded.ignore,
@@ -104,10 +104,10 @@ def increment_domain_error(domain, error_reason):
 def delete_if_error_max(domain):
     cursor = conn.cursor()
     try:
-        cursor.execute('SELECT errors FROM raw_domains WHERE domain = ?', (domain,))
+        cursor.execute('SELECT errors FROM raw_domains WHERE domain = %s', (domain,))
         result = cursor.fetchone()
         if result and result[0] >= error_threshold:
-            cursor.execute('SELECT timestamp FROM mastodon_domains WHERE domain = ?', (domain,))
+            cursor.execute('SELECT timestamp FROM mastodon_domains WHERE domain = %s', (domain,))
             timestamp = cursor.fetchone()
             if timestamp and (datetime.now() - datetime.strptime(timestamp[0], '%Y-%m-%d %H:%M:%S')).days >= error_threshold:
                 delete_domain_if_known(domain)
@@ -124,7 +124,7 @@ def clear_domain_error(domain):
         # Insert or update the domain with the new errors count
         cursor.execute('''
             INSERT INTO raw_domains (domain, failed, ignore, errors, reason, nxdomain, norobots)
-            VALUES (?, ?, ?, ?, ?, ?, ?)
+            VALUES (%s, %s, %s, %s, %s, %s, %s)
             ON CONFLICT(domain) DO UPDATE SET
             failed = excluded.failed,
             ignore = excluded.ignore,
@@ -146,7 +146,7 @@ def mark_ignore_domain(domain):
         # Insert or update the domain with the new errors count
         cursor.execute('''
             INSERT INTO raw_domains (domain, failed, ignore, errors, reason, nxdomain, norobots)
-            VALUES (?, ?, ?, ?, ?, ?, ?)
+            VALUES (%s, %s, %s, %s, %s, %s, %s)
             ON CONFLICT(domain) DO UPDATE SET
             failed = excluded.failed,
             ignore = excluded.ignore,
@@ -154,7 +154,7 @@ def mark_ignore_domain(domain):
             reason = excluded.reason,
             nxdomain = excluded.nxdomain,
             norobots = excluded.norobots
-        ''', (domain, None, 1, None, None, None, None))
+        ''', (domain, None, True, None, None, None, None))
         conn.commit()
     except Exception as e:
         print(f"Failed to mark domain ignored: {e}")
@@ -168,7 +168,7 @@ def mark_failed_domain(domain):
         # Insert or update the domain with the new errors count
         cursor.execute('''
             INSERT INTO raw_domains (domain, failed, ignore, errors, reason, nxdomain, norobots)
-            VALUES (?, ?, ?, ?, ?, ?, ?)
+            VALUES (%s, %s, %s, %s, %s, %s, %s)
             ON CONFLICT(domain) DO UPDATE SET
             failed = excluded.failed,
             ignore = excluded.ignore,
@@ -176,7 +176,7 @@ def mark_failed_domain(domain):
             reason = excluded.reason,
             nxdomain = excluded.nxdomain,
             norobots = excluded.norobots
-        ''', (domain, 1, None, None, None, None, None))
+        ''', (domain, True, None, None, None, None, None))
         conn.commit()
     except Exception as e:
         print(f"Failed to mark domain failed: {e}")
@@ -190,7 +190,7 @@ def mark_nxdomain_domain(domain):
         # Insert or update the domain with the new errors count
         cursor.execute('''
             INSERT INTO raw_domains (domain, failed, ignore, errors, reason, nxdomain, norobots)
-            VALUES (?, ?, ?, ?, ?, ?, ?)
+            VALUES (%s, %s, %s, %s, %s, %s, %s)
             ON CONFLICT(domain) DO UPDATE SET
             failed = excluded.failed,
             ignore = excluded.ignore,
@@ -198,7 +198,7 @@ def mark_nxdomain_domain(domain):
             reason = excluded.reason,
             nxdomain = excluded.nxdomain,
             norobots = excluded.norobots
-        ''', (domain, None, None, None, None, 1, None))
+        ''', (domain, None, None, None, None, True, None))
         conn.commit()
     except Exception as e:
         print(f"Failed to mark domain NXDOMAIN: {e}")
@@ -212,7 +212,7 @@ def mark_norobots_domain(domain):
         # Insert or update the domain with the new errors count
         cursor.execute('''
             INSERT INTO raw_domains (domain, failed, ignore, errors, reason, nxdomain, norobots)
-            VALUES (?, ?, ?, ?, ?, ?, ?)
+            VALUES (%s, %s, %s, %s, %s, %s, %s)
             ON CONFLICT(domain) DO UPDATE SET
             failed = excluded.failed,
             ignore = excluded.ignore,
@@ -220,7 +220,7 @@ def mark_norobots_domain(domain):
             reason = excluded.reason,
             nxdomain = excluded.nxdomain,
             norobots = excluded.norobots
-        ''', (domain, None, None, None, None, None, 1))
+        ''', (domain, None, None, None, None, None, True))
         conn.commit()
     except Exception as e:
         print(f"Failed to mark domain NoRobots: {e}")
@@ -280,7 +280,7 @@ def delete_domain_if_known(domain):
     cursor = conn.cursor()
     try:
         cursor.execute('''
-            DELETE FROM mastodon_domains WHERE "domain" = ?
+            DELETE FROM mastodon_domains WHERE domain = %s
             ''', (domain,))
         conn.commit()
     except Exception as e:
@@ -293,7 +293,7 @@ def delete_domain_from_raw(domain):
     cursor = conn.cursor()
     try:
         cursor.execute('''
-            DELETE FROM raw_domains WHERE "domain" = ?
+            DELETE FROM raw_domains WHERE domain = %s
             ''', (domain,))
         conn.commit()
     except Exception as e:
@@ -997,7 +997,7 @@ def update_mastodon_domain(domain, software_version, software_version_full, tota
         cursor.execute('''
             INSERT INTO mastodon_domains
             (domain, software_version, total_users, active_users_monthly, timestamp, contact, source, full_version)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
             ON CONFLICT(domain) DO UPDATE SET
             software_version = excluded.software_version,
             total_users = excluded.total_users,
@@ -1166,13 +1166,13 @@ def load_from_file(file_name):
             if domain:  # Ensure the domain is not empty
                 domain_list.append(domain)
                 # Check if the domain already exists in the database
-                cursor.execute('SELECT COUNT(*) FROM raw_domains WHERE domain = ?', (domain,))
+                cursor.execute('SELECT COUNT(*) FROM raw_domains WHERE domain = %s', (domain,))
                 result = cursor.fetchone()
                 exists = result is not None and result[0] > 0
 
                 # If not, insert the new domain into the database
                 if not exists:
-                    cursor.execute('INSERT INTO raw_domains (domain, errors) VALUES (?, ?)', (domain, None))
+                    cursor.execute('INSERT INTO raw_domains (domain, errors) VALUES (%s, %s)', (domain, None))
                     cursor.close()
                 conn.commit()
     return domain_list
