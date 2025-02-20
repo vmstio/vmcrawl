@@ -8,7 +8,6 @@ try:
     import json
     import mimetypes
     import random
-    import select
     import unicodedata
     from bs4 import BeautifulSoup, Tag
     from datetime import datetime, timedelta
