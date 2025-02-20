@@ -1217,7 +1217,7 @@ try:
             print("Crawling domains from file…")
         elif single_domain_target:  # Single domain provided as argument
             user_choice = 1
-            domain_list = [single_domain_target]
+            domain_list = single_domain_target.split(',')
             print("Crawling single domain from target…")
         elif sort_mode:  # Sort mode provided as argument
             if sort_mode == "random":
