@@ -36,7 +36,7 @@ if args.offset is not None:
 def fetch_exclude_domains(conn):
     cursor = conn.cursor()
     try:
-        cursor.execute("SELECT GROUP_CONCAT('''' || Domain || '''', ',') FROM NoPeers")
+        cursor.execute("SELECT string_agg('''' || domain || '''', ',') FROM no_peers")
         exclude_domains_sql = cursor.fetchone()[0]
         return exclude_domains_sql if exclude_domains_sql else ""
     except Exception as e:
@@ -50,9 +50,9 @@ def fetch_domain_list(conn, exclude_domains_sql):
     cursor = conn.cursor()
     try:
         query = f"""
-            SELECT Domain FROM MastodonDomains
-            WHERE Domain NOT IN ({exclude_domains_sql})
-            ORDER BY "Active Users (Monthly)" DESC
+            SELECT domain FROM mastodon_domains
+            WHERE domain NOT IN ({exclude_domains_sql})
+            ORDER BY active_users_monthly DESC
             LIMIT {db_limit} OFFSET {db_offset}
         """
         cursor.execute(query)
@@ -89,7 +89,7 @@ def import_domains(domains):
     try:
         for domain in domains:
             lowercase_domain = domain.lower()
-            cursor.execute("INSERT INTO RawDomains (Domain, Errors) VALUES (?, 0)", (lowercase_domain,))
+            cursor.execute("INSERT INTO raw_domains (domain, errors) VALUES (%s, 0)", (lowercase_domain,))
         conn.commit()
     except Exception as e:
         print_colored(f"Failed to import domain list: {e}", "orange")
@@ -101,7 +101,7 @@ def import_domains(domains):
 def get_junk_keywords():
     cursor = conn.cursor()
     try:
-        cursor.execute("SELECT Keywords FROM JunkWords")
+        cursor.execute("SELECT keywords FROM junk_words")
         keywords = [row[0] for row in cursor.fetchall()]
         conn.commit()
         return keywords
@@ -115,7 +115,7 @@ def get_junk_keywords():
 def get_bad_tld():
     cursor = conn.cursor()
     try:
-        cursor.execute("SELECT TLD FROM BadTLD")
+        cursor.execute("SELECT tld FROM bad_tld")
         tlds = [row[0] for row in cursor.fetchall()]
         conn.commit()
         return tlds
@@ -129,11 +129,11 @@ def get_bad_tld():
 def add_to_no_peers(domain):
     cursor = conn.cursor()
     try:
-        cursor.execute("INSERT INTO NoPeers (Domain) VALUES (?)", (domain,))
+        cursor.execute("INSERT INTO no_peers (domain) VALUES (%s)", (domain,))
         conn.commit()
-        print_colored(f"{domain} added to NoPeers table", "red")
+        print_colored(f"{domain} added to no_peers table", "red")
     except Exception as e:
-        print_colored(f"Failed to add domain to NoPeers list: {e}", "orange")
+        print_colored(f"Failed to add domain to no_peers list: {e}", "orange")
         conn.rollback()
         return None
     finally:
@@ -142,7 +142,7 @@ def add_to_no_peers(domain):
 def get_existing_domains():
     cursor = conn.cursor()
     try:
-        cursor.execute("SELECT Domain FROM RawDomains")
+        cursor.execute("SELECT domain FROM raw_domains")
         existing_domains = [row[0] for row in cursor.fetchall()]
         conn.commit()
         return existing_domains
@@ -170,7 +170,7 @@ def get_domains(api_url, domain, domain_endings):
         return filtered_domains
     except Exception as e:
         print_colored(f"{e}", "orange")
-        add_to_no_peers(domain)  # Add domain to NoPeers if any other error occurs
+        add_to_no_peers(domain)  # Add domain to no_peers if any other error occurs
     return []
 
 def process_domain(domain, counter, total):
