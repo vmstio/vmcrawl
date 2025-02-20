@@ -996,16 +996,16 @@ def update_mastodon_domain(domain, software_version, software_version_full, tota
     try:
         cursor.execute('''
             INSERT INTO MastodonDomains
-            ("Domain", "Software Version", "Total Users", "Active Users (Monthly)", "Timestamp", "Contact", "Source", "Full Version")
+            ("Domain", "SoftwareVersion", "TotalUsers", "ActiveUsersMonthly", "Timestamp", "Contact", "Source", "FullVersion")
             VALUES (?, ?, ?, ?, ?, ?, ?, ?)
             ON CONFLICT("Domain") DO UPDATE SET
-            "Software Version" = excluded."Software Version",
-            "Total Users" = excluded."Total Users",
-            "Active Users (Monthly)" = excluded."Active Users (Monthly)",
+            "SoftwareVersion" = excluded."SoftwareVersion",
+            "TotalUsers" = excluded."TotalUsers",
+            "ActiveUsersMonthly" = excluded."ActiveUsersMonthly",
             "Timestamp" = excluded."Timestamp",
             "Contact" = excluded."Contact",
             "Source" = excluded."Source",
-            "Full Version" = excluded."Full Version"
+            "FullVersion" = excluded."FullVersion"
         ''', (domain, software_version, total_users, active_month_users,
               datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
               contact_account, source_url, software_version_full))
@@ -1114,10 +1114,10 @@ def load_from_database(user_choice):
         "32": "SELECT Domain FROM RawDomains WHERE Reason = 'TXT' ORDER BY Errors ASC",
         "33": "SELECT Domain FROM RawDomains WHERE Reason = 'XML' ORDER BY Errors ASC",
         "40": f"SELECT Domain FROM MastodonDomains WHERE Timestamp <= datetime('now', '-{error_threshold} days') ORDER BY Timestamp DESC",
-        "41": f"SELECT Domain FROM MastodonDomains WHERE \"Software Version\" NOT LIKE '{version_main_branch}%' AND \"Software Version\" NOT LIKE '{version_latest_release}' ORDER BY \"Total Users\" DESC",
-        "42": f"SELECT Domain FROM MastodonDomains WHERE \"Software Version\" LIKE '{version_main_branch}%' ORDER BY \"Total Users\" DESC",
-        "43": "SELECT Domain FROM MastodonDomains WHERE \"Active Users (Monthly)\" = '0' ORDER BY \"Total Users\" DESC",
-        "44": "SELECT Domain FROM MastodonDomains ORDER BY \"Total Users\" DESC",
+        "41": f"SELECT Domain FROM MastodonDomains WHERE \"SoftwareVersion\" NOT LIKE '{version_main_branch}%' AND \"SoftwareVersion\" NOT LIKE '{version_latest_release}' ORDER BY \"TotalUsers\" DESC",
+        "42": f"SELECT Domain FROM MastodonDomains WHERE \"SoftwareVersion\" LIKE '{version_main_branch}%' ORDER BY \"TotalUsers\" DESC",
+        "43": "SELECT Domain FROM MastodonDomains WHERE \"ActiveUsersMonthly\" = '0' ORDER BY \"TotalUsers\" DESC",
+        "44": "SELECT Domain FROM MastodonDomains ORDER BY \"TotalUsers\" DESC",
     }
 
     if user_choice in ["2", "3"]: # Reverse or Random
