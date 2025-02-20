@@ -1217,7 +1217,7 @@ try:
             print("Crawling domains from file…")
         elif single_domain_target:  # Single domain provided as argument
             user_choice = 1
-            domain_list = single_domain_target.split(',')
+            domain_list = single_domain_target.replace(' ', '').split(',')
             print("Crawling single domain from target…")
         elif sort_mode:  # Sort mode provided as argument
             if sort_mode == "random":
@@ -1229,7 +1229,7 @@ try:
             else:
                 print_colored(f"Sort mode {sort_mode} was not available, using default query…", "yellow")
                 user_choice = "1"
-            print(f"Sorting domains by choice {user_choice}…")
+            print_colored(f"Sorting domains by choice {user_choice}…", "bold")
             domain_list = load_from_database(user_choice)
         else:  # Load from database by default
             print_menu()
