@@ -87,10 +87,13 @@ def detect_vowels(domain):
 def import_domains(domains):
     cursor = conn.cursor()
     try:
-        for domain in domains:
-            lowercase_domain = domain.lower()
-            cursor.execute("INSERT INTO raw_domains (domain, errors) VALUES (%s, 0)", (lowercase_domain,))
-        conn.commit()
+        if domains:
+            values = [(domain.lower(), 0) for domain in domains]
+            args_str = ','.join(['(%s,%s)' for _ in values])
+            flattened_values = [item for sublist in values for item in sublist]
+            cursor.execute("INSERT INTO raw_domains (domain, errors) VALUES " + args_str, flattened_values)
+            print_colored(f"Imported {len(domains)} domains", "green")
+            conn.commit()
     except Exception as e:
         print_colored(f"Failed to import domain list: {e}", "orange")
         conn.rollback()
