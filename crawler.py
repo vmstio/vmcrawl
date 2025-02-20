@@ -1114,7 +1114,7 @@ def load_from_database(user_choice):
         "31": "SELECT domain FROM raw_domains WHERE reason = 'JSON' ORDER BY errors ASC",
         "32": "SELECT domain FROM raw_domains WHERE reason = 'TXT' ORDER BY errors ASC",
         "33": "SELECT domain FROM raw_domains WHERE reason = 'XML' ORDER BY errors ASC",
-        "40": f"SELECT domain FROM mastodon_domains WHERE timestamp <= NOW() - INTERVAL '%s days' ORDER BY timestamp DESC",
+        "40": "SELECT domain FROM mastodon_domains WHERE timestamp::timestamptz <= NOW() - INTERVAL '%s days' ORDER BY timestamp DESC",
         "41": f"SELECT domain FROM mastodon_domains WHERE software_version NOT LIKE %s AND software_version NOT LIKE %s ORDER BY total_users DESC",
         "42": f"SELECT domain FROM mastodon_domains WHERE software_version LIKE %s ORDER BY total_users DESC",
         "43": "SELECT domain FROM mastodon_domains WHERE active_users_monthly = '0' ORDER BY total_users DESC",
