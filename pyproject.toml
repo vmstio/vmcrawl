@@ -11,6 +11,5 @@ dependencies = [
     "python-dotenv",
     "toml",
     "lxml",
-    "re",
     "packaging",
 ]
