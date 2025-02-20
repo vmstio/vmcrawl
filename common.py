@@ -7,7 +7,7 @@ try:
     import httpx
     import os
     import re
-    import sqlite3
+    import psycopg
     import sys
     import time
     import toml
@@ -25,8 +25,22 @@ except Exception as e:
     print(f"Error loading .env file: {e}")
     sys.exit(1)
 
-db_path = os.getenv("db_path")
-conn = sqlite3.connect(db_path) # type: ignore
+# PostgreSQL connection parameters
+db_name = os.getenv("POSTGRES_DB")
+db_user = os.getenv("POSTGRES_USER")
+db_password = os.getenv("POSTGRES_PASSWORD")
+db_host = os.getenv("POSTGRES_HOST", "localhost")
+db_port = os.getenv("POSTGRES_PORT", "5432")
+
+# Create PostgreSQL connection string
+conn_string = f"postgresql://{db_user}:{db_password}@{db_host}:{db_port}/{db_name}"
+
+try:
+    conn = psycopg.connect(conn_string)
+    # print("Connected to PostgreSQL database successfully.")
+except psycopg.Error as e:
+    print(f"Error connecting to PostgreSQL database: {e}")
+    sys.exit(1)
 
 # Versioning information
 toml_file_path = os.path.join(os.path.dirname(__file__), 'pyproject.toml')
