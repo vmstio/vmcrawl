@@ -1145,7 +1145,7 @@ def load_from_database(user_choice):
 
     cursor = conn.cursor()
     try:
-        cursor.execute(query, params if params else None)
+        cursor.execute(query, params if params else None) # type: ignore
         domain_list = [row[0].strip() for row in cursor.fetchall() if row[0].strip()]
         conn.commit()
     except Exception as e:
