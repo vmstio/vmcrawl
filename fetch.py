@@ -49,12 +49,19 @@ def fetch_exclude_domains(conn):
 def fetch_domain_list(conn, exclude_domains_sql):
     cursor = conn.cursor()
     try:
-        query = f"""
-            SELECT domain FROM mastodon_domains
-            WHERE domain NOT IN ({exclude_domains_sql})
-            ORDER BY active_users_monthly DESC
-            LIMIT {db_limit} OFFSET {db_offset}
-        """
+        if exclude_domains_sql:
+            query = f"""
+                SELECT domain FROM mastodon_domains
+                WHERE domain NOT IN ({exclude_domains_sql})
+                ORDER BY active_users_monthly DESC
+                LIMIT {db_limit} OFFSET {db_offset}
+            """
+        else:
+            query = f"""
+                SELECT domain FROM mastodon_domains
+                ORDER BY active_users_monthly DESC
+                LIMIT {db_limit} OFFSET {db_offset}
+            """
         cursor.execute(query)
         return [row[0] for row in cursor.fetchall()]
     except Exception as e:
