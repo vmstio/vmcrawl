@@ -2,10 +2,12 @@
 
 # Import required modules
 try:
+    import argparse
     import csv
     import hashlib
     import httpx
     import os
+    import random
     import re
     import psycopg
     import sys
