@@ -15,6 +15,7 @@ It is reccomended to use a dedicated Python virtual envionment within the cloned
 git clone https://github.com/vmstio/vmcrawl.git
 cd vmcrawl
 python -m venv .venv
+source .venv/bin/activate
 pip install --upgrade pip
 pip install .
 ```
