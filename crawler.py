@@ -20,6 +20,7 @@ current_filename = os.path.basename(__file__)
 
 parser = argparse.ArgumentParser(description="Crawl version information from Mastodon instances.")
 parser.add_argument('-f', '--file', type=str, help='bypass database and use a file instead (ex: ~/domains.txt)')
+parser.add_argument('-r', '--new', action='store_true', help='only process new domains added to the database (same as menu item 0)')
 parser.add_argument('-t', '--target', type=str, help='target only a specific domain and ignore the database (ex: vmst.io)')
 
 args = parser.parse_args()
@@ -1211,11 +1212,15 @@ try:
             domain_list = single_domain_target.replace(' ', '').split(',')
             print("Crawling single domain from target…")
         else:  # Load from database by default
-            if not is_running_headless():
+            if not is_running_headless() and not args.new:
                 print_menu()
                 user_choice = get_user_choice()
             else:
                 user_choice = "3"  # Default to random crawl in headless mode
+
+            if args.new:
+                user_choice = "0"
+
             print_colored(f"Crawling domains from database choice {user_choice}…", "pink")
             domain_list = load_from_database(user_choice)
 
