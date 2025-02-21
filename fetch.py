@@ -27,6 +27,10 @@ if (args.limit or args.offset) and args.target:
     print_colored("You cannot set both limit/offset and target arguments", "pink")
     sys.exit(1)
 
+if args.offset and args.random:
+    print_colored("You cannot set both offset and random arguments", "pink")
+    sys.exit(1)
+
 if args.limit is not None:
     db_limit = args.limit
 
@@ -52,8 +56,8 @@ def fetch_domain_list(conn, exclude_domains_sql):
         if exclude_domains_sql:
             query = f"""
                 SELECT domain FROM mastodon_domains
-                WHERE domain NOT IN ({exclude_domains_sql})
                 WHERE active_users_monthly > 100
+                AND domain NOT IN ({exclude_domains_sql})
                 ORDER BY active_users_monthly DESC
                 LIMIT {db_limit} OFFSET {db_offset}
             """
