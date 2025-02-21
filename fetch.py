@@ -5,8 +5,6 @@ from common import *
 # Import additional modules
 try:
     import ipaddress
-    import argparse
-    import random
 except ImportError as e:
     print(f"Error importing module: {e}")
     sys.exit(1)
@@ -14,7 +12,7 @@ except ImportError as e:
 # Detect the current filename
 current_filename = os.path.basename(__file__)
 
-db_limit = 100
+db_limit = os.getenv("DB_FETCH_LIMIT", "10")
 db_offset = 0
 
 parser = argparse.ArgumentParser(description="Fetch peer data from Mastodon instances.")
@@ -55,12 +53,14 @@ def fetch_domain_list(conn, exclude_domains_sql):
             query = f"""
                 SELECT domain FROM mastodon_domains
                 WHERE domain NOT IN ({exclude_domains_sql})
+                WHERE active_users_monthly > 100
                 ORDER BY active_users_monthly DESC
                 LIMIT {db_limit} OFFSET {db_offset}
             """
         else:
             query = f"""
                 SELECT domain FROM mastodon_domains
+                WHERE active_users_monthly > 100
                 ORDER BY active_users_monthly DESC
                 LIMIT {db_limit} OFFSET {db_offset}
             """
