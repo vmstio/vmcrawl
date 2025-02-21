@@ -832,11 +832,11 @@ def check_nodeinfo(domain, backend_domain, http_client):
                         else:
                             return nodeinfo_response.json()
                     elif nodeinfo_response.status_code in http_codes_to_fail and response.status_code != 404:
-                        print_colored(f'Responded HTTP {nodeinfo_response.status_code} @ {nodeinfo_2_url} - FAILED', 'red')
+                        print_colored(f'Responded HTTP {nodeinfo_response.status_code} to NodeInfo request - FAILED', 'red')
                         mark_failed_domain(domain)
                         delete_domain_if_known(domain)
                     else:
-                        error_message = f'Responded HTTP {nodeinfo_response.status_code} @ {nodeinfo_2_url}'
+                        error_message = f'Responded HTTP {nodeinfo_response.status_code} to NodeInfo request'
                         print_colored(f'{error_message}', 'yellow')
                         log_error(domain, f'{error_message}')
                         increment_domain_error(domain, str(nodeinfo_response.status_code))
@@ -1023,8 +1023,8 @@ def handle_http_exception(domain, exception):
     error_message = str(exception)
     if 'ssl' in error_message.casefold() and 'timed out' not in error_message.casefold():
         if "CERTIFICATE_VERIFY_FAILED" in error_message and 'masto.host' in domain:
-            print_colored('Dead masto.host instance - FAILED', 'red')
-            mark_failed_domain(domain)
+            print_colored('Dead masto.host instance - NXDOMAIN', 'red')
+            mark_nxdomain_domain(domain)
             delete_domain_if_known(domain)
         else:
             error_reason = 'SSL'
@@ -1034,12 +1034,12 @@ def handle_http_exception(domain, exception):
             delete_domain_if_known(domain)
     else:
         if 'maximum allowed redirects' in error_message.casefold():
-            print_colored('Exceeded maximum allowed redirects - FAILED', 'red')
-            mark_failed_domain(domain)
+            print_colored('Exceeded maximum allowed redirects - NXDOMAIN', 'red')
+            mark_nxdomain_domain(domain)
             delete_domain_if_known(domain)
         elif 'stream_id:7' in error_message.casefold() and 'error_code:2' in error_message.casefold():
-            print_colored('Received an empty response - FAILED', 'red')
-            mark_failed_domain(domain)
+            print_colored('Received an empty response - NXDOMAIN', 'red')
+            mark_nxdomain_domain(domain)
             delete_domain_if_known(domain)
         elif 'timed out' in error_message.casefold():
             error_reason = 'TIMEOUT'
