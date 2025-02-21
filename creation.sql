@@ -31,6 +31,14 @@ CREATE TABLE
   no_peers (domain TEXT PRIMARY KEY);
 
 CREATE TABLE
+  patch_versions (
+    software_version TEXT PRIMARY KEY,
+    main BOOLEAN DEFAULT NULL,
+    release BOOLEAN DEFAULT NULL,
+    n_level INTEGER DEFAULT NULL
+    );
+
+CREATE TABLE
   raw_domains (
     domain TEXT PRIMARY KEY,
     failed BOOLEAN DEFAULT NULL,
@@ -48,6 +56,14 @@ VALUES
   ('gov'),
   ('mil'),
   ('su');
+
+INSERT INTO
+  patch_versions (software_version, main, release, n_level)
+VALUES
+  ('4.4.0-alpha.2', TRUE, FALSE, NULL),
+  ('4.3.3', FALSE, TRUE, 0),
+  ('4.2.15', FALSE, TRUE, 1),
+  ('4.1.22', FALSE, TRUE, 2);
 
 INSERT INTO
   junk_words (keywords)
