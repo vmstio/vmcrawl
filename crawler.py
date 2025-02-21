@@ -1022,15 +1022,7 @@ def mark_as_non_mastodon(domain):
 def handle_http_exception(domain, exception):
     error_message = str(exception)
     if 'ssl' in error_message.casefold() and 'timed out' not in error_message.casefold():
-        if "TLSV1_ALERT_INTERNAL_ERROR" in error_message or "TLSV1_UNRECOGNIZED_NAME" in error_message:
-            print_colored('TLSv1 handshake detected - FAILED', 'red')
-            mark_failed_domain(domain)
-            delete_domain_if_known(domain)
-        elif "SSLV3_ALERT_HANDSHAKE_FAILURE" in error_message:
-            print_colored('SSLv3 handshake detected - FAILED', 'red')
-            mark_failed_domain(domain)
-            delete_domain_if_known(domain)
-        elif "CERTIFICATE_VERIFY_FAILED" in error_message and 'masto.host' in domain:
+        if "CERTIFICATE_VERIFY_FAILED" in error_message and 'masto.host' in domain:
             print_colored('Dead masto.host instance - FAILED', 'red')
             mark_failed_domain(domain)
             delete_domain_if_known(domain)
@@ -1041,11 +1033,7 @@ def handle_http_exception(domain, exception):
             increment_domain_error(domain, error_reason)
             delete_domain_if_known(domain)
     else:
-        if 'Errno 51' in error_message:
-            print_colored('Network is unreachable - FAILED', 'red')
-            mark_failed_domain(domain)
-            delete_domain_if_known(domain)
-        elif 'maximum allowed redirects' in error_message.casefold():
+        if 'maximum allowed redirects' in error_message.casefold():
             print_colored('Exceeded maximum allowed redirects - FAILED', 'red')
             mark_failed_domain(domain)
             delete_domain_if_known(domain)
