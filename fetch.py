@@ -24,7 +24,7 @@ parser.add_argument('-t', '--target', type=str, help='target only a specific dom
 args = parser.parse_args()
 
 if (args.limit or args.offset) and args.target:
-    print_colored("You cannot set both limit/offset and target arguments", "red")
+    print_colored("You cannot set both limit/offset and target arguments", "pink")
     sys.exit(1)
 
 if args.limit is not None:
@@ -200,15 +200,15 @@ if __name__ == "__main__":
     try:
         print_colored(f"{appname} v{appversion} ({current_filename})", "bold")
         if is_running_headless():
-            print_colored("Running in headless mode", "yellow")
+            print_colored("Running in headless mode", "pink")
         else:
-            print_colored("Running in interactive mode", "green")
+            print_colored("Running in interactive mode", "pink")
 
         exclude_domains_sql = fetch_exclude_domains(conn)
         domain_endings = get_domain_endings()
 
         if exclude_domains_sql is None:
-            print_colored("Failed to fetch excluded list, exiting…", "red")
+            print_colored("Failed to fetch excluded list, exiting…", "pink")
             sys.exit(1)
 
         if args.target is not None:
@@ -217,7 +217,7 @@ if __name__ == "__main__":
             domain_list = fetch_domain_list(conn, exclude_domains_sql)
 
         if not domain_list:
-            print_colored("No domains fetched, exiting…", "red")
+            print_colored("No domains fetched, exiting…", "pink")
             sys.exit(1)
 
         print(f"Fetching peer data from {len(domain_list)} instances…")
