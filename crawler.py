@@ -4,10 +4,8 @@
 from common import *
 # Import additional modules
 try:
-    import argparse
     import json
     import mimetypes
-    import random
     import unicodedata
     from bs4 import BeautifulSoup, Tag
     from datetime import datetime, timedelta
