@@ -6,6 +6,7 @@ from common import *
 try:
     import ipaddress
     import argparse
+    import random
 except ImportError as e:
     print(f"Error importing module: {e}")
     sys.exit(1)
@@ -19,6 +20,7 @@ db_offset = 0
 parser = argparse.ArgumentParser(description="Fetch peer data from Mastodon instances.")
 parser.add_argument('-l', '--limit', type=int, help=f'limit the number of domains requested from database (default: {db_limit})')
 parser.add_argument('-o', '--offset', type=int, help=f'offset the top of the domains requested from database (default: {db_offset})')
+parser.add_argument('-r', '--random', action='store_true', help='randomize the order of the domains returned (default: disabled)')
 parser.add_argument('-t', '--target', type=str, help='target only a specific domain and ignore the database (ex: vmst.io)')
 
 args = parser.parse_args()
@@ -63,7 +65,10 @@ def fetch_domain_list(conn, exclude_domains_sql):
                 LIMIT {db_limit} OFFSET {db_offset}
             """
         cursor.execute(query)
-        return [row[0] for row in cursor.fetchall()]
+        result = [row[0] for row in cursor.fetchall()]
+        if args.random is True:
+            random.shuffle(result)
+        return result if result else ["vmst.io"]
     except Exception as e:
         print(f"Failed to obtain primary domain list: {e}")
         conn.rollback()
