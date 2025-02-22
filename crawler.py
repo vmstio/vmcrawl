@@ -654,7 +654,7 @@ def check_robots_txt(domain, http_client):
                 mark_norobots_domain(domain)
                 delete_domain_if_known(domain)
                 return False
-        elif response.status_code in [410]:
+        elif response.status_code in http_codes_to_hardfail:
             print_colored(f'Responded HTTP {response.status_code} to robots.txt request - NOROBOTS', 'red')
             mark_norobots_domain(domain)
             delete_domain_if_known(domain)
@@ -712,7 +712,12 @@ def check_webfinger(domain, http_client):
                 mark_failed_domain(domain)
                 delete_domain_if_known(domain)
                 return False
-        elif response.status_code in http_codes_to_fail:
+        elif response.status_code in http_codes_to_hardfail:
+            print_colored(f'Responded HTTP {response.status_code} to Webfinger request - FAILED', 'red')
+            mark_failed_domain(domain)
+            delete_domain_if_known(domain)
+            return False
+        elif response.status_code in http_codes_to_softfail:
             if 'json' in content_type:
                 mark_as_non_mastodon(domain)
                 return None
@@ -774,7 +779,12 @@ def check_hostmeta(domain, http_client):
                 mark_failed_domain(domain)
                 delete_domain_if_known(domain)
                 return False
-        elif response.status_code in http_codes_to_fail:
+        elif response.status_code in http_codes_to_hardfail:
+            print_colored(f'Responded HTTP {response.status_code} to HostMeta request - FAILED', 'red')
+            mark_failed_domain(domain)
+            delete_domain_if_known(domain)
+            return False
+        elif response.status_code in http_codes_to_softfail:
             print(f'Responded HTTP {response.status_code} to HostMeta request…')
             return {'backend_domain': domain}
         else:
@@ -831,10 +841,11 @@ def check_nodeinfo(domain, backend_domain, http_client):
                             return None
                         else:
                             return nodeinfo_response.json()
-                    elif nodeinfo_response.status_code in http_codes_to_fail and response.status_code != 404:
-                        print_colored(f'Responded HTTP {nodeinfo_response.status_code} to NodeInfo request - FAILED', 'red')
+                    elif nodeinfo_response.status_code in http_codes_to_hardfail:
+                        print_colored(f'Responded HTTP {response.status_code} to NodeInfo request - FAILED', 'red')
                         mark_failed_domain(domain)
                         delete_domain_if_known(domain)
+                        return False
                     else:
                         error_message = f'Responded HTTP {nodeinfo_response.status_code} to NodeInfo request'
                         print_colored(f'{error_message}', 'yellow')
@@ -851,7 +862,7 @@ def check_nodeinfo(domain, backend_domain, http_client):
                 mark_failed_domain(domain)
                 delete_domain_if_known(domain)
                 return False
-        elif response.status_code in http_codes_to_fail and response.status_code != 404:
+        elif response.status_code in http_codes_to_hardfail:
             print_colored(f'Responded HTTP {response.status_code} to NodeInfo request - FAILED', 'red')
             mark_failed_domain(domain)
             delete_domain_if_known(domain)
@@ -973,7 +984,7 @@ def process_mastodon_instance(domain, webfinger_data, nodeinfo_data, http_client
             else:
                 print_colored(f'Mastodon v{software_version} ({nodeinfo_data["software"]["version"]})', 'green')
 
-        elif response.status_code in http_codes_to_fail:
+        elif response.status_code in http_codes_to_hardfail or response.status_code in 403:
             print_colored(f'Responded HTTP {response.status_code} to API request - FAILED', 'red')
             mark_ignore_domain(domain)
             delete_domain_if_known(domain)
@@ -1022,16 +1033,11 @@ def mark_as_non_mastodon(domain):
 def handle_http_exception(domain, exception):
     error_message = str(exception)
     if 'ssl' in error_message.casefold() and 'timed out' not in error_message.casefold():
-        if "CERTIFICATE_VERIFY_FAILED" in error_message and 'masto.host' in domain:
-            print_colored('Dead masto.host instance - NXDOMAIN', 'red')
-            mark_nxdomain_domain(domain)
-            delete_domain_if_known(domain)
-        else:
-            error_reason = 'SSL'
-            print_colored(f'{error_message}', 'orange')
-            log_error(domain, error_message)
-            increment_domain_error(domain, error_reason)
-            delete_domain_if_known(domain)
+        error_reason = 'SSL'
+        print_colored(f'{error_message}', 'orange')
+        log_error(domain, error_message)
+        increment_domain_error(domain, error_reason)
+        delete_domain_if_known(domain)
     else:
         if 'maximum allowed redirects' in error_message.casefold():
             print_colored('Exceeded maximum allowed redirects - NXDOMAIN', 'red')
