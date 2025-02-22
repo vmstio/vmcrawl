@@ -242,7 +242,7 @@ def delete_old_patch_versions():
     with conn.cursor() as cur:
         cur.execute("""
             DELETE FROM patch_versions
-            WHERE software_version = ANY(%s)
+            WHERE software_version != ALL(%s::text[])
         """, (all_patched_versions,))
         conn.commit()
 
@@ -255,7 +255,7 @@ version_backport_releases = get_backport_mastodon_versions()
 all_patched_versions = [version_main_release] + version_backport_releases
 
 update_patch_versions()
-# delete_old_patch_versions()
+delete_old_patch_versions()
 
 def print_colored(text: str, color: str, **kwargs) -> None:
     print(f"{colors.get(color, '')}{text}{colors['reset']}", **kwargs)
