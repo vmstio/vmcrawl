@@ -221,7 +221,7 @@ def update_patch_versions():
     Update the patch versions in the database.
     """
     with conn.cursor() as cur:
-        cur.execute("UPDATE patch_versions SET software_version = %s WHERE main = TRUE", (version_main_release,))
+        cur.execute("UPDATE patch_versions SET software_version = %s, n_level = -1 WHERE main = TRUE", (version_main_release,))
         # cur.execute("UPDATE patch_versions SET software_version = %s WHERE release = TRUE AND n_level = 0", (version_latest_release,))
         conn.commit()
 
