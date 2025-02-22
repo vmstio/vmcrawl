@@ -1,5 +1,7 @@
 #!/usr/bin/env python3
 
+from mstmap import *
+
 # Import required modules
 try:
     import argparse
@@ -157,6 +159,34 @@ def get_highest_mastodon_version():
 
     return highest_version
 
+
+def get_backport_mastodon_versions():
+    release_url = "https://api.github.com/repos/mastodon/mastodon/releases"
+
+    # Initialize with None instead of empty string
+    backport_versions = {branch: '' for branch in backport_branches}
+
+    response = http_client.get(release_url)
+    response.raise_for_status()
+    releases = response.json()
+
+    for release in releases:
+        release_version = release["tag_name"].lstrip("v")
+
+        for branch in backport_branches:
+            if release_version.startswith(branch):
+                if (backport_versions[branch] is None or
+                    (release_version and
+                        version.parse(release_version) > version.parse(backport_versions[branch] or '0.0.0'))):
+                    backport_versions[branch] = release_version
+
+    # Replace any remaining None values with a default version
+    for branch in backport_versions:
+        if backport_versions[branch] is None:
+            backport_versions[branch] = f"{branch}.0"
+
+    return list(backport_versions.values())
+
 def get_main_version_release():
     url = "https://raw.githubusercontent.com/mastodon/mastodon/refs/heads/main/lib/mastodon/version.rb"
     version_info = read_main_version_info(url)
@@ -184,6 +214,7 @@ error_threshold = int(common_timeout)
 version_main_branch = get_main_version_branch()
 version_main_release = get_main_version_release()
 version_latest_release = get_highest_mastodon_version()
+version_backport_releases = get_backport_mastodon_versions()
 
 def update_patch_versions():
     """
@@ -191,7 +222,19 @@ def update_patch_versions():
     """
     with conn.cursor() as cur:
         cur.execute("UPDATE patch_versions SET software_version = %s WHERE main = TRUE", (version_main_release,))
-        cur.execute("UPDATE patch_versions SET software_version = %s WHERE release = TRUE AND n_level = 0", (version_latest_release,))
+        # cur.execute("UPDATE patch_versions SET software_version = %s WHERE release = TRUE AND n_level = 0", (version_latest_release,))
+        conn.commit()
+
+    with conn.cursor() as cur:
+        n_level = 0
+        for n_level, version in enumerate(version_backport_releases):
+            cur.execute("""
+                INSERT INTO patch_versions (software_version, n_level)
+                VALUES (%s, %s)
+                ON CONFLICT (n_level) DO UPDATE
+                SET software_version = EXCLUDED.software_version
+            """, (version, n_level))
+            n_level += 1
         conn.commit()
 
 update_patch_versions()
