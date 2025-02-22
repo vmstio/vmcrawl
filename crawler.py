@@ -1040,15 +1040,13 @@ def handle_http_exception(domain, exception):
         delete_domain_if_known(domain)
     else:
         if 'maximum allowed redirects' in error_message.casefold():
-            print_colored('Exceeded maximum allowed redirects - NXDOMAIN', 'red')
-            mark_nxdomain_domain(domain)
-            delete_domain_if_known(domain)
-        elif 'stream_id:7' in error_message.casefold() and 'error_code:2' in error_message.casefold():
-            print_colored('Received an empty response - NXDOMAIN', 'red')
-            mark_nxdomain_domain(domain)
-            delete_domain_if_known(domain)
+            error_reason = 'MAX'
+            print_colored(f'HTTPX failure: {error_message}', 'orange')
+            log_error(domain, error_message)
+            increment_domain_error(domain, error_reason)
+            delete_if_error_max(domain)
         elif 'timed out' in error_message.casefold():
-            error_reason = 'TIMEOUT'
+            error_reason = 'TIME'
             print_colored(f'HTTPX failure: {error_message}', 'orange')
             log_error(domain, error_message)
             increment_domain_error(domain, error_reason)
@@ -1093,7 +1091,8 @@ def load_from_database(user_choice):
         "9": "SELECT domain FROM raw_domains WHERE norobots = TRUE ORDER BY domain",
         "10": "SELECT domain FROM raw_domains WHERE reason = 'SSL' ORDER BY errors ASC",
         "11": "SELECT domain FROM raw_domains WHERE reason = 'HTTP' ORDER BY errors ASC",
-        "12": "SELECT domain FROM raw_domains WHERE reason = 'TIMEOUT' ORDER BY errors ASC",
+        "12": "SELECT domain FROM raw_domains WHERE reason IN ('TIMEOUT', 'TIME') ORDER BY errors ASC",
+        "13": "SELECT domain FROM raw_domains WHERE reason = 'MAX' ORDER BY errors ASC",
         "20": "SELECT domain FROM raw_domains WHERE reason ~ '^2[0-9]{2}' ORDER BY errors ASC",
         "21": "SELECT domain FROM raw_domains WHERE reason ~ '^3[0-9]{2}' ORDER BY errors ASC",
         "22": "SELECT domain FROM raw_domains WHERE reason ~ '^4[0-9]{2}' ORDER BY errors ASC",
@@ -1171,7 +1170,7 @@ def print_menu() -> None:
         "Change process direction": {"1": "Standard", "2": "Reverse", "3": "Random"},
         "Retry general errors": {"4": f"Errors ≥{error_threshold + 1}", "5": f"Errors ≤{error_threshold}"},
         "Retry fatal errors": {"6": "Not Mastodon", "7": "Failed", "8": "NXDOMAIN", "9": "NoRobots"},
-        "Retry connection errors": {"10": "SSL", "11": "HTTP", "12": "TIMEOUT"},
+        "Retry connection errors": {"10": "SSL", "11": "HTTP", "12": "TIME", "13": "MAX"},
         "Retry HTTP errors": {"20": "2xx", "21": "3xx", "22": "4xx", "23": "5xx"},
         "Retry specific errors": {"30": "###", "31": "JSON", "32": "TXT", "33": "XML"},
         "Retry good data": {"40": f"Stale ≥{error_threshold}", "41": "Outdated", "42": "Main", "43": "Inactive", "44": "All Good"},
