@@ -648,12 +648,6 @@ def check_robots_txt(domain, http_client):
                         delete_domain_if_known(domain)
                         return False
         # Check for specific HTTP status codes
-        elif response.status_code in [202]:
-            if 'sgcaptcha' in response.text:
-                print_colored('Provided CAPTCHA for robots.txt', 'red')
-                mark_nxdomain_domain(domain)
-                delete_domain_if_known(domain)
-                return False
         elif response.status_code in http_codes_to_hardfail:
             print_colored(f'Responded HTTP {response.status_code} to robots.txt request', 'red')
             mark_nxdomain_domain(domain)
@@ -706,12 +700,6 @@ def check_webfinger(domain, http_client):
                     return {'backend_domain': backend_domain}
                 else:
                     return None
-        elif response.status_code in [202]:
-            if 'sgcaptcha' in response.text:
-                print_colored('Responded with CAPTCHA to Webfinger request', 'red')
-                mark_failed_domain(domain)
-                delete_domain_if_known(domain)
-                return False
         elif response.status_code in http_codes_to_hardfail:
             print_colored(f'Responded HTTP {response.status_code} to Webfinger request', 'red')
             mark_failed_domain(domain)
@@ -773,12 +761,6 @@ def check_hostmeta(domain, http_client):
                     parsed_link = urlparse(link.get('template'))
                     backend_domain = parsed_link.netloc
                     return {'backend_domain': backend_domain}
-        elif response.status_code in [202]:
-            if 'sgcaptcha' in response.text:
-                print_colored('Responded with CAPTCHA to HostMeta request', 'red')
-                mark_failed_domain(domain)
-                delete_domain_if_known(domain)
-                return False
         elif response.status_code in http_codes_to_hardfail:
             print_colored(f'Responded HTTP {response.status_code} to HostMeta request', 'red')
             mark_failed_domain(domain)
@@ -857,12 +839,6 @@ def check_nodeinfo(domain, backend_domain, http_client):
                     mark_as_non_mastodon(domain)
             else:
                 mark_as_non_mastodon(domain)
-        elif response.status_code in [202]:
-            if 'sgcaptcha' in response.text:
-                print_colored('Responded with CAPTCHA to NodeInfo request', 'red')
-                mark_failed_domain(domain)
-                delete_domain_if_known(domain)
-                return False
         elif response.status_code in http_codes_to_hardfail:
             print_colored(f'Responded HTTP {response.status_code} to NodeInfo request', 'red')
             mark_failed_domain(domain)
