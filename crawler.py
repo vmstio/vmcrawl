@@ -569,19 +569,19 @@ def should_skip_domain(domain, ignored_domains, failed_domains, nxdomain_domains
 
 def is_junk_or_bad_tld(domain, junk_domains, bad_tlds, domain_endings):
     if any(junk in domain for junk in junk_domains):
-        print_colored('Known junk domain - PURGED', 'red')
+        print_colored('Purging known junk domain', 'red')
         # mark_failed_domain(domain)
         delete_domain_if_known(domain)
         delete_domain_from_raw(domain)
         return True
     if any(domain.endswith(f'.{tld}') for tld in bad_tlds):
-        print_colored('Prohibited TLD - NXDOMAIN', 'red')
+        print_colored('Purging prohibited TLD', 'red')
         mark_nxdomain_domain(domain)
         delete_domain_if_known(domain)
         delete_domain_from_raw(domain)
         return True
     if not any(domain.endswith(f'.{domain_ending}') for domain_ending in domain_endings):
-        print_colored('Unknown TLD - NXDOMAIN', 'red')
+        print_colored('Purging unknown TLD', 'red')
         mark_nxdomain_domain(domain)
         delete_domain_if_known(domain)
         delete_domain_from_raw(domain)
@@ -590,7 +590,7 @@ def is_junk_or_bad_tld(domain, junk_domains, bad_tlds, domain_endings):
 
 def is_iftas_domain(domain, iftas_domains):
     if any(domain.endswith(f'{dni}') for dni in iftas_domains):
-        print_colored('Known IFTAS DNI domain - NXDOMAIN', 'red')
+        print_colored('Known IFTAS DNI domain', 'red')
         mark_nxdomain_domain(domain)
         delete_domain_if_known(domain)
         return True
@@ -598,7 +598,7 @@ def is_iftas_domain(domain, iftas_domains):
 
 def process_domain(domain, http_client):
     if has_emoji_or_special_chars(domain):
-        print_colored('Domain contains special characters - NXDOMAIN', 'red')
+        print_colored('Domain contains special characters', 'red')
         mark_nxdomain_domain(domain)
         delete_domain_if_known(domain)
         return
@@ -643,20 +643,20 @@ def check_robots_txt(domain, http_client):
                 elif line.startswith('disallow:'):
                     disallow_path = line.split(':', 1)[1].strip()
                     if user_agent in ['*', appname.lower()] and (disallow_path == '/' or disallow_path == '*'):
-                        print_colored('Crawling prohibited by robots.txt - NOROBOTS', 'red')
+                        print_colored('Crawling prohibited by robots.txt', 'red')
                         mark_norobots_domain(domain)
                         delete_domain_if_known(domain)
                         return False
         # Check for specific HTTP status codes
         elif response.status_code in [202]:
             if 'sgcaptcha' in response.text:
-                print_colored('Provided CAPTCHA for robots.txt - NOROBOTS', 'red')
-                mark_norobots_domain(domain)
+                print_colored('Provided CAPTCHA for robots.txt', 'red')
+                mark_nxdomain_domain(domain)
                 delete_domain_if_known(domain)
                 return False
         elif response.status_code in http_codes_to_hardfail:
-            print_colored(f'Responded HTTP {response.status_code} to robots.txt request - NOROBOTS', 'red')
-            mark_norobots_domain(domain)
+            print_colored(f'Responded HTTP {response.status_code} to robots.txt request', 'red')
+            mark_nxdomain_domain(domain)
             delete_domain_if_known(domain)
             return False
     except httpx.RequestError as e:
@@ -708,12 +708,12 @@ def check_webfinger(domain, http_client):
                     return None
         elif response.status_code in [202]:
             if 'sgcaptcha' in response.text:
-                print_colored('Responded with CAPTCHA to Webfinger request - FAILED', 'red')
+                print_colored('Responded with CAPTCHA to Webfinger request', 'red')
                 mark_failed_domain(domain)
                 delete_domain_if_known(domain)
                 return False
         elif response.status_code in http_codes_to_hardfail:
-            print_colored(f'Responded HTTP {response.status_code} to Webfinger request - FAILED', 'red')
+            print_colored(f'Responded HTTP {response.status_code} to Webfinger request', 'red')
             mark_failed_domain(domain)
             delete_domain_if_known(domain)
             return False
@@ -775,12 +775,12 @@ def check_hostmeta(domain, http_client):
                     return {'backend_domain': backend_domain}
         elif response.status_code in [202]:
             if 'sgcaptcha' in response.text:
-                print_colored('Responded with CAPTCHA to HostMeta request - FAILED', 'red')
+                print_colored('Responded with CAPTCHA to HostMeta request', 'red')
                 mark_failed_domain(domain)
                 delete_domain_if_known(domain)
                 return False
         elif response.status_code in http_codes_to_hardfail:
-            print_colored(f'Responded HTTP {response.status_code} to HostMeta request - FAILED', 'red')
+            print_colored(f'Responded HTTP {response.status_code} to HostMeta request', 'red')
             mark_failed_domain(domain)
             delete_domain_if_known(domain)
             return False
@@ -827,10 +827,11 @@ def check_nodeinfo(domain, backend_domain, http_client):
                     if nodeinfo_response.status_code in [200]:
                         nodeinfo_response_content_type = nodeinfo_response.headers.get('Content-Type', '')
                         if 'json' not in nodeinfo_response_content_type:
-                            error_message = 'NodeInfo V2 reply is not a JSON file - FAILED'
-                            print_colored(f'{error_message}', 'red')
-                            mark_failed_domain(domain)
-                            delete_domain_if_known(domain)
+                            error_message = 'NodeInfo V2 reply is not a JSON file'
+                            print_colored(f'{error_message}', 'magenta')
+                            log_error(domain, error_message)
+                            increment_domain_error(domain, 'JSON')
+                            delete_if_error_max(domain)
                             return None
                         if not nodeinfo_response.content:
                             error_message = 'NodeInfo V2 reply is empty'
@@ -842,7 +843,7 @@ def check_nodeinfo(domain, backend_domain, http_client):
                         else:
                             return nodeinfo_response.json()
                     elif nodeinfo_response.status_code in http_codes_to_hardfail:
-                        print_colored(f'Responded HTTP {response.status_code} to NodeInfo request - FAILED', 'red')
+                        print_colored(f'Responded HTTP {response.status_code} to NodeInfo request', 'red')
                         mark_failed_domain(domain)
                         delete_domain_if_known(domain)
                         return False
@@ -858,12 +859,12 @@ def check_nodeinfo(domain, backend_domain, http_client):
                 mark_as_non_mastodon(domain)
         elif response.status_code in [202]:
             if 'sgcaptcha' in response.text:
-                print_colored('Responded with CAPTCHA to NodeInfo request - FAILED', 'red')
+                print_colored('Responded with CAPTCHA to NodeInfo request', 'red')
                 mark_failed_domain(domain)
                 delete_domain_if_known(domain)
                 return False
         elif response.status_code in http_codes_to_hardfail:
-            print_colored(f'Responded HTTP {response.status_code} to NodeInfo request - FAILED', 'red')
+            print_colored(f'Responded HTTP {response.status_code} to NodeInfo request', 'red')
             mark_failed_domain(domain)
             delete_domain_if_known(domain)
         else:
@@ -910,10 +911,11 @@ def process_mastodon_instance(domain, webfinger_data, nodeinfo_data, http_client
         if response.status_code in [200]:
             content_type = response.headers.get('Content-Type', '')
             if 'json' not in content_type:
-                error_message = 'Instance API reply is not a JSON file - FAILED'
-                print_colored(f'{error_message}', 'red')
-                mark_failed_domain(domain)
-                delete_domain_if_known(domain)
+                error_message = 'Instance API reply is not a JSON file'
+                print_colored(f'{error_message}', 'magenta')
+                log_error(domain, error_message)
+                increment_domain_error(domain, 'JSON')
+                delete_if_error_max(domain)
                 return None
             if not response.content:
                 error_message = 'Instance API reply is empty'
@@ -927,9 +929,7 @@ def process_mastodon_instance(domain, webfinger_data, nodeinfo_data, http_client
 
             if 'error' in instance_api_data:
                 if instance_api_data['error'] == "This method requires an authenticated user":
-                    print_colored('Instance API requires authentication - IGNORED', 'red')
-                    mark_ignore_domain(domain)
-                    delete_domain_if_known(domain)
+                    mark_as_non_mastodon(domain)
                     return
 
             if software_version.startswith("4"):
@@ -984,10 +984,6 @@ def process_mastodon_instance(domain, webfinger_data, nodeinfo_data, http_client
             else:
                 print_colored(f'Mastodon v{software_version} ({nodeinfo_data["software"]["version"]})', 'green')
 
-        elif response.status_code in http_codes_to_hardfail or response.status_code in 403:
-            print_colored(f'Responded HTTP {response.status_code} to API request - FAILED', 'red')
-            mark_ignore_domain(domain)
-            delete_domain_if_known(domain)
         else:
             error_message = f'Responded HTTP {response.status_code} to API request'
             print_colored(f'{error_message}', 'yellow')
@@ -1026,7 +1022,7 @@ def update_mastodon_domain(domain, software_version, software_version_full, tota
         cursor.close()
 
 def mark_as_non_mastodon(domain):
-    print_colored('Not using Mastodon - IGNORED', 'red')
+    print_colored('Not using Mastodon', 'red')
     mark_ignore_domain(domain)
     delete_domain_if_known(domain)
 
