@@ -488,6 +488,19 @@ def get_ignored_domains():
         cursor.close()
     return ignored_domains
 
+def get_baddata_domains():
+    cursor = conn.cursor()
+    try:
+        cursor.execute("SELECT domain FROM raw_domains WHERE baddata = '1'")
+        baddata_domains = [row[0].strip() for row in cursor.fetchall() if row[0].strip()]
+        conn.commit()
+    except Exception as e:
+        print(f"Failed to obtain baddata domains: {e}")
+        conn.rollback()
+    finally:
+        cursor.close()
+    return baddata_domains
+
 def get_nxdomain_domains():
     cursor = conn.cursor()
     try:
@@ -514,11 +527,11 @@ def get_norobots_domains():
         cursor.close()
     return norobots_domains
 
-def check_and_record_domains(domain_list, ignored_domains, failed_domains, user_choice, junk_domains, bad_tlds, domain_endings, http_client, nxdomain_domains, norobots_domains, iftas_domains):
+def check_and_record_domains(domain_list, ignored_domains, baddata_domains, failed_domains, user_choice, junk_domains, bad_tlds, domain_endings, http_client, nxdomain_domains, norobots_domains, iftas_domains):
     for index, domain in enumerate(domain_list, start=1):
         print_colored(f'Crawling @ {domain} ({index}/{len(domain_list)})', 'bold')
 
-        if should_skip_domain(domain, ignored_domains, failed_domains, nxdomain_domains, norobots_domains, user_choice):
+        if should_skip_domain(domain, ignored_domains, baddata_domains, failed_domains, nxdomain_domains, norobots_domains, user_choice):
             continue
 
         if is_junk_or_bad_tld(domain, junk_domains, bad_tlds, domain_endings):
@@ -532,7 +545,7 @@ def check_and_record_domains(domain_list, ignored_domains, failed_domains, user_
         except Exception as e:
             handle_http_exception(domain, e)
 
-def should_skip_domain(domain, ignored_domains, failed_domains, nxdomain_domains, norobots_domains, user_choice):
+def should_skip_domain(domain, ignored_domains, baddata_domains, failed_domains, nxdomain_domains, norobots_domains, user_choice):
     if user_choice != "6" and domain in ignored_domains:
         print_colored('Previously IGNORED', 'cyan')
         delete_domain_if_known(domain)
@@ -547,6 +560,10 @@ def should_skip_domain(domain, ignored_domains, failed_domains, nxdomain_domains
         return True
     if user_choice != "9" and domain in norobots_domains:
         print_colored('Previously NOROBOTS', 'cyan')
+        delete_domain_if_known(domain)
+        return True
+    if domain in baddata_domains:
+        print_colored('Previous BADDATA', 'cyan')
         delete_domain_if_known(domain)
         return True
     return False
@@ -1191,11 +1208,12 @@ try:
     domain_endings = get_domain_endings()
     failed_domains = get_failed_domains()
     ignored_domains = get_ignored_domains()
+    baddata_domains = get_baddata_domains()
     nxdomain_domains = get_nxdomain_domains()
     norobots_domains = get_norobots_domains()
     iftas_domains = get_iftas_dni()
 
-    check_and_record_domains(domain_list, ignored_domains, failed_domains, user_choice, junk_domains, bad_tlds, domain_endings, http_client, nxdomain_domains, norobots_domains, iftas_domains)
+    check_and_record_domains(domain_list, ignored_domains, baddata_domains, failed_domains, user_choice, junk_domains, bad_tlds, domain_endings, http_client, nxdomain_domains, norobots_domains, iftas_domains)
 
     print_colored("Crawling complete!", "bold")
 except KeyboardInterrupt:
