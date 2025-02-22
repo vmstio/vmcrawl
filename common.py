@@ -209,13 +209,6 @@ def get_main_version_branch():
     obtained_main_branch = f"{major}.{minor}"
     return obtained_main_branch
 
-# Common variables
-error_threshold = int(common_timeout)
-version_main_branch = get_main_version_branch()
-version_main_release = get_main_version_release()
-version_latest_release = get_highest_mastodon_version()
-version_backport_releases = get_backport_mastodon_versions()
-
 def update_patch_versions():
     """
     Update the patch versions in the database.
@@ -236,6 +229,13 @@ def update_patch_versions():
             """, (version, n_level))
             n_level += 1
         conn.commit()
+
+# Common variables
+error_threshold = int(common_timeout)
+version_main_branch = get_main_version_branch()
+version_main_release = get_main_version_release()
+version_latest_release = get_highest_mastodon_version()
+version_backport_releases = get_backport_mastodon_versions()
 
 update_patch_versions()
 
