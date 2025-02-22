@@ -1060,7 +1060,7 @@ def load_from_database(user_choice):
         "32": "SELECT domain FROM raw_domains WHERE reason = 'TXT' ORDER BY errors ASC",
         "33": "SELECT domain FROM raw_domains WHERE reason = 'XML' ORDER BY errors ASC",
         "40": "SELECT domain FROM mastodon_domains WHERE timestamp::timestamptz <= NOW() - INTERVAL '%s days' ORDER BY timestamp DESC",
-        "41": f"SELECT domain FROM mastodon_domains WHERE software_version NOT LIKE %s AND software_version NOT LIKE %s ORDER BY total_users DESC",
+        "41": "SELECT domain FROM mastodon_domains WHERE software_version != ALL(%(versions)s::text[]) ORDER BY total_users DESC",
         "42": f"SELECT domain FROM mastodon_domains WHERE software_version LIKE %s ORDER BY total_users DESC",
         "43": "SELECT domain FROM mastodon_domains WHERE active_users_monthly = '0' ORDER BY total_users DESC",
         "44": "SELECT domain FROM mastodon_domains ORDER BY total_users DESC",
@@ -1079,7 +1079,9 @@ def load_from_database(user_choice):
         elif user_choice == "40":
             params = [error_threshold]
         elif user_choice == "41":
-            params = [f"{version_main_branch}%", version_latest_release]
+            versions = [version_main_release] + version_backport_releases
+            params = {'versions': versions}
+            print (params)
         elif user_choice == "42":
             params = [f"{version_main_branch}%"]
 
@@ -1131,7 +1133,7 @@ def print_menu() -> None:
         "Retry connection errors": {"10": "SSL", "11": "HTTP", "12": "TIME", "13": "MAX"},
         "Retry HTTP errors": {"20": "2xx", "21": "3xx", "22": "4xx", "23": "5xx"},
         "Retry specific errors": {"30": "###", "31": "JSON", "32": "TXT", "33": "XML"},
-        "Retry good data": {"40": f"Stale ≥{error_threshold}", "41": "Outdated", "42": "Main", "43": "Inactive", "44": "All Good"},
+        "Retry good data": {"40": f"Stale ≥{error_threshold}", "41": "Unpatched", "42": "Main", "43": "Inactive", "44": "All Good"},
     }
 
     for category, options in menu_options.items():
