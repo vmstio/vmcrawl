@@ -32,10 +32,10 @@ CREATE TABLE
 
 CREATE TABLE
   patch_versions (
-    software_version TEXT PRIMARY KEY,
+    software_version TEXT NULL,
     main BOOLEAN DEFAULT NULL,
     release BOOLEAN DEFAULT NULL,
-    n_level INTEGER DEFAULT NULL
+    n_level INTEGER PRIMARY KEY
   );
 
 CREATE TABLE
@@ -63,7 +63,7 @@ VALUES
 INSERT INTO
   patch_versions (software_version, main, release, n_level)
 VALUES
-  ('4.4.0-alpha.2', TRUE, FALSE, NULL),
+  ('4.4.0-alpha.2', TRUE, FALSE, -1),
   ('4.3.3', FALSE, TRUE, 0),
   ('4.2.15', FALSE, TRUE, 1),
   ('4.1.22', FALSE, TRUE, 2);
