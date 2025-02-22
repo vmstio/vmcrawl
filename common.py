@@ -214,20 +214,36 @@ def update_patch_versions():
     Update the patch versions in the database.
     """
     with conn.cursor() as cur:
-        cur.execute("UPDATE patch_versions SET software_version = %s, n_level = -1 WHERE main = TRUE", (version_main_release,))
-        # cur.execute("UPDATE patch_versions SET software_version = %s WHERE release = TRUE AND n_level = 0", (version_latest_release,))
+        n_level = -1
+        cur.execute("""
+            INSERT INTO patch_versions (software_version, main, n_level)
+            VALUES (%s, %s, %s)
+            ON CONFLICT (n_level) DO UPDATE
+            SET software_version = EXCLUDED.software_version
+        """, (version_main_release, True, n_level))
         conn.commit()
 
     with conn.cursor() as cur:
         n_level = 0
         for n_level, version in enumerate(version_backport_releases):
             cur.execute("""
-                INSERT INTO patch_versions (software_version, n_level)
-                VALUES (%s, %s)
+                INSERT INTO patch_versions (software_version, release, n_level)
+                VALUES (%s, %s, %s)
                 ON CONFLICT (n_level) DO UPDATE
                 SET software_version = EXCLUDED.software_version
-            """, (version, n_level))
+            """, (version, True, n_level))
             n_level += 1
+        conn.commit()
+
+def delete_old_patch_versions():
+    """
+    Delete rows from the patch_versions table where software_version is in all_patched_versions.
+    """
+    with conn.cursor() as cur:
+        cur.execute("""
+            DELETE FROM patch_versions
+            WHERE software_version = ANY(%s)
+        """, (all_patched_versions,))
         conn.commit()
 
 # Common variables
@@ -236,8 +252,10 @@ version_main_branch = get_main_version_branch()
 version_main_release = get_main_version_release()
 version_latest_release = get_highest_mastodon_version()
 version_backport_releases = get_backport_mastodon_versions()
+all_patched_versions = [version_main_release] + version_backport_releases
 
 update_patch_versions()
+# delete_old_patch_versions()
 
 def print_colored(text: str, color: str, **kwargs) -> None:
     print(f"{colors.get(color, '')}{text}{colors['reset']}", **kwargs)

@@ -1079,8 +1079,7 @@ def load_from_database(user_choice):
         elif user_choice == "40":
             params = [error_threshold]
         elif user_choice == "41":
-            versions = [version_main_release] + version_backport_releases
-            params = {'versions': versions}
+            params = {'versions': all_patched_versions}
             print (params)
         elif user_choice == "42":
             params = [f"{version_main_branch}%"]
