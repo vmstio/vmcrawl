@@ -138,52 +138,28 @@ def read_main_version_info(url):
 
 def get_highest_mastodon_version():
     release_url = "https://api.github.com/repos/mastodon/mastodon/releases"
-    cache_file_path = get_cache_file_path(release_url)
-    max_cache_age = 3600  # 1 hour in seconds
+    response = http_client.get(release_url)
+    if response.status_code == 200:
+        releases = response.json()
+        highest_version = None
+        for release in releases:
+            release_version = release["tag_name"]
 
-    if is_cache_valid(cache_file_path, max_cache_age):
-        with open(cache_file_path, 'r') as cache_file:
-            highest_version = cache_file.read().strip()
+            # Preprocess the version string to remove the 'v' symbol
+            if "v" in release_version:
+                release_version = release_version.split("v")[1]
+
+            if highest_version is None or version.parse(release_version) > version.parse(highest_version):
+                highest_version = release_version
     else:
-        response = http_client.get(release_url)
-        if response.status_code == 200:
-            releases = response.json()
-            highest_version = None
-            for release in releases:
-                release_version = release["tag_name"]
-
-                # Preprocess the version string to remove the 'v' symbol
-                if "v" in release_version:
-                    release_version = release_version.split("v")[1]
-
-                if highest_version is None or version.parse(release_version) > version.parse(highest_version):
-                    highest_version = release_version
-
-            with open(cache_file_path, 'w') as cache_file:
-                if highest_version is not None:
-                    cache_file.write(highest_version)
-        else:
-            print("Failed to retrieve latest Mastodon release version. HTTP Status Code:", response.status_code)
-            return None
+        print("Failed to retrieve latest Mastodon release version. HTTP Status Code:", response.status_code)
+        return None
 
     return highest_version
 
 def get_main_version_release():
     url = "https://raw.githubusercontent.com/mastodon/mastodon/refs/heads/main/lib/mastodon/version.rb"
-    cache_file_path = get_cache_file_path(url)
-    max_cache_age = 3600  # 1 hour in seconds
-
-    if is_cache_valid(cache_file_path, max_cache_age):
-        with open(cache_file_path, 'r') as cache_file:
-            version_info = {}
-            for line in cache_file:
-                key, value = line.strip().split(':')
-                version_info[key] = value
-    else:
-        version_info = read_main_version_info(url)
-        with open(cache_file_path, 'w') as cache_file:
-            for key, value in version_info.items():
-                cache_file.write(f"{key}:{value}\n")
+    version_info = read_main_version_info(url)
 
     major = version_info.get('major', '0')
     minor = version_info.get('minor', '0')
@@ -195,20 +171,7 @@ def get_main_version_release():
 
 def get_main_version_branch():
     url = "https://raw.githubusercontent.com/mastodon/mastodon/refs/heads/main/lib/mastodon/version.rb"
-    cache_file_path = get_cache_file_path(url)
-    max_cache_age = 3600  # 1 hour in seconds
-
-    if is_cache_valid(cache_file_path, max_cache_age):
-        with open(cache_file_path, 'r') as cache_file:
-            version_info = {}
-            for line in cache_file:
-                key, value = line.strip().split(':')
-                version_info[key] = value
-    else:
-        version_info = read_main_version_info(url)
-        with open(cache_file_path, 'w') as cache_file:
-            for key, value in version_info.items():
-                cache_file.write(f"{key}:{value}\n")
+    version_info = read_main_version_info(url)
 
     major = version_info.get('major', '0')
     minor = version_info.get('minor', '0')
@@ -227,7 +190,7 @@ def update_patch_versions():
     Update the patch versions in the database.
     """
     with conn.cursor() as cur:
-        cur.execute("UPDATE patch_versions SET software_version = %s WHERE main = TRUE", (version_main_branch,))
+        cur.execute("UPDATE patch_versions SET software_version = %s WHERE main = TRUE", (version_main_release,))
         cur.execute("UPDATE patch_versions SET software_version = %s WHERE release = TRUE AND n_level = 0", (version_latest_release,))
         conn.commit()
 
