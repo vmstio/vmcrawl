@@ -36,7 +36,10 @@ CREATE TABLE
     main BOOLEAN DEFAULT NULL,
     release BOOLEAN DEFAULT NULL,
     n_level INTEGER DEFAULT NULL
-    );
+  );
+
+CREATE TABLE
+  eol_versions (software_version TEXT PRIMARY KEY);
 
 CREATE TABLE
   raw_domains (
@@ -64,6 +67,14 @@ VALUES
   ('4.3.3', FALSE, TRUE, 0),
   ('4.2.15', FALSE, TRUE, 1),
   ('4.1.22', FALSE, TRUE, 2);
+
+INSERT INTO
+  eol_versions (software_version)
+VALUES
+  ('4.0'),
+  ('3'),
+  ('2'),
+  ('1');
 
 INSERT INTO
   junk_words (keywords)
