@@ -314,8 +314,6 @@ def clean_version(software_version_full):
     return software_version
 
 def clean_version_dumbstring(software_version):
-    unwanted_strings = ["-pre"]
-
     for unwanted_string in unwanted_strings:
         software_version = software_version.replace(unwanted_string, "")
 

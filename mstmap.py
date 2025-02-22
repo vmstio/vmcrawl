@@ -19,3 +19,5 @@ nightly_version_ranges = [
     ("4.3.0-alpha.1", datetime(2024, 1, 30), datetime(2024, 2, 14)),
     ("4.3.0-alpha.0", datetime(2023, 9, 28), datetime(2024, 1, 29))
 ]
+
+unwanted_strings = ["-pre", "-theconnector"]
