@@ -128,7 +128,7 @@ def read_main_version_info(url):
                 key = match.group(1)
                 if key in ["major", "minor", "patch", "default_prerelease"]:
                     value = lines[i+1].strip()
-                    if value.isnumeric() or re.match(r"'\w+'", value):
+                    if value.isnumeric() or re.match(r"'[^']+'", value):
                         version_info[key] = value.replace("'", "")
     except httpx.HTTPError as e:
         print(f"Failed to retrieve Mastodon main version: {e}")
@@ -168,7 +168,32 @@ def get_highest_mastodon_version():
 
     return highest_version
 
-def get_main_version_info():
+def get_main_version_release():
+    url = "https://raw.githubusercontent.com/mastodon/mastodon/refs/heads/main/lib/mastodon/version.rb"
+    cache_file_path = get_cache_file_path(url)
+    max_cache_age = 3600  # 1 hour in seconds
+
+    if is_cache_valid(cache_file_path, max_cache_age):
+        with open(cache_file_path, 'r') as cache_file:
+            version_info = {}
+            for line in cache_file:
+                key, value = line.strip().split(':')
+                version_info[key] = value
+    else:
+        version_info = read_main_version_info(url)
+        with open(cache_file_path, 'w') as cache_file:
+            for key, value in version_info.items():
+                cache_file.write(f"{key}:{value}\n")
+
+    major = version_info.get('major', '0')
+    minor = version_info.get('minor', '0')
+    patch = version_info.get('patch', '0')
+    pre = version_info.get('default_prerelease', 'alpha.0')
+
+    obtained_main_version = f"{major}.{minor}.{patch}-{pre}"
+    return obtained_main_version
+
+def get_main_version_branch():
     url = "https://raw.githubusercontent.com/mastodon/mastodon/refs/heads/main/lib/mastodon/version.rb"
     cache_file_path = get_cache_file_path(url)
     max_cache_age = 3600  # 1 hour in seconds
@@ -188,13 +213,25 @@ def get_main_version_info():
     major = version_info.get('major', '0')
     minor = version_info.get('minor', '0')
 
-    obtained_main_version = f"{major}.{minor}"
-    return obtained_main_version
+    obtained_main_branch = f"{major}.{minor}"
+    return obtained_main_branch
 
 # Common variables
 error_threshold = int(common_timeout)
-version_main_branch = get_main_version_info()
+version_main_branch = get_main_version_branch()
+version_main_release = get_main_version_release()
 version_latest_release = get_highest_mastodon_version()
+
+def update_patch_versions():
+    """
+    Update the patch versions in the database.
+    """
+    with conn.cursor() as cur:
+        cur.execute("UPDATE patch_versions SET software_version = %s WHERE main = TRUE", (version_main_branch,))
+        cur.execute("UPDATE patch_versions SET software_version = %s WHERE release = TRUE AND n_level = 0", (version_latest_release,))
+        conn.commit()
+
+update_patch_versions()
 
 def print_colored(text: str, color: str, **kwargs) -> None:
     print(f"{colors.get(color, '')}{text}{colors['reset']}", **kwargs)
