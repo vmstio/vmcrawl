@@ -1162,10 +1162,10 @@ def load_from_file(file_name):
 
 def print_menu() -> None:
     menu_options = {
-        "Process new domains": {"0": "Recently fetched"},
+        "Process new domains": {"0": "Recently Fetched"},
         "Change process direction": {"1": "Standard", "2": "Reverse", "3": "Random"},
-        "Retry general errors": {"4": f"Errors ≥{error_threshold + 1}", "5": f"Errors ≤{error_threshold}"},
-        "Retry fatal errors": {"6": "Not Mastodon", "7": "Failed", "8": "NXDOMAIN", "9": "NoRobots"},
+        "Retry general errors": {"4": f"Domains w/ ≥{error_threshold + 1} Errors", "5": f"Domains w/ ≤{error_threshold} Errors"},
+        "Retry fatal errors": {"6": "Not Mastodon", "7": "Marked Failed", "8": "Bad Domains", "9": "No Robots"},
         "Retry connection errors": {"10": "SSL", "11": "HTTP", "12": "TIME", "13": "MAX"},
         "Retry HTTP errors": {"20": "2xx", "21": "3xx", "22": "4xx", "23": "5xx"},
         "Retry specific errors": {"30": "###", "31": "JSON", "32": "TXT", "33": "XML"},
