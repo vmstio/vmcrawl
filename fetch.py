@@ -12,12 +12,9 @@ except ImportError as e:
 # Detect the current filename
 current_filename = os.path.basename(__file__)
 
-db_limit = os.getenv("VMCRAWL_FETCH_LIMIT", "10")
-db_offset = 0
-
 parser = argparse.ArgumentParser(description="Fetch peer data from Mastodon instances.")
-parser.add_argument('-l', '--limit', type=int, help=f'limit the number of domains requested from database (default: {db_limit})')
-parser.add_argument('-o', '--offset', type=int, help=f'offset the top of the domains requested from database (default: {db_offset})')
+parser.add_argument('-l', '--limit', type=int, help=f'limit the number of domains requested from database (default: {int(os.getenv("VMCRAWL_FETCH_LIMIT", "10"))})')
+parser.add_argument('-o', '--offset', type=int, help=f'offset the top of the domains requested from database (default: {int(os.getenv("VMCRAWL_FETCH_OFFSET", "0"))})')
 parser.add_argument('-r', '--random', action='store_true', help='randomize the order of the domains returned (default: disabled)')
 parser.add_argument('-t', '--target', type=str, help='target only a specific domain and ignore the database (ex: vmst.io)')
 
@@ -33,9 +30,13 @@ if args.offset and args.random:
 
 if args.limit is not None:
     db_limit = args.limit
+else:
+    db_limit = int(os.getenv("VMCRAWL_FETCH_LIMIT", "10"))
 
 if args.offset is not None:
     db_offset = args.offset
+else:
+    db_offset = int(os.getenv("VMCRAWL_FETCH_OFFSET", "0"))
 
 def fetch_exclude_domains(conn):
     cursor = conn.cursor()
