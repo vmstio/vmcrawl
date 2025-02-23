@@ -8,7 +8,7 @@ try:
     import mimetypes
     import unicodedata
     from bs4 import BeautifulSoup, Tag
-    from datetime import datetime, timedelta
+    from datetime import datetime, timedelta, timezone
     from lxml import etree
     from urllib.parse import urlparse, urlunparse
 except ImportError as e:
@@ -107,7 +107,7 @@ def delete_if_error_max(domain):
         if result and result[0] >= error_threshold:
             cursor.execute('SELECT timestamp FROM mastodon_domains WHERE domain = %s', (domain,))
             timestamp = cursor.fetchone()
-            if timestamp and (datetime.now() - datetime.strptime(timestamp[0], '%Y-%m-%d %H:%M:%S')).days >= error_threshold:
+            if timestamp and (datetime.now(timezone.utc) - datetime.strptime(timestamp[0], '%Y-%m-%d %H:%M:%S').replace(tzinfo=timezone.utc)).days >= error_threshold:
                 delete_domain_if_known(domain)
 
     except Exception as e:
@@ -973,7 +973,7 @@ def update_mastodon_domain(domain, software_version, software_version_full, tota
             source = excluded.source,
             full_version = excluded.full_version
         ''', (domain, software_version, total_users, active_month_users,
-              datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
+              datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M:%S'),
               contact_account, source_url, software_version_full))
         conn.commit()
     except Exception as e:
