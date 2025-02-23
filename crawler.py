@@ -1161,7 +1161,7 @@ try:
         elif single_domain_target:  # Single domain provided as argument
             user_choice = 1
             domain_list = single_domain_target.replace(' ', '').split(',')
-            print("Crawling single domain from target…")
+            print(f"Crawling domain{'s' if len(domain_list) > 1 else ''} from target…")
         else:  # Load from database by default
             if not is_running_headless() and not args.new:
                 print_menu()
