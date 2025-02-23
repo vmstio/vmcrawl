@@ -56,22 +56,27 @@ def fetch_domain_list(conn, exclude_domains_sql):
         if exclude_domains_sql:
             query = f"""
                 SELECT domain FROM mastodon_domains
-                WHERE active_users_monthly > 10
+                WHERE active_users_monthly > 100
                 AND domain NOT IN ({exclude_domains_sql})
                 ORDER BY active_users_monthly DESC
-                LIMIT {db_limit} OFFSET {db_offset}
             """
         else:
             query = f"""
                 SELECT domain FROM mastodon_domains
-                WHERE active_users_monthly > 10
+                WHERE active_users_monthly > 100
                 ORDER BY active_users_monthly DESC
-                LIMIT {db_limit} OFFSET {db_offset}
             """
         cursor.execute(query)
         result = [row[0] for row in cursor.fetchall()]
+
         if args.random is True:
             random.shuffle(result)
+
+        # Apply offset and limit to the results
+        start = int(db_offset)
+        end = start + int(db_limit)
+        result = result[start:end]
+
         return result if result else ["vmst.io"]
     except Exception as e:
         print(f"Failed to obtain primary domain list: {e}")
