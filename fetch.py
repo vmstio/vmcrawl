@@ -57,14 +57,14 @@ def fetch_domain_list(conn, exclude_domains_sql):
         if exclude_domains_sql:
             query = f"""
                 SELECT domain FROM mastodon_domains
-                WHERE active_users_monthly > 100
+                WHERE active_users_monthly > {int(os.getenv("VMCRAWL_FETCH_MIN_ACTIVE", "100"))}
                 AND domain NOT IN ({exclude_domains_sql})
                 ORDER BY active_users_monthly DESC
             """
         else:
             query = f"""
                 SELECT domain FROM mastodon_domains
-                WHERE active_users_monthly > 100
+                WHERE active_users_monthly > {int(os.getenv("VMCRAWL_FETCH_MIN_ACTIVE", "100"))}
                 ORDER BY active_users_monthly DESC
             """
         cursor.execute(query)
