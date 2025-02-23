@@ -56,7 +56,7 @@ def fetch_domain_list(conn, exclude_domains_sql):
         if exclude_domains_sql:
             query = f"""
                 SELECT domain FROM mastodon_domains
-                WHERE active_users_monthly > 100
+                WHERE active_users_monthly > 10
                 AND domain NOT IN ({exclude_domains_sql})
                 ORDER BY active_users_monthly DESC
                 LIMIT {db_limit} OFFSET {db_offset}
@@ -64,7 +64,7 @@ def fetch_domain_list(conn, exclude_domains_sql):
         else:
             query = f"""
                 SELECT domain FROM mastodon_domains
-                WHERE active_users_monthly > 100
+                WHERE active_users_monthly > 10
                 ORDER BY active_users_monthly DESC
                 LIMIT {db_limit} OFFSET {db_offset}
             """
