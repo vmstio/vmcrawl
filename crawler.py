@@ -230,22 +230,6 @@ def find_code_repository(backend_domain):
     # URL of the site you want to parse
     about_url = f'https://{backend_domain}/about'
 
-    # List of code repository domains to look for
-    repo_domains = [
-        'bitbucket.org',
-        'code.as',
-        'codeberg.org',
-        'git.closed.social',
-        'git.pixie.town',
-        'git.qoto.org',
-        'git.sr.ht',
-        'gitea.treehouse.systems',
-        'gitlab.com',
-        'gitlab.ejone.co',
-        'github.com',
-        'sourcehut.org'
-    ]
-
     about_response = http_client.get(about_url)
 
     if about_response.status_code == 200:
