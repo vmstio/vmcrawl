@@ -12,7 +12,7 @@ except ImportError as e:
 # Detect the current filename
 current_filename = os.path.basename(__file__)
 
-db_limit = os.getenv("DB_FETCH_LIMIT", "10")
+db_limit = os.getenv("VMCRAWL_FETCH_LIMIT", "10")
 db_offset = 0
 
 parser = argparse.ArgumentParser(description="Fetch peer data from Mastodon instances.")

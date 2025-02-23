@@ -23,11 +23,11 @@ pip install .
 You will then need an `.env` file in the `vmcrawl` folder with your custom values set:
 
 ```
-POSTGRES_DB="dbname"
-POSTGRES_USER="username"
-POSTGRES_PASSWORD="password"
-POSTGRES_HOST="localhost"
-POSTGRES_PORT="5432"
+VMCRAWL_POSTGRES_DATA="dbname"
+VMCRAWL_POSTGRES_USER="username"
+VMCRAWL_POSTGRES_PASS="password"
+VMCRAWL_POSTGRES_HOST="localhost"
+VMCRAWL_POSTGRES_PORT="5432"
 ```
 
 On your Postgres server, execute the contents of `creation.sql` to create the required tables.
