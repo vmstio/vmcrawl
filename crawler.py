@@ -295,6 +295,8 @@ def clean_version(software_version_full):
     software_version = clean_version_wrongpatch(software_version)
     software_version = clean_version_doubledash(software_version)
     software_version = clean_version_nightly(software_version)
+    software_version = clean_version_main_missing_prerelease(software_version)
+    software_version = clean_version_release_with_prerelease(software_version)
     return software_version
 
 def clean_version_dumbstring(software_version):
@@ -416,6 +418,16 @@ def clean_version_nightly(software_version):
             if start_date <= nightly_date <= end_date:
                 return version
 
+    return software_version
+
+def clean_version_main_missing_prerelease(software_version):
+    if software_version.startswith(version_main_branch) and "-" not in software_version:
+        software_version = f"{software_version}-alpha.0"
+    return software_version
+
+def clean_version_release_with_prerelease(software_version):
+    if version_latest_release and software_version.startswith(version_latest_release) and "-" in software_version and not version_latest_release.endswith('.0'):
+        software_version = software_version.split('-')[0]
     return software_version
 
 def get_junk_keywords():
