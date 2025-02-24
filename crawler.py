@@ -422,7 +422,7 @@ def clean_version_nightly(software_version):
 
 def clean_version_main_missing_prerelease(software_version):
     if software_version.startswith(version_main_branch) and "-" not in software_version:
-        software_version = f"{software_version}-alpha.0"
+        software_version = f"{software_version}-alpha.1"
     return software_version
 
 def clean_version_release_with_prerelease(software_version):
