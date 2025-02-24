@@ -216,22 +216,24 @@ def update_patch_versions():
     with conn.cursor() as cur:
         n_level = -1
         cur.execute("""
-            INSERT INTO patch_versions (software_version, main, n_level)
-            VALUES (%s, %s, %s)
+            INSERT INTO patch_versions (software_version, main, n_level, branch)
+            VALUES (%s, %s, %s, %s)
             ON CONFLICT (n_level) DO UPDATE
-            SET software_version = EXCLUDED.software_version
-        """, (version_main_release, True, n_level))
+            SET software_version = EXCLUDED.software_version,
+                branch = EXCLUDED.branch
+        """, (version_main_release, True, n_level, version_main_branch))
         conn.commit()
 
     with conn.cursor() as cur:
         n_level = 0
-        for n_level, version in enumerate(version_backport_releases):
+        for n_level, (version, branch) in enumerate(zip(version_backport_releases, backport_branches)):
             cur.execute("""
-                INSERT INTO patch_versions (software_version, release, n_level)
-                VALUES (%s, %s, %s)
+                INSERT INTO patch_versions (software_version, release, n_level, branch)
+                VALUES (%s, %s, %s, %s)
                 ON CONFLICT (n_level) DO UPDATE
-                SET software_version = EXCLUDED.software_version
-            """, (version, True, n_level))
+                SET software_version = EXCLUDED.software_version,
+                    branch = EXCLUDED.branch
+            """, (version, True, n_level, branch))
             n_level += 1
         conn.commit()
 

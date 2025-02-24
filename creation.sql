@@ -35,7 +35,8 @@ CREATE TABLE
     software_version TEXT NULL,
     main BOOLEAN DEFAULT NULL,
     release BOOLEAN DEFAULT NULL,
-    n_level INTEGER PRIMARY KEY
+    n_level INTEGER PRIMARY KEY,
+    branch TEXT DEFAULT NULL
   );
 
 CREATE TABLE
@@ -62,12 +63,12 @@ VALUES
   ('su');
 
 INSERT INTO
-  patch_versions (software_version, main, release, n_level)
+  patch_versions (software_version, main, release, n_level, branch)
 VALUES
-  ('4.4.0-alpha.2', TRUE, FALSE, -1),
-  ('4.3.3', FALSE, TRUE, 0),
-  ('4.2.15', FALSE, TRUE, 1),
-  ('4.1.22', FALSE, TRUE, 2);
+  ('4.4.0-alpha.2', TRUE, FALSE, -1, '4.4'),
+  ('4.3.3', FALSE, TRUE, 0, '4.3'),
+  ('4.2.15', FALSE, TRUE, 1, '4.2'),
+  ('4.1.22', FALSE, TRUE, 2, '4.1');
 
 INSERT INTO
   eol_versions (software_version)
