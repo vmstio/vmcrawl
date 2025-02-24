@@ -461,7 +461,7 @@ def get_bad_tld():
 def get_failed_domains():
     cursor = conn.cursor()
     try:
-        cursor.execute("SELECT domain FROM raw_domains WHERE failed = FALSE")
+        cursor.execute("SELECT domain FROM raw_domains WHERE failed = TRUE")
         failed_domains = [row[0].strip() for row in cursor.fetchall() if row[0].strip()]
         conn.commit()
     except Exception as e:
@@ -474,7 +474,7 @@ def get_failed_domains():
 def get_ignored_domains():
     cursor = conn.cursor()
     try:
-        cursor.execute("SELECT domain FROM raw_domains WHERE ignore = FALSE")
+        cursor.execute("SELECT domain FROM raw_domains WHERE ignore = TRUE")
         ignored_domains = [row[0].strip() for row in cursor.fetchall() if row[0].strip()]
         conn.commit()
     except Exception as e:
@@ -487,7 +487,7 @@ def get_ignored_domains():
 def get_baddata_domains():
     cursor = conn.cursor()
     try:
-        cursor.execute("SELECT domain FROM raw_domains WHERE baddata = FALSE")
+        cursor.execute("SELECT domain FROM raw_domains WHERE baddata = TRUE")
         baddata_domains = [row[0].strip() for row in cursor.fetchall() if row[0].strip()]
         conn.commit()
     except Exception as e:
@@ -500,7 +500,7 @@ def get_baddata_domains():
 def get_nxdomain_domains():
     cursor = conn.cursor()
     try:
-        cursor.execute("SELECT domain FROM raw_domains WHERE nxdomain = FALSE")
+        cursor.execute("SELECT domain FROM raw_domains WHERE nxdomain = TRUE")
         nxdomain_domains = [row[0].strip() for row in cursor.fetchall() if row[0].strip()]
         conn.commit()
     except Exception as e:
@@ -513,7 +513,7 @@ def get_nxdomain_domains():
 def get_norobots_domains():
     cursor = conn.cursor()
     try:
-        cursor.execute("SELECT domain FROM raw_domains WHERE norobots = FALSE")
+        cursor.execute("SELECT domain FROM raw_domains WHERE norobots = TRUE")
         norobots_domains = [row[0].strip() for row in cursor.fetchall() if row[0].strip()]
         conn.commit()
     except Exception as e:
