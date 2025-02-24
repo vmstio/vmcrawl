@@ -50,12 +50,8 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green",
+                "color": "super-light-purple",
                 "value": null
-              },
-              {
-                "color": "blue",
-                "value": 80
               }
             ]
           },
@@ -139,8 +135,16 @@
             "mode": "percentage",
             "steps": [
               {
-                "color": "yellow",
+                "color": "red",
                 "value": null
+              },
+              {
+                "color": "orange",
+                "value": 20
+              },
+              {
+                "color": "#EAB839",
+                "value": 50
               },
               {
                 "color": "green",
@@ -230,7 +234,7 @@
           }
         }
       ],
-      "title": "Patched On Main",
+      "title": "Patched On Main Branch",
       "transformations": [
         {
           "id": "configFromData",
@@ -257,18 +261,29 @@
         "type": "grafana-postgresql-datasource",
         "uid": "aedqwq5gb2ebkc"
       },
+      "description": "Count of patched instances running on latest branch, compared to the total instances on latest branch.",
       "fieldConfig": {
         "defaults": {
           "color": {
             "mode": "thresholds"
           },
+          "fieldMinMax": false,
           "mappings": [],
+          "min": 0,
           "thresholds": {
-            "mode": "absolute",
+            "mode": "percentage",
             "steps": [
               {
-                "color": "green",
+                "color": "red",
                 "value": null
+              },
+              {
+                "color": "orange",
+                "value": 20
+              },
+              {
+                "color": "yellow",
+                "value": 50
               },
               {
                 "color": "green",
@@ -281,9 +296,128 @@
         "overrides": []
       },
       "gridPos": {
-        "h": 3,
-        "w": 5,
+        "h": 6,
+        "w": 4,
         "x": 8,
+        "y": 1
+      },
+      "id": 21,
+      "options": {
+        "minVizHeight": 75,
+        "minVizWidth": 75,
+        "orientation": "auto",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "/.*/",
+          "values": true
+        },
+        "showThresholdLabels": false,
+        "showThresholdMarkers": false,
+        "sizing": "auto"
+      },
+      "pluginVersion": "11.5.2",
+      "targets": [
+        {
+          "editorMode": "code",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "SELECT COUNT(DISTINCT domain) as \"Latest Patched\"\nFROM mastodon_domains \nWHERE software_version LIKE (\n    SELECT software_version \n    FROM patch_versions \n    WHERE n_level = 0\n) || '%';\n",
+          "refId": "A",
+          "sql": {
+            "columns": [
+              {
+                "parameters": [],
+                "type": "function"
+              }
+            ],
+            "groupBy": [
+              {
+                "property": {
+                  "type": "string"
+                },
+                "type": "groupBy"
+              }
+            ],
+            "limit": 50
+          }
+        },
+        {
+          "datasource": {
+            "type": "grafana-postgresql-datasource",
+            "uid": "aedqwq5gb2ebkc"
+          },
+          "editorMode": "code",
+          "format": "table",
+          "hide": false,
+          "rawQuery": true,
+          "rawSql": "SELECT COUNT(DISTINCT domain) as \"Latest Total\"\nFROM mastodon_domains \nWHERE software_version LIKE '4.3.%';",
+          "refId": "B",
+          "sql": {
+            "columns": [
+              {
+                "parameters": [],
+                "type": "function"
+              }
+            ],
+            "groupBy": [
+              {
+                "property": {
+                  "type": "string"
+                },
+                "type": "groupBy"
+              }
+            ],
+            "limit": 50
+          }
+        }
+      ],
+      "title": "Patched On Latest Branch",
+      "transformations": [
+        {
+          "id": "configFromData",
+          "options": {
+            "configRefId": "B",
+            "mappings": [
+              {
+                "fieldName": "Latest Total",
+                "handlerKey": "max"
+              }
+            ]
+          }
+        }
+      ],
+      "type": "gauge"
+    },
+    {
+      "datasource": {
+        "type": "grafana-postgresql-datasource",
+        "uid": "aedqwq5gb2ebkc"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "super-light-purple",
+                "value": null
+              }
+            ]
+          },
+          "unit": "locale"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 3,
+        "w": 6,
+        "x": 12,
         "y": 1
       },
       "id": 2,
@@ -332,88 +466,6 @@
         }
       ],
       "title": "Total Mastodon Users",
-      "type": "stat"
-    },
-    {
-      "datasource": {
-        "type": "grafana-postgresql-datasource",
-        "uid": "aedqwq5gb2ebkc"
-      },
-      "description": "Count of distinct Mastodon versions, after various fork/meta identifiers are removed and nightly releases are normalized.",
-      "fieldConfig": {
-        "defaults": {
-          "color": {
-            "mode": "thresholds"
-          },
-          "mappings": [],
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "color": "green",
-                "value": null
-              },
-              {
-                "color": "purple",
-                "value": 80
-              }
-            ]
-          }
-        },
-        "overrides": []
-      },
-      "gridPos": {
-        "h": 3,
-        "w": 4,
-        "x": 13,
-        "y": 1
-      },
-      "id": 4,
-      "options": {
-        "colorMode": "value",
-        "graphMode": "area",
-        "justifyMode": "auto",
-        "orientation": "auto",
-        "percentChangeColorMode": "standard",
-        "reduceOptions": {
-          "calcs": [
-            "lastNotNull"
-          ],
-          "fields": "",
-          "values": false
-        },
-        "showPercentChange": false,
-        "textMode": "auto",
-        "wideLayout": true
-      },
-      "pluginVersion": "11.5.2",
-      "targets": [
-        {
-          "editorMode": "code",
-          "format": "table",
-          "rawQuery": true,
-          "rawSql": "SELECT COUNT(DISTINCT software_version) AS unique_software_versions\nFROM mastodon_domains;",
-          "refId": "A",
-          "sql": {
-            "columns": [
-              {
-                "parameters": [],
-                "type": "function"
-              }
-            ],
-            "groupBy": [
-              {
-                "property": {
-                  "type": "string"
-                },
-                "type": "groupBy"
-              }
-            ],
-            "limit": 50
-          }
-        }
-      ],
-      "title": "Unique Versions",
       "type": "stat"
     },
     {
@@ -518,6 +570,7 @@
         "type": "grafana-postgresql-datasource",
         "uid": "aedqwq5gb2ebkc"
       },
+      "description": "Count of distinct Mastodon versions, after various fork/meta identifiers are removed and nightly releases are normalized.",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -528,12 +581,11 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "red",
+                "color": "super-light-purple",
                 "value": null
               }
             ]
-          },
-          "unit": "locale"
+          }
         },
         "overrides": []
       },
@@ -543,7 +595,7 @@
         "x": 0,
         "y": 4
       },
-      "id": 19,
+      "id": 4,
       "options": {
         "colorMode": "value",
         "graphMode": "area",
@@ -564,14 +616,10 @@
       "pluginVersion": "11.5.2",
       "targets": [
         {
-          "datasource": {
-            "type": "grafana-postgresql-datasource",
-            "uid": "aedqwq5gb2ebkc"
-          },
           "editorMode": "code",
           "format": "table",
           "rawQuery": true,
-          "rawSql": "SELECT \n    (SELECT COUNT(DISTINCT domain) FROM mastodon_domains) -\n    (SELECT COUNT(DISTINCT domain) \n     FROM mastodon_domains \n     WHERE software_version IN (SELECT software_version FROM patch_versions)\n    ) as instances_requring_patches",
+          "rawSql": "SELECT COUNT(DISTINCT software_version) AS unique_software_versions\nFROM mastodon_domains;",
           "refId": "A",
           "sql": {
             "columns": [
@@ -592,7 +640,7 @@
           }
         }
       ],
-      "title": "Unpatched & EOL Instances",
+      "title": "Unique Versions",
       "type": "stat"
     },
     {
@@ -610,12 +658,8 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green",
+                "color": "super-light-purple",
                 "value": null
-              },
-              {
-                "color": "yellow",
-                "value": 80
               }
             ]
           },
@@ -625,8 +669,8 @@
       },
       "gridPos": {
         "h": 3,
-        "w": 5,
-        "x": 8,
+        "w": 6,
+        "x": 12,
         "y": 4
       },
       "id": 3,
@@ -675,88 +719,6 @@
         }
       ],
       "title": "Active Mastodon Users",
-      "type": "stat"
-    },
-    {
-      "datasource": {
-        "type": "grafana-postgresql-datasource",
-        "uid": "aedqwq5gb2ebkc"
-      },
-      "description": "Count of all distinct Mastodon versions detected.",
-      "fieldConfig": {
-        "defaults": {
-          "color": {
-            "mode": "thresholds"
-          },
-          "mappings": [],
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "color": "green",
-                "value": null
-              },
-              {
-                "color": "purple",
-                "value": 80
-              }
-            ]
-          }
-        },
-        "overrides": []
-      },
-      "gridPos": {
-        "h": 3,
-        "w": 4,
-        "x": 13,
-        "y": 4
-      },
-      "id": 14,
-      "options": {
-        "colorMode": "value",
-        "graphMode": "area",
-        "justifyMode": "auto",
-        "orientation": "auto",
-        "percentChangeColorMode": "standard",
-        "reduceOptions": {
-          "calcs": [
-            "lastNotNull"
-          ],
-          "fields": "",
-          "values": false
-        },
-        "showPercentChange": false,
-        "textMode": "auto",
-        "wideLayout": true
-      },
-      "pluginVersion": "11.5.2",
-      "targets": [
-        {
-          "editorMode": "code",
-          "format": "table",
-          "rawQuery": true,
-          "rawSql": "SELECT COUNT(DISTINCT full_version) AS unique_software_versions\nFROM mastodon_domains;",
-          "refId": "A",
-          "sql": {
-            "columns": [
-              {
-                "parameters": [],
-                "type": "function"
-              }
-            ],
-            "groupBy": [
-              {
-                "property": {
-                  "type": "string"
-                },
-                "type": "groupBy"
-              }
-            ],
-            "limit": 50
-          }
-        }
-      ],
-      "title": "Raw Versions",
       "type": "stat"
     },
     {
@@ -1429,6 +1391,6 @@
   "timezone": "browser",
   "title": "vmcrawl Dashboard",
   "uid": "aedqo0q7klrswa",
-  "version": 29,
+  "version": 30,
   "weekStart": ""
 }
