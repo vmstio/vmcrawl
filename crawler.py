@@ -461,7 +461,7 @@ def get_bad_tld():
 def get_failed_domains():
     cursor = conn.cursor()
     try:
-        cursor.execute("SELECT domain FROM raw_domains WHERE failed = '1'")
+        cursor.execute("SELECT domain FROM raw_domains WHERE failed = FALSE")
         failed_domains = [row[0].strip() for row in cursor.fetchall() if row[0].strip()]
         conn.commit()
     except Exception as e:
@@ -474,7 +474,7 @@ def get_failed_domains():
 def get_ignored_domains():
     cursor = conn.cursor()
     try:
-        cursor.execute("SELECT domain FROM raw_domains WHERE ignore = '1'")
+        cursor.execute("SELECT domain FROM raw_domains WHERE ignore = FALSE")
         ignored_domains = [row[0].strip() for row in cursor.fetchall() if row[0].strip()]
         conn.commit()
     except Exception as e:
@@ -487,7 +487,7 @@ def get_ignored_domains():
 def get_baddata_domains():
     cursor = conn.cursor()
     try:
-        cursor.execute("SELECT domain FROM raw_domains WHERE baddata = '1'")
+        cursor.execute("SELECT domain FROM raw_domains WHERE baddata = FALSE")
         baddata_domains = [row[0].strip() for row in cursor.fetchall() if row[0].strip()]
         conn.commit()
     except Exception as e:
@@ -500,7 +500,7 @@ def get_baddata_domains():
 def get_nxdomain_domains():
     cursor = conn.cursor()
     try:
-        cursor.execute("SELECT domain FROM raw_domains WHERE nxdomain = '1'")
+        cursor.execute("SELECT domain FROM raw_domains WHERE nxdomain = FALSE")
         nxdomain_domains = [row[0].strip() for row in cursor.fetchall() if row[0].strip()]
         conn.commit()
     except Exception as e:
@@ -513,7 +513,7 @@ def get_nxdomain_domains():
 def get_norobots_domains():
     cursor = conn.cursor()
     try:
-        cursor.execute("SELECT domain FROM raw_domains WHERE norobots = '1'")
+        cursor.execute("SELECT domain FROM raw_domains WHERE norobots = FALSE")
         norobots_domains = [row[0].strip() for row in cursor.fetchall() if row[0].strip()]
         conn.commit()
     except Exception as e:
