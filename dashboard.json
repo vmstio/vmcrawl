@@ -592,7 +592,7 @@
           }
         }
       ],
-      "title": "Unpatched & EOL",
+      "title": "Unpatched & EOL Instances",
       "type": "stat"
     },
     {
@@ -1429,6 +1429,6 @@
   "timezone": "browser",
   "title": "vmcrawl Dashboard",
   "uid": "aedqo0q7klrswa",
-  "version": 28,
+  "version": 29,
   "weekStart": ""
 }
