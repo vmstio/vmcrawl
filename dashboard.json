@@ -1123,7 +1123,7 @@
       },
       "gridPos": {
         "h": 12,
-        "w": 8,
+        "w": 9,
         "x": 0,
         "y": 24
       },
@@ -1146,7 +1146,7 @@
           "editorMode": "code",
           "format": "table",
           "rawQuery": true,
-          "rawSql": "SELECT \n    domain AS \"Domain\",\n    total_users as \"Total Users\",\n    software_version as \"Software Version\"\nFROM mastodon_domains \nWHERE software_version NOT IN (\n    SELECT software_version \n    FROM patch_versions\n)\nORDER BY total_users DESC\nLIMIT 10;\n",
+          "rawSql": "SELECT \n    domain AS \"Domain\",\n    active_users_monthly as \"Active Users\",\n    software_version as \"Software Version\"\nFROM mastodon_domains \nWHERE software_version NOT IN (\n    SELECT software_version \n    FROM patch_versions\n)\nORDER BY active_users_monthly DESC\nLIMIT 10;\n",
           "refId": "A",
           "sql": {
             "columns": [
@@ -1207,8 +1207,8 @@
       },
       "gridPos": {
         "h": 12,
-        "w": 8,
-        "x": 8,
+        "w": 9,
+        "x": 9,
         "y": 24
       },
       "id": 20,
@@ -1230,7 +1230,7 @@
           "editorMode": "code",
           "format": "table",
           "rawQuery": true,
-          "rawSql": "SELECT \n    domain AS \"Domain\",\n    total_users as \"Total Users\",\n    software_version as \"Software Version\"\nFROM mastodon_domains\nWHERE EXISTS (\n    SELECT 1 \n    FROM eol_versions ev\n    WHERE mastodon_domains.software_version LIKE ev.software_version || '.%'\n    OR mastodon_domains.software_version LIKE ev.software_version || '%'\n)\nORDER BY total_users DESC\nLIMIT 10;\n",
+          "rawSql": "SELECT \n    domain AS \"Domain\",\n    active_users_monthly as \"Active Users\",\n    software_version as \"Software Version\"\nFROM mastodon_domains\nWHERE EXISTS (\n    SELECT 1 \n    FROM eol_versions ev\n    WHERE mastodon_domains.software_version LIKE ev.software_version || '.%'\n    OR mastodon_domains.software_version LIKE ev.software_version || '%'\n)\nORDER BY active_users_monthly DESC\nLIMIT 10;\n",
           "refId": "A",
           "sql": {
             "columns": [
@@ -1289,8 +1289,8 @@
       },
       "gridPos": {
         "h": 12,
-        "w": 8,
-        "x": 16,
+        "w": 6,
+        "x": 18,
         "y": 24
       },
       "id": 12,
@@ -1463,6 +1463,6 @@
   "timezone": "browser",
   "title": "vmcrawl Dashboard",
   "uid": "aedqo0q7klrswa",
-  "version": 25,
+  "version": 27,
   "weekStart": ""
 }
