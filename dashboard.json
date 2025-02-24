@@ -15,7 +15,8 @@
       }
     ]
   },
-  "editable": true,
+  "description": "Reports Mastodon version data and patch adoption",
+  "editable": false,
   "fiscalYearStartMonth": 0,
   "graphTooltip": 0,
   "id": 3,
@@ -1389,8 +1390,8 @@
   },
   "timepicker": {},
   "timezone": "browser",
-  "title": "vmcrawl Dashboard",
+  "title": "vmcrawl",
   "uid": "aedqo0q7klrswa",
-  "version": 30,
+  "version": 31,
   "weekStart": ""
 }
