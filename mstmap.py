@@ -19,21 +19,3 @@ nightly_version_ranges = [
     ("4.3.0-alpha.1", datetime(2024, 1, 30), datetime(2024, 2, 14)),
     ("4.3.0-alpha.0", datetime(2023, 9, 28), datetime(2024, 1, 29))
 ]
-# List of unwanted strings from versions to filter out
-unwanted_strings = ["-pre", "-theconnector"]
-
-# List of code repository domains to look for
-repo_domains = [
-    'bitbucket.org',
-    'code.as',
-    'codeberg.org',
-    'git.closed.social',
-    'git.pixie.town',
-    'git.qoto.org',
-    'git.sr.ht',
-    'gitea.treehouse.systems',
-    'gitlab.com',
-    'gitlab.ejone.co',
-    'github.com',
-    'sourcehut.org'
-]

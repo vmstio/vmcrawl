@@ -7,7 +7,6 @@ try:
     import json
     import mimetypes
     import unicodedata
-    from bs4 import BeautifulSoup, Tag
     from datetime import datetime, timedelta, timezone
     from lxml import etree
     from urllib.parse import urlparse, urlunparse
@@ -226,28 +225,6 @@ def mark_norobots_domain(domain):
     finally:
         cursor.close()
 
-def find_code_repository(backend_domain):
-    # URL of the site you want to parse
-    about_url = f'https://{backend_domain}/about'
-
-    about_response = http_client.get(about_url)
-
-    if about_response.status_code == 200:
-        # Parse the HTML content of the page
-        soup = BeautifulSoup(about_response.text, 'html.parser')
-
-        # Find all links in the page
-        links = soup.find_all('a', href=True)
-
-        # Iterate over each link and check if it contains any of the repo domains
-        for link in links:
-            if isinstance(link, Tag):
-                href = link.get('href')
-                if href and any(domain in href for domain in repo_domains):
-                    return href
-    else:
-        return None
-
 def limit_url_depth(source_url, depth=2):
     parsed_url = urlparse(source_url)
     # Split the path into parts
@@ -300,6 +277,9 @@ def clean_version(software_version_full):
     return software_version
 
 def clean_version_dumbstring(software_version):
+    # List of unwanted strings from versions to filter out
+    unwanted_strings = ["-pre", "-theconnector"]
+
     for unwanted_string in unwanted_strings:
         software_version = software_version.replace(unwanted_string, "")
 
@@ -912,7 +892,7 @@ def process_mastodon_instance(domain, webfinger_data, nodeinfo_data, http_client
             else:
                 actual_domain = instance_api_data['uri'].lower()
                 contact_account = normalize_email(instance_api_data['email']).lower()
-                source_url = find_code_repository(webfinger_data["backend_domain"])
+                source_url = ''
 
             if not is_valid_email(contact_account):
                 contact_account = None

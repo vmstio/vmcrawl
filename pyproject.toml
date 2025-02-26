@@ -7,7 +7,6 @@ requires-python = ">=3.13"
 dependencies = [
     "psycopg[binary]",
     "httpx[http2]",
-    "beautifulsoup4",
     "python-dotenv",
     "toml",
     "lxml",
