@@ -974,91 +974,6 @@
         "x": 8,
         "y": 7
       },
-      "id": 6,
-      "options": {
-        "displayLabels": [],
-        "legend": {
-          "displayMode": "list",
-          "placement": "bottom",
-          "showLegend": true,
-          "values": [
-            "percent"
-          ]
-        },
-        "pieType": "donut",
-        "reduceOptions": {
-          "calcs": [
-            "lastNotNull"
-          ],
-          "fields": "",
-          "values": true
-        },
-        "tooltip": {
-          "hideZeros": false,
-          "mode": "single",
-          "sort": "none"
-        }
-      },
-      "pluginVersion": "11.5.2",
-      "targets": [
-        {
-          "editorMode": "code",
-          "format": "table",
-          "rawQuery": true,
-          "rawSql": "WITH version_cases AS (\n  SELECT software_version\n  FROM patch_versions\n),\neol_check AS (\n  SELECT DISTINCT software_version\n  FROM mastodon_domains md\n  WHERE EXISTS (\n    SELECT 1 \n    FROM eol_versions ev\n    WHERE md.software_version LIKE ev.software_version || '.%'\n       OR md.software_version LIKE ev.software_version || '%'\n  )\n)\nSELECT \n  CASE \n    WHEN software_version IN (SELECT software_version FROM version_cases) THEN software_version\n    WHEN software_version IN (SELECT software_version FROM eol_check) THEN 'EOL'\n    ELSE 'Unpatched'\n  END as version,\n  SUM(total_users) as user_count\nFROM mastodon_domains \nGROUP BY CASE \n    WHEN software_version IN (SELECT software_version FROM version_cases) THEN software_version\n    WHEN software_version IN (SELECT software_version FROM eol_check) THEN 'EOL'\n    ELSE 'Unpatched'\n  END;\n",
-          "refId": "A",
-          "sql": {
-            "columns": [
-              {
-                "parameters": [],
-                "type": "function"
-              }
-            ],
-            "groupBy": [
-              {
-                "property": {
-                  "type": "string"
-                },
-                "type": "groupBy"
-              }
-            ],
-            "limit": 50
-          }
-        }
-      ],
-      "title": "Patches by Total User Count",
-      "type": "piechart"
-    },
-    {
-      "datasource": {
-        "type": "grafana-postgresql-datasource",
-        "uid": "aedqwq5gb2ebkc"
-      },
-      "fieldConfig": {
-        "defaults": {
-          "color": {
-            "fixedColor": "purple",
-            "mode": "palette-classic"
-          },
-          "custom": {
-            "hideFrom": {
-              "legend": false,
-              "tooltip": false,
-              "viz": false
-            }
-          },
-          "decimals": 2,
-          "mappings": [],
-          "unit": "locale"
-        },
-        "overrides": []
-      },
-      "gridPos": {
-        "h": 16,
-        "w": 8,
-        "x": 16,
-        "y": 7
-      },
       "id": 7,
       "options": {
         "displayLabels": [],
@@ -1112,6 +1027,91 @@
         }
       ],
       "title": "Patches by Active User Count",
+      "type": "piechart"
+    },
+    {
+      "datasource": {
+        "type": "grafana-postgresql-datasource",
+        "uid": "aedqwq5gb2ebkc"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "fixedColor": "purple",
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            }
+          },
+          "decimals": 2,
+          "mappings": [],
+          "unit": "locale"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 16,
+        "w": 8,
+        "x": 16,
+        "y": 7
+      },
+      "id": 6,
+      "options": {
+        "displayLabels": [],
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true,
+          "values": [
+            "percent"
+          ]
+        },
+        "pieType": "donut",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": true
+        },
+        "tooltip": {
+          "hideZeros": false,
+          "mode": "single",
+          "sort": "none"
+        }
+      },
+      "pluginVersion": "11.5.2",
+      "targets": [
+        {
+          "editorMode": "code",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "WITH version_cases AS (\n  SELECT software_version\n  FROM patch_versions\n),\neol_check AS (\n  SELECT DISTINCT software_version\n  FROM mastodon_domains md\n  WHERE EXISTS (\n    SELECT 1 \n    FROM eol_versions ev\n    WHERE md.software_version LIKE ev.software_version || '.%'\n       OR md.software_version LIKE ev.software_version || '%'\n  )\n)\nSELECT \n  CASE \n    WHEN software_version IN (SELECT software_version FROM version_cases) THEN software_version\n    WHEN software_version IN (SELECT software_version FROM eol_check) THEN 'EOL'\n    ELSE 'Unpatched'\n  END as version,\n  SUM(total_users) as user_count\nFROM mastodon_domains \nGROUP BY CASE \n    WHEN software_version IN (SELECT software_version FROM version_cases) THEN software_version\n    WHEN software_version IN (SELECT software_version FROM eol_check) THEN 'EOL'\n    ELSE 'Unpatched'\n  END;\n",
+          "refId": "A",
+          "sql": {
+            "columns": [
+              {
+                "parameters": [],
+                "type": "function"
+              }
+            ],
+            "groupBy": [
+              {
+                "property": {
+                  "type": "string"
+                },
+                "type": "groupBy"
+              }
+            ],
+            "limit": 50
+          }
+        }
+      ],
+      "title": "Patches by Total User Count",
       "type": "piechart"
     },
     {
@@ -1398,7 +1398,7 @@
           "editorMode": "code",
           "format": "table",
           "rawQuery": true,
-          "rawSql": "WITH version_matches AS (\n    SELECT \n        md.software_version,\n        md.active_users_monthly,\n        COALESCE(ev.software_version, pv.branch) as \"Branch Version\"\n    FROM \n        mastodon_domains md\n    LEFT JOIN eol_versions ev \n        ON md.software_version LIKE ev.software_version || '%'\n    LEFT JOIN patch_versions pv \n        ON md.software_version LIKE pv.branch || '%'\n    WHERE \n        ev.software_version IS NOT NULL \n        OR pv.branch IS NOT NULL\n)\nSELECT \n    \"Branch Version\",\n    SUM(active_users_monthly) as \"Active Users\"\nFROM \n    version_matches\nGROUP BY \n    \"Branch Version\"\nORDER BY \n    \"Branch Version\" DESC\nLIMIT 10\n",
+          "rawSql": "WITH version_matches AS (\n    SELECT \n        md.software_version,\n        md.total_users,\n        COALESCE(ev.software_version, pv.branch) as \"Branch Version\"\n    FROM \n        mastodon_domains md\n    LEFT JOIN eol_versions ev \n        ON md.software_version LIKE ev.software_version || '%'\n    LEFT JOIN patch_versions pv \n        ON md.software_version LIKE pv.branch || '%'\n    WHERE \n        ev.software_version IS NOT NULL \n        OR pv.branch IS NOT NULL\n)\nSELECT \n    \"Branch Version\",\n    SUM(total_users) as \"Total Users\"\nFROM \n    version_matches\nGROUP BY \n    \"Branch Version\"\nORDER BY \n    \"Branch Version\" DESC\nLIMIT 10\n",
           "refId": "A",
           "sql": {
             "columns": [
@@ -1419,7 +1419,7 @@
           }
         }
       ],
-      "title": "Top 10 Branches by Active Users",
+      "title": "Top 10 Branches by Total Users",
       "type": "barchart"
     },
     {
@@ -1549,6 +1549,6 @@
   "timezone": "browser",
   "title": "vmcrawl",
   "uid": "aedqo0q7klrswa",
-  "version": 36,
+  "version": 37,
   "weekStart": ""
 }
