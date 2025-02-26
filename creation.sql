@@ -9,10 +9,11 @@ CREATE TABLE
       TIME ZONE DEFAULT CURRENT_TIMESTAMP,
       domain TEXT DEFAULT NULL,
       error TEXT DEFAULT NULL
-  );
-
-CREATE TABLE
-  junk_words (keywords TEXT PRIMARY KEY);
+  CREATE TABLE
+    junk_words (
+      keywords TEXT PRIMARY KEY,
+      comments TEXT DEFAULT NULL
+    );
 
 CREATE TABLE
   mastodon_domains (
@@ -79,20 +80,20 @@ VALUES
   ('1');
 
 INSERT INTO
-  junk_words (keywords)
+  junk_words (keywords, comments)
 VALUES
-  ('activitypub-proxy.cf'),
-  ('activitypub-troll.cf'),
-  ('cf-ipfs.com'),
-  ('elestio.app'),
-  ('github.dev'),
-  ('gitpod.io'),
-  ('herokuapp.com'),
-  ('lhr.life'),
-  ('lhrtunnel.link'),
-  ('ngrok-free.app'),
-  ('ngrok.app'),
-  ('ngrok.dev'),
-  ('ngrok.io'),
-  ('nope.rodeo'),
-  ('serveo.net');
+  ('activitypub-proxy.cf', NULL),
+  ('activitypub-troll.cf', NULL),
+  ('cf-ipfs.com', NULL),
+  ('elestio.app', NULL),
+  ('github.dev', NULL),
+  ('gitpod.io', NULL),
+  ('herokuapp.com', NULL),
+  ('lhr.life', NULL),
+  ('lhrtunnel.link', NULL),
+  ('ngrok-free.app', NULL),
+  ('ngrok.app', NULL),
+  ('ngrok.dev', NULL),
+  ('ngrok.io', NULL),
+  ('nope.rodeo', NULL),
+  ('serveo.net', NULL);
