@@ -530,7 +530,7 @@
         "type": "grafana-postgresql-datasource",
         "uid": "aedqwq5gb2ebkc"
       },
-      "description": "Count of instances running latest patches for branch release-2 (pending EOL), compared to the total instances on branch release-2.",
+      "description": "Count of instances running latest patches for branch release-2 (deprecated/pending-eol), compared to the total instances on branch release-2.",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -642,7 +642,7 @@
           }
         }
       ],
-      "title": "Patched Instances, Pending",
+      "title": "Patched Instances, Deprecated",
       "transformations": [
         {
           "id": "configFromData",
@@ -1256,7 +1256,7 @@
         "type": "grafana-postgresql-datasource",
         "uid": "aedqwq5gb2ebkc"
       },
-      "description": "Count of monthly active users (MAUs) on instances running latest patches for branch release-2 (pending), compared to the total instances on branch release-2.",
+      "description": "Count of monthly active users (MAUs) on instances running latest patches for branch release-2 (deprecated/pending-eol), compared to the total instances on branch release-2.",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -1368,7 +1368,7 @@
           }
         }
       ],
-      "title": "Patched MAUs, Pending",
+      "title": "Patched MAUs, Deprecated",
       "transformations": [
         {
           "id": "configFromData",
@@ -1719,7 +1719,8 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green"
+                "color": "green",
+                "value": null
               },
               {
                 "color": "red",
@@ -1816,7 +1817,8 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green"
+                "color": "green",
+                "value": null
               },
               {
                 "color": "red",
@@ -1924,7 +1926,8 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "blue"
+                "color": "blue",
+                "value": null
               }
             ]
           },
@@ -2041,7 +2044,8 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "purple"
+                "color": "purple",
+                "value": null
               }
             ]
           },
@@ -2084,7 +2088,7 @@
           "editorMode": "code",
           "format": "table",
           "rawQuery": true,
-          "rawSql": "SELECT\n  statistics.date AS time,\n  statistics.total_main_instances AS \"Main Branch\",\n  statistics.total_release_instances AS \"Latest Branch\",\n  statistics.total_previous_instances AS \"Previous Branch\",\n  statistics.total_pending_eol_instances AS \"Pending Branch\",\n  statistics.total_eol_instances AS \"EOL\"\nFROM\n  statistics\nORDER BY\n  statistics.date DESC\nLIMIT 30",
+          "rawSql": "SELECT\n  statistics.date AS time,\n  statistics.total_main_instances AS \"Main Branch\",\n  statistics.total_release_instances AS \"Latest Branch\",\n  statistics.total_previous_instances AS \"Previous Branch\",\n  statistics.total_pending_eol_instances AS \"Deprecated Branch\",\n  statistics.total_eol_instances AS \"EOL\"\nFROM\n  statistics\nORDER BY\n  statistics.date DESC\nLIMIT 30",
           "refId": "A",
           "sql": {
             "columns": [
@@ -2213,7 +2217,8 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "purple"
+                "color": "purple",
+                "value": null
               }
             ]
           },
@@ -2256,7 +2261,7 @@
           "editorMode": "code",
           "format": "table",
           "rawQuery": true,
-          "rawSql": "SELECT\n  statistics.date AS time,\n  statistics.total_active_main_branch_users AS \"Main Branch\",\n  statistics.total_active_release_branch_users AS \"Latest Branch\",\n  statistics.total_active_previous_branch_users AS \"Previous Branch\",\n  statistics.total_active_pending_eol_branch_users AS \"Pending Branch\",\n  statistics.total_active_eol_branch_users AS \"EOL\"\nFROM\n  statistics\nORDER BY\n  statistics.date DESC\nLIMIT 30",
+          "rawSql": "SELECT\n  statistics.date AS time,\n  statistics.total_active_main_branch_users AS \"Main Branch\",\n  statistics.total_active_release_branch_users AS \"Latest Branch\",\n  statistics.total_active_previous_branch_users AS \"Previous Branch\",\n  statistics.total_active_pending_eol_branch_users AS \"Deprecated Branch\",\n  statistics.total_active_eol_branch_users AS \"EOL\"\nFROM\n  statistics\nORDER BY\n  statistics.date DESC\nLIMIT 30",
           "refId": "A",
           "sql": {
             "columns": [
@@ -2385,7 +2390,8 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "purple"
+                "color": "purple",
+                "value": null
               }
             ]
           },
@@ -2428,7 +2434,7 @@
           "editorMode": "code",
           "format": "table",
           "rawQuery": true,
-          "rawSql": "SELECT\n  statistics.date AS time,\n  statistics.total_main_branch_users AS \"Main Branch\",\n  statistics.total_release_branch_users AS \"Latest Branch\",\n  statistics.total_previous_branch_users AS \"Previous Branch\",\n  statistics.total_pending_eol_branch_users AS \"Pending Branch\",\n  statistics.total_eol_branch_users AS \"EOL\"\nFROM\n  statistics\nORDER BY\n  statistics.date DESC\nLIMIT 30",
+          "rawSql": "SELECT\n  statistics.date AS time,\n  statistics.total_main_branch_users AS \"Main Branch\",\n  statistics.total_release_branch_users AS \"Latest Branch\",\n  statistics.total_previous_branch_users AS \"Previous Branch\",\n  statistics.total_pending_eol_branch_users AS \"Deprecated Branch\",\n  statistics.total_eol_branch_users AS \"EOL\"\nFROM\n  statistics\nORDER BY\n  statistics.date DESC\nLIMIT 30",
           "refId": "A",
           "sql": {
             "columns": [
@@ -2557,7 +2563,8 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "purple"
+                "color": "purple",
+                "value": null
               }
             ]
           },
@@ -2600,7 +2607,7 @@
           "editorMode": "code",
           "format": "table",
           "rawQuery": true,
-          "rawSql": "SELECT\n  statistics.date AS time,\n  statistics.total_main_patched_instances AS \"Main Branch\",\n  statistics.total_release_patched_instances AS \"Latest Branch\",\n  statistics.total_previous_patched_instances AS \"Previous Branch\",\n  statistics.total_pending_eol_patched_instances AS \"Pending Branch\"\nFROM\n  statistics\nORDER BY\n  statistics.date DESC\nLIMIT 30",
+          "rawSql": "SELECT\n  statistics.date AS time,\n  statistics.total_main_patched_instances AS \"Main Branch\",\n  statistics.total_release_patched_instances AS \"Latest Branch\",\n  statistics.total_previous_patched_instances AS \"Previous Branch\",\n  statistics.total_pending_eol_patched_instances AS \"Deprecated Branch\"\nFROM\n  statistics\nORDER BY\n  statistics.date DESC\nLIMIT 30",
           "refId": "A",
           "sql": {
             "columns": [
@@ -2729,7 +2736,8 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "purple"
+                "color": "purple",
+                "value": null
               }
             ]
           },
@@ -2772,7 +2780,7 @@
           "editorMode": "code",
           "format": "table",
           "rawQuery": true,
-          "rawSql": "SELECT\n  statistics.date AS time,\n  statistics.total_active_main_patched_users AS \"Main Branch\",\n  statistics.total_active_release_patched_users AS \"Latest Branch\",\n  statistics.total_active_previous_patched_users AS \"Previous Branch\",\n  statistics.total_active_pending_eol_patched_users AS \"Pending Branch\"\nFROM\n  statistics\nORDER BY\n  statistics.date DESC\nLIMIT 30",
+          "rawSql": "SELECT\n  statistics.date AS time,\n  statistics.total_active_main_patched_users AS \"Main Branch\",\n  statistics.total_active_release_patched_users AS \"Latest Branch\",\n  statistics.total_active_previous_patched_users AS \"Previous Branch\",\n  statistics.total_active_pending_eol_patched_users AS \"Deprecated Branch\"\nFROM\n  statistics\nORDER BY\n  statistics.date DESC\nLIMIT 30",
           "refId": "A",
           "sql": {
             "columns": [
@@ -2901,7 +2909,8 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "purple"
+                "color": "purple",
+                "value": null
               }
             ]
           },
@@ -2944,7 +2953,7 @@
           "editorMode": "code",
           "format": "table",
           "rawQuery": true,
-          "rawSql": "SELECT\n  statistics.date AS time,\n  statistics.total_main_patched_users AS \"Main Branch\",\n  statistics.total_release_patched_users AS \"Latest Branch\",\n  statistics.total_previous_patched_users AS \"Previous Branch\",\n  statistics.total_pending_eol_patched_users AS \"Pending Branch\"\nFROM\n  statistics\nORDER BY\n  statistics.date DESC\nLIMIT 30",
+          "rawSql": "SELECT\n  statistics.date AS time,\n  statistics.total_main_patched_users AS \"Main Branch\",\n  statistics.total_release_patched_users AS \"Latest Branch\",\n  statistics.total_previous_patched_users AS \"Previous Branch\",\n  statistics.total_pending_eol_patched_users AS \"Deprecated Branch\"\nFROM\n  statistics\nORDER BY\n  statistics.date DESC\nLIMIT 30",
           "refId": "A",
           "sql": {
             "columns": [
@@ -3072,7 +3081,8 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green"
+                "color": "green",
+                "value": null
               },
               {
                 "color": "red",
@@ -3162,6 +3172,6 @@
   "timezone": "browser",
   "title": "vmcrawl",
   "uid": "aedqo0q7klrswa",
-  "version": 45,
+  "version": 46,
   "weekStart": ""
 }
