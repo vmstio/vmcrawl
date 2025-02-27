@@ -7,3 +7,4 @@ target/*.txt
 error/*.txt
 .env
 .ruff_cache
+tests/*.txt
