@@ -55,6 +55,49 @@ CREATE TABLE
     baddata BOOLEAN DEFAULT NULL
   );
 
+CREATE TABLE statistics (
+    date DATE PRIMARY KEY,
+    total_raw_domains INTEGER,
+    total_failed_domains INTEGER,
+    total_mastodon_domains INTEGER,
+    total_ignored_domains INTEGER,
+    total_nxdomains INTEGER,
+    total_norobots INTEGER,
+    total_baddata INTEGER,
+    total_error_over INTEGER,
+    total_error_under INTEGER,
+    total_users INTEGER,
+    total_active_users INTEGER,
+    total_unique_versions INTEGER,
+    total_main_instances INTEGER,
+    total_release_instances INTEGER,
+    total_previous_instances INTEGER,
+    total_pending_eol_instances INTEGER,
+    total_eol_instances INTEGER,
+    total_main_patched_instances INTEGER,
+    total_release_patched_instances INTEGER,
+    total_previous_patched_instances INTEGER,
+    total_pending_eol_patched_instances INTEGER,
+    total_main_branch_users INTEGER,
+    total_release_branch_users INTEGER,
+    total_previous_branch_users INTEGER,
+    total_pending_eol_branch_users INTEGER,
+    total_eol_branch_users INTEGER,
+    total_main_patched_users INTEGER,
+    total_release_patched_users INTEGER,
+    total_previous_patched_users INTEGER,
+    total_pending_eol_patched_users INTEGER,
+    total_active_main_branch_users INTEGER,
+    total_active_release_branch_users INTEGER,
+    total_active_previous_branch_users INTEGER,
+    total_active_pending_eol_branch_users INTEGER,
+    total_active_eol_branch_users INTEGER,
+    total_active_main_patched_users INTEGER,
+    total_active_release_patched_users INTEGER,
+    total_active_previous_patched_users INTEGER,
+    total_active_pending_eol_patched_users INTEGER
+  );
+
 INSERT INTO
   bad_tld (tld)
 VALUES
