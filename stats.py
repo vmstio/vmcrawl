@@ -953,6 +953,98 @@ if __name__ == "__main__":
         total_active_pending_eol_patched_users = get_active_pending_eol_patched_users()
         print(f"Total active pending EOL patched users: {total_active_pending_eol_patched_users}")
 
+        cursor = conn.cursor()
+        try:
+            cursor.execute("""
+            INSERT INTO statistics (
+            date, total_raw_domains, total_failed_domains, total_mastodon_domains,
+            total_ignored_domains, total_nxdomains, total_norobots, total_baddata,
+            total_error_over, total_error_under, total_users, total_active_users,
+            total_unique_versions, total_main_instances, total_release_instances,
+            total_previous_instances, total_pending_eol_instances, total_eol_instances,
+            total_main_patched_instances, total_release_patched_instances,
+            total_previous_patched_instances, total_pending_eol_patched_instances,
+            total_main_branch_users, total_release_branch_users,
+            total_previous_branch_users, total_pending_eol_branch_users,
+            total_eol_branch_users, total_main_patched_users,
+            total_release_patched_users, total_previous_patched_users,
+            total_pending_eol_patched_users, total_active_main_branch_users,
+            total_active_release_branch_users, total_active_previous_branch_users,
+            total_active_pending_eol_branch_users, total_active_eol_branch_users,
+            total_active_main_patched_users, total_active_release_patched_users,
+            total_active_previous_patched_users, total_active_pending_eol_patched_users
+            )
+            VALUES (
+            (SELECT CURRENT_DATE AT TIME ZONE 'UTC'), %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s,
+            %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s,
+            %s, %s, %s, %s, %s, %s, %s, %s
+            )
+            ON CONFLICT (date) DO UPDATE SET
+            total_raw_domains = EXCLUDED.total_raw_domains,
+            total_failed_domains = EXCLUDED.total_failed_domains,
+            total_mastodon_domains = EXCLUDED.total_mastodon_domains,
+            total_ignored_domains = EXCLUDED.total_ignored_domains,
+            total_nxdomains = EXCLUDED.total_nxdomains,
+            total_norobots = EXCLUDED.total_norobots,
+            total_baddata = EXCLUDED.total_baddata,
+            total_error_over = EXCLUDED.total_error_over,
+            total_error_under = EXCLUDED.total_error_under,
+            total_users = EXCLUDED.total_users,
+            total_active_users = EXCLUDED.total_active_users,
+            total_unique_versions = EXCLUDED.total_unique_versions,
+            total_main_instances = EXCLUDED.total_main_instances,
+            total_release_instances = EXCLUDED.total_release_instances,
+            total_previous_instances = EXCLUDED.total_previous_instances,
+            total_pending_eol_instances = EXCLUDED.total_pending_eol_instances,
+            total_eol_instances = EXCLUDED.total_eol_instances,
+            total_main_patched_instances = EXCLUDED.total_main_patched_instances,
+            total_release_patched_instances = EXCLUDED.total_release_patched_instances,
+            total_previous_patched_instances = EXCLUDED.total_previous_patched_instances,
+            total_pending_eol_patched_instances = EXCLUDED.total_pending_eol_patched_instances,
+            total_main_branch_users = EXCLUDED.total_main_branch_users,
+            total_release_branch_users = EXCLUDED.total_release_branch_users,
+            total_previous_branch_users = EXCLUDED.total_previous_branch_users,
+            total_pending_eol_branch_users = EXCLUDED.total_pending_eol_branch_users,
+            total_eol_branch_users = EXCLUDED.total_eol_branch_users,
+            total_main_patched_users = EXCLUDED.total_main_patched_users,
+            total_release_patched_users = EXCLUDED.total_release_patched_users,
+            total_previous_patched_users = EXCLUDED.total_previous_patched_users,
+            total_pending_eol_patched_users = EXCLUDED.total_pending_eol_patched_users,
+            total_active_main_branch_users = EXCLUDED.total_active_main_branch_users,
+            total_active_release_branch_users = EXCLUDED.total_active_release_branch_users,
+            total_active_previous_branch_users = EXCLUDED.total_active_previous_branch_users,
+            total_active_pending_eol_branch_users = EXCLUDED.total_active_pending_eol_branch_users,
+            total_active_eol_branch_users = EXCLUDED.total_active_eol_branch_users,
+            total_active_main_patched_users = EXCLUDED.total_active_main_patched_users,
+            total_active_release_patched_users = EXCLUDED.total_active_release_patched_users,
+            total_active_previous_patched_users = EXCLUDED.total_active_previous_patched_users,
+            total_active_pending_eol_patched_users = EXCLUDED.total_active_pending_eol_patched_users
+            """, (
+            total_raw_domains, total_failed_domains, total_mastodon_domains,
+            total_ignored_domains, total_nxdomains, total_norobots, total_baddata,
+            total_error_over, total_error_under, total_users, total_active_users,
+            total_unique_versions, total_main_instances, total_release_instances,
+            total_previous_instances, total_pending_eol_instances, total_eol_instances,
+            total_main_patched_instances, total_release_patched_instances,
+            total_previous_patched_instances, total_pending_eol_patched_instances,
+            total_main_branch_users, total_release_branch_users,
+            total_previous_branch_users, total_pending_eol_branch_users,
+            total_eol_branch_users, total_main_patched_users,
+            total_release_patched_users, total_previous_patched_users,
+            total_pending_eol_patched_users, total_active_main_branch_users,
+            total_active_release_branch_users, total_active_previous_branch_users,
+            total_active_pending_eol_branch_users, total_active_eol_branch_users,
+            total_active_main_patched_users, total_active_release_patched_users,
+            total_active_previous_patched_users, total_active_pending_eol_patched_users
+            ))
+            conn.commit()
+            print("Statistics inserted/updated successfully")
+        except Exception as e:
+            print(f"Failed to insert/update statistics: {e}")
+            conn.rollback()
+        finally:
+            cursor.close()
+
     except KeyboardInterrupt:
         print_colored(f"\n{appname} interrupted by user", "bold")
     finally:
