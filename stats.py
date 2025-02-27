@@ -206,7 +206,6 @@ def get_total_unique_versions():
     finally:
         cursor.close()
 
-
 def get_total_main__branch_instances():
     cursor = conn.cursor()
     try:
@@ -331,6 +330,541 @@ def get_total_eol_branch_instances():
     finally:
         cursor.close()
 
+def get_total_main_patched_instances():
+    cursor = conn.cursor()
+    try:
+        cursor.execute(
+            """
+            SELECT COUNT(DISTINCT domain) as "Main Patched"
+            FROM mastodon_domains
+            WHERE software_version LIKE (
+                SELECT software_version
+                FROM patch_versions
+                WHERE main = True
+            ) || '%';
+        """
+        )
+        result = cursor.fetchone()
+        total_raw_domains = result[0] if result is not None else 0
+        conn.commit()
+        return total_raw_domains
+    except Exception as e:
+        print(f"Failed to obtain main patched instances: {e}")
+        conn.rollback()
+    finally:
+        cursor.close()
+
+def get_total_release_patched_instances():
+    cursor = conn.cursor()
+    try:
+        cursor.execute(
+            """
+            SELECT COUNT(DISTINCT domain) as "Latest Patched"
+            FROM mastodon_domains
+            WHERE software_version LIKE (
+                SELECT software_version
+                FROM patch_versions
+                WHERE n_level = 0
+            ) || '%';
+        """
+        )
+        result = cursor.fetchone()
+        total_raw_domains = result[0] if result is not None else 0
+        conn.commit()
+        return total_raw_domains
+    except Exception as e:
+        print(f"Failed to obtain release patched instances: {e}")
+        conn.rollback()
+    finally:
+        cursor.close()
+
+def get_total_previous_patched_instances():
+    cursor = conn.cursor()
+    try:
+        cursor.execute(
+            """
+            SELECT COUNT(DISTINCT domain) as "Previous Patched"
+            FROM mastodon_domains
+            WHERE software_version LIKE (
+                SELECT software_version
+                FROM patch_versions
+                WHERE n_level = 1
+            ) || '%';
+        """
+        )
+        result = cursor.fetchone()
+        total_raw_domains = result[0] if result is not None else 0
+        conn.commit()
+        return total_raw_domains
+    except Exception as e:
+        print(f"Failed to obtain previous patched instances: {e}")
+        conn.rollback()
+    finally:
+        cursor.close()
+
+def get_total_pending_eol_patched_instances():
+    cursor = conn.cursor()
+    try:
+        cursor.execute(
+            """
+            SELECT COUNT(DISTINCT domain) as "Pending EOL Patched"
+            FROM mastodon_domains
+            WHERE software_version LIKE (
+                SELECT software_version
+                FROM patch_versions
+                WHERE n_level = 2
+            ) || '%';
+        """
+        )
+        result = cursor.fetchone()
+        total_raw_domains = result[0] if result is not None else 0
+        conn.commit()
+        return total_raw_domains
+    except Exception as e:
+        print(f"Failed to obtain ending EOL patched instances: {e}")
+        conn.rollback()
+    finally:
+        cursor.close()
+
+def get_total_main_branch_users():
+    cursor = conn.cursor()
+    try:
+        cursor.execute(
+            """
+            SELECT SUM(total_users) as "Main Total"
+            FROM mastodon_domains
+            WHERE software_version LIKE (
+                SELECT branch || '.%'
+                FROM patch_versions
+                WHERE n_level = -1
+            );
+        """
+        )
+        result = cursor.fetchone()
+        total_users = result[0] if result is not None else 0
+        conn.commit()
+        return total_users
+    except Exception as e:
+        print(f"Failed to obtain total main instances users: {e}")
+        conn.rollback()
+    finally:
+        cursor.close()
+
+
+def get_total_release_branch_users():
+    cursor = conn.cursor()
+    try:
+        cursor.execute(
+            """
+            SELECT SUM(total_users) as "Latest Total"
+            FROM mastodon_domains
+            WHERE software_version LIKE (
+                SELECT branch || '.%'
+                FROM patch_versions
+                WHERE n_level = 0
+            );
+        """
+        )
+        result = cursor.fetchone()
+        total_users = result[0] if result is not None else 0
+        conn.commit()
+        return total_users
+    except Exception as e:
+        print(f"Failed to obtain total latest instances users: {e}")
+        conn.rollback()
+    finally:
+        cursor.close()
+
+
+def get_total_previous_branch_users():
+    cursor = conn.cursor()
+    try:
+        cursor.execute(
+            """
+            SELECT SUM(total_users) as "Latest Total"
+            FROM mastodon_domains
+            WHERE software_version LIKE (
+                SELECT branch || '.%'
+                FROM patch_versions
+                WHERE n_level = 1
+            );
+        """
+        )
+        result = cursor.fetchone()
+        total_users = result[0] if result is not None else 0
+        conn.commit()
+        return total_users
+    except Exception as e:
+        print(f"Failed to obtain total previous instances users: {e}")
+        conn.rollback()
+    finally:
+        cursor.close()
+
+
+def get_total_pending_eol_branch_users():
+    cursor = conn.cursor()
+    try:
+        cursor.execute(
+            """
+            SELECT SUM(total_users) as "Latest Total"
+            FROM mastodon_domains
+            WHERE software_version LIKE (
+                SELECT branch || '.%'
+                FROM patch_versions
+                WHERE n_level = 2
+            );
+        """
+        )
+        result = cursor.fetchone()
+        total_users = result[0] if result is not None else 0
+        conn.commit()
+        return total_users
+    except Exception as e:
+        print(f"Failed to obtain total pending EOL instances users: {e}")
+        conn.rollback()
+    finally:
+        cursor.close()
+
+
+def get_total_eol_branch_users():
+    cursor = conn.cursor()
+    try:
+        cursor.execute(
+            """
+            SELECT SUM(mastodon_domains.total_users) as "Latest Total"
+            FROM mastodon_domains
+            WHERE EXISTS (
+                SELECT 1
+                FROM eol_versions
+                WHERE mastodon_domains.software_version LIKE eol_versions.software_version || '%'
+            );
+        """
+        )
+        result = cursor.fetchone()
+        total_users = result[0] if result is not None else 0
+        conn.commit()
+        return total_users
+    except Exception as e:
+        print(f"Failed to obtain total EOL instances users: {e}")
+        conn.rollback()
+    finally:
+        cursor.close()
+
+def get_total_main_patched_users():
+    cursor = conn.cursor()
+    try:
+        cursor.execute(
+            """
+            SELECT SUM(total_users) as "Main Patched"
+            FROM mastodon_domains
+            WHERE software_version LIKE (
+                SELECT software_version
+                FROM patch_versions
+                WHERE main = True
+            ) || '%';
+        """
+        )
+        result = cursor.fetchone()
+        total_users = result[0] if result is not None else 0
+        conn.commit()
+        return total_users
+    except Exception as e:
+        print(f"Failed to obtain main patched instances users: {e}")
+        conn.rollback()
+    finally:
+        cursor.close()
+
+def get_total_release_patched_users():
+    cursor = conn.cursor()
+    try:
+        cursor.execute(
+            """
+            SELECT SUM(total_users) as "Latest Patched"
+            FROM mastodon_domains
+            WHERE software_version LIKE (
+                SELECT software_version
+                FROM patch_versions
+                WHERE n_level = 0
+            ) || '%';
+        """
+        )
+        result = cursor.fetchone()
+        total_users = result[0] if result is not None else 0
+        conn.commit()
+        return total_users
+    except Exception as e:
+        print(f"Failed to obtain release patched instances users: {e}")
+        conn.rollback()
+    finally:
+        cursor.close()
+
+def get_total_previous_patched_users():
+    cursor = conn.cursor()
+    try:
+        cursor.execute(
+            """
+            SELECT SUM(total_users) as "Previous Patched"
+            FROM mastodon_domains
+            WHERE software_version LIKE (
+                SELECT software_version
+                FROM patch_versions
+                WHERE n_level = 1
+            ) || '%';
+        """
+        )
+        result = cursor.fetchone()
+        total_users = result[0] if result is not None else 0
+        conn.commit()
+        return total_users
+    except Exception as e:
+        print(f"Failed to obtain previous patched instances users: {e}")
+        conn.rollback()
+    finally:
+        cursor.close()
+
+def get_total_pending_eol_patched_users():
+    cursor = conn.cursor()
+    try:
+        cursor.execute(
+            """
+            SELECT SUM(total_users) as "Pending EOL Patched"
+            FROM mastodon_domains
+            WHERE software_version LIKE (
+                SELECT software_version
+                FROM patch_versions
+                WHERE n_level = 2
+            ) || '%';
+        """
+        )
+        result = cursor.fetchone()
+        total_users = result[0] if result is not None else 0
+        conn.commit()
+        return total_users
+    except Exception as e:
+        print(f"Failed to obtain pending EOL patched instances users: {e}")
+        conn.rollback()
+    finally:
+        cursor.close()
+
+def get_active_main_branch_users():
+    cursor = conn.cursor()
+    try:
+        cursor.execute(
+            """
+            SELECT SUM(active_users_monthly) as "Main Total"
+            FROM mastodon_domains
+            WHERE software_version LIKE (
+                SELECT branch || '.%'
+                FROM patch_versions
+                WHERE n_level = -1
+            );
+        """
+        )
+        result = cursor.fetchone()
+        active_users = result[0] if result is not None else 0
+        conn.commit()
+        return active_users
+    except Exception as e:
+        print(f"Failed to obtain active main instances users: {e}")
+        conn.rollback()
+    finally:
+        cursor.close()
+
+
+def get_active_release_branch_users():
+    cursor = conn.cursor()
+    try:
+        cursor.execute(
+            """
+            SELECT SUM(active_users_monthly) as "Latest Total"
+            FROM mastodon_domains
+            WHERE software_version LIKE (
+                SELECT branch || '.%'
+                FROM patch_versions
+                WHERE n_level = 0
+            );
+        """
+        )
+        result = cursor.fetchone()
+        active_users = result[0] if result is not None else 0
+        conn.commit()
+        return active_users
+    except Exception as e:
+        print(f"Failed to obtain active latest instances users: {e}")
+        conn.rollback()
+    finally:
+        cursor.close()
+
+
+def get_active_previous_branch_users():
+    cursor = conn.cursor()
+    try:
+        cursor.execute(
+            """
+            SELECT SUM(active_users_monthly) as "Latest Total"
+            FROM mastodon_domains
+            WHERE software_version LIKE (
+                SELECT branch || '.%'
+                FROM patch_versions
+                WHERE n_level = 1
+            );
+        """
+        )
+        result = cursor.fetchone()
+        active_users = result[0] if result is not None else 0
+        conn.commit()
+        return active_users
+    except Exception as e:
+        print(f"Failed to obtain active previous instances users: {e}")
+        conn.rollback()
+    finally:
+        cursor.close()
+
+
+def get_active_pending_eol_branch_users():
+    cursor = conn.cursor()
+    try:
+        cursor.execute(
+            """
+            SELECT SUM(active_users_monthly) as "Latest Total"
+            FROM mastodon_domains
+            WHERE software_version LIKE (
+                SELECT branch || '.%'
+                FROM patch_versions
+                WHERE n_level = 2
+            );
+        """
+        )
+        result = cursor.fetchone()
+        active_users = result[0] if result is not None else 0
+        conn.commit()
+        return active_users
+    except Exception as e:
+        print(f"Failed to obtain active pending EOL instances users: {e}")
+        conn.rollback()
+    finally:
+        cursor.close()
+
+
+def get_active_eol_branch_users():
+    cursor = conn.cursor()
+    try:
+        cursor.execute(
+            """
+            SELECT SUM(mastodon_domains.active_users_monthly) as "Latest Total"
+            FROM mastodon_domains
+            WHERE EXISTS (
+                SELECT 1
+                FROM eol_versions
+                WHERE mastodon_domains.software_version LIKE eol_versions.software_version || '%'
+            );
+        """
+        )
+        result = cursor.fetchone()
+        active_users = result[0] if result is not None else 0
+        conn.commit()
+        return active_users
+    except Exception as e:
+        print(f"Failed to obtain active EOL instances users: {e}")
+        conn.rollback()
+    finally:
+        cursor.close()
+
+def get_active_main_patched_users():
+    cursor = conn.cursor()
+    try:
+        cursor.execute(
+            """
+            SELECT SUM(active_users_monthly) as "Main Patched"
+            FROM mastodon_domains
+            WHERE software_version LIKE (
+                SELECT software_version
+                FROM patch_versions
+                WHERE main = True
+            ) || '%';
+        """
+        )
+        result = cursor.fetchone()
+        active_users = result[0] if result is not None else 0
+        conn.commit()
+        return active_users
+    except Exception as e:
+        print(f"Failed to obtain active main patched instances users: {e}")
+        conn.rollback()
+    finally:
+        cursor.close()
+
+def get_active_release_patched_users():
+    cursor = conn.cursor()
+    try:
+        cursor.execute(
+            """
+            SELECT SUM(active_users_monthly) as "Latest Patched"
+            FROM mastodon_domains
+            WHERE software_version LIKE (
+                SELECT software_version
+                FROM patch_versions
+                WHERE n_level = 0
+            ) || '%';
+        """
+        )
+        result = cursor.fetchone()
+        active_users = result[0] if result is not None else 0
+        conn.commit()
+        return active_users
+    except Exception as e:
+        print(f"Failed to obtain active release patched instances users: {e}")
+        conn.rollback()
+    finally:
+        cursor.close()
+
+def get_active_previous_patched_users():
+    cursor = conn.cursor()
+    try:
+        cursor.execute(
+            """
+            SELECT SUM(active_users_monthly) as "Previous Patched"
+            FROM mastodon_domains
+            WHERE software_version LIKE (
+                SELECT software_version
+                FROM patch_versions
+                WHERE n_level = 1
+            ) || '%';
+        """
+        )
+        result = cursor.fetchone()
+        active_users = result[0] if result is not None else 0
+        conn.commit()
+        return active_users
+    except Exception as e:
+        print(f"Failed to obtain active previous patched instances users: {e}")
+        conn.rollback()
+    finally:
+        cursor.close()
+
+def get_active_pending_eol_patched_users():
+    cursor = conn.cursor()
+    try:
+        cursor.execute(
+            """
+            SELECT SUM(active_users_monthly) as "Pending EOL Patched"
+            FROM mastodon_domains
+            WHERE software_version LIKE (
+                SELECT software_version
+                FROM patch_versions
+                WHERE n_level = 2
+            ) || '%';
+        """
+        )
+        result = cursor.fetchone()
+        active_users = result[0] if result is not None else 0
+        conn.commit()
+        return active_users
+    except Exception as e:
+        print(f"Failed to obtain active pending EOL patched instances users: {e}")
+        conn.rollback()
+    finally:
+        cursor.close()
 
 if __name__ == "__main__":
     try:
@@ -374,6 +908,50 @@ if __name__ == "__main__":
         print(f"Total pending EOL branch instances: {total_pending_eol_instances}")
         total_eol_instances = get_total_eol_branch_instances()
         print(f"Total EOL branch instances: {total_eol_instances}")
+        total_main_patched_instances = get_total_main_patched_instances()
+        print(f"Total main patched instances: {total_main_patched_instances}")
+        total_release_patched_instances = get_total_release_patched_instances()
+        print(f"Total release patched instances: {total_release_patched_instances}")
+        total_previous_patched_instances = get_total_previous_patched_instances()
+        print(f"Total previous patched instances: {total_previous_patched_instances}")
+        total_pending_eol_patched_instances = get_total_pending_eol_patched_instances()
+        print(f"Total pending EOL patched instances: {total_pending_eol_patched_instances}")
+        total_main_branch_users = get_total_main_branch_users()
+        print(f"Total main branch users: {total_main_branch_users}")
+        total_release_branch_users = get_total_release_branch_users()
+        print(f"Total release branch users: {total_release_branch_users}")
+        total_previous_branch_users = get_total_previous_branch_users()
+        print(f"Total previous branch users: {total_previous_branch_users}")
+        total_pending_eol_branch_users = get_total_pending_eol_branch_users()
+        print(f"Total pending EOL branch users: {total_pending_eol_branch_users}")
+        total_eol_branch_users = get_total_eol_branch_users()
+        print(f"Total EOL branch users: {total_eol_branch_users}")
+        total_main_patched_users = get_total_main_patched_users()
+        print(f"Total main patched users: {total_main_patched_users}")
+        total_release_patched_users = get_total_release_patched_users()
+        print(f"Total release patched users: {total_release_patched_users}")
+        total_previous_patched_users = get_total_previous_patched_users()
+        print(f"Total previous patched users: {total_previous_patched_users}")
+        total_pending_eol_patched_users = get_total_pending_eol_patched_users()
+        print(f"Total pending EOL patched users: {total_pending_eol_patched_users}")
+        total_active_main_branch_users = get_active_main_branch_users()
+        print(f"Total active main branch users: {total_active_main_branch_users}")
+        total_active_release_branch_users = get_active_release_branch_users()
+        print(f"Total active release branch users: {total_active_release_branch_users}")
+        total_active_previous_branch_users = get_active_previous_branch_users()
+        print(f"Total active previous branch users: {total_active_previous_branch_users}")
+        total_active_pending_eol_branch_users = get_active_pending_eol_branch_users()
+        print(f"Total active pending EOL branch users: {total_active_pending_eol_branch_users}")
+        total_active_eol_branch_users = get_active_eol_branch_users()
+        print(f"Total active EOL branch users: {total_active_eol_branch_users}")
+        total_active_main_patched_users = get_active_main_patched_users()
+        print(f"Total active main patched users: {total_active_main_patched_users}")
+        total_active_release_patched_users = get_active_release_patched_users()
+        print(f"Total active release patched users: {total_active_release_patched_users}")
+        total_active_previous_patched_users = get_active_previous_patched_users()
+        print(f"Total active previous patched users: {total_active_previous_patched_users}")
+        total_active_pending_eol_patched_users = get_active_pending_eol_patched_users()
+        print(f"Total active pending EOL patched users: {total_active_pending_eol_patched_users}")
 
     except KeyboardInterrupt:
         print_colored(f"\n{appname} interrupted by user", "bold")
