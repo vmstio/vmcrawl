@@ -11,12 +11,13 @@ current_filename = os.path.basename(__file__)
 
 def get_total_raw_domains():
     cursor = conn.cursor()
+    value_to_return = 0
     try:
         cursor.execute("SELECT COUNT(domain) AS total_domains FROM raw_domains;")
         result = cursor.fetchone()
-        total_raw_domains = result[0] if result is not None else 0
+        value_to_return = result[0] if result is not None else 0
         conn.commit()
-        return total_raw_domains
+        return value_to_return
     except Exception as e:
         print(f"Failed to obtain total raw domains: {e}")
         conn.rollback()
@@ -26,14 +27,15 @@ def get_total_raw_domains():
 
 def get_total_failed_domains():
     cursor = conn.cursor()
+    value_to_return = 0
     try:
         cursor.execute(
             "SELECT COUNT(domain) AS total_domains FROM raw_domains WHERE failed = True;"
         )
         result = cursor.fetchone()
-        total_raw_domains = result[0] if result is not None else 0
+        value_to_return = result[0] if result is not None else 0
         conn.commit()
-        return total_raw_domains
+        return value_to_return
     except Exception as e:
         print(f"Failed to obtain total failed domains: {e}")
         conn.rollback()
@@ -43,12 +45,13 @@ def get_total_failed_domains():
 
 def get_total_mastodon_domains():
     cursor = conn.cursor()
+    value_to_return = 0
     try:
         cursor.execute("SELECT COUNT(domain) AS total_domains FROM mastodon_domains;")
         result = cursor.fetchone()
-        total_raw_domains = result[0] if result is not None else 0
+        value_to_return = result[0] if result is not None else 0
         conn.commit()
-        return total_raw_domains
+        return value_to_return
     except Exception as e:
         print(f"Failed to obtain total Mastodon domains: {e}")
         conn.rollback()
@@ -58,14 +61,15 @@ def get_total_mastodon_domains():
 
 def get_total_ignored_domains():
     cursor = conn.cursor()
+    value_to_return = 0
     try:
         cursor.execute(
             "SELECT COUNT(domain) AS total_domains FROM raw_domains WHERE ignore = True;"
         )
         result = cursor.fetchone()
-        total_raw_domains = result[0] if result is not None else 0
+        value_to_return = result[0] if result is not None else 0
         conn.commit()
-        return total_raw_domains
+        return value_to_return
     except Exception as e:
         print(f"Failed to obtain total non-Mastodon domains: {e}")
         conn.rollback()
@@ -75,14 +79,15 @@ def get_total_ignored_domains():
 
 def get_total_nxdomains():
     cursor = conn.cursor()
+    value_to_return = 0
     try:
         cursor.execute(
             "SELECT COUNT(domain) AS total_domains FROM raw_domains WHERE nxdomain = True;"
         )
         result = cursor.fetchone()
-        total_raw_domains = result[0] if result is not None else 0
+        value_to_return = result[0] if result is not None else 0
         conn.commit()
-        return total_raw_domains
+        return value_to_return
     except Exception as e:
         print(f"Failed to obtain total nxdomain domains: {e}")
         conn.rollback()
@@ -92,14 +97,15 @@ def get_total_nxdomains():
 
 def get_total_norobots():
     cursor = conn.cursor()
+    value_to_return = 0
     try:
         cursor.execute(
             "SELECT COUNT(domain) AS total_domains FROM raw_domains WHERE norobots = True;"
         )
         result = cursor.fetchone()
-        total_raw_domains = result[0] if result is not None else 0
+        value_to_return = result[0] if result is not None else 0
         conn.commit()
-        return total_raw_domains
+        return value_to_return
     except Exception as e:
         print(f"Failed to obtain total norobots domains: {e}")
         conn.rollback()
@@ -109,14 +115,15 @@ def get_total_norobots():
 
 def get_total_baddata():
     cursor = conn.cursor()
+    value_to_return = 0
     try:
         cursor.execute(
             "SELECT COUNT(domain) AS total_domains FROM raw_domains WHERE baddata = True;"
         )
         result = cursor.fetchone()
-        total_raw_domains = result[0] if result is not None else 0
+        value_to_return = result[0] if result is not None else 0
         conn.commit()
-        return total_raw_domains
+        return value_to_return
     except Exception as e:
         print(f"Failed to obtain total baddata domains: {e}")
         conn.rollback()
@@ -126,14 +133,15 @@ def get_total_baddata():
 
 def get_total_error_over():
     cursor = conn.cursor()
+    value_to_return = 0
     try:
         cursor.execute(
             "SELECT COUNT(domain) AS total_domains FROM raw_domains WHERE errors >= 8;"
         )
         result = cursor.fetchone()
-        total_raw_domains = result[0] if result is not None else 0
+        value_to_return = result[0] if result is not None else 0
         conn.commit()
-        return total_raw_domains
+        return value_to_return
     except Exception as e:
         print(f"Failed to obtain total error over domains: {e}")
         conn.rollback()
@@ -143,14 +151,15 @@ def get_total_error_over():
 
 def get_total_error_under():
     cursor = conn.cursor()
+    value_to_return = 0
     try:
         cursor.execute(
             "SELECT COUNT(domain) AS total_domains FROM raw_domains WHERE errors <= 7;"
         )
         result = cursor.fetchone()
-        total_raw_domains = result[0] if result is not None else 0
+        value_to_return = result[0] if result is not None else 0
         conn.commit()
-        return total_raw_domains
+        return value_to_return
     except Exception as e:
         print(f"Failed to obtain total error under domains: {e}")
         conn.rollback()
@@ -160,12 +169,13 @@ def get_total_error_under():
 
 def get_total_users():
     cursor = conn.cursor()
+    value_to_return = 0
     try:
         cursor.execute("SELECT SUM(total_users) AS total_users FROM mastodon_domains;")
         result = cursor.fetchone()
-        total_raw_domains = result[0] if result is not None else 0
+        value_to_return = result[0] if result is not None else 0
         conn.commit()
-        return total_raw_domains
+        return value_to_return
     except Exception as e:
         print(f"Failed to obtain total users: {e}")
         conn.rollback()
@@ -175,14 +185,15 @@ def get_total_users():
 
 def get_total_active_users():
     cursor = conn.cursor()
+    value_to_return = 0
     try:
         cursor.execute(
             "SELECT SUM(active_users_monthly) AS total_users FROM mastodon_domains;"
         )
         result = cursor.fetchone()
-        total_raw_domains = result[0] if result is not None else 0
+        value_to_return = result[0] if result is not None else 0
         conn.commit()
-        return total_raw_domains
+        return value_to_return
     except Exception as e:
         print(f"Failed to obtain active users: {e}")
         conn.rollback()
@@ -192,14 +203,15 @@ def get_total_active_users():
 
 def get_total_unique_versions():
     cursor = conn.cursor()
+    value_to_return = 0
     try:
         cursor.execute(
             "SELECT COUNT(DISTINCT software_version) AS unique_software_versions FROM mastodon_domains;"
         )
         result = cursor.fetchone()
-        total_raw_domains = result[0] if result is not None else 0
+        value_to_return = result[0] if result is not None else 0
         conn.commit()
-        return total_raw_domains
+        return value_to_return
     except Exception as e:
         print(f"Failed to obtain unique versions: {e}")
         conn.rollback()
@@ -208,6 +220,7 @@ def get_total_unique_versions():
 
 def get_total_main_branch_instances():
     cursor = conn.cursor()
+    value_to_return = 0
     try:
         cursor.execute(
             """
@@ -221,9 +234,9 @@ def get_total_main_branch_instances():
         """
         )
         result = cursor.fetchone()
-        total_raw_domains = result[0] if result is not None else 0
+        value_to_return = result[0] if result is not None else 0
         conn.commit()
-        return total_raw_domains
+        return value_to_return
     except Exception as e:
         print(f"Failed to obtain total main instances: {e}")
         conn.rollback()
@@ -233,6 +246,7 @@ def get_total_main_branch_instances():
 
 def get_total_release_branch_instances():
     cursor = conn.cursor()
+    value_to_return = 0
     try:
         cursor.execute(
             """
@@ -246,9 +260,9 @@ def get_total_release_branch_instances():
         """
         )
         result = cursor.fetchone()
-        total_raw_domains = result[0] if result is not None else 0
+        value_to_return = result[0] if result is not None else 0
         conn.commit()
-        return total_raw_domains
+        return value_to_return
     except Exception as e:
         print(f"Failed to obtain total latest instances: {e}")
         conn.rollback()
@@ -258,6 +272,7 @@ def get_total_release_branch_instances():
 
 def get_total_previous_branch_instances():
     cursor = conn.cursor()
+    value_to_return = 0
     try:
         cursor.execute(
             """
@@ -271,9 +286,9 @@ def get_total_previous_branch_instances():
         """
         )
         result = cursor.fetchone()
-        total_raw_domains = result[0] if result is not None else 0
+        value_to_return = result[0] if result is not None else 0
         conn.commit()
-        return total_raw_domains
+        return value_to_return
     except Exception as e:
         print(f"Failed to obtain total previous instances: {e}")
         conn.rollback()
@@ -283,6 +298,7 @@ def get_total_previous_branch_instances():
 
 def get_total_pending_eol_branch_instances():
     cursor = conn.cursor()
+    value_to_return = 0
     try:
         cursor.execute(
             """
@@ -296,9 +312,9 @@ def get_total_pending_eol_branch_instances():
         """
         )
         result = cursor.fetchone()
-        total_raw_domains = result[0] if result is not None else 0
+        value_to_return = result[0] if result is not None else 0
         conn.commit()
-        return total_raw_domains
+        return value_to_return
     except Exception as e:
         print(f"Failed to obtain total pending EOL instances: {e}")
         conn.rollback()
@@ -308,6 +324,7 @@ def get_total_pending_eol_branch_instances():
 
 def get_total_eol_branch_instances():
     cursor = conn.cursor()
+    value_to_return = 0
     try:
         cursor.execute(
             """
@@ -321,9 +338,9 @@ def get_total_eol_branch_instances():
         """
         )
         result = cursor.fetchone()
-        total_raw_domains = result[0] if result is not None else 0
+        value_to_return = result[0] if result is not None else 0
         conn.commit()
-        return total_raw_domains
+        return value_to_return
     except Exception as e:
         print(f"Failed to obtain total EOL instances: {e}")
         conn.rollback()
@@ -332,6 +349,7 @@ def get_total_eol_branch_instances():
 
 def get_total_main_patched_instances():
     cursor = conn.cursor()
+    value_to_return = 0
     try:
         cursor.execute(
             """
@@ -345,9 +363,9 @@ def get_total_main_patched_instances():
         """
         )
         result = cursor.fetchone()
-        total_raw_domains = result[0] if result is not None else 0
+        value_to_return = result[0] if result is not None else 0
         conn.commit()
-        return total_raw_domains
+        return value_to_return
     except Exception as e:
         print(f"Failed to obtain main patched instances: {e}")
         conn.rollback()
@@ -356,6 +374,7 @@ def get_total_main_patched_instances():
 
 def get_total_release_patched_instances():
     cursor = conn.cursor()
+    value_to_return = 0
     try:
         cursor.execute(
             """
@@ -369,9 +388,9 @@ def get_total_release_patched_instances():
         """
         )
         result = cursor.fetchone()
-        total_raw_domains = result[0] if result is not None else 0
+        value_to_return = result[0] if result is not None else 0
         conn.commit()
-        return total_raw_domains
+        return value_to_return
     except Exception as e:
         print(f"Failed to obtain release patched instances: {e}")
         conn.rollback()
@@ -380,6 +399,7 @@ def get_total_release_patched_instances():
 
 def get_total_previous_patched_instances():
     cursor = conn.cursor()
+    value_to_return = 0
     try:
         cursor.execute(
             """
@@ -393,9 +413,9 @@ def get_total_previous_patched_instances():
         """
         )
         result = cursor.fetchone()
-        total_raw_domains = result[0] if result is not None else 0
+        value_to_return = result[0] if result is not None else 0
         conn.commit()
-        return total_raw_domains
+        return value_to_return
     except Exception as e:
         print(f"Failed to obtain previous patched instances: {e}")
         conn.rollback()
@@ -404,6 +424,7 @@ def get_total_previous_patched_instances():
 
 def get_total_pending_eol_patched_instances():
     cursor = conn.cursor()
+    value_to_return = 0
     try:
         cursor.execute(
             """
@@ -417,9 +438,9 @@ def get_total_pending_eol_patched_instances():
         """
         )
         result = cursor.fetchone()
-        total_raw_domains = result[0] if result is not None else 0
+        value_to_return = result[0] if result is not None else 0
         conn.commit()
-        return total_raw_domains
+        return value_to_return
     except Exception as e:
         print(f"Failed to obtain ending EOL patched instances: {e}")
         conn.rollback()
@@ -428,6 +449,7 @@ def get_total_pending_eol_patched_instances():
 
 def get_total_main_branch_users():
     cursor = conn.cursor()
+    value_to_return = 0
     try:
         cursor.execute(
             """
@@ -441,9 +463,9 @@ def get_total_main_branch_users():
         """
         )
         result = cursor.fetchone()
-        total_users = result[0] if result is not None else 0
+        value_to_return = result[0] if result is not None else 0
         conn.commit()
-        return total_users
+        return value_to_return
     except Exception as e:
         print(f"Failed to obtain total main instances users: {e}")
         conn.rollback()
@@ -453,6 +475,7 @@ def get_total_main_branch_users():
 
 def get_total_release_branch_users():
     cursor = conn.cursor()
+    value_to_return = 0
     try:
         cursor.execute(
             """
@@ -466,9 +489,9 @@ def get_total_release_branch_users():
         """
         )
         result = cursor.fetchone()
-        total_users = result[0] if result is not None else 0
+        value_to_return = result[0] if result is not None else 0
         conn.commit()
-        return total_users
+        return value_to_return
     except Exception as e:
         print(f"Failed to obtain total latest instances users: {e}")
         conn.rollback()
@@ -478,6 +501,7 @@ def get_total_release_branch_users():
 
 def get_total_previous_branch_users():
     cursor = conn.cursor()
+    value_to_return = 0
     try:
         cursor.execute(
             """
@@ -491,9 +515,9 @@ def get_total_previous_branch_users():
         """
         )
         result = cursor.fetchone()
-        total_users = result[0] if result is not None else 0
+        value_to_return = result[0] if result is not None else 0
         conn.commit()
-        return total_users
+        return value_to_return
     except Exception as e:
         print(f"Failed to obtain total previous instances users: {e}")
         conn.rollback()
@@ -503,6 +527,7 @@ def get_total_previous_branch_users():
 
 def get_total_pending_eol_branch_users():
     cursor = conn.cursor()
+    value_to_return = 0
     try:
         cursor.execute(
             """
@@ -516,9 +541,9 @@ def get_total_pending_eol_branch_users():
         """
         )
         result = cursor.fetchone()
-        total_users = result[0] if result is not None else 0
+        value_to_return = result[0] if result is not None else 0
         conn.commit()
-        return total_users
+        return value_to_return
     except Exception as e:
         print(f"Failed to obtain total pending EOL instances users: {e}")
         conn.rollback()
@@ -528,6 +553,7 @@ def get_total_pending_eol_branch_users():
 
 def get_total_eol_branch_users():
     cursor = conn.cursor()
+    value_to_return = 0
     try:
         cursor.execute(
             """
@@ -541,9 +567,9 @@ def get_total_eol_branch_users():
         """
         )
         result = cursor.fetchone()
-        total_users = result[0] if result is not None else 0
+        value_to_return = result[0] if result is not None else 0
         conn.commit()
-        return total_users
+        return value_to_return
     except Exception as e:
         print(f"Failed to obtain total EOL instances users: {e}")
         conn.rollback()
@@ -552,6 +578,7 @@ def get_total_eol_branch_users():
 
 def get_total_main_patched_users():
     cursor = conn.cursor()
+    value_to_return = 0
     try:
         cursor.execute(
             """
@@ -565,9 +592,9 @@ def get_total_main_patched_users():
         """
         )
         result = cursor.fetchone()
-        total_users = result[0] if result is not None else 0
+        value_to_return = result[0] if result is not None else 0
         conn.commit()
-        return total_users
+        return value_to_return
     except Exception as e:
         print(f"Failed to obtain main patched instances users: {e}")
         conn.rollback()
@@ -576,6 +603,7 @@ def get_total_main_patched_users():
 
 def get_total_release_patched_users():
     cursor = conn.cursor()
+    value_to_return = 0
     try:
         cursor.execute(
             """
@@ -589,9 +617,9 @@ def get_total_release_patched_users():
         """
         )
         result = cursor.fetchone()
-        total_users = result[0] if result is not None else 0
+        value_to_return = result[0] if result is not None else 0
         conn.commit()
-        return total_users
+        return value_to_return
     except Exception as e:
         print(f"Failed to obtain release patched instances users: {e}")
         conn.rollback()
@@ -600,6 +628,7 @@ def get_total_release_patched_users():
 
 def get_total_previous_patched_users():
     cursor = conn.cursor()
+    value_to_return = 0
     try:
         cursor.execute(
             """
@@ -613,9 +642,9 @@ def get_total_previous_patched_users():
         """
         )
         result = cursor.fetchone()
-        total_users = result[0] if result is not None else 0
+        value_to_return = result[0] if result is not None else 0
         conn.commit()
-        return total_users
+        return value_to_return
     except Exception as e:
         print(f"Failed to obtain previous patched instances users: {e}")
         conn.rollback()
@@ -624,6 +653,7 @@ def get_total_previous_patched_users():
 
 def get_total_pending_eol_patched_users():
     cursor = conn.cursor()
+    value_to_return = 0
     try:
         cursor.execute(
             """
@@ -637,9 +667,9 @@ def get_total_pending_eol_patched_users():
         """
         )
         result = cursor.fetchone()
-        total_users = result[0] if result is not None else 0
+        value_to_return = result[0] if result is not None else 0
         conn.commit()
-        return total_users
+        return value_to_return
     except Exception as e:
         print(f"Failed to obtain pending EOL patched instances users: {e}")
         conn.rollback()
@@ -648,6 +678,7 @@ def get_total_pending_eol_patched_users():
 
 def get_active_main_branch_users():
     cursor = conn.cursor()
+    value_to_return = 0
     try:
         cursor.execute(
             """
@@ -661,9 +692,9 @@ def get_active_main_branch_users():
         """
         )
         result = cursor.fetchone()
-        active_users = result[0] if result is not None else 0
+        value_to_return = result[0] if result is not None else 0
         conn.commit()
-        return active_users
+        return value_to_return
     except Exception as e:
         print(f"Failed to obtain active main instances users: {e}")
         conn.rollback()
@@ -673,6 +704,7 @@ def get_active_main_branch_users():
 
 def get_active_release_branch_users():
     cursor = conn.cursor()
+    value_to_return = 0
     try:
         cursor.execute(
             """
@@ -686,9 +718,9 @@ def get_active_release_branch_users():
         """
         )
         result = cursor.fetchone()
-        active_users = result[0] if result is not None else 0
+        value_to_return = result[0] if result is not None else 0
         conn.commit()
-        return active_users
+        return value_to_return
     except Exception as e:
         print(f"Failed to obtain active latest instances users: {e}")
         conn.rollback()
@@ -698,6 +730,7 @@ def get_active_release_branch_users():
 
 def get_active_previous_branch_users():
     cursor = conn.cursor()
+    value_to_return = 0
     try:
         cursor.execute(
             """
@@ -711,9 +744,9 @@ def get_active_previous_branch_users():
         """
         )
         result = cursor.fetchone()
-        active_users = result[0] if result is not None else 0
+        value_to_return = result[0] if result is not None else 0
         conn.commit()
-        return active_users
+        return value_to_return
     except Exception as e:
         print(f"Failed to obtain active previous instances users: {e}")
         conn.rollback()
@@ -723,6 +756,7 @@ def get_active_previous_branch_users():
 
 def get_active_pending_eol_branch_users():
     cursor = conn.cursor()
+    value_to_return = 0
     try:
         cursor.execute(
             """
@@ -736,9 +770,9 @@ def get_active_pending_eol_branch_users():
         """
         )
         result = cursor.fetchone()
-        active_users = result[0] if result is not None else 0
+        value_to_return = result[0] if result is not None else 0
         conn.commit()
-        return active_users
+        return value_to_return
     except Exception as e:
         print(f"Failed to obtain active pending EOL instances users: {e}")
         conn.rollback()
@@ -748,6 +782,7 @@ def get_active_pending_eol_branch_users():
 
 def get_active_eol_branch_users():
     cursor = conn.cursor()
+    value_to_return = 0
     try:
         cursor.execute(
             """
@@ -761,9 +796,9 @@ def get_active_eol_branch_users():
         """
         )
         result = cursor.fetchone()
-        active_users = result[0] if result is not None else 0
+        value_to_return = result[0] if result is not None else 0
         conn.commit()
-        return active_users
+        return value_to_return
     except Exception as e:
         print(f"Failed to obtain active EOL instances users: {e}")
         conn.rollback()
@@ -772,6 +807,7 @@ def get_active_eol_branch_users():
 
 def get_active_main_patched_users():
     cursor = conn.cursor()
+    value_to_return = 0
     try:
         cursor.execute(
             """
@@ -785,9 +821,9 @@ def get_active_main_patched_users():
         """
         )
         result = cursor.fetchone()
-        active_users = result[0] if result is not None else 0
+        value_to_return = result[0] if result is not None else 0
         conn.commit()
-        return active_users
+        return value_to_return
     except Exception as e:
         print(f"Failed to obtain active main patched instances users: {e}")
         conn.rollback()
@@ -796,6 +832,7 @@ def get_active_main_patched_users():
 
 def get_active_release_patched_users():
     cursor = conn.cursor()
+    value_to_return = 0
     try:
         cursor.execute(
             """
@@ -809,9 +846,9 @@ def get_active_release_patched_users():
         """
         )
         result = cursor.fetchone()
-        active_users = result[0] if result is not None else 0
+        value_to_return = result[0] if result is not None else 0
         conn.commit()
-        return active_users
+        return value_to_return
     except Exception as e:
         print(f"Failed to obtain active release patched instances users: {e}")
         conn.rollback()
@@ -820,6 +857,7 @@ def get_active_release_patched_users():
 
 def get_active_previous_patched_users():
     cursor = conn.cursor()
+    value_to_return = 0
     try:
         cursor.execute(
             """
@@ -833,9 +871,9 @@ def get_active_previous_patched_users():
         """
         )
         result = cursor.fetchone()
-        active_users = result[0] if result is not None else 0
+        value_to_return = result[0] if result is not None else 0
         conn.commit()
-        return active_users
+        return value_to_return
     except Exception as e:
         print(f"Failed to obtain active previous patched instances users: {e}")
         conn.rollback()
@@ -844,6 +882,7 @@ def get_active_previous_patched_users():
 
 def get_active_pending_eol_patched_users():
     cursor = conn.cursor()
+    value_to_return = 0
     try:
         cursor.execute(
             """
@@ -857,9 +896,9 @@ def get_active_pending_eol_patched_users():
         """
         )
         result = cursor.fetchone()
-        active_users = result[0] if result is not None else 0
+        value_to_return = result[0] if result is not None else 0
         conn.commit()
-        return active_users
+        return value_to_return
     except Exception as e:
         print(f"Failed to obtain active pending EOL patched instances users: {e}")
         conn.rollback()
