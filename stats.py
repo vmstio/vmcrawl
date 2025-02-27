@@ -2,10 +2,12 @@
 
 # Import common modules
 from common import *
+
 # Import additional modules
 
 # Detect the current filename
 current_filename = os.path.basename(__file__)
+
 
 def get_total_raw_domains():
     cursor = conn.cursor()
@@ -20,12 +22,14 @@ def get_total_raw_domains():
         conn.rollback()
     finally:
         cursor.close()
-    return []
+
 
 def get_total_failed_domains():
     cursor = conn.cursor()
     try:
-        cursor.execute("SELECT COUNT(domain) AS total_domains FROM raw_domains WHERE failed = True;")
+        cursor.execute(
+            "SELECT COUNT(domain) AS total_domains FROM raw_domains WHERE failed = True;"
+        )
         result = cursor.fetchone()
         total_raw_domains = result[0] if result is not None else 0
         conn.commit()
@@ -35,7 +39,7 @@ def get_total_failed_domains():
         conn.rollback()
     finally:
         cursor.close()
-    return []
+
 
 def get_total_mastodon_domains():
     cursor = conn.cursor()
@@ -50,12 +54,14 @@ def get_total_mastodon_domains():
         conn.rollback()
     finally:
         cursor.close()
-    return []
+
 
 def get_total_ignored_domains():
     cursor = conn.cursor()
     try:
-        cursor.execute("SELECT COUNT(domain) AS total_domains FROM raw_domains WHERE ignore = True;")
+        cursor.execute(
+            "SELECT COUNT(domain) AS total_domains FROM raw_domains WHERE ignore = True;"
+        )
         result = cursor.fetchone()
         total_raw_domains = result[0] if result is not None else 0
         conn.commit()
@@ -65,12 +71,14 @@ def get_total_ignored_domains():
         conn.rollback()
     finally:
         cursor.close()
-    return []
+
 
 def get_total_nxdomains():
     cursor = conn.cursor()
     try:
-        cursor.execute("SELECT COUNT(domain) AS total_domains FROM raw_domains WHERE nxdomain = True;")
+        cursor.execute(
+            "SELECT COUNT(domain) AS total_domains FROM raw_domains WHERE nxdomain = True;"
+        )
         result = cursor.fetchone()
         total_raw_domains = result[0] if result is not None else 0
         conn.commit()
@@ -80,12 +88,14 @@ def get_total_nxdomains():
         conn.rollback()
     finally:
         cursor.close()
-    return []
+
 
 def get_total_norobots():
     cursor = conn.cursor()
     try:
-        cursor.execute("SELECT COUNT(domain) AS total_domains FROM raw_domains WHERE norobots = True;")
+        cursor.execute(
+            "SELECT COUNT(domain) AS total_domains FROM raw_domains WHERE norobots = True;"
+        )
         result = cursor.fetchone()
         total_raw_domains = result[0] if result is not None else 0
         conn.commit()
@@ -95,12 +105,14 @@ def get_total_norobots():
         conn.rollback()
     finally:
         cursor.close()
-    return []
+
 
 def get_total_baddata():
     cursor = conn.cursor()
     try:
-        cursor.execute("SELECT COUNT(domain) AS total_domains FROM raw_domains WHERE baddata = True;")
+        cursor.execute(
+            "SELECT COUNT(domain) AS total_domains FROM raw_domains WHERE baddata = True;"
+        )
         result = cursor.fetchone()
         total_raw_domains = result[0] if result is not None else 0
         conn.commit()
@@ -110,12 +122,14 @@ def get_total_baddata():
         conn.rollback()
     finally:
         cursor.close()
-    return []
+
 
 def get_total_error_over():
     cursor = conn.cursor()
     try:
-        cursor.execute("SELECT COUNT(domain) AS total_domains FROM raw_domains WHERE errors >= 8;")
+        cursor.execute(
+            "SELECT COUNT(domain) AS total_domains FROM raw_domains WHERE errors >= 8;"
+        )
         result = cursor.fetchone()
         total_raw_domains = result[0] if result is not None else 0
         conn.commit()
@@ -125,12 +139,14 @@ def get_total_error_over():
         conn.rollback()
     finally:
         cursor.close()
-    return []
+
 
 def get_total_error_under():
     cursor = conn.cursor()
     try:
-        cursor.execute("SELECT COUNT(domain) AS total_domains FROM raw_domains WHERE errors <= 7;")
+        cursor.execute(
+            "SELECT COUNT(domain) AS total_domains FROM raw_domains WHERE errors <= 7;"
+        )
         result = cursor.fetchone()
         total_raw_domains = result[0] if result is not None else 0
         conn.commit()
@@ -140,7 +156,7 @@ def get_total_error_under():
         conn.rollback()
     finally:
         cursor.close()
-    return []
+
 
 def get_total_users():
     cursor = conn.cursor()
@@ -155,12 +171,14 @@ def get_total_users():
         conn.rollback()
     finally:
         cursor.close()
-    return []
+
 
 def get_total_active_users():
     cursor = conn.cursor()
     try:
-        cursor.execute("SELECT SUM(active_users_monthly) AS total_users FROM mastodon_domains;")
+        cursor.execute(
+            "SELECT SUM(active_users_monthly) AS total_users FROM mastodon_domains;"
+        )
         result = cursor.fetchone()
         total_raw_domains = result[0] if result is not None else 0
         conn.commit()
@@ -170,7 +188,149 @@ def get_total_active_users():
         conn.rollback()
     finally:
         cursor.close()
-    return []
+
+
+def get_total_unique_versions():
+    cursor = conn.cursor()
+    try:
+        cursor.execute(
+            "SELECT COUNT(DISTINCT software_version) AS unique_software_versions FROM mastodon_domains;"
+        )
+        result = cursor.fetchone()
+        total_raw_domains = result[0] if result is not None else 0
+        conn.commit()
+        return total_raw_domains
+    except Exception as e:
+        print(f"Failed to obtain unique versions: {e}")
+        conn.rollback()
+    finally:
+        cursor.close()
+
+
+def get_total_main__branch_instances():
+    cursor = conn.cursor()
+    try:
+        cursor.execute(
+            """
+            SELECT COUNT(DISTINCT domain) as "Main Total"
+            FROM mastodon_domains
+            WHERE software_version LIKE (
+                SELECT branch || '.%'
+                FROM patch_versions
+                WHERE n_level = -1
+            );
+        """
+        )
+        result = cursor.fetchone()
+        total_raw_domains = result[0] if result is not None else 0
+        conn.commit()
+        return total_raw_domains
+    except Exception as e:
+        print(f"Failed to obtain total main instances: {e}")
+        conn.rollback()
+    finally:
+        cursor.close()
+
+
+def get_total_release_branch_instances():
+    cursor = conn.cursor()
+    try:
+        cursor.execute(
+            """
+            SELECT COUNT(DISTINCT domain) as "Latest Total"
+            FROM mastodon_domains
+            WHERE software_version LIKE (
+                SELECT branch || '.%'
+                FROM patch_versions
+                WHERE n_level = 0
+            );
+        """
+        )
+        result = cursor.fetchone()
+        total_raw_domains = result[0] if result is not None else 0
+        conn.commit()
+        return total_raw_domains
+    except Exception as e:
+        print(f"Failed to obtain total latest instances: {e}")
+        conn.rollback()
+    finally:
+        cursor.close()
+
+
+def get_total_previous_branch_instances():
+    cursor = conn.cursor()
+    try:
+        cursor.execute(
+            """
+            SELECT COUNT(DISTINCT domain) as "Latest Total"
+            FROM mastodon_domains
+            WHERE software_version LIKE (
+                SELECT branch || '.%'
+                FROM patch_versions
+                WHERE n_level = 1
+            );
+        """
+        )
+        result = cursor.fetchone()
+        total_raw_domains = result[0] if result is not None else 0
+        conn.commit()
+        return total_raw_domains
+    except Exception as e:
+        print(f"Failed to obtain total previous instances: {e}")
+        conn.rollback()
+    finally:
+        cursor.close()
+
+
+def get_total_pending_eol_branch_instances():
+    cursor = conn.cursor()
+    try:
+        cursor.execute(
+            """
+            SELECT COUNT(DISTINCT domain) as "Latest Total"
+            FROM mastodon_domains
+            WHERE software_version LIKE (
+                SELECT branch || '.%'
+                FROM patch_versions
+                WHERE n_level = 2
+            );
+        """
+        )
+        result = cursor.fetchone()
+        total_raw_domains = result[0] if result is not None else 0
+        conn.commit()
+        return total_raw_domains
+    except Exception as e:
+        print(f"Failed to obtain total pending EOL instances: {e}")
+        conn.rollback()
+    finally:
+        cursor.close()
+
+
+def get_total_eol_branch_instances():
+    cursor = conn.cursor()
+    try:
+        cursor.execute(
+            """
+            SELECT COUNT(DISTINCT mastodon_domains.domain) as "Latest Total"
+            FROM mastodon_domains
+            WHERE EXISTS (
+                SELECT 1
+                FROM eol_versions
+                WHERE mastodon_domains.software_version LIKE eol_versions.software_version || '%'
+            );
+        """
+        )
+        result = cursor.fetchone()
+        total_raw_domains = result[0] if result is not None else 0
+        conn.commit()
+        return total_raw_domains
+    except Exception as e:
+        print(f"Failed to obtain total EOL instances: {e}")
+        conn.rollback()
+    finally:
+        cursor.close()
+
 
 if __name__ == "__main__":
     try:
@@ -202,6 +362,18 @@ if __name__ == "__main__":
         print(f"Total users: {total_users}")
         total_active_users = get_total_active_users()
         print(f"Total active users: {total_active_users}")
+        total_unique_versions = get_total_unique_versions()
+        print(f"Total unique versions: {total_unique_versions}")
+        total_main_instances = get_total_main__branch_instances()
+        print(f"Total main branch instances: {total_main_instances}")
+        total_release_instances = get_total_release_branch_instances()
+        print(f"Total release branch instances: {total_release_instances}")
+        total_previous_instances = get_total_previous_branch_instances()
+        print(f"Total previous branch instances: {total_previous_instances}")
+        total_pending_eol_instances = get_total_pending_eol_branch_instances()
+        print(f"Total pending EOL branch instances: {total_pending_eol_instances}")
+        total_eol_instances = get_total_eol_branch_instances()
+        print(f"Total EOL branch instances: {total_eol_instances}")
 
     except KeyboardInterrupt:
         print_colored(f"\n{appname} interrupted by user", "bold")
