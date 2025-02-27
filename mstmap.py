@@ -6,6 +6,7 @@ from datetime import datetime
 backport_branches = ["4.3", "4.2", "4.1"]
 
 # Define nightly version ranges with their respective start and end dates
+# First date is the state of release in UTC, last is the previous day, with most recent in the future
 nightly_version_ranges = [
     ("4.4.0-alpha.3", datetime(2025, 2, 28), datetime(2026, 12, 31)),
     ("4.4.0-alpha.2", datetime(2025, 1, 16), datetime(2025, 2, 27)),
