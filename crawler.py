@@ -867,14 +867,14 @@ def process_mastodon_instance(domain, webfinger_data, nodeinfo_data, http_client
                 error_message = 'Instance API reply is not a JSON file'
                 print_colored(f'{error_message}', 'magenta')
                 log_error(domain, error_message)
-                increment_domain_error(domain, 'JSON')
+                increment_domain_error(domain, 'API')
                 delete_if_error_max(domain)
                 return None
             if not response.content:
                 error_message = 'Instance API reply is empty'
                 print_colored(f'{error_message}', 'magenta')
                 log_error(domain, error_message)
-                increment_domain_error(domain, 'JSON')
+                increment_domain_error(domain, 'API')
                 delete_if_error_max(domain)
                 return None
             else:
@@ -882,8 +882,12 @@ def process_mastodon_instance(domain, webfinger_data, nodeinfo_data, http_client
 
             if 'error' in instance_api_data:
                 if instance_api_data['error'] == "This method requires an authenticated user":
-                    mark_as_non_mastodon(domain)
-                    return
+                    error_message = 'Instance API requires authentication'
+                    print_colored(f'{error_message}', 'magenta')
+                    log_error(domain, error_message)
+                    increment_domain_error(domain, 'API')
+                    delete_if_error_max(domain)
+                    return None
 
             if software_version.startswith("4"):
                 actual_domain = instance_api_data['domain'].lower()
