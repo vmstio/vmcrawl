@@ -206,7 +206,7 @@ def get_total_unique_versions():
     finally:
         cursor.close()
 
-def get_total_main__branch_instances():
+def get_total_main_branch_instances():
     cursor = conn.cursor()
     try:
         cursor.execute(
@@ -898,7 +898,7 @@ if __name__ == "__main__":
         print(f"Total active users: {total_active_users}")
         total_unique_versions = get_total_unique_versions()
         print(f"Total unique versions: {total_unique_versions}")
-        total_main_instances = get_total_main__branch_instances()
+        total_main_instances = get_total_main_branch_instances()
         print(f"Total main branch instances: {total_main_instances}")
         total_release_instances = get_total_release_branch_instances()
         print(f"Total release branch instances: {total_release_instances}")
