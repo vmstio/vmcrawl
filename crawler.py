@@ -1054,6 +1054,7 @@ def load_from_database(user_choice):
         "31": "SELECT domain FROM raw_domains WHERE reason = 'JSON' ORDER BY errors ASC",
         "32": "SELECT domain FROM raw_domains WHERE reason = 'TXT' ORDER BY errors ASC",
         "33": "SELECT domain FROM raw_domains WHERE reason = 'XML' ORDER BY errors ASC",
+        "34": "SELECT domain FROM raw_domains WHERE reason = 'API' ORDER BY errors ASC",
         "40": "SELECT domain FROM mastodon_domains WHERE timestamp::timestamptz <= NOW() - INTERVAL '%s days' ORDER BY timestamp DESC",
         "41": "SELECT domain FROM mastodon_domains WHERE software_version != ALL(%(versions)s::text[]) ORDER BY total_users DESC",
         "42": f"SELECT domain FROM mastodon_domains WHERE software_version LIKE %s ORDER BY total_users DESC",
@@ -1126,7 +1127,7 @@ def print_menu() -> None:
         "Retry fatal errors": {"6": "Not Mastodon", "7": "Marked Failed", "8": "Bad Domains", "9": "No Robots"},
         "Retry connection errors": {"10": "SSL", "11": "HTTP", "12": "TIME", "13": "MAX"},
         "Retry HTTP errors": {"20": "2xx", "21": "3xx", "22": "4xx", "23": "5xx"},
-        "Retry specific errors": {"30": "###", "31": "JSON", "32": "TXT", "33": "XML"},
+        "Retry specific errors": {"30": "###", "31": "JSON", "32": "TXT", "33": "XML", "34": "API"},
         "Retry good data": {"40": f"Stale ≥{error_threshold}", "41": "Unpatched", "42": "Main", "43": "Inactive", "44": "All Good"},
     }
 
