@@ -437,7 +437,7 @@
           }
         }
       ],
-      "title": "Last Crawl Activity (UTC)",
+      "title": "Last Crawl Activity (Local Time)",
       "transformations": [
         {
           "id": "formatTime",
@@ -3845,7 +3845,7 @@
           "editorMode": "code",
           "format": "table",
           "rawQuery": true,
-          "rawSql": "SELECT \n    domain AS \"Domain\",\n    software_version AS \"Software Version\",\n    full_version as \"Raw Version\",\n    total_users AS \"Total Users\",\n    active_users_monthly as \"Active Users\",\n    timestamp as \"Last Crawled\"\nFROM mastodon_domains\nORDER BY total_users DESC;",
+          "rawSql": "SELECT \n    domain AS \"Domain\",\n    software_version AS \"Software Version\",\n    full_version as \"Raw Version\",\n    total_users AS \"Total Users\",\n    active_users_monthly as \"Active Users\",\n    timestamp as \"Last Crawled (UTC)\"\nFROM mastodon_domains\nORDER BY total_users DESC;",
           "refId": "A",
           "sql": {
             "columns": [
@@ -3891,6 +3891,6 @@
   "timezone": "browser",
   "title": "vmcrawl",
   "uid": "aedqo0q7klrswa",
-  "version": 49,
+  "version": 50,
   "weekStart": ""
 }
