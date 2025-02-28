@@ -2088,7 +2088,7 @@
           "editorMode": "code",
           "format": "table",
           "rawQuery": true,
-          "rawSql": "SELECT\n  statistics.date AS time,\n  statistics.total_main_instances AS \"Main Branch\",\n  statistics.total_release_instances AS \"Latest Branch\",\n  statistics.total_previous_instances AS \"Previous Branch\",\n  statistics.total_pending_eol_instances AS \"Deprecated Branch\",\n  statistics.total_eol_instances AS \"EOL\"\nFROM\n  statistics\nORDER BY\n  statistics.date DESC\nLIMIT 30",
+          "rawSql": "SELECT\n  statistics.date AS time,\n  statistics.total_main_instances AS \"Main Branch\",\n  statistics.total_release_instances AS \"Latest Branch\",\n  statistics.total_previous_instances AS \"Previous Branch\",\n  statistics.total_pending_eol_instances AS \"Deprecated Branch\",\n  statistics.total_eol_instances AS \"EOL\"\nFROM\n  statistics\nORDER BY\n  statistics.date ASC\nLIMIT 30",
           "refId": "A",
           "sql": {
             "columns": [
@@ -2261,7 +2261,7 @@
           "editorMode": "code",
           "format": "table",
           "rawQuery": true,
-          "rawSql": "SELECT\n  statistics.date AS time,\n  statistics.total_active_main_branch_users AS \"Main Branch\",\n  statistics.total_active_release_branch_users AS \"Latest Branch\",\n  statistics.total_active_previous_branch_users AS \"Previous Branch\",\n  statistics.total_active_pending_eol_branch_users AS \"Deprecated Branch\",\n  statistics.total_active_eol_branch_users AS \"EOL\"\nFROM\n  statistics\nORDER BY\n  statistics.date DESC\nLIMIT 30",
+          "rawSql": "SELECT\n  statistics.date AS time,\n  statistics.total_active_main_branch_users AS \"Main Branch\",\n  statistics.total_active_release_branch_users AS \"Latest Branch\",\n  statistics.total_active_previous_branch_users AS \"Previous Branch\",\n  statistics.total_active_pending_eol_branch_users AS \"Deprecated Branch\",\n  statistics.total_active_eol_branch_users AS \"EOL\"\nFROM\n  statistics\nORDER BY\n  statistics.date ASC\nLIMIT 30",
           "refId": "A",
           "sql": {
             "columns": [
@@ -2434,7 +2434,7 @@
           "editorMode": "code",
           "format": "table",
           "rawQuery": true,
-          "rawSql": "SELECT\n  statistics.date AS time,\n  statistics.total_main_branch_users AS \"Main Branch\",\n  statistics.total_release_branch_users AS \"Latest Branch\",\n  statistics.total_previous_branch_users AS \"Previous Branch\",\n  statistics.total_pending_eol_branch_users AS \"Deprecated Branch\",\n  statistics.total_eol_branch_users AS \"EOL\"\nFROM\n  statistics\nORDER BY\n  statistics.date DESC\nLIMIT 30",
+          "rawSql": "SELECT\n  statistics.date AS time,\n  statistics.total_main_branch_users AS \"Main Branch\",\n  statistics.total_release_branch_users AS \"Latest Branch\",\n  statistics.total_previous_branch_users AS \"Previous Branch\",\n  statistics.total_pending_eol_branch_users AS \"Deprecated Branch\",\n  statistics.total_eol_branch_users AS \"EOL\"\nFROM\n  statistics\nORDER BY\n  statistics.date ASC\nLIMIT 30",
           "refId": "A",
           "sql": {
             "columns": [
@@ -2607,7 +2607,7 @@
           "editorMode": "code",
           "format": "table",
           "rawQuery": true,
-          "rawSql": "SELECT\n  statistics.date AS time,\n  statistics.total_main_patched_instances AS \"Main Branch\",\n  statistics.total_release_patched_instances AS \"Latest Branch\",\n  statistics.total_previous_patched_instances AS \"Previous Branch\",\n  statistics.total_pending_eol_patched_instances AS \"Deprecated Branch\"\nFROM\n  statistics\nORDER BY\n  statistics.date DESC\nLIMIT 30",
+          "rawSql": "SELECT\n  statistics.date AS time,\n  statistics.total_main_patched_instances AS \"Main Branch\",\n  statistics.total_release_patched_instances AS \"Latest Branch\",\n  statistics.total_previous_patched_instances AS \"Previous Branch\",\n  statistics.total_pending_eol_patched_instances AS \"Deprecated Branch\"\nFROM\n  statistics\nORDER BY\n  statistics.date ASC\nLIMIT 30",
           "refId": "A",
           "sql": {
             "columns": [
@@ -2780,7 +2780,7 @@
           "editorMode": "code",
           "format": "table",
           "rawQuery": true,
-          "rawSql": "SELECT\n  statistics.date AS time,\n  statistics.total_active_main_patched_users AS \"Main Branch\",\n  statistics.total_active_release_patched_users AS \"Latest Branch\",\n  statistics.total_active_previous_patched_users AS \"Previous Branch\",\n  statistics.total_active_pending_eol_patched_users AS \"Deprecated Branch\"\nFROM\n  statistics\nORDER BY\n  statistics.date DESC\nLIMIT 30",
+          "rawSql": "SELECT\n  statistics.date AS time,\n  statistics.total_active_main_patched_users AS \"Main Branch\",\n  statistics.total_active_release_patched_users AS \"Latest Branch\",\n  statistics.total_active_previous_patched_users AS \"Previous Branch\",\n  statistics.total_active_pending_eol_patched_users AS \"Deprecated Branch\"\nFROM\n  statistics\nORDER BY\n  statistics.date ASC\nLIMIT 30",
           "refId": "A",
           "sql": {
             "columns": [
@@ -2953,7 +2953,7 @@
           "editorMode": "code",
           "format": "table",
           "rawQuery": true,
-          "rawSql": "SELECT\n  statistics.date AS time,\n  statistics.total_main_patched_users AS \"Main Branch\",\n  statistics.total_release_patched_users AS \"Latest Branch\",\n  statistics.total_previous_patched_users AS \"Previous Branch\",\n  statistics.total_pending_eol_patched_users AS \"Deprecated Branch\"\nFROM\n  statistics\nORDER BY\n  statistics.date DESC\nLIMIT 30",
+          "rawSql": "SELECT\n  statistics.date AS time,\n  statistics.total_main_patched_users AS \"Main Branch\",\n  statistics.total_release_patched_users AS \"Latest Branch\",\n  statistics.total_previous_patched_users AS \"Previous Branch\",\n  statistics.total_pending_eol_patched_users AS \"Deprecated Branch\"\nFROM\n  statistics\nORDER BY\n  statistics.date ASC\nLIMIT 30",
           "refId": "A",
           "sql": {
             "columns": [
@@ -3172,6 +3172,6 @@
   "timezone": "browser",
   "title": "vmcrawl",
   "uid": "aedqo0q7klrswa",
-  "version": 46,
+  "version": 47,
   "weekStart": ""
 }
