@@ -1035,7 +1035,7 @@ def load_from_database(user_choice):
     # PostgreSQL uses SIMILAR TO instead of GLOB, and different timestamp functions
     query_map = {
         "0": "SELECT domain FROM raw_domains WHERE errors = 0 ORDER BY LENGTH(DOMAIN) ASC",
-        "1": f"SELECT domain FROM raw_domains WHERE (failed IS NULL OR failed = FALSE) AND (ignore IS NULL OR ignore = FALSE) AND (nxdomain IS NULL OR nxdomain = FALSE) AND (norobots IS NULL OR norobots = FALSE) AND (errors <= %s OR errors IS NULL) ORDER BY domain ASC",
+        "1": f"SELECT domain FROM raw_domains WHERE (failed IS NULL OR failed = FALSE) AND (ignore IS NULL OR ignore = FALSE) AND (nxdomain IS NULL OR nxdomain = FALSE) AND (norobots IS NULL OR norobots = FALSE) AND (baddata IS NULL OR baddata = FALSE) AND (errors <= %s OR errors IS NULL) ORDER BY domain ASC",
         "4": f"SELECT domain FROM raw_domains WHERE errors >= %s ORDER BY LENGTH(DOMAIN) ASC",
         "5": f"SELECT domain FROM raw_domains WHERE errors <= %s ORDER BY LENGTH(DOMAIN) ASC",
         "6": "SELECT domain FROM raw_domains WHERE ignore = TRUE ORDER BY domain",
@@ -1056,10 +1056,10 @@ def load_from_database(user_choice):
         "33": "SELECT domain FROM raw_domains WHERE reason = 'XML' ORDER BY errors ASC",
         "34": "SELECT domain FROM raw_domains WHERE reason = 'API' ORDER BY errors ASC",
         "40": "SELECT domain FROM mastodon_domains WHERE timestamp::timestamptz <= NOW() - INTERVAL '%s days' ORDER BY timestamp DESC",
-        "41": "SELECT domain FROM mastodon_domains WHERE software_version != ALL(%(versions)s::text[]) ORDER BY total_users DESC",
-        "42": f"SELECT domain FROM mastodon_domains WHERE software_version LIKE %s ORDER BY total_users DESC",
-        "43": "SELECT domain FROM mastodon_domains WHERE active_users_monthly = '0' ORDER BY total_users DESC",
-        "44": "SELECT domain FROM mastodon_domains ORDER BY total_users DESC",
+        "41": "SELECT domain FROM mastodon_domains WHERE software_version != ALL(%(versions)s::text[]) ORDER BY active_users_monthly DESC",
+        "42": f"SELECT domain FROM mastodon_domains WHERE software_version LIKE %s ORDER BY active_users_monthly DESC",
+        "43": "SELECT domain FROM mastodon_domains WHERE active_users_monthly = '0' ORDER BY active_users_monthly DESC",
+        "44": "SELECT domain FROM mastodon_domains ORDER BY active_users_monthly DESC",
     }
 
     if user_choice in ["2", "3"]: # Reverse or Random
@@ -1076,7 +1076,9 @@ def load_from_database(user_choice):
             params = [error_threshold]
         elif user_choice == "41":
             params = {'versions': all_patched_versions}
-            print (params)
+            print("Exclusing versions:")
+            for version in params['versions']:
+                print(f" - {version}")
         elif user_choice == "42":
             params = [f"{version_main_branch}%"]
 
