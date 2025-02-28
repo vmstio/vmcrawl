@@ -2418,20 +2418,34 @@
     },
     {
       "datasource": {
-        "type": "grafana-postgresql-datasource",
         "uid": "aedqwq5gb2ebkc"
       },
       "fieldConfig": {
         "defaults": {
           "color": {
-            "mode": "thresholds"
+            "fixedColor": "purple",
+            "mode": "fixed"
           },
           "custom": {
-            "align": "auto",
-            "cellOptions": {
-              "type": "auto"
+            "axisBorderShow": false,
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "fillOpacity": 80,
+            "gradientMode": "none",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
             },
-            "inspect": false
+            "lineWidth": 1,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
           },
           "mappings": [],
           "thresholds": {
@@ -2457,18 +2471,28 @@
         "x": 0,
         "y": 35
       },
-      "id": 13,
+      "id": 12,
       "options": {
-        "cellHeight": "sm",
-        "footer": {
-          "countRows": false,
-          "fields": "",
-          "reducer": [
-            "sum"
-          ],
-          "show": false
+        "barRadius": 0,
+        "barWidth": 0.97,
+        "fullHighlight": false,
+        "groupWidth": 0.7,
+        "legend": {
+          "calcs": [],
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": false
         },
-        "showHeader": true
+        "orientation": "horizontal",
+        "showValue": "auto",
+        "stacking": "none",
+        "tooltip": {
+          "hideZeros": false,
+          "mode": "single",
+          "sort": "none"
+        },
+        "xTickLabelRotation": 0,
+        "xTickLabelSpacing": 0
       },
       "pluginVersion": "11.5.2",
       "targets": [
@@ -2476,7 +2500,7 @@
           "editorMode": "code",
           "format": "table",
           "rawQuery": true,
-          "rawSql": "SELECT \n    domain AS \"Domain\",\n    active_users_monthly as \"Active Users\",\n    software_version as \"Software Version\"\nFROM mastodon_domains \nWHERE software_version NOT IN (\n    SELECT software_version \n    FROM patch_versions\n)\nORDER BY active_users_monthly DESC\nLIMIT 10;\n",
+          "rawSql": "SELECT \n    software_version AS \"Software Version\",\n    COUNT(*) AS \"Instances\"\nFROM mastodon_domains\nGROUP BY software_version\nORDER BY COUNT(*) DESC\nLIMIT 10;\n",
           "refId": "A",
           "sql": {
             "columns": [
@@ -2497,8 +2521,8 @@
           }
         }
       ],
-      "title": "Top 10 Unpatched & EOL Instances",
-      "type": "table"
+      "title": "Top 10 Versions by Instance",
+      "type": "barchart"
     },
     {
       "datasource": {
@@ -2555,7 +2579,7 @@
         "x": 6,
         "y": 35
       },
-      "id": 12,
+      "id": 48,
       "options": {
         "barRadius": 0,
         "barWidth": 0.97,
@@ -2584,7 +2608,7 @@
           "editorMode": "code",
           "format": "table",
           "rawQuery": true,
-          "rawSql": "SELECT \n    software_version AS \"Software Version\",\n    COUNT(*) AS \"Instances\"\nFROM mastodon_domains\nGROUP BY software_version\nORDER BY COUNT(*) DESC\nLIMIT 10;\n",
+          "rawSql": "SELECT \n    software_version AS \"Software Version\",\n    SUM(active_users_monthly) AS \"Monthly Active Users\"\nFROM mastodon_domains\nGROUP BY software_version\nORDER BY SUM(active_users_monthly) DESC\nLIMIT 10;\n",
           "refId": "A",
           "sql": {
             "columns": [
@@ -2605,7 +2629,7 @@
           }
         }
       ],
-      "title": "Top 10 Versions by Instance",
+      "title": "Top 10 Versions by MAUs",
       "type": "barchart"
     },
     {
@@ -2819,12 +2843,348 @@
       "type": "barchart"
     },
     {
+      "datasource": {
+        "type": "grafana-postgresql-datasource",
+        "uid": "aedqwq5gb2ebkc"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "custom": {
+            "align": "auto",
+            "cellOptions": {
+              "type": "auto"
+            },
+            "inspect": false
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "red",
+                "value": 80
+              }
+            ]
+          },
+          "unit": "locale"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 12,
+        "w": 6,
+        "x": 0,
+        "y": 47
+      },
+      "id": 13,
+      "options": {
+        "cellHeight": "sm",
+        "footer": {
+          "countRows": false,
+          "fields": "",
+          "reducer": [
+            "sum"
+          ],
+          "show": false
+        },
+        "showHeader": true
+      },
+      "pluginVersion": "11.5.2",
+      "targets": [
+        {
+          "editorMode": "code",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "SELECT \n    domain AS \"Domain\",\n    active_users_monthly AS \"Active Users\",\n    software_version AS \"Software Version\"\nFROM mastodon_domains \nWHERE software_version NOT IN (\n    SELECT software_version \n    FROM patch_versions\n)\nAND NOT EXISTS (\n    SELECT 1\n    FROM eol_versions\n    WHERE mastodon_domains.software_version LIKE eol_versions.software_version || '%'\n)\nORDER BY active_users_monthly DESC\nLIMIT 10;\n",
+          "refId": "A",
+          "sql": {
+            "columns": [
+              {
+                "parameters": [],
+                "type": "function"
+              }
+            ],
+            "groupBy": [
+              {
+                "property": {
+                  "type": "string"
+                },
+                "type": "groupBy"
+              }
+            ],
+            "limit": 50
+          }
+        }
+      ],
+      "title": "Top 10 Unpatched Instances by MAUs",
+      "type": "table"
+    },
+    {
+      "datasource": {
+        "type": "grafana-postgresql-datasource",
+        "uid": "aedqwq5gb2ebkc"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "custom": {
+            "align": "auto",
+            "cellOptions": {
+              "type": "auto"
+            },
+            "inspect": false
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "red",
+                "value": 80
+              }
+            ]
+          },
+          "unit": "locale"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 12,
+        "w": 6,
+        "x": 6,
+        "y": 47
+      },
+      "id": 47,
+      "options": {
+        "cellHeight": "sm",
+        "footer": {
+          "countRows": false,
+          "fields": "",
+          "reducer": [
+            "sum"
+          ],
+          "show": false
+        },
+        "showHeader": true
+      },
+      "pluginVersion": "11.5.2",
+      "targets": [
+        {
+          "editorMode": "code",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "SELECT \n    domain AS \"Domain\",\n    active_users_monthly AS \"Active Users\",\n    software_version AS \"Software Version\"\nFROM mastodon_domains \nWHERE software_version NOT IN (\n    SELECT software_version \n    FROM patch_versions\n)\nAND EXISTS (\n    SELECT 1\n    FROM eol_versions\n    WHERE mastodon_domains.software_version LIKE eol_versions.software_version || '%'\n)\nORDER BY active_users_monthly DESC\nLIMIT 10;\n",
+          "refId": "A",
+          "sql": {
+            "columns": [
+              {
+                "parameters": [],
+                "type": "function"
+              }
+            ],
+            "groupBy": [
+              {
+                "property": {
+                  "type": "string"
+                },
+                "type": "groupBy"
+              }
+            ],
+            "limit": 50
+          }
+        }
+      ],
+      "title": "Top 10 EOL Instances by MAUs",
+      "type": "table"
+    },
+    {
+      "datasource": {
+        "type": "grafana-postgresql-datasource",
+        "uid": "aedqwq5gb2ebkc"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "custom": {
+            "align": "auto",
+            "cellOptions": {
+              "type": "auto"
+            },
+            "inspect": false
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "red",
+                "value": 80
+              }
+            ]
+          },
+          "unit": "locale"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 12,
+        "w": 6,
+        "x": 12,
+        "y": 47
+      },
+      "id": 49,
+      "options": {
+        "cellHeight": "sm",
+        "footer": {
+          "countRows": false,
+          "fields": "",
+          "reducer": [
+            "sum"
+          ],
+          "show": false
+        },
+        "showHeader": true
+      },
+      "pluginVersion": "11.5.2",
+      "targets": [
+        {
+          "editorMode": "code",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "SELECT \n    domain AS \"Domain\",\n    active_users_monthly AS \"Active Users\",\n    software_version AS \"Software Version\"\nFROM mastodon_domains \nWHERE EXISTS (\n    SELECT 1\n    FROM patch_versions\n    WHERE mastodon_domains.software_version LIKE patch_versions.branch || '%'\n    AND patch_versions.n_level >= 2\n)\nORDER BY active_users_monthly DESC\nLIMIT 10;\n",
+          "refId": "A",
+          "sql": {
+            "columns": [
+              {
+                "parameters": [],
+                "type": "function"
+              }
+            ],
+            "groupBy": [
+              {
+                "property": {
+                  "type": "string"
+                },
+                "type": "groupBy"
+              }
+            ],
+            "limit": 50
+          }
+        }
+      ],
+      "title": "Top 10 Deprecated Instances by MAUs",
+      "type": "table"
+    },
+    {
+      "datasource": {
+        "type": "grafana-postgresql-datasource",
+        "uid": "aedqwq5gb2ebkc"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "custom": {
+            "align": "auto",
+            "cellOptions": {
+              "type": "auto"
+            },
+            "inspect": false
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "red",
+                "value": 80
+              }
+            ]
+          },
+          "unit": "locale"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 12,
+        "w": 6,
+        "x": 18,
+        "y": 47
+      },
+      "id": 50,
+      "options": {
+        "cellHeight": "sm",
+        "footer": {
+          "countRows": false,
+          "fields": "",
+          "reducer": [
+            "sum"
+          ],
+          "show": false
+        },
+        "showHeader": true
+      },
+      "pluginVersion": "11.5.2",
+      "targets": [
+        {
+          "editorMode": "code",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "SELECT \n    domain AS \"Domain\",\n    active_users_monthly AS \"Active Users\",\n    software_version AS \"Software Version\"\nFROM mastodon_domains \nWHERE EXISTS (\n    SELECT 1\n    FROM patch_versions\n    WHERE mastodon_domains.software_version LIKE patch_versions.branch || '%'\n    AND patch_versions.n_level = -1\n)\nORDER BY active_users_monthly DESC\nLIMIT 10;\n",
+          "refId": "A",
+          "sql": {
+            "columns": [
+              {
+                "parameters": [],
+                "type": "function"
+              }
+            ],
+            "groupBy": [
+              {
+                "property": {
+                  "type": "string"
+                },
+                "type": "groupBy"
+              }
+            ],
+            "limit": 50
+          }
+        }
+      ],
+      "title": "Top 10 Main Instances by MAUs",
+      "type": "table"
+    },
+    {
       "collapsed": false,
       "gridPos": {
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 47
+        "y": 59
       },
       "id": 23,
       "panels": [],
@@ -2881,7 +3241,7 @@
         "h": 14,
         "w": 8,
         "x": 0,
-        "y": 48
+        "y": 60
       },
       "id": 24,
       "options": {
@@ -3054,7 +3414,7 @@
         "h": 14,
         "w": 8,
         "x": 8,
-        "y": 48
+        "y": 60
       },
       "id": 26,
       "options": {
@@ -3227,7 +3587,7 @@
         "h": 14,
         "w": 8,
         "x": 16,
-        "y": 48
+        "y": 60
       },
       "id": 25,
       "options": {
@@ -3400,7 +3760,7 @@
         "h": 14,
         "w": 8,
         "x": 0,
-        "y": 62
+        "y": 74
       },
       "id": 27,
       "options": {
@@ -3573,7 +3933,7 @@
         "h": 14,
         "w": 8,
         "x": 8,
-        "y": 62
+        "y": 74
       },
       "id": 28,
       "options": {
@@ -3746,7 +4106,7 @@
         "h": 14,
         "w": 8,
         "x": 16,
-        "y": 62
+        "y": 74
       },
       "id": 29,
       "options": {
@@ -3875,7 +4235,7 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 76
+        "y": 88
       },
       "id": 9,
       "panels": [],
@@ -3922,7 +4282,7 @@
         "h": 28,
         "w": 24,
         "x": 0,
-        "y": 77
+        "y": 89
       },
       "id": 10,
       "options": {
@@ -3996,6 +4356,6 @@
   "timezone": "browser",
   "title": "vmcrawl",
   "uid": "aedqo0q7klrswa",
-  "version": 51,
+  "version": 52,
   "weekStart": ""
 }
