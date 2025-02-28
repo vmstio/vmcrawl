@@ -2453,7 +2453,7 @@
       },
       "gridPos": {
         "h": 12,
-        "w": 8,
+        "w": 6,
         "x": 0,
         "y": 35
       },
@@ -2551,8 +2551,8 @@
       },
       "gridPos": {
         "h": 12,
-        "w": 8,
-        "x": 8,
+        "w": 6,
+        "x": 6,
         "y": 35
       },
       "id": 12,
@@ -2656,8 +2656,113 @@
       },
       "gridPos": {
         "h": 12,
-        "w": 8,
-        "x": 16,
+        "w": 6,
+        "x": 12,
+        "y": 35
+      },
+      "id": 46,
+      "options": {
+        "barRadius": 0,
+        "barWidth": 0.97,
+        "fullHighlight": false,
+        "groupWidth": 0.7,
+        "legend": {
+          "calcs": [],
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": false
+        },
+        "orientation": "horizontal",
+        "showValue": "auto",
+        "stacking": "none",
+        "tooltip": {
+          "hideZeros": false,
+          "mode": "single",
+          "sort": "none"
+        },
+        "xTickLabelRotation": 0,
+        "xTickLabelSpacing": 0
+      },
+      "pluginVersion": "11.5.2",
+      "targets": [
+        {
+          "editorMode": "code",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "WITH version_matches AS (\n    SELECT \n        md.domain,\n        md.software_version,\n        COALESCE(ev.software_version, pv.branch) as \"Branch Version\"\n    FROM \n        mastodon_domains md\n    LEFT JOIN eol_versions ev \n        ON md.software_version LIKE ev.software_version || '%'\n    LEFT JOIN patch_versions pv \n        ON md.software_version LIKE pv.branch || '%'\n    WHERE \n        ev.software_version IS NOT NULL \n        OR pv.branch IS NOT NULL\n)\nSELECT \n    \"Branch Version\",\n    COUNT(domain) as \"Total Domains\"\nFROM \n    version_matches\nGROUP BY \n    \"Branch Version\"\nORDER BY \n    \"Branch Version\" DESC\nLIMIT 10\n",
+          "refId": "A",
+          "sql": {
+            "columns": [
+              {
+                "parameters": [],
+                "type": "function"
+              }
+            ],
+            "groupBy": [
+              {
+                "property": {
+                  "type": "string"
+                },
+                "type": "groupBy"
+              }
+            ],
+            "limit": 50
+          }
+        }
+      ],
+      "title": "Top 10 Branches by Instance",
+      "type": "barchart"
+    },
+    {
+      "datasource": {
+        "type": "grafana-postgresql-datasource",
+        "uid": "aedqwq5gb2ebkc"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "fixedColor": "purple",
+            "mode": "fixed"
+          },
+          "custom": {
+            "axisBorderShow": false,
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "fillOpacity": 80,
+            "gradientMode": "none",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "lineWidth": 1,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "blue",
+                "value": null
+              }
+            ]
+          },
+          "unit": "locale"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 12,
+        "w": 6,
+        "x": 18,
         "y": 35
       },
       "id": 20,
@@ -2689,7 +2794,7 @@
           "editorMode": "code",
           "format": "table",
           "rawQuery": true,
-          "rawSql": "WITH version_matches AS (\n    SELECT \n        md.software_version,\n        md.total_users,\n        COALESCE(ev.software_version, pv.branch) as \"Branch Version\"\n    FROM \n        mastodon_domains md\n    LEFT JOIN eol_versions ev \n        ON md.software_version LIKE ev.software_version || '%'\n    LEFT JOIN patch_versions pv \n        ON md.software_version LIKE pv.branch || '%'\n    WHERE \n        ev.software_version IS NOT NULL \n        OR pv.branch IS NOT NULL\n)\nSELECT \n    \"Branch Version\",\n    SUM(total_users) as \"Total Users\"\nFROM \n    version_matches\nGROUP BY \n    \"Branch Version\"\nORDER BY \n    \"Branch Version\" DESC\nLIMIT 10\n",
+          "rawSql": "WITH version_matches AS (\n    SELECT \n        md.software_version,\n        md.active_users_monthly,\n        COALESCE(ev.software_version, pv.branch) as \"Branch Version\"\n    FROM \n        mastodon_domains md\n    LEFT JOIN eol_versions ev \n        ON md.software_version LIKE ev.software_version || '%'\n    LEFT JOIN patch_versions pv \n        ON md.software_version LIKE pv.branch || '%'\n    WHERE \n        ev.software_version IS NOT NULL \n        OR pv.branch IS NOT NULL\n)\nSELECT \n    \"Branch Version\",\n    SUM(active_users_monthly) as \"Total Users\"\nFROM \n    version_matches\nGROUP BY \n    \"Branch Version\"\nORDER BY \n    \"Branch Version\" DESC\nLIMIT 10\n",
           "refId": "A",
           "sql": {
             "columns": [
@@ -2710,7 +2815,7 @@
           }
         }
       ],
-      "title": "Top 10 Branches by Total Users",
+      "title": "Top 10 Branches by MAUs",
       "type": "barchart"
     },
     {
@@ -3891,6 +3996,6 @@
   "timezone": "browser",
   "title": "vmcrawl",
   "uid": "aedqo0q7klrswa",
-  "version": 50,
+  "version": 51,
   "weekStart": ""
 }
