@@ -1036,8 +1036,8 @@ def load_from_database(user_choice):
     query_map = {
         "0": "SELECT domain FROM raw_domains WHERE errors = 0 ORDER BY LENGTH(DOMAIN) ASC",
         "1": f"SELECT domain FROM raw_domains WHERE (failed IS NULL OR failed = FALSE) AND (ignore IS NULL OR ignore = FALSE) AND (nxdomain IS NULL OR nxdomain = FALSE) AND (norobots IS NULL OR norobots = FALSE) AND (baddata IS NULL OR baddata = FALSE) AND (errors <= %s OR errors IS NULL) ORDER BY domain ASC",
-        "4": f"SELECT domain FROM raw_domains WHERE errors >= %s ORDER BY LENGTH(DOMAIN) ASC",
-        "5": f"SELECT domain FROM raw_domains WHERE errors <= %s ORDER BY LENGTH(DOMAIN) ASC",
+        "4": f"SELECT domain FROM raw_domains WHERE errors >= %s ORDER BY errors ASC",
+        "5": f"SELECT domain FROM raw_domains WHERE errors <= %s ORDER BY errors ASC",
         "6": "SELECT domain FROM raw_domains WHERE ignore = TRUE ORDER BY domain",
         "7": "SELECT domain FROM raw_domains WHERE failed = TRUE ORDER BY domain",
         "8": "SELECT domain FROM raw_domains WHERE nxdomain = TRUE ORDER BY domain",
