@@ -12,3 +12,12 @@ dependencies = [
     "lxml",
     "packaging",
 ]
+
+[tool.setuptools]
+packages = [
+    "common",
+    "crawler",
+    "fetch",
+    "mstmap",
+    "stats",
+]
