@@ -985,31 +985,36 @@ def mark_as_non_mastodon(domain):
 
 def handle_http_exception(domain, exception):
     error_message = str(exception)
-    if 'ssl' in error_message.casefold() and 'timed out' not in error_message.casefold():
+    if '_ssl.c' in error_message.casefold():
         error_reason = 'SSL'
         print_colored(f'{error_message}', 'orange')
         log_error(domain, error_message)
         increment_domain_error(domain, error_reason)
-        delete_domain_if_known(domain)
+        delete_if_error_max(domain)
+    elif 'maximum allowed redirects' in error_message.casefold():
+        error_reason = 'MAX'
+        print_colored(f'HTTPX failure: {error_message}', 'orange')
+        log_error(domain, error_message)
+        increment_domain_error(domain, error_reason)
+        delete_if_error_max(domain)
+    elif 'timed out' in error_message.casefold():
+        error_reason = 'TIME'
+        print_colored(f'HTTPX failure: {error_message}', 'orange')
+        log_error(domain, error_message)
+        increment_domain_error(domain, error_reason)
+        delete_if_error_max(domain)
+    elif 'nodename nor servname provided' in error_message.casefold() or 'name or service not known' in error_message.casefold() or 'no address associated with hostname' in error_message.casefold() or 'temporary failure in name resolution' in error_message.casefold():
+        error_reason = 'DNS'
+        print_colored(f'DNS failure: {error_message}', 'orange')
+        log_error(domain, error_message)
+        increment_domain_error(domain, error_reason)
+        delete_if_error_max(domain)
     else:
-        if 'maximum allowed redirects' in error_message.casefold():
-            error_reason = 'MAX'
-            print_colored(f'HTTPX failure: {error_message}', 'orange')
-            log_error(domain, error_message)
-            increment_domain_error(domain, error_reason)
-            delete_if_error_max(domain)
-        elif 'timed out' in error_message.casefold():
-            error_reason = 'TIME'
-            print_colored(f'HTTPX failure: {error_message}', 'orange')
-            log_error(domain, error_message)
-            increment_domain_error(domain, error_reason)
-            delete_if_error_max(domain)
-        else:
-            error_reason = 'HTTP'
-            print_colored(f'HTTPX failure: {error_message}', 'orange')
-            log_error(domain, error_message)
-            increment_domain_error(domain, error_reason)
-            delete_if_error_max(domain)
+        error_reason = 'HTTP'
+        print_colored(f'HTTPX failure: {error_message}', 'orange')
+        log_error(domain, error_message)
+        increment_domain_error(domain, error_reason)
+        delete_if_error_max(domain)
 
 def handle_json_exception(domain, exception):
     error_message = str(exception)
@@ -1127,7 +1132,7 @@ def print_menu() -> None:
         "Process new domains": {"0": "Recently Fetched"},
         "Change process direction": {"1": "Standard", "2": "Reverse", "3": "Random"},
         "Retry fatal errors": {"6": "Not Mastodon", "7": "Marked Failed", "8": "Bad Domains", "9": "No Robots"},
-        "Retry connection errors": {"10": "SSL", "11": "HTTP", "12": "TIME", "13": "MAX"},
+        "Retry connection errors": {"10": "SSL", "11": "HTTP", "12": "TIME", "13": "MAX", "14": "DNS"},
         "Retry HTTP errors": {"20": "2xx", "21": "3xx", "22": "4xx", "23": "5xx"},
         "Retry specific errors": {"30": "###", "31": "JSON", "32": "TXT", "33": "XML", "34": "API"},
         "Retry good data": {"40": f"Stale ≥{error_threshold}", "41": "Unpatched", "42": "Main", "43": "Inactive", "44": "All Good"},
