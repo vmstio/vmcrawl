@@ -1036,8 +1036,6 @@ def load_from_database(user_choice):
     query_map = {
         "0": "SELECT domain FROM raw_domains WHERE errors = 0 ORDER BY LENGTH(DOMAIN) ASC",
         "1": f"SELECT domain FROM raw_domains WHERE (failed IS NULL OR failed = FALSE) AND (ignore IS NULL OR ignore = FALSE) AND (nxdomain IS NULL OR nxdomain = FALSE) AND (norobots IS NULL OR norobots = FALSE) AND (baddata IS NULL OR baddata = FALSE) AND (errors <= %s OR errors IS NULL) ORDER BY domain ASC",
-        "4": f"SELECT domain FROM raw_domains WHERE errors >= %s ORDER BY errors ASC",
-        "5": f"SELECT domain FROM raw_domains WHERE errors <= %s ORDER BY errors ASC",
         "6": "SELECT domain FROM raw_domains WHERE ignore = TRUE ORDER BY domain",
         "7": "SELECT domain FROM raw_domains WHERE failed = TRUE ORDER BY domain",
         "8": "SELECT domain FROM raw_domains WHERE nxdomain = TRUE ORDER BY domain",
@@ -1060,6 +1058,9 @@ def load_from_database(user_choice):
         "42": f"SELECT domain FROM mastodon_domains WHERE software_version LIKE %s ORDER BY active_users_monthly DESC",
         "43": "SELECT domain FROM mastodon_domains WHERE active_users_monthly = '0' ORDER BY active_users_monthly DESC",
         "44": "SELECT domain FROM mastodon_domains ORDER BY active_users_monthly DESC",
+        "50": f"SELECT domain FROM raw_domains WHERE errors >= %s ORDER BY errors ASC",
+        "51": f"SELECT domain FROM raw_domains WHERE errors < %s ORDER BY errors ASC",
+        "52": f"SELECT domain FROM raw_domains WHERE errors >= %s AND errors <= %s ORDER BY errors ASC",
     }
 
     if user_choice in ["2", "3"]: # Reverse or Random
@@ -1070,8 +1071,8 @@ def load_from_database(user_choice):
 
         # Set parameters based on query type
         params = []
-        if user_choice in ["1", "4", "5"]:
-            params = [error_threshold]
+        if user_choice in ["1", "50", "51", "52"]:
+            params = [error_threshold, error_threshold + error_threshold]
         elif user_choice == "40":
             params = [error_threshold]
         elif user_choice == "41":
@@ -1125,12 +1126,12 @@ def print_menu() -> None:
     menu_options = {
         "Process new domains": {"0": "Recently Fetched"},
         "Change process direction": {"1": "Standard", "2": "Reverse", "3": "Random"},
-        "Retry general errors": {"4": f"Domains w/ ≥{error_threshold + 1} Errors", "5": f"Domains w/ ≤{error_threshold} Errors"},
         "Retry fatal errors": {"6": "Not Mastodon", "7": "Marked Failed", "8": "Bad Domains", "9": "No Robots"},
         "Retry connection errors": {"10": "SSL", "11": "HTTP", "12": "TIME", "13": "MAX"},
         "Retry HTTP errors": {"20": "2xx", "21": "3xx", "22": "4xx", "23": "5xx"},
         "Retry specific errors": {"30": "###", "31": "JSON", "32": "TXT", "33": "XML", "34": "API"},
         "Retry good data": {"40": f"Stale ≥{error_threshold}", "41": "Unpatched", "42": "Main", "43": "Inactive", "44": "All Good"},
+        "Retry general errors": {"50": f"Domains w/ ≥{error_threshold} Errors", "51": f"Domains w/ <{error_threshold} Errors", "52": f"Domains w/ {error_threshold}-{error_threshold + error_threshold} Errors"},
     }
 
     for category, options in menu_options.items():
