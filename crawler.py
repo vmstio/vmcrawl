@@ -1065,7 +1065,7 @@ def load_from_database(user_choice):
         "42": f"SELECT domain FROM mastodon_domains WHERE software_version LIKE %s ORDER BY active_users_monthly DESC",
         "43": "SELECT domain FROM mastodon_domains WHERE active_users_monthly = '0' ORDER BY active_users_monthly DESC",
         "44": "SELECT domain FROM mastodon_domains ORDER BY active_users_monthly DESC",
-        "50": f"SELECT domain FROM raw_domains WHERE errors >= %s ORDER BY errors ASC",
+        "50": f"SELECT domain FROM raw_domains WHERE errors > %s ORDER BY errors ASC",
         "51": f"SELECT domain FROM raw_domains WHERE errors < %s ORDER BY errors ASC",
         "52": f"SELECT domain FROM raw_domains WHERE errors >= %s AND errors <= %s ORDER BY errors ASC",
     }
@@ -1078,8 +1078,10 @@ def load_from_database(user_choice):
 
         # Set parameters based on query type
         params = []
-        if user_choice in ["1", "50", "51", "52"]:
+        if user_choice in ["1", "51", "52"]:
             params = [error_threshold, error_threshold + error_threshold]
+        elif user_choice == "50":
+            params = [error_threshold * 2]
         elif user_choice == "40":
             params = [error_threshold]
         elif user_choice == "41":
@@ -1138,7 +1140,7 @@ def print_menu() -> None:
         "Retry HTTP errors": {"20": "2xx", "21": "3xx", "22": "4xx", "23": "5xx"},
         "Retry specific errors": {"30": "###", "31": "JSON", "32": "TXT", "33": "XML", "34": "API"},
         "Retry good data": {"40": f"Stale ≥{error_threshold}", "41": "Unpatched", "42": "Main", "43": "Inactive", "44": "All Good"},
-        "Retry general errors": {"50": f"Domains w/ ≥{error_threshold} Errors", "51": f"Domains w/ <{error_threshold} Errors", "52": f"Domains w/ {error_threshold}-{error_threshold + error_threshold} Errors"},
+        "Retry general errors": {"50": f"Domains w/ >{error_threshold * 2} Errors", "51": f"Domains w/ <{error_threshold} Errors", "52": f"Domains w/ {error_threshold}-{error_threshold + error_threshold} Errors"},
     }
 
     for category, options in menu_options.items():
