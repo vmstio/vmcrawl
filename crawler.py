@@ -1049,6 +1049,7 @@ def load_from_database(user_choice):
         "11": "SELECT domain FROM raw_domains WHERE reason = 'HTTP' ORDER BY errors ASC",
         "12": "SELECT domain FROM raw_domains WHERE reason IN ('TIMEOUT', 'TIME') ORDER BY errors ASC",
         "13": "SELECT domain FROM raw_domains WHERE reason = 'MAX' ORDER BY errors ASC",
+        "14": "SELECT domain FROM raw_domains WHERE reason = 'DNS' ORDER BY errors ASC",
         "20": "SELECT domain FROM raw_domains WHERE reason ~ '^2[0-9]{2}' ORDER BY errors ASC",
         "21": "SELECT domain FROM raw_domains WHERE reason ~ '^3[0-9]{2}' ORDER BY errors ASC",
         "22": "SELECT domain FROM raw_domains WHERE reason ~ '^4[0-9]{2}' ORDER BY errors ASC",
