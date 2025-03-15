@@ -1078,7 +1078,9 @@ def load_from_database(user_choice):
 
         # Set parameters based on query type
         params = []
-        if user_choice in ["1", "51", "52"]:
+        if user_choice in ["1", "51"]:
+            params = [error_threshold]
+        elif user_choice == "52":
             params = [error_threshold, error_threshold + error_threshold]
         elif user_choice == "50":
             params = [error_threshold * 2]
