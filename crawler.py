@@ -970,8 +970,7 @@ def update_mastodon_domain(domain, software_version, software_version_full, tota
             source = excluded.source,
             full_version = excluded.full_version
         ''', (domain, software_version, total_users, active_month_users,
-              datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M:%S'),
-              contact_account, source_url, software_version_full))
+              datetime.now(timezone.utc), contact_account, source_url, software_version_full))
         conn.commit()
     except Exception as e:
         print(f"Failed to update Mastodon domain data: {e}")
