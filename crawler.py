@@ -1141,7 +1141,7 @@ def print_menu() -> None:
         "Retry connection errors": {"10": "SSL", "11": "HTTP", "12": "TIME", "13": "MAX", "14": "DNS"},
         "Retry HTTP errors": {"20": "2xx", "21": "3xx", "22": "4xx", "23": "5xx"},
         "Retry specific errors": {"30": "###", "31": "JSON", "32": "TXT", "33": "XML", "34": "API"},
-        "Retry good data": {"40": f"Stale ≥{error_threshold}", "41": "Unpatched", "42": "Main", "43": "Inactive", "44": "All Good"},
+        "Retry good data": {"40": f"Stale ≥1 Week", "41": "Unpatched", "42": "Main", "43": "Inactive", "44": "All Good"},
         "Retry general errors": {"50": f"Domains w/ >{error_threshold * 2} Errors", "51": f"Domains w/ <{error_threshold} Errors", "52": f"Domains w/ {error_threshold}-{error_threshold + error_threshold} Errors"},
     }
 
