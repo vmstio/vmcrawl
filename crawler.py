@@ -107,7 +107,7 @@ def delete_if_error_max(domain):
         if result and result[0] >= error_threshold:
             cursor.execute('SELECT timestamp FROM mastodon_domains WHERE domain = %s', (domain,))
             timestamp = cursor.fetchone()
-            if timestamp and (datetime.now(timezone.utc) - datetime.strptime(timestamp[0], '%Y-%m-%d %H:%M:%S').replace(tzinfo=timezone.utc)).days >= error_threshold:
+            if timestamp and (datetime.now(timezone.utc) - timestamp[0].replace(tzinfo=timezone.utc)).days >= error_threshold:
                 delete_domain_if_known(domain)
 
     except Exception as e:
@@ -1060,7 +1060,7 @@ def load_from_database(user_choice):
         "32": "SELECT domain FROM raw_domains WHERE reason = 'TXT' ORDER BY errors ASC",
         "33": "SELECT domain FROM raw_domains WHERE reason = 'XML' ORDER BY errors ASC",
         "34": "SELECT domain FROM raw_domains WHERE reason = 'API' ORDER BY errors ASC",
-        "40": "SELECT domain FROM mastodon_domains WHERE timestamp::timestamptz <= NOW() - INTERVAL '%s days' ORDER BY timestamp DESC",
+        "40": "SELECT domain FROM mastodon_domains WHERE timestamp <= (CURRENT_TIMESTAMP - INTERVAL '7 days') AT TIME ZONE 'UTC' ORDER BY timestamp ASC",
         "41": "SELECT domain FROM mastodon_domains WHERE software_version != ALL(%(versions)s::text[]) ORDER BY active_users_monthly DESC",
         "42": f"SELECT domain FROM mastodon_domains WHERE software_version LIKE %s ORDER BY active_users_monthly DESC",
         "43": "SELECT domain FROM mastodon_domains WHERE active_users_monthly = '0' ORDER BY active_users_monthly DESC",
@@ -1084,8 +1084,8 @@ def load_from_database(user_choice):
             params = [error_threshold, error_threshold + error_threshold]
         elif user_choice == "50":
             params = [error_threshold * 2]
-        elif user_choice == "40":
-            params = [error_threshold]
+        # elif user_choice == "40":
+        #     params = [error_threshold]
         elif user_choice == "41":
             params = {'versions': all_patched_versions}
             print("Exclusing versions:")
