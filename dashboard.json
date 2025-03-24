@@ -3243,525 +3243,6 @@
         "x": 0,
         "y": 60
       },
-      "id": 24,
-      "options": {
-        "barRadius": 0,
-        "barWidth": 0.97,
-        "fullHighlight": false,
-        "groupWidth": 0.7,
-        "legend": {
-          "calcs": [],
-          "displayMode": "list",
-          "placement": "bottom",
-          "showLegend": false
-        },
-        "orientation": "vertical",
-        "showValue": "never",
-        "stacking": "normal",
-        "tooltip": {
-          "hideZeros": false,
-          "mode": "single",
-          "sort": "none"
-        },
-        "xTickLabelRotation": 0,
-        "xTickLabelSpacing": 0
-      },
-      "pluginVersion": "11.5.2",
-      "targets": [
-        {
-          "editorMode": "code",
-          "format": "table",
-          "rawQuery": true,
-          "rawSql": "SELECT\n  statistics.date AS time,\n  statistics.total_main_instances AS \"Main Branch\",\n  statistics.total_release_instances AS \"Latest Branch\",\n  statistics.total_previous_instances AS \"Previous Branch\",\n  statistics.total_pending_eol_instances AS \"Deprecated Branch\",\n  statistics.total_eol_instances AS \"EOL\"\nFROM\n  statistics\nORDER BY\n  statistics.date ASC\nLIMIT 30",
-          "refId": "A",
-          "sql": {
-            "columns": [
-              {
-                "parameters": [
-                  {
-                    "name": "date",
-                    "type": "functionParameter"
-                  }
-                ],
-                "type": "function"
-              },
-              {
-                "parameters": [
-                  {
-                    "name": "total_mastodon_domains",
-                    "type": "functionParameter"
-                  }
-                ],
-                "type": "function"
-              }
-            ],
-            "groupBy": [
-              {
-                "property": {
-                  "type": "string"
-                },
-                "type": "groupBy"
-              }
-            ],
-            "limit": 50
-          },
-          "table": "statistics"
-        },
-        {
-          "datasource": {
-            "type": "grafana-postgresql-datasource",
-            "uid": "aedqwq5gb2ebkc"
-          },
-          "editorMode": "code",
-          "format": "table",
-          "hide": false,
-          "rawQuery": true,
-          "rawSql": "SELECT \n    statistics.date,\n    statistics.total_mastodon_domains\nFROM \n    statistics\nORDER BY \n    statistics.date DESC;\n",
-          "refId": "B",
-          "sql": {
-            "columns": [
-              {
-                "parameters": [],
-                "type": "function"
-              }
-            ],
-            "groupBy": [
-              {
-                "property": {
-                  "type": "string"
-                },
-                "type": "groupBy"
-              }
-            ],
-            "limit": 50
-          }
-        }
-      ],
-      "title": "Total Mastodon Instances by Branch",
-      "transformations": [
-        {
-          "id": "formatTime",
-          "options": {
-            "outputFormat": "YYYY-MM-DD",
-            "timeField": "time",
-            "timezone": "utc",
-            "useTimezone": true
-          }
-        },
-        {
-          "id": "configFromData",
-          "options": {
-            "configRefId": "B",
-            "mappings": [
-              {
-                "fieldName": "total_mastodon_domains",
-                "handlerKey": "max",
-                "reducerId": "max"
-              }
-            ]
-          }
-        }
-      ],
-      "type": "barchart"
-    },
-    {
-      "datasource": {
-        "type": "grafana-postgresql-datasource",
-        "uid": "aedqwq5gb2ebkc"
-      },
-      "fieldConfig": {
-        "defaults": {
-          "color": {
-            "mode": "palette-classic"
-          },
-          "custom": {
-            "axisBorderShow": false,
-            "axisCenteredZero": false,
-            "axisColorMode": "text",
-            "axisLabel": "",
-            "axisPlacement": "auto",
-            "fillOpacity": 80,
-            "gradientMode": "none",
-            "hideFrom": {
-              "legend": false,
-              "tooltip": false,
-              "viz": false
-            },
-            "lineWidth": 1,
-            "scaleDistribution": {
-              "type": "linear"
-            },
-            "thresholdsStyle": {
-              "mode": "off"
-            }
-          },
-          "fieldMinMax": false,
-          "mappings": [],
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "color": "purple",
-                "value": null
-              }
-            ]
-          },
-          "unit": "locale"
-        },
-        "overrides": []
-      },
-      "gridPos": {
-        "h": 14,
-        "w": 8,
-        "x": 8,
-        "y": 60
-      },
-      "id": 26,
-      "options": {
-        "barRadius": 0,
-        "barWidth": 0.97,
-        "fullHighlight": false,
-        "groupWidth": 0.7,
-        "legend": {
-          "calcs": [],
-          "displayMode": "list",
-          "placement": "bottom",
-          "showLegend": false
-        },
-        "orientation": "vertical",
-        "showValue": "never",
-        "stacking": "normal",
-        "tooltip": {
-          "hideZeros": false,
-          "mode": "single",
-          "sort": "none"
-        },
-        "xTickLabelRotation": 0,
-        "xTickLabelSpacing": 0
-      },
-      "pluginVersion": "11.5.2",
-      "targets": [
-        {
-          "editorMode": "code",
-          "format": "table",
-          "rawQuery": true,
-          "rawSql": "SELECT\n  statistics.date AS time,\n  statistics.total_active_main_branch_users AS \"Main Branch\",\n  statistics.total_active_release_branch_users AS \"Latest Branch\",\n  statistics.total_active_previous_branch_users AS \"Previous Branch\",\n  statistics.total_active_pending_eol_branch_users AS \"Deprecated Branch\",\n  statistics.total_active_eol_branch_users AS \"EOL\"\nFROM\n  statistics\nORDER BY\n  statistics.date ASC\nLIMIT 30",
-          "refId": "A",
-          "sql": {
-            "columns": [
-              {
-                "parameters": [
-                  {
-                    "name": "date",
-                    "type": "functionParameter"
-                  }
-                ],
-                "type": "function"
-              },
-              {
-                "parameters": [
-                  {
-                    "name": "total_mastodon_domains",
-                    "type": "functionParameter"
-                  }
-                ],
-                "type": "function"
-              }
-            ],
-            "groupBy": [
-              {
-                "property": {
-                  "type": "string"
-                },
-                "type": "groupBy"
-              }
-            ],
-            "limit": 50
-          },
-          "table": "statistics"
-        },
-        {
-          "datasource": {
-            "type": "grafana-postgresql-datasource",
-            "uid": "aedqwq5gb2ebkc"
-          },
-          "editorMode": "code",
-          "format": "table",
-          "hide": false,
-          "rawQuery": true,
-          "rawSql": "SELECT \n    statistics.date,\n    statistics.total_active_users\nFROM \n    statistics\nORDER BY \n    statistics.date DESC;\n",
-          "refId": "B",
-          "sql": {
-            "columns": [
-              {
-                "parameters": [],
-                "type": "function"
-              }
-            ],
-            "groupBy": [
-              {
-                "property": {
-                  "type": "string"
-                },
-                "type": "groupBy"
-              }
-            ],
-            "limit": 50
-          }
-        }
-      ],
-      "title": "Active Mastodon Users by Branch",
-      "transformations": [
-        {
-          "id": "formatTime",
-          "options": {
-            "outputFormat": "YYYY-MM-DD",
-            "timeField": "time",
-            "timezone": "utc",
-            "useTimezone": true
-          }
-        },
-        {
-          "id": "configFromData",
-          "options": {
-            "configRefId": "B",
-            "mappings": [
-              {
-                "fieldName": "total_mastodon_domains",
-                "handlerKey": "max",
-                "reducerId": "max"
-              }
-            ]
-          }
-        }
-      ],
-      "type": "barchart"
-    },
-    {
-      "datasource": {
-        "type": "grafana-postgresql-datasource",
-        "uid": "aedqwq5gb2ebkc"
-      },
-      "fieldConfig": {
-        "defaults": {
-          "color": {
-            "mode": "palette-classic"
-          },
-          "custom": {
-            "axisBorderShow": false,
-            "axisCenteredZero": false,
-            "axisColorMode": "text",
-            "axisLabel": "",
-            "axisPlacement": "auto",
-            "fillOpacity": 80,
-            "gradientMode": "none",
-            "hideFrom": {
-              "legend": false,
-              "tooltip": false,
-              "viz": false
-            },
-            "lineWidth": 1,
-            "scaleDistribution": {
-              "type": "linear"
-            },
-            "thresholdsStyle": {
-              "mode": "off"
-            }
-          },
-          "fieldMinMax": false,
-          "mappings": [],
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "color": "purple",
-                "value": null
-              }
-            ]
-          },
-          "unit": "locale"
-        },
-        "overrides": []
-      },
-      "gridPos": {
-        "h": 14,
-        "w": 8,
-        "x": 16,
-        "y": 60
-      },
-      "id": 25,
-      "options": {
-        "barRadius": 0,
-        "barWidth": 0.97,
-        "fullHighlight": false,
-        "groupWidth": 0.7,
-        "legend": {
-          "calcs": [],
-          "displayMode": "list",
-          "placement": "bottom",
-          "showLegend": false
-        },
-        "orientation": "vertical",
-        "showValue": "never",
-        "stacking": "normal",
-        "tooltip": {
-          "hideZeros": false,
-          "mode": "single",
-          "sort": "none"
-        },
-        "xTickLabelRotation": 0,
-        "xTickLabelSpacing": 0
-      },
-      "pluginVersion": "11.5.2",
-      "targets": [
-        {
-          "editorMode": "code",
-          "format": "table",
-          "rawQuery": true,
-          "rawSql": "SELECT\n  statistics.date AS time,\n  statistics.total_main_branch_users AS \"Main Branch\",\n  statistics.total_release_branch_users AS \"Latest Branch\",\n  statistics.total_previous_branch_users AS \"Previous Branch\",\n  statistics.total_pending_eol_branch_users AS \"Deprecated Branch\",\n  statistics.total_eol_branch_users AS \"EOL\"\nFROM\n  statistics\nORDER BY\n  statistics.date ASC\nLIMIT 30",
-          "refId": "A",
-          "sql": {
-            "columns": [
-              {
-                "parameters": [
-                  {
-                    "name": "date",
-                    "type": "functionParameter"
-                  }
-                ],
-                "type": "function"
-              },
-              {
-                "parameters": [
-                  {
-                    "name": "total_mastodon_domains",
-                    "type": "functionParameter"
-                  }
-                ],
-                "type": "function"
-              }
-            ],
-            "groupBy": [
-              {
-                "property": {
-                  "type": "string"
-                },
-                "type": "groupBy"
-              }
-            ],
-            "limit": 50
-          },
-          "table": "statistics"
-        },
-        {
-          "datasource": {
-            "type": "grafana-postgresql-datasource",
-            "uid": "aedqwq5gb2ebkc"
-          },
-          "editorMode": "code",
-          "format": "table",
-          "hide": false,
-          "rawQuery": true,
-          "rawSql": "SELECT \n    statistics.date,\n    statistics.total_users\nFROM \n    statistics\nORDER BY \n    statistics.date DESC;\n",
-          "refId": "B",
-          "sql": {
-            "columns": [
-              {
-                "parameters": [],
-                "type": "function"
-              }
-            ],
-            "groupBy": [
-              {
-                "property": {
-                  "type": "string"
-                },
-                "type": "groupBy"
-              }
-            ],
-            "limit": 50
-          }
-        }
-      ],
-      "title": "Total Mastodon Users by Branch",
-      "transformations": [
-        {
-          "id": "formatTime",
-          "options": {
-            "outputFormat": "YYYY-MM-DD",
-            "timeField": "time",
-            "timezone": "utc",
-            "useTimezone": true
-          }
-        },
-        {
-          "id": "configFromData",
-          "options": {
-            "configRefId": "B",
-            "mappings": [
-              {
-                "fieldName": "total_mastodon_domains",
-                "handlerKey": "max",
-                "reducerId": "max"
-              }
-            ]
-          }
-        }
-      ],
-      "type": "barchart"
-    },
-    {
-      "datasource": {
-        "type": "grafana-postgresql-datasource",
-        "uid": "aedqwq5gb2ebkc"
-      },
-      "fieldConfig": {
-        "defaults": {
-          "color": {
-            "mode": "palette-classic"
-          },
-          "custom": {
-            "axisBorderShow": false,
-            "axisCenteredZero": false,
-            "axisColorMode": "text",
-            "axisLabel": "",
-            "axisPlacement": "auto",
-            "fillOpacity": 80,
-            "gradientMode": "none",
-            "hideFrom": {
-              "legend": false,
-              "tooltip": false,
-              "viz": false
-            },
-            "lineWidth": 1,
-            "scaleDistribution": {
-              "type": "linear"
-            },
-            "thresholdsStyle": {
-              "mode": "off"
-            }
-          },
-          "fieldMinMax": false,
-          "mappings": [],
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "color": "purple",
-                "value": null
-              }
-            ]
-          },
-          "unit": "locale"
-        },
-        "overrides": []
-      },
-      "gridPos": {
-        "h": 14,
-        "w": 8,
-        "x": 0,
-        "y": 74
-      },
       "id": 27,
       "options": {
         "barRadius": 0,
@@ -3861,7 +3342,7 @@
         {
           "id": "formatTime",
           "options": {
-            "outputFormat": "YYYY-MM-DD",
+            "outputFormat": "DD",
             "timeField": "time",
             "timezone": "utc",
             "useTimezone": true
@@ -3933,7 +3414,7 @@
         "h": 14,
         "w": 8,
         "x": 8,
-        "y": 74
+        "y": 60
       },
       "id": 28,
       "options": {
@@ -4034,7 +3515,7 @@
         {
           "id": "formatTime",
           "options": {
-            "outputFormat": "YYYY-MM-DD",
+            "outputFormat": "DD",
             "timeField": "time",
             "timezone": "utc",
             "useTimezone": true
@@ -4106,7 +3587,7 @@
         "h": 14,
         "w": 8,
         "x": 16,
-        "y": 74
+        "y": 60
       },
       "id": 29,
       "options": {
@@ -4207,7 +3688,526 @@
         {
           "id": "formatTime",
           "options": {
-            "outputFormat": "YYYY-MM-DD",
+            "outputFormat": "DD",
+            "timeField": "time",
+            "timezone": "utc",
+            "useTimezone": true
+          }
+        },
+        {
+          "id": "configFromData",
+          "options": {
+            "configRefId": "B",
+            "mappings": [
+              {
+                "fieldName": "total_mastodon_domains",
+                "handlerKey": "max",
+                "reducerId": "max"
+              }
+            ]
+          }
+        }
+      ],
+      "type": "barchart"
+    },
+    {
+      "datasource": {
+        "type": "grafana-postgresql-datasource",
+        "uid": "aedqwq5gb2ebkc"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "axisBorderShow": false,
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "fillOpacity": 80,
+            "gradientMode": "none",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "lineWidth": 1,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          },
+          "fieldMinMax": false,
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "purple",
+                "value": null
+              }
+            ]
+          },
+          "unit": "locale"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 14,
+        "w": 8,
+        "x": 0,
+        "y": 74
+      },
+      "id": 24,
+      "options": {
+        "barRadius": 0,
+        "barWidth": 0.97,
+        "fullHighlight": false,
+        "groupWidth": 0.7,
+        "legend": {
+          "calcs": [],
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": false
+        },
+        "orientation": "vertical",
+        "showValue": "never",
+        "stacking": "normal",
+        "tooltip": {
+          "hideZeros": false,
+          "mode": "single",
+          "sort": "none"
+        },
+        "xTickLabelRotation": 0,
+        "xTickLabelSpacing": 0
+      },
+      "pluginVersion": "11.5.2",
+      "targets": [
+        {
+          "editorMode": "code",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "SELECT\n  statistics.date AS time,\n  statistics.total_main_instances AS \"Main Branch\",\n  statistics.total_release_instances AS \"Latest Branch\",\n  statistics.total_previous_instances AS \"Previous Branch\",\n  statistics.total_pending_eol_instances AS \"Deprecated Branch\",\n  statistics.total_eol_instances AS \"EOL\"\nFROM\n  statistics\nORDER BY\n  statistics.date ASC\nLIMIT 30",
+          "refId": "A",
+          "sql": {
+            "columns": [
+              {
+                "parameters": [
+                  {
+                    "name": "date",
+                    "type": "functionParameter"
+                  }
+                ],
+                "type": "function"
+              },
+              {
+                "parameters": [
+                  {
+                    "name": "total_mastodon_domains",
+                    "type": "functionParameter"
+                  }
+                ],
+                "type": "function"
+              }
+            ],
+            "groupBy": [
+              {
+                "property": {
+                  "type": "string"
+                },
+                "type": "groupBy"
+              }
+            ],
+            "limit": 50
+          },
+          "table": "statistics"
+        },
+        {
+          "datasource": {
+            "type": "grafana-postgresql-datasource",
+            "uid": "aedqwq5gb2ebkc"
+          },
+          "editorMode": "code",
+          "format": "table",
+          "hide": false,
+          "rawQuery": true,
+          "rawSql": "SELECT \n    statistics.date,\n    statistics.total_mastodon_domains\nFROM \n    statistics\nORDER BY \n    statistics.date DESC;\n",
+          "refId": "B",
+          "sql": {
+            "columns": [
+              {
+                "parameters": [],
+                "type": "function"
+              }
+            ],
+            "groupBy": [
+              {
+                "property": {
+                  "type": "string"
+                },
+                "type": "groupBy"
+              }
+            ],
+            "limit": 50
+          }
+        }
+      ],
+      "title": "Total Mastodon Instances by Branch",
+      "transformations": [
+        {
+          "id": "formatTime",
+          "options": {
+            "outputFormat": "DD",
+            "timeField": "time",
+            "timezone": "utc",
+            "useTimezone": true
+          }
+        },
+        {
+          "id": "configFromData",
+          "options": {
+            "configRefId": "B",
+            "mappings": [
+              {
+                "fieldName": "total_mastodon_domains",
+                "handlerKey": "max",
+                "reducerId": "max"
+              }
+            ]
+          }
+        }
+      ],
+      "type": "barchart"
+    },
+    {
+      "datasource": {
+        "type": "grafana-postgresql-datasource",
+        "uid": "aedqwq5gb2ebkc"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "axisBorderShow": false,
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "fillOpacity": 80,
+            "gradientMode": "none",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "lineWidth": 1,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          },
+          "fieldMinMax": false,
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "purple",
+                "value": null
+              }
+            ]
+          },
+          "unit": "locale"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 14,
+        "w": 8,
+        "x": 8,
+        "y": 74
+      },
+      "id": 26,
+      "options": {
+        "barRadius": 0,
+        "barWidth": 0.97,
+        "fullHighlight": false,
+        "groupWidth": 0.7,
+        "legend": {
+          "calcs": [],
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": false
+        },
+        "orientation": "vertical",
+        "showValue": "never",
+        "stacking": "normal",
+        "tooltip": {
+          "hideZeros": false,
+          "mode": "single",
+          "sort": "none"
+        },
+        "xTickLabelRotation": 0,
+        "xTickLabelSpacing": 0
+      },
+      "pluginVersion": "11.5.2",
+      "targets": [
+        {
+          "editorMode": "code",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "SELECT\n  statistics.date AS time,\n  statistics.total_active_main_branch_users AS \"Main Branch\",\n  statistics.total_active_release_branch_users AS \"Latest Branch\",\n  statistics.total_active_previous_branch_users AS \"Previous Branch\",\n  statistics.total_active_pending_eol_branch_users AS \"Deprecated Branch\",\n  statistics.total_active_eol_branch_users AS \"EOL\"\nFROM\n  statistics\nORDER BY\n  statistics.date ASC\nLIMIT 30",
+          "refId": "A",
+          "sql": {
+            "columns": [
+              {
+                "parameters": [
+                  {
+                    "name": "date",
+                    "type": "functionParameter"
+                  }
+                ],
+                "type": "function"
+              },
+              {
+                "parameters": [
+                  {
+                    "name": "total_mastodon_domains",
+                    "type": "functionParameter"
+                  }
+                ],
+                "type": "function"
+              }
+            ],
+            "groupBy": [
+              {
+                "property": {
+                  "type": "string"
+                },
+                "type": "groupBy"
+              }
+            ],
+            "limit": 50
+          },
+          "table": "statistics"
+        },
+        {
+          "datasource": {
+            "type": "grafana-postgresql-datasource",
+            "uid": "aedqwq5gb2ebkc"
+          },
+          "editorMode": "code",
+          "format": "table",
+          "hide": false,
+          "rawQuery": true,
+          "rawSql": "SELECT \n    statistics.date,\n    statistics.total_active_users\nFROM \n    statistics\nORDER BY \n    statistics.date DESC;\n",
+          "refId": "B",
+          "sql": {
+            "columns": [
+              {
+                "parameters": [],
+                "type": "function"
+              }
+            ],
+            "groupBy": [
+              {
+                "property": {
+                  "type": "string"
+                },
+                "type": "groupBy"
+              }
+            ],
+            "limit": 50
+          }
+        }
+      ],
+      "title": "Active Mastodon Users by Branch",
+      "transformations": [
+        {
+          "id": "formatTime",
+          "options": {
+            "outputFormat": "DD",
+            "timeField": "time",
+            "timezone": "utc",
+            "useTimezone": true
+          }
+        },
+        {
+          "id": "configFromData",
+          "options": {
+            "configRefId": "B",
+            "mappings": [
+              {
+                "fieldName": "total_mastodon_domains",
+                "handlerKey": "max",
+                "reducerId": "max"
+              }
+            ]
+          }
+        }
+      ],
+      "type": "barchart"
+    },
+    {
+      "datasource": {
+        "type": "grafana-postgresql-datasource",
+        "uid": "aedqwq5gb2ebkc"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "axisBorderShow": false,
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "fillOpacity": 80,
+            "gradientMode": "none",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "lineWidth": 1,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          },
+          "fieldMinMax": false,
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "purple",
+                "value": null
+              }
+            ]
+          },
+          "unit": "locale"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 14,
+        "w": 8,
+        "x": 16,
+        "y": 74
+      },
+      "id": 25,
+      "options": {
+        "barRadius": 0,
+        "barWidth": 0.97,
+        "fullHighlight": false,
+        "groupWidth": 0.7,
+        "legend": {
+          "calcs": [],
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": false
+        },
+        "orientation": "vertical",
+        "showValue": "never",
+        "stacking": "normal",
+        "tooltip": {
+          "hideZeros": false,
+          "mode": "single",
+          "sort": "none"
+        },
+        "xTickLabelRotation": 0,
+        "xTickLabelSpacing": 0
+      },
+      "pluginVersion": "11.5.2",
+      "targets": [
+        {
+          "editorMode": "code",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "SELECT\n  statistics.date AS time,\n  statistics.total_main_branch_users AS \"Main Branch\",\n  statistics.total_release_branch_users AS \"Latest Branch\",\n  statistics.total_previous_branch_users AS \"Previous Branch\",\n  statistics.total_pending_eol_branch_users AS \"Deprecated Branch\",\n  statistics.total_eol_branch_users AS \"EOL\"\nFROM\n  statistics\nORDER BY\n  statistics.date ASC\nLIMIT 30",
+          "refId": "A",
+          "sql": {
+            "columns": [
+              {
+                "parameters": [
+                  {
+                    "name": "date",
+                    "type": "functionParameter"
+                  }
+                ],
+                "type": "function"
+              },
+              {
+                "parameters": [
+                  {
+                    "name": "total_mastodon_domains",
+                    "type": "functionParameter"
+                  }
+                ],
+                "type": "function"
+              }
+            ],
+            "groupBy": [
+              {
+                "property": {
+                  "type": "string"
+                },
+                "type": "groupBy"
+              }
+            ],
+            "limit": 50
+          },
+          "table": "statistics"
+        },
+        {
+          "datasource": {
+            "type": "grafana-postgresql-datasource",
+            "uid": "aedqwq5gb2ebkc"
+          },
+          "editorMode": "code",
+          "format": "table",
+          "hide": false,
+          "rawQuery": true,
+          "rawSql": "SELECT \n    statistics.date,\n    statistics.total_users\nFROM \n    statistics\nORDER BY \n    statistics.date DESC;\n",
+          "refId": "B",
+          "sql": {
+            "columns": [
+              {
+                "parameters": [],
+                "type": "function"
+              }
+            ],
+            "groupBy": [
+              {
+                "property": {
+                  "type": "string"
+                },
+                "type": "groupBy"
+              }
+            ],
+            "limit": 50
+          }
+        }
+      ],
+      "title": "Total Mastodon Users by Branch",
+      "transformations": [
+        {
+          "id": "formatTime",
+          "options": {
+            "outputFormat": "DD",
             "timeField": "time",
             "timezone": "utc",
             "useTimezone": true
@@ -4236,6 +4236,299 @@
         "w": 24,
         "x": 0,
         "y": 88
+      },
+      "id": 51,
+      "panels": [],
+      "title": "GHSA Coverage (Manual)",
+      "type": "row"
+    },
+    {
+      "fieldConfig": {
+        "defaults": {},
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 3,
+        "w": 24,
+        "x": 0,
+        "y": 89
+      },
+      "id": 52,
+      "options": {
+        "code": {
+          "language": "plaintext",
+          "showLineNumbers": false,
+          "showMiniMap": false
+        },
+        "content": "Versions identified in GHSA notifications are manually updated in this section and may not be accurate for the first 24 hours after a new GHSA is issued.\n\nCurrently tracking `Patched` as running `>4.4.0-alpha.3`, `>4.3.4`, `>4.2.16`, or `>4.1.23` - See [https://github.com/mastodon/mastodon/security](https://github.com/mastodon/mastodon/security) for more.",
+        "mode": "markdown"
+      },
+      "pluginVersion": "11.5.2",
+      "title": "Disclaimer",
+      "type": "text"
+    },
+    {
+      "datasource": {
+        "type": "grafana-postgresql-datasource",
+        "uid": "aedqwq5gb2ebkc"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "fixedColor": "purple",
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            }
+          },
+          "decimals": 2,
+          "mappings": [],
+          "unit": "locale"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 16,
+        "w": 8,
+        "x": 0,
+        "y": 92
+      },
+      "id": 53,
+      "options": {
+        "displayLabels": [],
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true,
+          "values": [
+            "percent"
+          ]
+        },
+        "pieType": "donut",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": true
+        },
+        "tooltip": {
+          "hideZeros": false,
+          "mode": "single",
+          "sort": "none"
+        }
+      },
+      "pluginVersion": "11.5.2",
+      "targets": [
+        {
+          "editorMode": "code",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "WITH \n-- Define the specific versions we want to count (easy to update)\ntarget_versions(version) AS (\n    VALUES ('4.4.0-alpha.4'), ('4.4.0-alpha.3'), ('4.3.6'), ('4.3.5'), ('4.3.4'), ('4.2.19'), ('4.2.18'), ('4.2.17'), ('4.2.16'), ('4.1.24'), ('4.1.23')\n),\n-- Count domains with specific versions\nspecific_versions AS (\n    SELECT COUNT(DISTINCT domain) as specific_version_count\n    FROM mastodon_domains\n    WHERE software_version IN (SELECT version FROM target_versions)\n),\n-- Count domains with EOL versions\neol_versions_count AS (\n    SELECT COUNT(DISTINCT md.domain) as eol_version_count\n    FROM mastodon_domains md\n    JOIN eol_versions ev ON md.software_version LIKE ev.software_version || '%'\n    WHERE md.software_version NOT IN (SELECT version FROM target_versions)\n),\n-- Count all other domains\ntotal_domains AS (\n    SELECT COUNT(DISTINCT domain) as total_count\n    FROM mastodon_domains\n)\n-- Final result with all three counts\nSELECT \n    specific_version_count AS \"Patched\",\n    eol_version_count AS \"EOL\",\n    (total_count - specific_version_count - eol_version_count) AS \"Vulnerable\"\nFROM specific_versions, eol_versions_count, total_domains;\n",
+          "refId": "A",
+          "sql": {
+            "columns": [
+              {
+                "parameters": [],
+                "type": "function"
+              }
+            ],
+            "groupBy": [
+              {
+                "property": {
+                  "type": "string"
+                },
+                "type": "groupBy"
+              }
+            ],
+            "limit": 50
+          }
+        }
+      ],
+      "title": "Latest GHSA Coverage by Server Count",
+      "type": "piechart"
+    },
+    {
+      "datasource": {
+        "type": "grafana-postgresql-datasource",
+        "uid": "aedqwq5gb2ebkc"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "fixedColor": "purple",
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            }
+          },
+          "decimals": 2,
+          "mappings": [],
+          "unit": "locale"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 16,
+        "w": 8,
+        "x": 8,
+        "y": 92
+      },
+      "id": 54,
+      "options": {
+        "displayLabels": [],
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true,
+          "values": [
+            "percent"
+          ]
+        },
+        "pieType": "donut",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": true
+        },
+        "tooltip": {
+          "hideZeros": false,
+          "mode": "single",
+          "sort": "none"
+        }
+      },
+      "pluginVersion": "11.5.2",
+      "targets": [
+        {
+          "editorMode": "code",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "WITH \n-- Define the specific versions we want to count (easy to update)\ntarget_versions(version) AS (\n    VALUES ('4.4.0-alpha.4'), ('4.4.0-alpha.3'), ('4.3.6'), ('4.3.5'), ('4.3.4'), \n           ('4.2.19'), ('4.2.18'), ('4.2.17'), ('4.2.16'), ('4.1.24'), ('4.1.23')\n),\n-- Sum active_users_monthly for patched versions\nspecific_versions AS (\n    SELECT COALESCE(SUM(active_users_monthly), 0) as specific_version_users\n    FROM mastodon_domains\n    WHERE software_version IN (SELECT version FROM target_versions)\n),\n-- Sum active_users_monthly for EOL versions\neol_versions_count AS (\n    SELECT COALESCE(SUM(md.active_users_monthly), 0) as eol_version_users\n    FROM mastodon_domains md\n    JOIN eol_versions ev ON md.software_version LIKE ev.software_version || '%'\n    WHERE md.software_version NOT IN (SELECT version FROM target_versions)\n),\n-- Sum active_users_monthly for all domains\ntotal_users AS (\n    SELECT COALESCE(SUM(active_users_monthly), 0) as total_users_count\n    FROM mastodon_domains\n)\n-- Final result with all three sums\nSELECT \n    specific_version_users AS \"Patched\",\n    eol_version_users AS \"EOL\",\n    (total_users_count - specific_version_users - eol_version_users) AS \"Vulnerable\"\nFROM specific_versions, eol_versions_count, total_users;\n",
+          "refId": "A",
+          "sql": {
+            "columns": [
+              {
+                "parameters": [],
+                "type": "function"
+              }
+            ],
+            "groupBy": [
+              {
+                "property": {
+                  "type": "string"
+                },
+                "type": "groupBy"
+              }
+            ],
+            "limit": 50
+          }
+        }
+      ],
+      "title": "Latest GHSA Coverage by Active User Count",
+      "type": "piechart"
+    },
+    {
+      "datasource": {
+        "type": "grafana-postgresql-datasource",
+        "uid": "aedqwq5gb2ebkc"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "fixedColor": "purple",
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            }
+          },
+          "decimals": 2,
+          "mappings": [],
+          "unit": "locale"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 16,
+        "w": 8,
+        "x": 16,
+        "y": 92
+      },
+      "id": 55,
+      "options": {
+        "displayLabels": [],
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true,
+          "values": [
+            "percent"
+          ]
+        },
+        "pieType": "donut",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": true
+        },
+        "tooltip": {
+          "hideZeros": false,
+          "mode": "single",
+          "sort": "none"
+        }
+      },
+      "pluginVersion": "11.5.2",
+      "targets": [
+        {
+          "editorMode": "code",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "WITH \n-- Define the specific versions we want to count (easy to update)\ntarget_versions(version) AS (\n    VALUES ('4.4.0-alpha.4'), ('4.4.0-alpha.3'), ('4.3.6'), ('4.3.5'), ('4.3.4'), \n           ('4.2.19'), ('4.2.18'), ('4.2.17'), ('4.2.16'), ('4.1.24'), ('4.1.23')\n),\n-- Sum total_users for patched versions\nspecific_versions AS (\n    SELECT COALESCE(SUM(total_users), 0) as specific_version_users\n    FROM mastodon_domains\n    WHERE software_version IN (SELECT version FROM target_versions)\n),\n-- Sum total_users for EOL versions\neol_versions_count AS (\n    SELECT COALESCE(SUM(md.total_users), 0) as eol_version_users\n    FROM mastodon_domains md\n    JOIN eol_versions ev ON md.software_version LIKE ev.software_version || '%'\n    WHERE md.software_version NOT IN (SELECT version FROM target_versions)\n),\n-- Sum total_users for all domains\ntotal_users AS (\n    SELECT COALESCE(SUM(total_users), 0) as total_users_count\n    FROM mastodon_domains\n)\n-- Final result with all three sums\nSELECT \n    specific_version_users AS \"Patched\",\n    eol_version_users AS \"EOL\",\n    (total_users_count - specific_version_users - eol_version_users) AS \"Vulnerable\"\nFROM specific_versions, eol_versions_count, total_users;\n",
+          "refId": "A",
+          "sql": {
+            "columns": [
+              {
+                "parameters": [],
+                "type": "function"
+              }
+            ],
+            "groupBy": [
+              {
+                "property": {
+                  "type": "string"
+                },
+                "type": "groupBy"
+              }
+            ],
+            "limit": 50
+          }
+        }
+      ],
+      "title": "Latest GHSA Coverage by Total User Count",
+      "type": "piechart"
+    },
+    {
+      "collapsed": false,
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 108
       },
       "id": 9,
       "panels": [],
@@ -4282,7 +4575,7 @@
         "h": 28,
         "w": 24,
         "x": 0,
-        "y": 89
+        "y": 109
       },
       "id": 10,
       "options": {
@@ -4356,6 +4649,6 @@
   "timezone": "browser",
   "title": "vmcrawl",
   "uid": "aedqo0q7klrswa",
-  "version": 52,
+  "version": 54,
   "weekStart": ""
 }
