@@ -4260,7 +4260,7 @@
           "showLineNumbers": false,
           "showMiniMap": false
         },
-        "content": "Versions identified in GHSA notifications are manually updated in this section and may not be accurate for the first 24 hours after a new GHSA is issued.\n\nCurrently tracking `Patched` as running `>4.4.0-alpha.3`, `>4.3.4`, `>4.2.16`, or `>4.1.23` - See [https://github.com/mastodon/mastodon/security](https://github.com/mastodon/mastodon/security) for more.",
+        "content": "Currently tracking `Patched` as running `>= 4.4.0-alpha.3`, `>= 4.3.4`, `>= 4.2.16`, or `>= 4.1.23` which are uneffected by any known security issues identified by on the [Mastodon GitHub](https://github.com/mastodon/mastodon/security).\n\nModels in this section are manually updated and may not be accurate for a few hours after subsequent to new GHSA/patch releases.",
         "mode": "markdown"
       },
       "pluginVersion": "11.5.2",
@@ -4540,6 +4540,7 @@
         "type": "grafana-postgresql-datasource",
         "uid": "aedqwq5gb2ebkc"
       },
+      "description": "",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -4590,12 +4591,7 @@
           "show": false
         },
         "showHeader": true,
-        "sortBy": [
-          {
-            "desc": true,
-            "displayName": "Total Users"
-          }
-        ]
+        "sortBy": []
       },
       "pluginVersion": "11.5.2",
       "targets": [
@@ -4603,7 +4599,7 @@
           "editorMode": "code",
           "format": "table",
           "rawQuery": true,
-          "rawSql": "SELECT \n    domain AS \"Domain\",\n    software_version AS \"Software Version\",\n    full_version as \"Raw Version\",\n    total_users AS \"Total Users\",\n    active_users_monthly as \"Active Users\",\n    timestamp as \"Last Crawled (UTC)\"\nFROM mastodon_domains\nORDER BY total_users DESC;",
+          "rawSql": "SELECT \n    domain AS \"Domain\",\n    software_version AS \"Software Version\",\n    full_version as \"Raw Version\",\n    total_users AS \"Total Users\",\n    active_users_monthly as \"Active Users\",\n    EXTRACT(YEAR FROM age(CURRENT_DATE, registration_date)) * 12 + \n    EXTRACT(MONTH FROM age(CURRENT_DATE, registration_date)) AS \"Estimated Age (M)\",\n    timestamp as \"Last Crawled (UTC)\"\nFROM mastodon_domains\nORDER BY total_users DESC;\n",
           "refId": "A",
           "sql": {
             "columns": [
@@ -4649,6 +4645,6 @@
   "timezone": "browser",
   "title": "vmcrawl",
   "uid": "aedqo0q7klrswa",
-  "version": 54,
+  "version": 58,
   "weekStart": ""
 }
