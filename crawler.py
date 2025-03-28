@@ -7,6 +7,7 @@ try:
     import json
     import mimetypes
     import unicodedata
+    import whois
     from datetime import datetime, timedelta, timezone
     from lxml import etree
     from urllib.parse import urlparse, urlunparse
@@ -893,10 +894,12 @@ def process_mastodon_instance(domain, webfinger_data, nodeinfo_data, http_client
             if software_version.startswith("4"):
                 actual_domain = instance_api_data['domain'].lower()
                 contact_account = normalize_email(instance_api_data['contact']['email']).lower()
+                admin_creation = instance_api_data['contact']['account']['created_at']
                 source_url = instance_api_data['source_url']
             else:
                 actual_domain = instance_api_data['uri'].lower()
                 contact_account = normalize_email(instance_api_data['email']).lower()
+                admin_creation = instance_api_data['contact_account']['created_at']
                 source_url = ''
 
             if not is_valid_email(contact_account):
@@ -933,8 +936,8 @@ def process_mastodon_instance(domain, webfinger_data, nodeinfo_data, http_client
                 return
 
             # Update database
-            update_mastodon_domain(actual_domain, software_version, software_version_full, total_users, active_month_users, contact_account, source_url)
-
+            update_mastodon_domain(actual_domain, software_version, software_version_full, total_users, active_month_users, contact_account, source_url, admin_creation)
+            add_registration_date(actual_domain)
             clear_domain_error(domain)
 
             if software_version == nodeinfo_data['software']['version']:
@@ -954,13 +957,13 @@ def process_mastodon_instance(domain, webfinger_data, nodeinfo_data, http_client
     except json.JSONDecodeError as e:
         handle_json_exception(domain, e)
 
-def update_mastodon_domain(domain, software_version, software_version_full, total_users, active_month_users, contact_account, source_url):
+def update_mastodon_domain(actual_domain, software_version, software_version_full, total_users, active_month_users, contact_account, source_url, admin_creation):
     cursor = conn.cursor()
     try:
         cursor.execute('''
             INSERT INTO mastodon_domains
-            (domain, software_version, total_users, active_users_monthly, timestamp, contact, source, full_version)
-            VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
+            (domain, software_version, total_users, active_users_monthly, timestamp, contact, source, full_version, registration_date)
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
             ON CONFLICT(domain) DO UPDATE SET
             software_version = excluded.software_version,
             total_users = excluded.total_users,
@@ -968,9 +971,37 @@ def update_mastodon_domain(domain, software_version, software_version_full, tota
             timestamp = excluded.timestamp,
             contact = excluded.contact,
             source = excluded.source,
-            full_version = excluded.full_version
-        ''', (domain, software_version, total_users, active_month_users,
-              datetime.now(timezone.utc), contact_account, source_url, software_version_full))
+            full_version = excluded.full_version,
+            registration_date = excluded.registration_date
+        ''', (actual_domain, software_version, total_users, active_month_users,
+              datetime.now(timezone.utc), contact_account, source_url, software_version_full, admin_creation))
+        conn.commit()
+    except Exception as e:
+        print(f"Failed to update Mastodon domain data: {e}")
+        conn.rollback()
+    finally:
+        cursor.close()
+
+def add_registration_date(actual_domain):
+    cursor = conn.cursor()
+    try:
+        # Check if registration_date is already set
+        cursor.execute('SELECT registration_date FROM mastodon_domains WHERE domain = %s', (actual_domain,))
+        result = cursor.fetchone()
+        if result and result[0] is not None:
+            return
+        # Get the registration date
+        registration_date = get_domain_registration_date(actual_domain)
+        if not registration_date:
+            registration_date = datetime.now(timezone.utc)
+        # Insert or update registration_date if not already set
+        cursor.execute('''
+            INSERT INTO mastodon_domains
+            (domain, registration_date)
+            VALUES (%s, %s)
+            ON CONFLICT(domain) DO UPDATE SET
+            registration_date = excluded.registration_date
+        ''', (actual_domain, registration_date))
         conn.commit()
     except Exception as e:
         print(f"Failed to update Mastodon domain data: {e}")
@@ -1031,6 +1062,33 @@ def handle_xml_exception(domain, exception):
     log_error(domain, error_message)
     increment_domain_error(domain, error_reason)
     delete_if_error_max(domain)
+
+def get_domain_registration_date(actual_domain):
+    try:
+        # Query WHOIS information
+        flags = 0
+        flags = flags | whois.NICClient.WHOIS_QUICK
+        domain_info = whois.whois(actual_domain, flags=flags)
+
+        # Get creation date (registration date)
+        creation_date = domain_info.creation_date
+
+        # Handle different return types (some domains return a list of dates)
+        if isinstance(creation_date, list):
+            creation_date = creation_date[0]
+
+        if creation_date:
+            # Format the date
+            if isinstance(creation_date, datetime):
+                return creation_date
+            else:
+                return str(creation_date)
+        else:
+            return None
+
+    except Exception as e:
+        print(f"Error retrieving domain information: {str(e)}")
+        return None
 
 def read_domain_list(file_path):
     with open(file_path, 'r') as file:
