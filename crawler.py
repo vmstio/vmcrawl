@@ -893,14 +893,29 @@ def process_mastodon_instance(domain, webfinger_data, nodeinfo_data, http_client
 
             if software_version.startswith("4"):
                 actual_domain = instance_api_data['domain'].lower()
-                contact_account = normalize_email(instance_api_data['contact']['email']).lower()
-                admin_creation = instance_api_data['contact']['account']['created_at']
-                source_url = instance_api_data['source_url']
+                if 'email' in instance_api_data['contact']:
+                    contact_account = normalize_email(instance_api_data['contact']['email']).lower()
+                else:
+                    contact_account = None
+                if 'created_at' in instance_api_data['contact']:
+                    admin_creation = instance_api_data['contact']['created_at']
+                else:
+                    admin_creation = None
+                if 'source_url' in instance_api_data:
+                    source_url = instance_api_data['source_url']
+                else:
+                    source_url = None
             else:
                 actual_domain = instance_api_data['uri'].lower()
-                contact_account = normalize_email(instance_api_data['email']).lower()
-                admin_creation = instance_api_data['contact_account']['created_at']
-                source_url = ''
+                if 'email' in instance_api_data:
+                    contact_account = normalize_email(instance_api_data['email']).lower()
+                else:
+                    contact_account = None
+                if 'created_at' in instance_api_data:
+                    admin_creation = instance_api_data['contact_account']['created_at']
+                else:
+                    admin_creation = None
+                source_url = None
 
             if not is_valid_email(contact_account):
                 contact_account = None
