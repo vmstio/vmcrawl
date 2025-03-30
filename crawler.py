@@ -670,6 +670,13 @@ def check_webfinger(domain, http_client):
                     return {'backend_domain': backend_domain}
                 else:
                     return None
+            if 'localhost' in response.content.decode('utf-8'):
+                error_message = f'WebFinger alias points to localhost'
+                print_colored(f'{error_message}', 'magenta')
+                log_error(domain, error_message)
+                increment_domain_error(domain, '???')
+                delete_domain_if_known(domain)
+                return None
             else:
                 data = response.json()
             aliases = data.get('aliases', [])
