@@ -599,9 +599,9 @@ def process_domain(domain, http_client):
         mark_as_non_mastodon(domain)
 
 def check_robots_txt(domain, http_client):
-    robots_url = f'https://{domain}/robots.txt'
+    url = f'https://{domain}/robots.txt'
     try:
-        response = http_client.get(robots_url)
+        response = get_with_fallback(url, http_client)
         # Check for valid HTTP status code
         if response.status_code in [200]:
             content_type = response.headers.get('Content-Type', '')
@@ -613,7 +613,7 @@ def check_robots_txt(domain, http_client):
                 delete_if_error_max(domain)
                 return False
             robots_txt = response.text
-            lines = robots_txt.split('\n')
+            lines = robots_txt.splitlines()
             user_agent = None
             for line in lines:
                 line = line.strip().lower()
@@ -638,9 +638,9 @@ def check_robots_txt(domain, http_client):
     return True
 
 def check_webfinger(domain, http_client):
-    webfinger_url = f'https://{domain}/.well-known/webfinger?resource=acct:{domain}@{domain}'
+    url = f'https://{domain}/.well-known/webfinger?resource=acct:{domain}@{domain}'
     try:
-        response = http_client.get(webfinger_url)
+        response = get_with_fallback(url, http_client)
         content_type = response.headers.get('Content-Type', '')
         content_length = response.headers.get('Content-Length', '')
         if response.status_code in [200]:
@@ -709,9 +709,9 @@ def check_webfinger(domain, http_client):
     return None
 
 def check_hostmeta(domain, http_client):
-    hostmeta_url = f'https://{domain}/.well-known/host-meta'
+    url = f'https://{domain}/.well-known/host-meta'
     try:
-        response = http_client.get(hostmeta_url)
+        response = get_with_fallback(url, http_client)
         if response.status_code in [200]:
             content_type = response.headers.get('Content-Type', '')
             if 'xml' not in content_type:
@@ -760,9 +760,9 @@ def check_hostmeta(domain, http_client):
         handle_xml_exception(domain, e)
 
 def check_nodeinfo(domain, backend_domain, http_client):
-    nodeinfo_url = f'https://{backend_domain}/.well-known/nodeinfo'
+    url = f'https://{backend_domain}/.well-known/nodeinfo'
     try:
-        response = http_client.get(nodeinfo_url)
+        response = get_with_fallback(url, http_client)
         if response.status_code in [200]:
             content_type = response.headers.get('Content-Type', '')
             if 'json' not in content_type:
@@ -784,7 +784,7 @@ def check_nodeinfo(domain, backend_domain, http_client):
             if 'links' in data and len(data['links']) > 0:
                 nodeinfo_2_url = next((link['href'] for link in data['links'] if link.get('rel') == 'http://nodeinfo.diaspora.software/ns/schema/2.0'), None)
                 if nodeinfo_2_url and 'wp-json' not in nodeinfo_2_url:
-                    nodeinfo_response = http_client.get(nodeinfo_2_url)
+                    nodeinfo_response = get_with_fallback(nodeinfo_2_url, http_client)
                     if nodeinfo_response.status_code in [200]:
                         nodeinfo_response_content_type = nodeinfo_response.headers.get('Content-Type', '')
                         if 'json' not in nodeinfo_response_content_type:
@@ -862,7 +862,7 @@ def process_mastodon_instance(domain, webfinger_data, nodeinfo_data, http_client
         instance_api_url = f'https://{webfinger_data["backend_domain"]}/api/v1/instance'
 
     try:
-        response = http_client.get(instance_api_url)
+        response = get_with_fallback(instance_api_url, http_client)
         if response.status_code in [200]:
             content_type = response.headers.get('Content-Type', '')
             if 'json' not in content_type:
@@ -1049,7 +1049,7 @@ def handle_http_exception(domain, exception):
         log_error(domain, error_message)
         increment_domain_error(domain, error_reason)
         delete_if_error_max(domain)
-    elif 'timed out' in error_message.casefold() or 'connection reset by peer' in error_message.casefold() or 'network is unreachable' in error_message.casefold() or 'connection refused' in error_message.casefold() or 'could not connect to host' in error_message.casefold():
+    elif 'timed out' in error_message.casefold() or 'connection reset by peer' in error_message.casefold() or 'network is unreachable' in error_message.casefold() or 'connection refused' in error_message.casefold() or 'could not connect to host' in error_message.casefold() or 'no route to host' in error_message.casefold() or 'server disconnected without sending a response' in error_message.casefold():
         error_reason = 'TCP'
         print_colored(f'TCP failure: {error_message}', 'orange')
         log_error(domain, error_message)

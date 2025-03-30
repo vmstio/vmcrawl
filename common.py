@@ -100,6 +100,29 @@ http_client = httpx.Client(http2=True, follow_redirects=True, headers=http_custo
 http_codes_to_softfail = [451, 429, 423, 422, 405, 404, 403, 402, 401, 400]
 http_codes_to_hardfail = [418, 410]
 
+
+def get_with_fallback(url, http_client):
+    try:
+        return http_client.get(url)
+    except httpx.RequestError as e:
+        error_str = str(e).casefold()
+
+        # Check for HTTP/2 specific issues
+        http2_error_indicators = [
+            "connectionterminated",
+            "streamreset"
+        ]
+
+        if any(indicator in error_str for indicator in http2_error_indicators):
+            print_colored(f"HTTP/2 request failed: {e}, falling back to HTTP/1.1", "yellow")
+            # Create a new client with HTTP/2 explicitly disabled
+            fallback_client = httpx.Client(http2=False, follow_redirects=True, headers=http_custom_headers, timeout=common_timeout)
+            return fallback_client.get(url)
+        else:
+            # If it's not an HTTP/2 issue, just raise the error
+            raise e
+
+
 def get_cache_file_path(url: str) -> str:
     # Create a unique cache file path based on the URL
     url_hash = hashlib.md5(url.encode()).hexdigest()
@@ -120,7 +143,7 @@ def read_main_version_info(url):
     """
     version_info = {}
     try:
-        response = httpx.get(url)
+        response = get_with_fallback(url, http_client)
         response.raise_for_status()
         lines = response.text.splitlines()
 
@@ -161,12 +184,12 @@ def get_highest_mastodon_version():
 
 
 def get_backport_mastodon_versions():
-    release_url = "https://api.github.com/repos/mastodon/mastodon/releases"
+    url = "https://api.github.com/repos/mastodon/mastodon/releases"
 
     # Initialize with None instead of empty string
     backport_versions = {branch: '' for branch in backport_branches}
 
-    response = http_client.get(release_url)
+    response = get_with_fallback(url, http_client)
     response.raise_for_status()
     releases = response.json()
 
@@ -263,15 +286,15 @@ def print_colored(text: str, color: str, **kwargs) -> None:
     print(f"{colors.get(color, '')}{text}{colors['reset']}", **kwargs)
 
 def get_domain_endings():
-    domain_endings_url = 'http://data.iana.org/TLD/tlds-alpha-by-domain.txt'
-    cache_file_path = get_cache_file_path(domain_endings_url)
+    url = 'http://data.iana.org/TLD/tlds-alpha-by-domain.txt'
+    cache_file_path = get_cache_file_path(url)
     max_cache_age = 86400  # 1 day in seconds
 
     if is_cache_valid(cache_file_path, max_cache_age):
         with open(cache_file_path, 'r') as cache_file:
             domain_endings = [line.strip().lower() for line in cache_file.readlines()]
     else:
-        domain_endings_response = http_client.get(domain_endings_url)
+        domain_endings_response = get_with_fallback(url, http_client)
         if domain_endings_response.status_code in [200]:
             domain_endings = [line.strip().lower() for line in domain_endings_response.text.splitlines() if not line.startswith('#')]
             with open(cache_file_path, 'w') as cache_file:
@@ -282,15 +305,15 @@ def get_domain_endings():
     return domain_endings
 
 def get_iftas_dni():
-    iftas_dns_url = "https://connect.iftas.org/wp-content/uploads/2024/04/dni.csv"
-    cache_file_path = get_cache_file_path(iftas_dns_url)
+    url = "https://connect.iftas.org/wp-content/uploads/2024/04/dni.csv"
+    cache_file_path = get_cache_file_path(url)
     max_cache_age = 86400  # 1 day in seconds
 
     if is_cache_valid(cache_file_path, max_cache_age):
         with open(cache_file_path, 'r') as cache_file:
             iftas_domains = [line.strip().lower() for line in cache_file.readlines()]
     else:
-        iftas_dns_response = http_client.get(iftas_dns_url)
+        iftas_dns_response = get_with_fallback(url, http_client)
         if iftas_dns_response.status_code in [200]:
 
             csv_content = StringIO(iftas_dns_response.text)
