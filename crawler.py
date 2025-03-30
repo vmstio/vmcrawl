@@ -1043,15 +1043,15 @@ def handle_http_exception(domain, exception):
         log_error(domain, error_message)
         increment_domain_error(domain, error_reason)
         delete_if_error_max(domain)
-    elif 'timed out' in error_message.casefold():
-        error_reason = 'TIME'
-        print_colored(f'HTTPX failure: {error_message}', 'orange')
-        log_error(domain, error_message)
-        increment_domain_error(domain, error_reason)
-        delete_if_error_max(domain)
     elif 'nodename nor servname provided' in error_message.casefold() or 'name or service not known' in error_message.casefold() or 'no address associated with hostname' in error_message.casefold() or 'temporary failure in name resolution' in error_message.casefold():
         error_reason = 'DNS'
         print_colored(f'DNS failure: {error_message}', 'orange')
+        log_error(domain, error_message)
+        increment_domain_error(domain, error_reason)
+        delete_if_error_max(domain)
+    elif 'timed out' in error_message.casefold() or 'connection reset by peer' in error_message.casefold() or 'network is unreachable' in error_message.casefold() or 'connection refused' in error_message.casefold() or 'could not connect to host' in error_message.casefold():
+        error_reason = 'TCP'
+        print_colored(f'TCP failure: {error_message}', 'orange')
         log_error(domain, error_message)
         increment_domain_error(domain, error_reason)
         delete_if_error_max(domain)
@@ -1120,7 +1120,7 @@ def load_from_database(user_choice):
         "9": "SELECT domain FROM raw_domains WHERE norobots = TRUE ORDER BY domain",
         "10": "SELECT domain FROM raw_domains WHERE reason = 'SSL' ORDER BY errors ASC",
         "11": "SELECT domain FROM raw_domains WHERE reason = 'HTTP' ORDER BY errors ASC",
-        "12": "SELECT domain FROM raw_domains WHERE reason IN ('TIMEOUT', 'TIME') ORDER BY errors ASC",
+        "12": "SELECT domain FROM raw_domains WHERE reason IN ('TIMEOUT', 'TIME', 'TCP') ORDER BY errors ASC",
         "13": "SELECT domain FROM raw_domains WHERE reason = 'MAX' ORDER BY errors ASC",
         "14": "SELECT domain FROM raw_domains WHERE reason = 'DNS' ORDER BY errors ASC",
         "20": "SELECT domain FROM raw_domains WHERE reason ~ '^2[0-9]{2}' ORDER BY errors ASC",
@@ -1211,7 +1211,7 @@ def print_menu() -> None:
         "Process new domains": {"0": "Recently Fetched"},
         "Change process direction": {"1": "Standard", "2": "Reverse", "3": "Random"},
         "Retry fatal errors": {"6": "Not Mastodon", "7": "Marked Failed", "8": "Bad Domains", "9": "No Robots"},
-        "Retry connection errors": {"10": "SSL", "11": "HTTP", "12": "TIME", "13": "MAX", "14": "DNS"},
+        "Retry connection errors": {"10": "SSL", "11": "HTTP", "12": "TCP", "13": "MAX", "14": "DNS"},
         "Retry HTTP errors": {"20": "2xx", "21": "3xx", "22": "4xx", "23": "5xx"},
         "Retry specific errors": {"30": "###", "31": "JSON", "32": "TXT", "33": "XML", "34": "API"},
         "Retry good data": {"40": f"Stale ≥1 Week", "41": "Stale ≥1 Day", "42": "Unpatched", "43": "Main", "44": "Inactive", "45": "All Good"},
