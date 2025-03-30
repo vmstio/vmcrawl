@@ -973,7 +973,7 @@ def process_mastodon_instance(domain, webfinger_data, nodeinfo_data, http_client
                 error_to_print = f'Mastodon v{software_version.split("-")[0]} is higher than main branch version v{version_main_branch}.0'
                 print_colored(error_to_print, 'magenta')
                 log_error(domain, error_to_print)
-                increment_domain_error(domain, '###')
+                increment_domain_error(domain, '???')
                 delete_domain_if_known(domain)
                 return
 
@@ -1175,6 +1175,7 @@ def load_from_database(user_choice):
         "32": "SELECT domain FROM raw_domains WHERE reason = 'TXT' ORDER BY errors ASC",
         "33": "SELECT domain FROM raw_domains WHERE reason = 'XML' ORDER BY errors ASC",
         "34": "SELECT domain FROM raw_domains WHERE reason = 'API' ORDER BY errors ASC",
+        "35": "SELECT domain FROM raw_domains WHERE reason = '???' ORDER BY errors ASC",
         "40": "SELECT domain FROM mastodon_domains WHERE timestamp <= (CURRENT_TIMESTAMP - INTERVAL '1 week') AT TIME ZONE 'UTC' ORDER BY timestamp ASC",
         "41": "SELECT domain FROM mastodon_domains WHERE timestamp <= (CURRENT_TIMESTAMP - INTERVAL '1 day') AT TIME ZONE 'UTC' ORDER BY timestamp ASC",
         "42": "SELECT domain FROM mastodon_domains WHERE software_version != ALL(%(versions)s::text[]) ORDER BY active_users_monthly DESC",
@@ -1256,7 +1257,7 @@ def print_menu() -> None:
         "Retry fatal errors": {"6": "Not Mastodon", "7": "Marked Failed", "8": "Bad Domains", "9": "No Robots"},
         "Retry connection errors": {"10": "SSL", "11": "HTTP", "12": "TCP", "13": "MAX", "14": "DNS"},
         "Retry HTTP errors": {"20": "2xx", "21": "3xx", "22": "4xx", "23": "5xx"},
-        "Retry specific errors": {"30": "###", "31": "JSON", "32": "TXT", "33": "XML", "34": "API"},
+        "Retry specific errors": {"30": "###", "31": "JSON", "32": "TXT", "33": "XML", "34": "API", "35": "???"},
         "Retry good data": {"40": f"Stale ≥1 Week", "41": "Stale ≥1 Day", "42": "Unpatched", "43": "Main", "44": "Inactive", "45": "All Good"},
         "Retry general errors": {"50": f"Domains w/ >{error_threshold * 2} Errors", "51": f"Domains w/ <{error_threshold} Errors", "52": f"Domains w/ {error_threshold}-{error_threshold + error_threshold} Errors"},
     }
