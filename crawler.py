@@ -1049,7 +1049,8 @@ def handle_http_exception(domain, exception):
         'nodename nor servname provided',
         'name or service not known',
         'no address associated with hostname',
-        'temporary failure in name resolution'
+        'temporary failure in name resolution',
+        'address family not supported'
     ]):
         error_reason = 'DNS'
         print_colored(f'DNS failure: {error_message}', 'orange')
@@ -1064,7 +1065,7 @@ def handle_http_exception(domain, exception):
         'could not connect to host',
         'no route to host',
         'streamreset',
-        'server disconneted'
+        'server disconnected'
     ]):
         error_reason = 'TCP'
         print_colored(f'TCP failure: {error_message}', 'orange')
