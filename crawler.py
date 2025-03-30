@@ -1066,7 +1066,8 @@ def handle_http_exception(domain, exception):
         delete_if_error_max(domain)
     elif 'maximum allowed redirects' in error_message.casefold():
         error_reason = 'MAX'
-        print_colored(f'HTTPX failure: {error_message}', 'orange')
+        error_message = error_message.strip('.')
+        print_colored(f'{error_message}', 'orange')
         log_error(domain, error_message)
         increment_domain_error(domain, error_reason)
         delete_if_error_max(domain)
