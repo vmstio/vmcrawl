@@ -855,8 +855,33 @@ def process_mastodon_instance(domain, webfinger_data, nodeinfo_data, http_client
     software_name = nodeinfo_data['software']['name'].lower()
     software_version_full = nodeinfo_data['software']['version']
     software_version = clean_version(nodeinfo_data['software']['version'])
-    total_users = nodeinfo_data['usage']['users']['total']
-    active_month_users = nodeinfo_data['usage']['users']['activeMonth']
+
+    if 'usage' not in nodeinfo_data or 'users' not in nodeinfo_data['usage']:
+        error_to_print = f'Mastodon v{software_version} but not reporting user count'
+        print_colored(error_to_print, 'magenta')
+        log_error(domain, error_to_print)
+        increment_domain_error(domain, '###')
+        delete_domain_if_known(domain)
+        return
+
+    if 'total' in nodeinfo_data['usage']['users']:
+        total_users = nodeinfo_data['usage']['users']['total']
+    else:
+        error_to_print = f'Mastodon v{software_version} but not reporting total user count'
+        print_colored(error_to_print, 'magenta')
+        log_error(domain, error_to_print)
+        increment_domain_error(domain, '###')
+        delete_domain_if_known(domain)
+        return
+    if 'activeMonth' in nodeinfo_data['usage']['users']:
+        active_month_users = nodeinfo_data['usage']['users']['activeMonth']
+    else:
+        error_to_print = f'Mastodon v{software_version} but not reporting active user count'
+        print_colored(error_to_print, 'magenta')
+        log_error(domain, error_to_print)
+        increment_domain_error(domain, '###')
+        delete_domain_if_known(domain)
+        return
 
     if software_version.startswith("4"):
         instance_api_url = f'https://{webfinger_data["backend_domain"]}/api/v2/instance'
