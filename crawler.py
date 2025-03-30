@@ -662,7 +662,7 @@ def check_webfinger(domain, http_client):
                     return {'backend_domain': backend_domain}
                 else:
                     return None
-            if not response.content.decode('utf-8') == 'aliases':
+            if not 'aliases' in response.content.decode('utf-8'):
                 print('WebFinger reply is invalid…')
                 hostmeta_result = check_hostmeta(domain, http_client)
                 if hostmeta_result:
