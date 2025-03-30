@@ -799,7 +799,18 @@ def check_nodeinfo(domain, backend_domain, http_client):
             else:
                 data = response.json()
             if 'links' in data and len(data['links']) > 0:
-                nodeinfo_2_url = next((link['href'] for link in data['links'] if link.get('rel') == 'http://nodeinfo.diaspora.software/ns/schema/2.0'), None)
+                nodeinfo_2_url = next((link['href'] for link in data['links']
+                                    if link.get('rel') == 'http://nodeinfo.diaspora.software/ns/schema/2.0'
+                                    and 'href' in link), None)
+                if not nodeinfo_2_url:
+                    rel_index = next((i for i, link in enumerate(data['links'])
+                                    if link.get('rel') == 'http://nodeinfo.diaspora.software/ns/schema/2.0'
+                                    and 'href' not in link), None)
+                    if rel_index is not None and rel_index + 1 < len(data['links']):
+                        next_obj = data['links'][rel_index + 1]
+                        if 'href' in next_obj and 'rel' not in next_obj:
+                            nodeinfo_2_url = next_obj['href']
+
                 if nodeinfo_2_url and 'wp-json' not in nodeinfo_2_url:
                     nodeinfo_response = get_with_fallback(nodeinfo_2_url, http_client)
                     if nodeinfo_response.status_code in [200]:
