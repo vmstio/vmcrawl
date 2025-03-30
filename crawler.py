@@ -892,13 +892,6 @@ def process_mastodon_instance(domain, webfinger_data, nodeinfo_data, http_client
         response = get_with_fallback(instance_api_url, http_client)
         if response.status_code in [200]:
             content_type = response.headers.get('Content-Type', '')
-            if 'json' not in content_type:
-                error_message = 'Instance API reply is not a JSON file'
-                print_colored(f'{error_message}', 'magenta')
-                log_error(domain, error_message)
-                increment_domain_error(domain, 'API')
-                delete_if_error_max(domain)
-                return None
             if not response.content:
                 error_message = 'Instance API reply is empty'
                 print_colored(f'{error_message}', 'magenta')
@@ -906,17 +899,24 @@ def process_mastodon_instance(domain, webfinger_data, nodeinfo_data, http_client
                 increment_domain_error(domain, 'API')
                 delete_if_error_max(domain)
                 return None
-            else:
-                instance_api_data = response.json()
+            elif 'json' not in content_type:
+                error_message = 'Instance API reply is not a JSON file'
+                print_colored(f'{error_message}', 'magenta')
+                log_error(domain, error_message)
+                increment_domain_error(domain, 'API')
+                delete_if_error_max(domain)
+                return None
 
-            if 'error' in instance_api_data:
-                if instance_api_data['error'] == "This method requires an authenticated user":
-                    error_message = 'Instance API requires authentication'
-                    print_colored(f'{error_message}', 'magenta')
-                    log_error(domain, error_message)
-                    increment_domain_error(domain, 'API')
-                    delete_if_error_max(domain)
-                    return None
+            response_json = response.json()
+            if 'error' in response_json:
+                error_message = 'Instance API returned an error'
+                print_colored(f'{error_message}', 'magenta')
+                log_error(domain, error_message)
+                increment_domain_error(domain, 'API')
+                delete_if_error_max(domain)
+                return None
+            else:
+                instance_api_data = response_json
 
             if software_version.startswith("4"):
                 actual_domain = instance_api_data['domain'].lower()
@@ -988,10 +988,10 @@ def process_mastodon_instance(domain, webfinger_data, nodeinfo_data, http_client
                 print_colored(f'Mastodon v{software_version} ({nodeinfo_data["software"]["version"]})', 'green')
 
         else:
-            error_message = f'Responded HTTP {response.status_code} to API request'
-            print_colored(f'{error_message}', 'yellow')
-            log_error(domain, f'{error_message}')
-            increment_domain_error(domain, str(response.status_code))
+            error_message = f'Failed to respond to API request'
+            print_colored(f'{error_message}', 'magenta')
+            log_error(domain, error_message)
+            increment_domain_error(domain, 'API')
             delete_if_error_max(domain)
 
     except httpx.RequestError as e:
