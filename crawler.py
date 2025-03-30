@@ -654,8 +654,16 @@ def check_webfinger(domain, http_client):
                     return {'backend_domain': backend_domain}
                 else:
                     return None
-            if not response.content:
+            if not response.content or content_length == '0':
                 print('WebFinger reply is empty…')
+                hostmeta_result = check_hostmeta(domain, http_client)
+                if hostmeta_result:
+                    backend_domain = hostmeta_result['backend_domain']
+                    return {'backend_domain': backend_domain}
+                else:
+                    return None
+            if not response.content.decode('utf-8') == 'aliases':
+                print('WebFinger reply is invalid…')
                 hostmeta_result = check_hostmeta(domain, http_client)
                 if hostmeta_result:
                     backend_domain = hostmeta_result['backend_domain']
