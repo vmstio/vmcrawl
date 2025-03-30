@@ -339,6 +339,8 @@ def clean_version_hometown(software_version):
         software_version = "3.5.3"
     elif software_version == "1.0.7":
         software_version = "3.5.5"
+    elif software_version == "3.4.6ht":
+        software_version = "3.4.6"
 
     return software_version
 
@@ -1043,13 +1045,27 @@ def handle_http_exception(domain, exception):
         log_error(domain, error_message)
         increment_domain_error(domain, error_reason)
         delete_if_error_max(domain)
-    elif 'nodename nor servname provided' in error_message.casefold() or 'name or service not known' in error_message.casefold() or 'no address associated with hostname' in error_message.casefold() or 'temporary failure in name resolution' in error_message.casefold():
+    elif any(msg in error_message.casefold() for msg in [
+        'nodename nor servname provided',
+        'name or service not known',
+        'no address associated with hostname',
+        'temporary failure in name resolution'
+    ]):
         error_reason = 'DNS'
         print_colored(f'DNS failure: {error_message}', 'orange')
         log_error(domain, error_message)
         increment_domain_error(domain, error_reason)
         delete_if_error_max(domain)
-    elif 'timed out' in error_message.casefold() or 'connection reset by peer' in error_message.casefold() or 'network is unreachable' in error_message.casefold() or 'connection refused' in error_message.casefold() or 'could not connect to host' in error_message.casefold() or 'no route to host' in error_message.casefold() or 'server disconnected without sending a response' in error_message.casefold():
+    elif any(msg in error_message.casefold() for msg in [
+        'timed out',
+        'connection reset by peer',
+        'network is unreachable',
+        'connection refused',
+        'could not connect to host',
+        'no route to host',
+        'streamreset',
+        'server disconneted'
+    ]):
         error_reason = 'TCP'
         print_colored(f'TCP failure: {error_message}', 'orange')
         log_error(domain, error_message)

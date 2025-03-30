@@ -109,8 +109,7 @@ def get_with_fallback(url, http_client):
 
         # Check for HTTP/2 specific issues
         http2_error_indicators = [
-            "connectionterminated",
-            "streamreset"
+            "connectionterminated"
         ]
 
         if any(indicator in error_str for indicator in http2_error_indicators):
