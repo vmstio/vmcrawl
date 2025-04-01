@@ -1280,8 +1280,8 @@ def print_menu() -> None:
     menu_options = {
         "Process new domains": {"0": "Recently Fetched"},
         "Change process direction": {"1": "Standard", "2": "Reverse", "3": "Random"},
-        "Retry fatal errors": {"6": "Not Mastodon", "7": "Marked Failed", "8": "Bad Domains", "9": "No Robots"},
-        "Retry connection errors": {"10": "SSL", "11": "HTTP", "12": "TCP", "13": "MAX", "14": "DNS"},
+        "Retry fatal errors": {"6": "Other Platforms", "7": "HTTP 410/418", "8": "IFTAS DNI", "9": "Robots Prohibited"},
+        "Retry connection errors": {"10": "SSL", "11": "HTTP", "12": "TCP", "13": "Redirects", "14": "DNS"},
         "Retry HTTP errors": {"20": "2xx", "21": "3xx", "22": "4xx", "23": "5xx"},
         "Retry specific errors": {"30": "###", "31": "JSON", "32": "TXT", "33": "XML", "34": "API", "35": "???"},
         "Retry good data": {"40": f"Stale ≥1 Week", "41": "Stale ≥1 Day", "42": "Unpatched", "43": "Main", "44": "Inactive", "45": "All Good"},
