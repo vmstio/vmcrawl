@@ -785,8 +785,6 @@ def check_hostmeta(domain, http_client):
             delete_if_error_max(domain)
     except httpx.RequestError as e:
         handle_http_exception(domain, e)
-    except etree.XMLSyntaxError as e:
-        handle_xml_exception(domain, e)
 
 def check_nodeinfo(domain, backend_domain, http_client):
     url = f'https://{backend_domain}/.well-known/nodeinfo'
@@ -1159,14 +1157,6 @@ def handle_json_exception(domain, exception):
     increment_domain_error(domain, error_reason)
     delete_if_error_max(domain)
 
-def handle_xml_exception(domain, exception):
-    error_message = str(exception)
-    error_reason = 'XML'
-    print_colored(error_message, 'magenta')
-    log_error(domain, error_message)
-    increment_domain_error(domain, error_reason)
-    delete_if_error_max(domain)
-
 def get_domain_registration_date(actual_domain):
     try:
         # Query WHOIS information
@@ -1219,9 +1209,8 @@ def load_from_database(user_choice):
         "30": "SELECT domain FROM raw_domains WHERE reason = '###' ORDER BY errors ASC",
         "31": "SELECT domain FROM raw_domains WHERE reason = 'JSON' ORDER BY errors ASC",
         "32": "SELECT domain FROM raw_domains WHERE reason = 'TXT' ORDER BY errors ASC",
-        "33": "SELECT domain FROM raw_domains WHERE reason = 'XML' ORDER BY errors ASC",
-        "34": "SELECT domain FROM raw_domains WHERE reason = 'API' ORDER BY errors ASC",
-        "35": "SELECT domain FROM raw_domains WHERE reason = '???' ORDER BY errors ASC",
+        "33": "SELECT domain FROM raw_domains WHERE reason = 'API' ORDER BY errors ASC",
+        "34": "SELECT domain FROM raw_domains WHERE reason = '???' ORDER BY errors ASC",
         "40": "SELECT domain FROM mastodon_domains WHERE timestamp <= (CURRENT_TIMESTAMP - INTERVAL '1 week') AT TIME ZONE 'UTC' ORDER BY timestamp ASC",
         "41": "SELECT domain FROM mastodon_domains WHERE timestamp <= (CURRENT_TIMESTAMP - INTERVAL '1 day') AT TIME ZONE 'UTC' ORDER BY timestamp ASC",
         "42": "SELECT domain FROM mastodon_domains WHERE software_version != ALL(%(versions)s::text[]) ORDER BY active_users_monthly DESC",
@@ -1303,7 +1292,7 @@ def print_menu() -> None:
         "Retry fatal errors": {"6": "Other Platforms", "7": "HTTP 410/418", "8": "IFTAS DNI", "9": "Robots Prohibited"},
         "Retry connection errors": {"10": "SSL", "11": "HTTP", "12": "TCP", "13": "Redirects", "14": "DNS"},
         "Retry HTTP errors": {"20": "2xx", "21": "3xx", "22": "4xx", "23": "5xx"},
-        "Retry specific errors": {"30": "###", "31": "JSON", "32": "TXT", "33": "XML", "34": "API", "35": "???"},
+        "Retry specific errors": {"30": "###", "31": "JSON", "32": "TXT", "33": "API", "34": "???"},
         "Retry good data": {"40": f"Stale ≥1 Week", "41": "Stale ≥1 Day", "42": "Unpatched", "43": "Main", "44": "Inactive", "45": "All Good"},
         "Retry general errors": {"50": f"Domains w/ >{error_threshold * 2} Errors", "51": f"Domains w/ <{error_threshold} Errors", "52": f"Domains w/ {error_threshold}-{error_threshold + error_threshold} Errors"},
     }
