@@ -51,8 +51,7 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "purple",
-                "value": null
+                "color": "purple"
               }
             ]
           },
@@ -61,8 +60,8 @@
         "overrides": []
       },
       "gridPos": {
-        "h": 3,
-        "w": 5,
+        "h": 4,
+        "w": 4,
         "x": 0,
         "y": 1
       },
@@ -84,7 +83,7 @@
         "textMode": "auto",
         "wideLayout": true
       },
-      "pluginVersion": "11.5.2",
+      "pluginVersion": "11.6.0",
       "targets": [
         {
           "datasource": {
@@ -123,84 +122,6 @@
         "type": "grafana-postgresql-datasource",
         "uid": "aedqwq5gb2ebkc"
       },
-      "description": "Count of distinct Mastodon versions, after various fork/meta identifiers are removed and nightly releases are normalized.",
-      "fieldConfig": {
-        "defaults": {
-          "color": {
-            "mode": "thresholds"
-          },
-          "mappings": [],
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "color": "purple",
-                "value": null
-              }
-            ]
-          }
-        },
-        "overrides": []
-      },
-      "gridPos": {
-        "h": 3,
-        "w": 3,
-        "x": 5,
-        "y": 1
-      },
-      "id": 4,
-      "options": {
-        "colorMode": "value",
-        "graphMode": "area",
-        "justifyMode": "auto",
-        "orientation": "auto",
-        "percentChangeColorMode": "standard",
-        "reduceOptions": {
-          "calcs": [
-            "lastNotNull"
-          ],
-          "fields": "",
-          "values": false
-        },
-        "showPercentChange": false,
-        "textMode": "auto",
-        "wideLayout": true
-      },
-      "pluginVersion": "11.5.2",
-      "targets": [
-        {
-          "editorMode": "code",
-          "format": "table",
-          "rawQuery": true,
-          "rawSql": "SELECT COUNT(DISTINCT software_version) AS unique_software_versions\nFROM mastodon_domains;",
-          "refId": "A",
-          "sql": {
-            "columns": [
-              {
-                "parameters": [],
-                "type": "function"
-              }
-            ],
-            "groupBy": [
-              {
-                "property": {
-                  "type": "string"
-                },
-                "type": "groupBy"
-              }
-            ],
-            "limit": 50
-          }
-        }
-      ],
-      "title": "Unique Versions",
-      "type": "stat"
-    },
-    {
-      "datasource": {
-        "type": "grafana-postgresql-datasource",
-        "uid": "aedqwq5gb2ebkc"
-      },
       "description": "",
       "fieldConfig": {
         "defaults": {
@@ -212,8 +133,7 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "purple",
-                "value": null
+                "color": "purple"
               }
             ]
           },
@@ -222,9 +142,9 @@
         "overrides": []
       },
       "gridPos": {
-        "h": 3,
-        "w": 5,
-        "x": 8,
+        "h": 4,
+        "w": 4,
+        "x": 4,
         "y": 1
       },
       "id": 40,
@@ -245,7 +165,7 @@
         "textMode": "auto",
         "wideLayout": true
       },
-      "pluginVersion": "11.5.2",
+      "pluginVersion": "11.6.0",
       "targets": [
         {
           "editorMode": "code",
@@ -291,8 +211,7 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "purple",
-                "value": null
+                "color": "purple"
               }
             ]
           },
@@ -301,9 +220,9 @@
         "overrides": []
       },
       "gridPos": {
-        "h": 3,
-        "w": 5,
-        "x": 13,
+        "h": 4,
+        "w": 4,
+        "x": 8,
         "y": 1
       },
       "id": 41,
@@ -324,7 +243,7 @@
         "textMode": "auto",
         "wideLayout": true
       },
-      "pluginVersion": "11.5.2",
+      "pluginVersion": "11.6.0",
       "targets": [
         {
           "editorMode": "code",
@@ -359,6 +278,7 @@
         "type": "grafana-postgresql-datasource",
         "uid": "aedqwq5gb2ebkc"
       },
+      "description": "Count of distinct Mastodon versions, after various fork/meta identifiers are removed and nightly releases are normalized.",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -369,8 +289,160 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "purple",
-                "value": null
+                "color": "purple"
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 4,
+        "w": 2,
+        "x": 12,
+        "y": 1
+      },
+      "id": 4,
+      "options": {
+        "colorMode": "value",
+        "graphMode": "area",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "percentChangeColorMode": "standard",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "showPercentChange": false,
+        "textMode": "auto",
+        "wideLayout": true
+      },
+      "pluginVersion": "11.6.0",
+      "targets": [
+        {
+          "editorMode": "code",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "SELECT COUNT(DISTINCT software_version) AS unique_software_versions\nFROM mastodon_domains;",
+          "refId": "A",
+          "sql": {
+            "columns": [
+              {
+                "parameters": [],
+                "type": "function"
+              }
+            ],
+            "groupBy": [
+              {
+                "property": {
+                  "type": "string"
+                },
+                "type": "groupBy"
+              }
+            ],
+            "limit": 50
+          }
+        }
+      ],
+      "title": "All Versions",
+      "type": "stat"
+    },
+    {
+      "datasource": {
+        "type": "grafana-postgresql-datasource",
+        "uid": "aedqwq5gb2ebkc"
+      },
+      "description": "Count of distinct Mastodon versions, including various fork/meta identifiers.",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "purple"
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 4,
+        "w": 2,
+        "x": 14,
+        "y": 1
+      },
+      "id": 58,
+      "options": {
+        "colorMode": "value",
+        "graphMode": "area",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "percentChangeColorMode": "standard",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "showPercentChange": false,
+        "textMode": "auto",
+        "wideLayout": true
+      },
+      "pluginVersion": "11.6.0",
+      "targets": [
+        {
+          "editorMode": "code",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "SELECT COUNT(DISTINCT full_version) AS unique_software_versions\nFROM mastodon_domains;",
+          "refId": "A",
+          "sql": {
+            "columns": [
+              {
+                "parameters": [],
+                "type": "function"
+              }
+            ],
+            "groupBy": [
+              {
+                "property": {
+                  "type": "string"
+                },
+                "type": "groupBy"
+              }
+            ],
+            "limit": 50
+          }
+        }
+      ],
+      "title": "Raw Versions",
+      "type": "stat"
+    },
+    {
+      "datasource": {
+        "type": "grafana-postgresql-datasource",
+        "uid": "aedqwq5gb2ebkc"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "text"
               }
             ]
           },
@@ -387,9 +459,9 @@
         ]
       },
       "gridPos": {
-        "h": 3,
-        "w": 6,
-        "x": 18,
+        "h": 4,
+        "w": 8,
+        "x": 16,
         "y": 1
       },
       "id": 16,
@@ -410,7 +482,7 @@
         "textMode": "auto",
         "wideLayout": true
       },
-      "pluginVersion": "11.5.2",
+      "pluginVersion": "11.6.0",
       "targets": [
         {
           "editorMode": "code",
@@ -457,7 +529,7 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 4
+        "y": 5
       },
       "id": 8,
       "panels": [],
@@ -482,15 +554,14 @@
             "mode": "percentage",
             "steps": [
               {
-                "color": "red",
-                "value": null
+                "color": "red"
               },
               {
                 "color": "orange",
                 "value": 20
               },
               {
-                "color": "#EAB839",
+                "color": "yellow",
                 "value": 50
               },
               {
@@ -504,10 +575,10 @@
         "overrides": []
       },
       "gridPos": {
-        "h": 6,
+        "h": 7,
         "w": 4,
         "x": 0,
-        "y": 5
+        "y": 6
       },
       "id": 42,
       "options": {
@@ -525,7 +596,7 @@
         "showThresholdMarkers": false,
         "sizing": "auto"
       },
-      "pluginVersion": "11.5.2",
+      "pluginVersion": "11.6.0",
       "targets": [
         {
           "editorMode": "code",
@@ -620,15 +691,14 @@
             "mode": "percentage",
             "steps": [
               {
-                "color": "red",
-                "value": null
+                "color": "red"
               },
               {
                 "color": "orange",
                 "value": 20
               },
               {
-                "color": "#EAB839",
+                "color": "yellow",
                 "value": 50
               },
               {
@@ -642,10 +712,10 @@
         "overrides": []
       },
       "gridPos": {
-        "h": 6,
+        "h": 7,
         "w": 4,
         "x": 4,
-        "y": 5
+        "y": 6
       },
       "id": 11,
       "options": {
@@ -663,7 +733,7 @@
         "showThresholdMarkers": false,
         "sizing": "auto"
       },
-      "pluginVersion": "11.5.2",
+      "pluginVersion": "11.6.0",
       "targets": [
         {
           "editorMode": "code",
@@ -759,8 +829,7 @@
             "mode": "percentage",
             "steps": [
               {
-                "color": "red",
-                "value": null
+                "color": "red"
               },
               {
                 "color": "orange",
@@ -781,10 +850,10 @@
         "overrides": []
       },
       "gridPos": {
-        "h": 6,
+        "h": 7,
         "w": 4,
         "x": 8,
-        "y": 5
+        "y": 6
       },
       "id": 21,
       "options": {
@@ -802,7 +871,7 @@
         "showThresholdMarkers": false,
         "sizing": "auto"
       },
-      "pluginVersion": "11.5.2",
+      "pluginVersion": "11.6.0",
       "targets": [
         {
           "editorMode": "code",
@@ -893,8 +962,7 @@
             "mode": "percentage",
             "steps": [
               {
-                "color": "red",
-                "value": null
+                "color": "red"
               },
               {
                 "color": "orange",
@@ -915,10 +983,10 @@
         "overrides": []
       },
       "gridPos": {
-        "h": 6,
+        "h": 7,
         "w": 4,
         "x": 12,
-        "y": 5
+        "y": 6
       },
       "id": 22,
       "options": {
@@ -936,7 +1004,7 @@
         "showThresholdMarkers": false,
         "sizing": "auto"
       },
-      "pluginVersion": "11.5.2",
+      "pluginVersion": "11.6.0",
       "targets": [
         {
           "editorMode": "code",
@@ -1027,8 +1095,7 @@
             "mode": "percentage",
             "steps": [
               {
-                "color": "red",
-                "value": null
+                "color": "red"
               },
               {
                 "color": "orange",
@@ -1049,10 +1116,10 @@
         "overrides": []
       },
       "gridPos": {
-        "h": 6,
+        "h": 7,
         "w": 4,
         "x": 16,
-        "y": 5
+        "y": 6
       },
       "id": 37,
       "options": {
@@ -1070,7 +1137,7 @@
         "showThresholdMarkers": false,
         "sizing": "auto"
       },
-      "pluginVersion": "11.5.2",
+      "pluginVersion": "11.6.0",
       "targets": [
         {
           "editorMode": "code",
@@ -1144,11 +1211,36 @@
       "type": "gauge"
     },
     {
+      "fieldConfig": {
+        "defaults": {},
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 7,
+        "w": 4,
+        "x": 20,
+        "y": 6
+      },
+      "id": 56,
+      "options": {
+        "code": {
+          "language": "plaintext",
+          "showLineNumbers": false,
+          "showMiniMap": false
+        },
+        "content": "New graphs will be added here, soon.",
+        "mode": "markdown"
+      },
+      "pluginVersion": "11.6.0",
+      "title": "Placeholder",
+      "type": "text"
+    },
+    {
       "datasource": {
         "type": "grafana-postgresql-datasource",
         "uid": "aedqwq5gb2ebkc"
       },
-      "description": "Count of instances running the last patch released for all EOL branches, compared to the total instances on all EOL branches.",
+      "description": "Count of monthly active users (MAUs) on instances running latest patches for any supported branch, compared to all instances.",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -1161,8 +1253,7 @@
             "mode": "percentage",
             "steps": [
               {
-                "color": "red",
-                "value": null
+                "color": "red"
               },
               {
                 "color": "orange",
@@ -1183,144 +1274,10 @@
         "overrides": []
       },
       "gridPos": {
-        "h": 6,
-        "w": 4,
-        "x": 20,
-        "y": 5
-      },
-      "id": 44,
-      "options": {
-        "minVizHeight": 75,
-        "minVizWidth": 75,
-        "orientation": "auto",
-        "reduceOptions": {
-          "calcs": [
-            "lastNotNull"
-          ],
-          "fields": "/.*/",
-          "values": true
-        },
-        "showThresholdLabels": false,
-        "showThresholdMarkers": false,
-        "sizing": "auto"
-      },
-      "pluginVersion": "11.5.2",
-      "targets": [
-        {
-          "editorMode": "code",
-          "format": "table",
-          "rawQuery": true,
-          "rawSql": "WITH highest_version AS (\n    SELECT md.software_version AS version\n    FROM mastodon_domains md\n    WHERE EXISTS (\n        SELECT 1 \n        FROM eol_versions ev\n        WHERE md.software_version LIKE ev.software_version || '%'\n    )\n    ORDER BY \n        CAST(REGEXP_REPLACE(SPLIT_PART(md.software_version, '.', 1), '[^0-9]', '', 'g') AS INTEGER) DESC,\n        CAST(REGEXP_REPLACE(SPLIT_PART(md.software_version, '.', 2), '[^0-9]', '', 'g') AS INTEGER) DESC,\n        CAST(REGEXP_REPLACE(SPLIT_PART(md.software_version, '.', 3), '[^0-9]', '', 'g') AS INTEGER) DESC,\n        md.software_version DESC\n    LIMIT 1\n)\nSELECT \n    COUNT(*) AS total_instances\nFROM \n    mastodon_domains md,\n    highest_version hv\nWHERE \n    md.software_version = hv.version\nGROUP BY \n    hv.version;\n",
-          "refId": "A",
-          "sql": {
-            "columns": [
-              {
-                "parameters": [],
-                "type": "function"
-              }
-            ],
-            "groupBy": [
-              {
-                "property": {
-                  "type": "string"
-                },
-                "type": "groupBy"
-              }
-            ],
-            "limit": 50
-          }
-        },
-        {
-          "datasource": {
-            "type": "grafana-postgresql-datasource",
-            "uid": "aedqwq5gb2ebkc"
-          },
-          "editorMode": "code",
-          "format": "table",
-          "hide": false,
-          "rawQuery": true,
-          "rawSql": "            SELECT COUNT(DISTINCT mastodon_domains.domain) as \"Latest Total\"\n            FROM mastodon_domains\n            WHERE EXISTS (\n                SELECT 1\n                FROM eol_versions\n                WHERE mastodon_domains.software_version LIKE eol_versions.software_version || '%'\n            );",
-          "refId": "B",
-          "sql": {
-            "columns": [
-              {
-                "parameters": [],
-                "type": "function"
-              }
-            ],
-            "groupBy": [
-              {
-                "property": {
-                  "type": "string"
-                },
-                "type": "groupBy"
-              }
-            ],
-            "limit": 50
-          }
-        }
-      ],
-      "title": "Patched Instances, EOL",
-      "transformations": [
-        {
-          "id": "configFromData",
-          "options": {
-            "configRefId": "B",
-            "mappings": [
-              {
-                "fieldName": "Latest Total",
-                "handlerKey": "max"
-              }
-            ]
-          }
-        }
-      ],
-      "type": "gauge"
-    },
-    {
-      "datasource": {
-        "type": "grafana-postgresql-datasource",
-        "uid": "aedqwq5gb2ebkc"
-      },
-      "description": "Count of monthly active users (MAUs) on instances running latest patches for any supported branch, compared to all instances.",
-      "fieldConfig": {
-        "defaults": {
-          "color": {
-            "mode": "thresholds"
-          },
-          "fieldMinMax": false,
-          "mappings": [],
-          "min": 0,
-          "thresholds": {
-            "mode": "percentage",
-            "steps": [
-              {
-                "color": "red",
-                "value": null
-              },
-              {
-                "color": "orange",
-                "value": 20
-              },
-              {
-                "color": "#EAB839",
-                "value": 50
-              },
-              {
-                "color": "green",
-                "value": 80
-              }
-            ]
-          },
-          "unit": "locale"
-        },
-        "overrides": []
-      },
-      "gridPos": {
-        "h": 6,
+        "h": 7,
         "w": 4,
         "x": 0,
-        "y": 11
+        "y": 13
       },
       "id": 43,
       "options": {
@@ -1338,7 +1295,7 @@
         "showThresholdMarkers": false,
         "sizing": "auto"
       },
-      "pluginVersion": "11.5.2",
+      "pluginVersion": "11.6.0",
       "targets": [
         {
           "editorMode": "code",
@@ -1433,15 +1390,14 @@
             "mode": "percentage",
             "steps": [
               {
-                "color": "red",
-                "value": null
+                "color": "red"
               },
               {
                 "color": "orange",
                 "value": 20
               },
               {
-                "color": "#EAB839",
+                "color": "yellow",
                 "value": 50
               },
               {
@@ -1455,10 +1411,10 @@
         "overrides": []
       },
       "gridPos": {
-        "h": 6,
+        "h": 7,
         "w": 4,
         "x": 4,
-        "y": 11
+        "y": 13
       },
       "id": 32,
       "options": {
@@ -1476,7 +1432,7 @@
         "showThresholdMarkers": false,
         "sizing": "auto"
       },
-      "pluginVersion": "11.5.2",
+      "pluginVersion": "11.6.0",
       "targets": [
         {
           "editorMode": "code",
@@ -1572,15 +1528,14 @@
             "mode": "percentage",
             "steps": [
               {
-                "color": "red",
-                "value": null
+                "color": "red"
               },
               {
                 "color": "orange",
                 "value": 20
               },
               {
-                "color": "#EAB839",
+                "color": "yellow",
                 "value": 50
               },
               {
@@ -1594,10 +1549,10 @@
         "overrides": []
       },
       "gridPos": {
-        "h": 6,
+        "h": 7,
         "w": 4,
         "x": 8,
-        "y": 11
+        "y": 13
       },
       "id": 35,
       "options": {
@@ -1615,7 +1570,7 @@
         "showThresholdMarkers": false,
         "sizing": "auto"
       },
-      "pluginVersion": "11.5.2",
+      "pluginVersion": "11.6.0",
       "targets": [
         {
           "editorMode": "code",
@@ -1711,15 +1666,14 @@
             "mode": "percentage",
             "steps": [
               {
-                "color": "red",
-                "value": null
+                "color": "red"
               },
               {
                 "color": "orange",
                 "value": 20
               },
               {
-                "color": "#EAB839",
+                "color": "yellow",
                 "value": 50
               },
               {
@@ -1733,10 +1687,10 @@
         "overrides": []
       },
       "gridPos": {
-        "h": 6,
+        "h": 7,
         "w": 4,
         "x": 12,
-        "y": 11
+        "y": 13
       },
       "id": 36,
       "options": {
@@ -1754,7 +1708,7 @@
         "showThresholdMarkers": false,
         "sizing": "auto"
       },
-      "pluginVersion": "11.5.2",
+      "pluginVersion": "11.6.0",
       "targets": [
         {
           "editorMode": "code",
@@ -1850,15 +1804,14 @@
             "mode": "percentage",
             "steps": [
               {
-                "color": "red",
-                "value": null
+                "color": "red"
               },
               {
                 "color": "orange",
                 "value": 20
               },
               {
-                "color": "#EAB839",
+                "color": "yellow",
                 "value": 50
               },
               {
@@ -1872,10 +1825,10 @@
         "overrides": []
       },
       "gridPos": {
-        "h": 6,
+        "h": 7,
         "w": 4,
         "x": 16,
-        "y": 11
+        "y": 13
       },
       "id": 38,
       "options": {
@@ -1893,7 +1846,7 @@
         "showThresholdMarkers": false,
         "sizing": "auto"
       },
-      "pluginVersion": "11.5.2",
+      "pluginVersion": "11.6.0",
       "targets": [
         {
           "editorMode": "code",
@@ -1972,142 +1925,29 @@
       "type": "gauge"
     },
     {
-      "datasource": {
-        "type": "grafana-postgresql-datasource",
-        "uid": "aedqwq5gb2ebkc"
-      },
-      "description": "Count of monthly active users (MAUs) on instances running the last patch released for all EOL branches, compared to the total instances on all EOL branches.",
       "fieldConfig": {
-        "defaults": {
-          "color": {
-            "mode": "thresholds"
-          },
-          "fieldMinMax": false,
-          "mappings": [],
-          "min": 0,
-          "thresholds": {
-            "mode": "percentage",
-            "steps": [
-              {
-                "color": "red",
-                "value": null
-              },
-              {
-                "color": "orange",
-                "value": 20
-              },
-              {
-                "color": "#EAB839",
-                "value": 50
-              },
-              {
-                "color": "green",
-                "value": 80
-              }
-            ]
-          },
-          "unit": "locale"
-        },
+        "defaults": {},
         "overrides": []
       },
       "gridPos": {
-        "h": 6,
+        "h": 7,
         "w": 4,
         "x": 20,
-        "y": 11
+        "y": 13
       },
-      "id": 45,
+      "id": 57,
       "options": {
-        "minVizHeight": 75,
-        "minVizWidth": 75,
-        "orientation": "auto",
-        "reduceOptions": {
-          "calcs": [
-            "lastNotNull"
-          ],
-          "fields": "/.*/",
-          "values": true
+        "code": {
+          "language": "plaintext",
+          "showLineNumbers": false,
+          "showMiniMap": false
         },
-        "showThresholdLabels": false,
-        "showThresholdMarkers": false,
-        "sizing": "auto"
+        "content": "New graphs will be added here, soon.",
+        "mode": "markdown"
       },
-      "pluginVersion": "11.5.2",
-      "targets": [
-        {
-          "editorMode": "code",
-          "format": "table",
-          "rawQuery": true,
-          "rawSql": "WITH highest_version AS (\n    SELECT md.software_version AS version\n    FROM mastodon_domains md\n    WHERE EXISTS (\n        SELECT 1 \n        FROM eol_versions ev\n        WHERE md.software_version LIKE ev.software_version || '%'\n    )\n    ORDER BY \n        CAST(REGEXP_REPLACE(SPLIT_PART(md.software_version, '.', 1), '[^0-9]', '', 'g') AS INTEGER) DESC,\n        CAST(REGEXP_REPLACE(SPLIT_PART(md.software_version, '.', 2), '[^0-9]', '', 'g') AS INTEGER) DESC,\n        CAST(REGEXP_REPLACE(SPLIT_PART(md.software_version, '.', 3), '[^0-9]', '', 'g') AS INTEGER) DESC,\n        md.software_version DESC\n    LIMIT 1\n)\nSELECT \n    SUM(md.active_users_monthly) AS total_monthly_active_users\nFROM \n    mastodon_domains md,\n    highest_version hv\nWHERE \n    md.software_version = hv.version\nGROUP BY \n    hv.version;\n",
-          "refId": "A",
-          "sql": {
-            "columns": [
-              {
-                "parameters": [],
-                "type": "function"
-              }
-            ],
-            "groupBy": [
-              {
-                "property": {
-                  "type": "string"
-                },
-                "type": "groupBy"
-              }
-            ],
-            "limit": 50
-          }
-        },
-        {
-          "datasource": {
-            "type": "grafana-postgresql-datasource",
-            "uid": "aedqwq5gb2ebkc"
-          },
-          "editorMode": "code",
-          "format": "table",
-          "hide": false,
-          "rawQuery": true,
-          "rawSql": "            SELECT SUM(mastodon_domains.active_users_monthly) as \"Latest Total\"\n            FROM mastodon_domains\n            WHERE EXISTS (\n                SELECT 1\n                FROM eol_versions\n                WHERE mastodon_domains.software_version LIKE eol_versions.software_version || '%'\n            );",
-          "refId": "B",
-          "sql": {
-            "columns": [
-              {
-                "parameters": [],
-                "type": "function"
-              }
-            ],
-            "groupBy": [
-              {
-                "property": {
-                  "type": "string"
-                },
-                "type": "groupBy"
-              }
-            ],
-            "limit": 50
-          }
-        }
-      ],
-      "title": "Patched MAUs, EOL",
-      "transformations": [
-        {
-          "id": "configFromData",
-          "options": {
-            "applyTo": {
-              "id": "byType",
-              "options": "number"
-            },
-            "configRefId": "B",
-            "mappings": [
-              {
-                "fieldName": "Latest Total",
-                "handlerKey": "max"
-              }
-            ]
-          }
-        }
-      ],
-      "type": "gauge"
+      "pluginVersion": "11.6.0",
+      "title": "Placeholder",
+      "type": "text"
     },
     {
       "collapsed": false,
@@ -2115,7 +1955,7 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 17
+        "y": 20
       },
       "id": 30,
       "panels": [],
@@ -2173,10 +2013,10 @@
         ]
       },
       "gridPos": {
-        "h": 16,
+        "h": 18,
         "w": 8,
         "x": 0,
-        "y": 18
+        "y": 21
       },
       "id": 5,
       "options": {
@@ -2203,7 +2043,7 @@
           "sort": "none"
         }
       },
-      "pluginVersion": "11.5.2",
+      "pluginVersion": "11.6.0",
       "targets": [
         {
           "editorMode": "code",
@@ -2258,10 +2098,10 @@
         "overrides": []
       },
       "gridPos": {
-        "h": 16,
+        "h": 18,
         "w": 8,
         "x": 8,
-        "y": 18
+        "y": 21
       },
       "id": 7,
       "options": {
@@ -2288,7 +2128,7 @@
           "sort": "none"
         }
       },
-      "pluginVersion": "11.5.2",
+      "pluginVersion": "11.6.0",
       "targets": [
         {
           "editorMode": "code",
@@ -2343,10 +2183,10 @@
         "overrides": []
       },
       "gridPos": {
-        "h": 16,
+        "h": 18,
         "w": 8,
         "x": 16,
-        "y": 18
+        "y": 21
       },
       "id": 6,
       "options": {
@@ -2373,7 +2213,7 @@
           "sort": "none"
         }
       },
-      "pluginVersion": "11.5.2",
+      "pluginVersion": "11.6.0",
       "targets": [
         {
           "editorMode": "code",
@@ -2409,7 +2249,7 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 34
+        "y": 39
       },
       "id": 17,
       "panels": [],
@@ -2452,8 +2292,7 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green",
-                "value": null
+                "color": "green"
               },
               {
                 "color": "red",
@@ -2466,10 +2305,10 @@
         "overrides": []
       },
       "gridPos": {
-        "h": 12,
+        "h": 14,
         "w": 6,
         "x": 0,
-        "y": 35
+        "y": 40
       },
       "id": 12,
       "options": {
@@ -2494,7 +2333,7 @@
         "xTickLabelRotation": 0,
         "xTickLabelSpacing": 0
       },
-      "pluginVersion": "11.5.2",
+      "pluginVersion": "11.6.0",
       "targets": [
         {
           "editorMode": "code",
@@ -2560,8 +2399,7 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green",
-                "value": null
+                "color": "green"
               },
               {
                 "color": "red",
@@ -2574,10 +2412,10 @@
         "overrides": []
       },
       "gridPos": {
-        "h": 12,
+        "h": 14,
         "w": 6,
         "x": 6,
-        "y": 35
+        "y": 40
       },
       "id": 48,
       "options": {
@@ -2602,7 +2440,7 @@
         "xTickLabelRotation": 0,
         "xTickLabelSpacing": 0
       },
-      "pluginVersion": "11.5.2",
+      "pluginVersion": "11.6.0",
       "targets": [
         {
           "editorMode": "code",
@@ -2669,8 +2507,7 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "blue",
-                "value": null
+                "color": "blue"
               }
             ]
           },
@@ -2679,10 +2516,10 @@
         "overrides": []
       },
       "gridPos": {
-        "h": 12,
+        "h": 14,
         "w": 6,
         "x": 12,
-        "y": 35
+        "y": 40
       },
       "id": 46,
       "options": {
@@ -2707,7 +2544,7 @@
         "xTickLabelRotation": 0,
         "xTickLabelSpacing": 0
       },
-      "pluginVersion": "11.5.2",
+      "pluginVersion": "11.6.0",
       "targets": [
         {
           "editorMode": "code",
@@ -2774,8 +2611,7 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "blue",
-                "value": null
+                "color": "blue"
               }
             ]
           },
@@ -2784,10 +2620,10 @@
         "overrides": []
       },
       "gridPos": {
-        "h": 12,
+        "h": 14,
         "w": 6,
         "x": 18,
-        "y": 35
+        "y": 40
       },
       "id": 20,
       "options": {
@@ -2812,7 +2648,7 @@
         "xTickLabelRotation": 0,
         "xTickLabelSpacing": 0
       },
-      "pluginVersion": "11.5.2",
+      "pluginVersion": "11.6.0",
       "targets": [
         {
           "editorMode": "code",
@@ -2864,8 +2700,7 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green",
-                "value": null
+                "color": "green"
               },
               {
                 "color": "red",
@@ -2881,7 +2716,7 @@
         "h": 12,
         "w": 6,
         "x": 0,
-        "y": 47
+        "y": 54
       },
       "id": 13,
       "options": {
@@ -2896,7 +2731,7 @@
         },
         "showHeader": true
       },
-      "pluginVersion": "11.5.2",
+      "pluginVersion": "11.6.0",
       "targets": [
         {
           "editorMode": "code",
@@ -2948,8 +2783,7 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green",
-                "value": null
+                "color": "green"
               },
               {
                 "color": "red",
@@ -2965,7 +2799,7 @@
         "h": 12,
         "w": 6,
         "x": 6,
-        "y": 47
+        "y": 54
       },
       "id": 47,
       "options": {
@@ -2980,7 +2814,7 @@
         },
         "showHeader": true
       },
-      "pluginVersion": "11.5.2",
+      "pluginVersion": "11.6.0",
       "targets": [
         {
           "editorMode": "code",
@@ -3032,8 +2866,7 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green",
-                "value": null
+                "color": "green"
               },
               {
                 "color": "red",
@@ -3049,7 +2882,7 @@
         "h": 12,
         "w": 6,
         "x": 12,
-        "y": 47
+        "y": 54
       },
       "id": 49,
       "options": {
@@ -3064,7 +2897,7 @@
         },
         "showHeader": true
       },
-      "pluginVersion": "11.5.2",
+      "pluginVersion": "11.6.0",
       "targets": [
         {
           "editorMode": "code",
@@ -3116,8 +2949,7 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green",
-                "value": null
+                "color": "green"
               },
               {
                 "color": "red",
@@ -3133,7 +2965,7 @@
         "h": 12,
         "w": 6,
         "x": 18,
-        "y": 47
+        "y": 54
       },
       "id": 50,
       "options": {
@@ -3148,7 +2980,7 @@
         },
         "showHeader": true
       },
-      "pluginVersion": "11.5.2",
+      "pluginVersion": "11.6.0",
       "targets": [
         {
           "editorMode": "code",
@@ -3184,7 +3016,7 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 59
+        "y": 66
       },
       "id": 23,
       "panels": [],
@@ -3228,8 +3060,7 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "purple",
-                "value": null
+                "color": "purple"
               }
             ]
           },
@@ -3238,10 +3069,10 @@
         "overrides": []
       },
       "gridPos": {
-        "h": 14,
+        "h": 16,
         "w": 8,
         "x": 0,
-        "y": 60
+        "y": 67
       },
       "id": 27,
       "options": {
@@ -3266,7 +3097,7 @@
         "xTickLabelRotation": 0,
         "xTickLabelSpacing": 0
       },
-      "pluginVersion": "11.5.2",
+      "pluginVersion": "11.6.0",
       "targets": [
         {
           "editorMode": "code",
@@ -3401,8 +3232,7 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "purple",
-                "value": null
+                "color": "purple"
               }
             ]
           },
@@ -3411,10 +3241,10 @@
         "overrides": []
       },
       "gridPos": {
-        "h": 14,
+        "h": 16,
         "w": 8,
         "x": 8,
-        "y": 60
+        "y": 67
       },
       "id": 28,
       "options": {
@@ -3439,7 +3269,7 @@
         "xTickLabelRotation": 0,
         "xTickLabelSpacing": 0
       },
-      "pluginVersion": "11.5.2",
+      "pluginVersion": "11.6.0",
       "targets": [
         {
           "editorMode": "code",
@@ -3574,8 +3404,7 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "purple",
-                "value": null
+                "color": "purple"
               }
             ]
           },
@@ -3584,10 +3413,10 @@
         "overrides": []
       },
       "gridPos": {
-        "h": 14,
+        "h": 16,
         "w": 8,
         "x": 16,
-        "y": 60
+        "y": 67
       },
       "id": 29,
       "options": {
@@ -3612,7 +3441,7 @@
         "xTickLabelRotation": 0,
         "xTickLabelSpacing": 0
       },
-      "pluginVersion": "11.5.2",
+      "pluginVersion": "11.6.0",
       "targets": [
         {
           "editorMode": "code",
@@ -3747,8 +3576,7 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "purple",
-                "value": null
+                "color": "purple"
               }
             ]
           },
@@ -3757,10 +3585,10 @@
         "overrides": []
       },
       "gridPos": {
-        "h": 14,
+        "h": 16,
         "w": 8,
         "x": 0,
-        "y": 74
+        "y": 83
       },
       "id": 24,
       "options": {
@@ -3785,7 +3613,7 @@
         "xTickLabelRotation": 0,
         "xTickLabelSpacing": 0
       },
-      "pluginVersion": "11.5.2",
+      "pluginVersion": "11.6.0",
       "targets": [
         {
           "editorMode": "code",
@@ -3920,8 +3748,7 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "purple",
-                "value": null
+                "color": "purple"
               }
             ]
           },
@@ -3930,10 +3757,10 @@
         "overrides": []
       },
       "gridPos": {
-        "h": 14,
+        "h": 16,
         "w": 8,
         "x": 8,
-        "y": 74
+        "y": 83
       },
       "id": 26,
       "options": {
@@ -3958,7 +3785,7 @@
         "xTickLabelRotation": 0,
         "xTickLabelSpacing": 0
       },
-      "pluginVersion": "11.5.2",
+      "pluginVersion": "11.6.0",
       "targets": [
         {
           "editorMode": "code",
@@ -4093,8 +3920,7 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "purple",
-                "value": null
+                "color": "purple"
               }
             ]
           },
@@ -4103,10 +3929,10 @@
         "overrides": []
       },
       "gridPos": {
-        "h": 14,
+        "h": 16,
         "w": 8,
         "x": 16,
-        "y": 74
+        "y": 83
       },
       "id": 25,
       "options": {
@@ -4131,7 +3957,7 @@
         "xTickLabelRotation": 0,
         "xTickLabelSpacing": 0
       },
-      "pluginVersion": "11.5.2",
+      "pluginVersion": "11.6.0",
       "targets": [
         {
           "editorMode": "code",
@@ -4235,7 +4061,7 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 88
+        "y": 99
       },
       "id": 51,
       "panels": [],
@@ -4251,7 +4077,7 @@
         "h": 3,
         "w": 24,
         "x": 0,
-        "y": 89
+        "y": 100
       },
       "id": 52,
       "options": {
@@ -4263,7 +4089,7 @@
         "content": "Currently tracking `Patched` as running `>= 4.4.0-alpha.3`, `>= 4.3.4`, `>= 4.2.16`, or `>= 4.1.23` which are uneffected by any known security issues identified by on the [Mastodon GitHub](https://github.com/mastodon/mastodon/security).\n\nModels in this section are manually updated and may not be accurate for a few hours after subsequent to new GHSA/patch releases.",
         "mode": "markdown"
       },
-      "pluginVersion": "11.5.2",
+      "pluginVersion": "11.6.0",
       "title": "Disclaimer",
       "type": "text"
     },
@@ -4292,10 +4118,10 @@
         "overrides": []
       },
       "gridPos": {
-        "h": 16,
+        "h": 18,
         "w": 8,
         "x": 0,
-        "y": 92
+        "y": 103
       },
       "id": 53,
       "options": {
@@ -4322,7 +4148,7 @@
           "sort": "none"
         }
       },
-      "pluginVersion": "11.5.2",
+      "pluginVersion": "11.6.0",
       "targets": [
         {
           "editorMode": "code",
@@ -4377,10 +4203,10 @@
         "overrides": []
       },
       "gridPos": {
-        "h": 16,
+        "h": 18,
         "w": 8,
         "x": 8,
-        "y": 92
+        "y": 103
       },
       "id": 54,
       "options": {
@@ -4407,7 +4233,7 @@
           "sort": "none"
         }
       },
-      "pluginVersion": "11.5.2",
+      "pluginVersion": "11.6.0",
       "targets": [
         {
           "editorMode": "code",
@@ -4462,10 +4288,10 @@
         "overrides": []
       },
       "gridPos": {
-        "h": 16,
+        "h": 18,
         "w": 8,
         "x": 16,
-        "y": 92
+        "y": 103
       },
       "id": 55,
       "options": {
@@ -4492,7 +4318,7 @@
           "sort": "none"
         }
       },
-      "pluginVersion": "11.5.2",
+      "pluginVersion": "11.6.0",
       "targets": [
         {
           "editorMode": "code",
@@ -4528,7 +4354,7 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 108
+        "y": 121
       },
       "id": 9,
       "panels": [],
@@ -4559,8 +4385,7 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green",
-                "value": null
+                "color": "green"
               },
               {
                 "color": "red",
@@ -4576,7 +4401,7 @@
         "h": 28,
         "w": 24,
         "x": 0,
-        "y": 109
+        "y": 122
       },
       "id": 10,
       "options": {
@@ -4593,13 +4418,13 @@
         "showHeader": true,
         "sortBy": []
       },
-      "pluginVersion": "11.5.2",
+      "pluginVersion": "11.6.0",
       "targets": [
         {
           "editorMode": "code",
           "format": "table",
           "rawQuery": true,
-          "rawSql": "SELECT \n    domain AS \"Domain\",\n    software_version AS \"Software Version\",\n    full_version as \"Raw Version\",\n    total_users AS \"Total Users\",\n    active_users_monthly as \"Active Users\",\n    EXTRACT(YEAR FROM age(CURRENT_DATE, registration_date)) * 12 + \n    EXTRACT(MONTH FROM age(CURRENT_DATE, registration_date)) AS \"Estimated Age (M)\",\n    timestamp as \"Last Crawled (UTC)\"\nFROM mastodon_domains\nORDER BY total_users DESC;\n",
+          "rawSql": "SELECT \n    domain AS \"Domain\",\n    software_version AS \"Software Version\",\n    full_version as \"Raw Version\",\n    total_users AS \"Total Users\",\n    active_users_monthly as \"Active Users\",\n    timestamp as \"Last Crawled (UTC)\"\nFROM mastodon_domains\nORDER BY total_users DESC;\n",
           "refId": "A",
           "sql": {
             "columns": [
@@ -4632,7 +4457,7 @@
   ],
   "preload": false,
   "refresh": "auto",
-  "schemaVersion": 40,
+  "schemaVersion": 41,
   "tags": [],
   "templating": {
     "list": []
@@ -4645,6 +4470,5 @@
   "timezone": "browser",
   "title": "vmcrawl",
   "uid": "aedqo0q7klrswa",
-  "version": 58,
-  "weekStart": ""
+  "version": 62
 }
