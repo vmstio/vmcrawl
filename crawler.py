@@ -747,9 +747,21 @@ def check_hostmeta(domain, http_client):
                 content = response.content.strip()
                 content = content.lower()
                 parser = etree.XMLParser(recover=True)
-                xmldata = etree.fromstring(content, parser=parser)
+                try:
+                    xmldata = etree.fromstring(content, parser=parser)
+                except etree.XMLSyntaxError as e:
+                    error_message = f'Invalid XML: {e}'
+                    print(f'{error_message}')
+                    return {'backend_domain': domain}
                 ns = {'xrd': 'http://docs.oasis-open.org/ns/xri/xrd-1.0'}  # Namespace
-                link = xmldata.find(".//xrd:link[@rel='lrdd']", namespaces=ns)
+                try:
+                    link = xmldata.find(".//xrd:link[@rel='lrdd']", namespaces=ns)
+                except AttributeError as e:
+                    print(f"Error finding 'lrdd' link in HostMeta XML…")
+                    return {'backend_domain': domain}
+                except etree.XMLSyntaxError as e:
+                    print(f"XML syntax error while parsing HostMeta…")
+                    return {'backend_domain': domain}
                 if link is None:
                     print('Unable to find lrdd link in HostMeta…')
                     return {'backend_domain': domain}
@@ -797,7 +809,15 @@ def check_nodeinfo(domain, backend_domain, http_client):
                 delete_if_error_max(domain)
                 return None
             else:
-                data = response.json()
+                try:
+                    data = response.json()
+                except json.JSONDecodeError as e:
+                    error_message = f"Invalid JSON response: {e}"
+                    print_colored(error_message, "magenta")
+                    log_error(domain, error_message)
+                    increment_domain_error(domain, "JSON")
+                    delete_if_error_max(domain)
+                    return None
             if 'links' in data and len(data['links']) > 0:
                 nodeinfo_2_url = next((link['href'] for link in data['links']
                                     if link.get('rel') == 'http://nodeinfo.diaspora.software/ns/schema/2.0'
