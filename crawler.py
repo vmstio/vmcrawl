@@ -1005,7 +1005,7 @@ def process_mastodon_instance(domain, webfinger_data, nodeinfo_data, http_client
 
             # Update database
             update_mastodon_domain(actual_domain, software_version, software_version_full, total_users, active_month_users, contact_account, source_url, admin_creation)
-            add_registration_date(actual_domain)
+            # add_registration_date(actual_domain)
             clear_domain_error(domain)
 
             if software_version == nodeinfo_data['software']['version']:
