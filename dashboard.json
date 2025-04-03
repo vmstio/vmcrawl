@@ -3103,7 +3103,7 @@
           "editorMode": "code",
           "format": "table",
           "rawQuery": true,
-          "rawSql": "SELECT\n  statistics.date AS time,\n  statistics.total_main_patched_instances AS \"Main Branch\",\n  statistics.total_release_patched_instances AS \"Latest Branch\",\n  statistics.total_previous_patched_instances AS \"Previous Branch\",\n  statistics.total_pending_eol_patched_instances AS \"Deprecated Branch\"\nFROM\n  statistics\nORDER BY\n  statistics.date ASC\nLIMIT 30",
+          "rawSql": "SELECT\n  statistics.date AS time,\n  statistics.total_main_patched_instances AS \"Main Branch\",\n  statistics.total_release_patched_instances AS \"Latest Branch\",\n  statistics.total_previous_patched_instances AS \"Previous Branch\",\n  statistics.total_pending_eol_patched_instances AS \"Deprecated Branch\"\nFROM\n  statistics\nORDER BY\n  statistics.date DESC\nLIMIT 30",
           "refId": "A",
           "sql": {
             "columns": [
@@ -3170,6 +3170,17 @@
       ],
       "title": "Total Mastodon Instances by Patched Release",
       "transformations": [
+        {
+          "id": "sortBy",
+          "options": {
+            "fields": {},
+            "sort": [
+              {
+                "field": "time"
+              }
+            ]
+          }
+        },
         {
           "id": "formatTime",
           "options": {
@@ -3275,7 +3286,7 @@
           "editorMode": "code",
           "format": "table",
           "rawQuery": true,
-          "rawSql": "SELECT\n  statistics.date AS time,\n  statistics.total_active_main_patched_users AS \"Main Branch\",\n  statistics.total_active_release_patched_users AS \"Latest Branch\",\n  statistics.total_active_previous_patched_users AS \"Previous Branch\",\n  statistics.total_active_pending_eol_patched_users AS \"Deprecated Branch\"\nFROM\n  statistics\nORDER BY\n  statistics.date ASC\nLIMIT 30",
+          "rawSql": "SELECT\n  statistics.date AS time,\n  statistics.total_active_main_patched_users AS \"Main Branch\",\n  statistics.total_active_release_patched_users AS \"Latest Branch\",\n  statistics.total_active_previous_patched_users AS \"Previous Branch\",\n  statistics.total_active_pending_eol_patched_users AS \"Deprecated Branch\"\nFROM\n  statistics\nORDER BY\n  statistics.date DESC\nLIMIT 30",
           "refId": "A",
           "sql": {
             "columns": [
@@ -3342,6 +3353,17 @@
       ],
       "title": "Active Mastodon Users by Patched Release",
       "transformations": [
+        {
+          "id": "sortBy",
+          "options": {
+            "fields": {},
+            "sort": [
+              {
+                "field": "time"
+              }
+            ]
+          }
+        },
         {
           "id": "formatTime",
           "options": {
@@ -3447,7 +3469,7 @@
           "editorMode": "code",
           "format": "table",
           "rawQuery": true,
-          "rawSql": "SELECT\n  statistics.date AS time,\n  statistics.total_main_patched_users AS \"Main Branch\",\n  statistics.total_release_patched_users AS \"Latest Branch\",\n  statistics.total_previous_patched_users AS \"Previous Branch\",\n  statistics.total_pending_eol_patched_users AS \"Deprecated Branch\"\nFROM\n  statistics\nORDER BY\n  statistics.date ASC\nLIMIT 30",
+          "rawSql": "SELECT\n  statistics.date AS time,\n  statistics.total_main_patched_users AS \"Main Branch\",\n  statistics.total_release_patched_users AS \"Latest Branch\",\n  statistics.total_previous_patched_users AS \"Previous Branch\",\n  statistics.total_pending_eol_patched_users AS \"Deprecated Branch\"\nFROM\n  statistics\nORDER BY\n  statistics.date DESC\nLIMIT 30",
           "refId": "A",
           "sql": {
             "columns": [
@@ -3514,6 +3536,17 @@
       ],
       "title": "Total Mastodon Users by Patched Release",
       "transformations": [
+        {
+          "id": "sortBy",
+          "options": {
+            "fields": {},
+            "sort": [
+              {
+                "field": "time"
+              }
+            ]
+          }
+        },
         {
           "id": "formatTime",
           "options": {
@@ -3619,7 +3652,7 @@
           "editorMode": "code",
           "format": "table",
           "rawQuery": true,
-          "rawSql": "SELECT\n  statistics.date AS time,\n  statistics.total_main_instances AS \"Main Branch\",\n  statistics.total_release_instances AS \"Latest Branch\",\n  statistics.total_previous_instances AS \"Previous Branch\",\n  statistics.total_pending_eol_instances AS \"Deprecated Branch\",\n  statistics.total_eol_instances AS \"EOL\"\nFROM\n  statistics\nORDER BY\n  statistics.date ASC\nLIMIT 30",
+          "rawSql": "SELECT\n  statistics.date AS time,\n  statistics.total_main_instances AS \"Main Branch\",\n  statistics.total_release_instances AS \"Latest Branch\",\n  statistics.total_previous_instances AS \"Previous Branch\",\n  statistics.total_pending_eol_instances AS \"Deprecated Branch\",\n  statistics.total_eol_instances AS \"EOL\"\nFROM\n  statistics\nORDER BY\n  statistics.date DESC\nLIMIT 30",
           "refId": "A",
           "sql": {
             "columns": [
@@ -3686,6 +3719,17 @@
       ],
       "title": "Total Mastodon Instances by Branch",
       "transformations": [
+        {
+          "id": "sortBy",
+          "options": {
+            "fields": {},
+            "sort": [
+              {
+                "field": "time"
+              }
+            ]
+          }
+        },
         {
           "id": "formatTime",
           "options": {
@@ -3791,7 +3835,7 @@
           "editorMode": "code",
           "format": "table",
           "rawQuery": true,
-          "rawSql": "SELECT\n  statistics.date AS time,\n  statistics.total_active_main_branch_users AS \"Main Branch\",\n  statistics.total_active_release_branch_users AS \"Latest Branch\",\n  statistics.total_active_previous_branch_users AS \"Previous Branch\",\n  statistics.total_active_pending_eol_branch_users AS \"Deprecated Branch\",\n  statistics.total_active_eol_branch_users AS \"EOL\"\nFROM\n  statistics\nORDER BY\n  statistics.date ASC\nLIMIT 30",
+          "rawSql": "SELECT\n  statistics.date AS time,\n  statistics.total_active_main_branch_users AS \"Main Branch\",\n  statistics.total_active_release_branch_users AS \"Latest Branch\",\n  statistics.total_active_previous_branch_users AS \"Previous Branch\",\n  statistics.total_active_pending_eol_branch_users AS \"Deprecated Branch\",\n  statistics.total_active_eol_branch_users AS \"EOL\"\nFROM\n  statistics\nORDER BY\n  statistics.date DESC\nLIMIT 30",
           "refId": "A",
           "sql": {
             "columns": [
@@ -3858,6 +3902,17 @@
       ],
       "title": "Active Mastodon Users by Branch",
       "transformations": [
+        {
+          "id": "sortBy",
+          "options": {
+            "fields": {},
+            "sort": [
+              {
+                "field": "time"
+              }
+            ]
+          }
+        },
         {
           "id": "formatTime",
           "options": {
@@ -3963,7 +4018,7 @@
           "editorMode": "code",
           "format": "table",
           "rawQuery": true,
-          "rawSql": "SELECT\n  statistics.date AS time,\n  statistics.total_main_branch_users AS \"Main Branch\",\n  statistics.total_release_branch_users AS \"Latest Branch\",\n  statistics.total_previous_branch_users AS \"Previous Branch\",\n  statistics.total_pending_eol_branch_users AS \"Deprecated Branch\",\n  statistics.total_eol_branch_users AS \"EOL\"\nFROM\n  statistics\nORDER BY\n  statistics.date ASC\nLIMIT 30",
+          "rawSql": "SELECT\n  statistics.date AS time,\n  statistics.total_main_branch_users AS \"Main Branch\",\n  statistics.total_release_branch_users AS \"Latest Branch\",\n  statistics.total_previous_branch_users AS \"Previous Branch\",\n  statistics.total_pending_eol_branch_users AS \"Deprecated Branch\",\n  statistics.total_eol_branch_users AS \"EOL\"\nFROM\n  statistics\nORDER BY\n  statistics.date DESC\nLIMIT 30",
           "refId": "A",
           "sql": {
             "columns": [
@@ -4030,6 +4085,17 @@
       ],
       "title": "Total Mastodon Users by Branch",
       "transformations": [
+        {
+          "id": "sortBy",
+          "options": {
+            "fields": {},
+            "sort": [
+              {
+                "field": "time"
+              }
+            ]
+          }
+        },
         {
           "id": "formatTime",
           "options": {
@@ -4154,7 +4220,7 @@
           "editorMode": "code",
           "format": "table",
           "rawQuery": true,
-          "rawSql": "WITH \n-- Define the specific versions we want to count (easy to update)\ntarget_versions(version) AS (\n    VALUES ('4.4.0-alpha.4'), ('4.4.0-alpha.3'), ('4.3.6'), ('4.3.5'), ('4.3.4'), ('4.2.19'), ('4.2.18'), ('4.2.17'), ('4.2.16'), ('4.1.24'), ('4.1.23')\n),\n-- Count domains with specific versions\nspecific_versions AS (\n    SELECT COUNT(DISTINCT domain) as specific_version_count\n    FROM mastodon_domains\n    WHERE software_version IN (SELECT version FROM target_versions)\n),\n-- Count domains with EOL versions\neol_versions_count AS (\n    SELECT COUNT(DISTINCT md.domain) as eol_version_count\n    FROM mastodon_domains md\n    JOIN eol_versions ev ON md.software_version LIKE ev.software_version || '%'\n    WHERE md.software_version NOT IN (SELECT version FROM target_versions)\n),\n-- Count all other domains\ntotal_domains AS (\n    SELECT COUNT(DISTINCT domain) as total_count\n    FROM mastodon_domains\n)\n-- Final result with all three counts\nSELECT \n    specific_version_count AS \"Patched\",\n    eol_version_count AS \"EOL\",\n    (total_count - specific_version_count - eol_version_count) AS \"Vulnerable\"\nFROM specific_versions, eol_versions_count, total_domains;\n",
+          "rawSql": "WITH \n-- Define the specific versions we want to count (easy to update)\ntarget_versions(version) AS (\n    VALUES ('4.4.0-alpha.4'), ('4.4.0-alpha.3'), ('4.3.7'), ('4.3.6'), ('4.3.5'), ('4.3.4'), ('4.2.20'), ('4.2.19'), ('4.2.18'), ('4.2.17'), ('4.2.16'), ('4.1.25'), ('4.1.24'), ('4.1.23')\n),\n-- Count domains with specific versions\nspecific_versions AS (\n    SELECT COUNT(DISTINCT domain) as specific_version_count\n    FROM mastodon_domains\n    WHERE software_version IN (SELECT version FROM target_versions)\n),\n-- Count domains with EOL versions\neol_versions_count AS (\n    SELECT COUNT(DISTINCT md.domain) as eol_version_count\n    FROM mastodon_domains md\n    JOIN eol_versions ev ON md.software_version LIKE ev.software_version || '%'\n    WHERE md.software_version NOT IN (SELECT version FROM target_versions)\n),\n-- Count all other domains\ntotal_domains AS (\n    SELECT COUNT(DISTINCT domain) as total_count\n    FROM mastodon_domains\n)\n-- Final result with all three counts\nSELECT \n    specific_version_count AS \"Patched\",\n    eol_version_count AS \"EOL\",\n    (total_count - specific_version_count - eol_version_count) AS \"Vulnerable\"\nFROM specific_versions, eol_versions_count, total_domains;\n",
           "refId": "A",
           "sql": {
             "columns": [
@@ -4239,7 +4305,7 @@
           "editorMode": "code",
           "format": "table",
           "rawQuery": true,
-          "rawSql": "WITH \n-- Define the specific versions we want to count (easy to update)\ntarget_versions(version) AS (\n    VALUES ('4.4.0-alpha.4'), ('4.4.0-alpha.3'), ('4.3.6'), ('4.3.5'), ('4.3.4'), \n           ('4.2.19'), ('4.2.18'), ('4.2.17'), ('4.2.16'), ('4.1.24'), ('4.1.23')\n),\n-- Sum active_users_monthly for patched versions\nspecific_versions AS (\n    SELECT COALESCE(SUM(active_users_monthly), 0) as specific_version_users\n    FROM mastodon_domains\n    WHERE software_version IN (SELECT version FROM target_versions)\n),\n-- Sum active_users_monthly for EOL versions\neol_versions_count AS (\n    SELECT COALESCE(SUM(md.active_users_monthly), 0) as eol_version_users\n    FROM mastodon_domains md\n    JOIN eol_versions ev ON md.software_version LIKE ev.software_version || '%'\n    WHERE md.software_version NOT IN (SELECT version FROM target_versions)\n),\n-- Sum active_users_monthly for all domains\ntotal_users AS (\n    SELECT COALESCE(SUM(active_users_monthly), 0) as total_users_count\n    FROM mastodon_domains\n)\n-- Final result with all three sums\nSELECT \n    specific_version_users AS \"Patched\",\n    eol_version_users AS \"EOL\",\n    (total_users_count - specific_version_users - eol_version_users) AS \"Vulnerable\"\nFROM specific_versions, eol_versions_count, total_users;\n",
+          "rawSql": "WITH \n-- Define the specific versions we want to count (easy to update)\ntarget_versions(version) AS (\n    VALUES ('4.4.0-alpha.4'), ('4.4.0-alpha.3'), ('4.3.7'), ('4.3.6'), ('4.3.5'), ('4.3.4'), ('4.2.20'), ('4.2.19'), ('4.2.18'), ('4.2.17'), ('4.2.16'), ('4.1.25'), ('4.1.24'), ('4.1.23')\n),\n-- Sum active_users_monthly for patched versions\nspecific_versions AS (\n    SELECT COALESCE(SUM(active_users_monthly), 0) as specific_version_users\n    FROM mastodon_domains\n    WHERE software_version IN (SELECT version FROM target_versions)\n),\n-- Sum active_users_monthly for EOL versions\neol_versions_count AS (\n    SELECT COALESCE(SUM(md.active_users_monthly), 0) as eol_version_users\n    FROM mastodon_domains md\n    JOIN eol_versions ev ON md.software_version LIKE ev.software_version || '%'\n    WHERE md.software_version NOT IN (SELECT version FROM target_versions)\n),\n-- Sum active_users_monthly for all domains\ntotal_users AS (\n    SELECT COALESCE(SUM(active_users_monthly), 0) as total_users_count\n    FROM mastodon_domains\n)\n-- Final result with all three sums\nSELECT \n    specific_version_users AS \"Patched\",\n    eol_version_users AS \"EOL\",\n    (total_users_count - specific_version_users - eol_version_users) AS \"Vulnerable\"\nFROM specific_versions, eol_versions_count, total_users;\n",
           "refId": "A",
           "sql": {
             "columns": [
@@ -4324,7 +4390,7 @@
           "editorMode": "code",
           "format": "table",
           "rawQuery": true,
-          "rawSql": "WITH \n-- Define the specific versions we want to count (easy to update)\ntarget_versions(version) AS (\n    VALUES ('4.4.0-alpha.4'), ('4.4.0-alpha.3'), ('4.3.6'), ('4.3.5'), ('4.3.4'), \n           ('4.2.19'), ('4.2.18'), ('4.2.17'), ('4.2.16'), ('4.1.24'), ('4.1.23')\n),\n-- Sum total_users for patched versions\nspecific_versions AS (\n    SELECT COALESCE(SUM(total_users), 0) as specific_version_users\n    FROM mastodon_domains\n    WHERE software_version IN (SELECT version FROM target_versions)\n),\n-- Sum total_users for EOL versions\neol_versions_count AS (\n    SELECT COALESCE(SUM(md.total_users), 0) as eol_version_users\n    FROM mastodon_domains md\n    JOIN eol_versions ev ON md.software_version LIKE ev.software_version || '%'\n    WHERE md.software_version NOT IN (SELECT version FROM target_versions)\n),\n-- Sum total_users for all domains\ntotal_users AS (\n    SELECT COALESCE(SUM(total_users), 0) as total_users_count\n    FROM mastodon_domains\n)\n-- Final result with all three sums\nSELECT \n    specific_version_users AS \"Patched\",\n    eol_version_users AS \"EOL\",\n    (total_users_count - specific_version_users - eol_version_users) AS \"Vulnerable\"\nFROM specific_versions, eol_versions_count, total_users;\n",
+          "rawSql": "WITH \n-- Define the specific versions we want to count (easy to update)\ntarget_versions(version) AS (\n    VALUES ('4.4.0-alpha.4'), ('4.4.0-alpha.3'), ('4.3.7'), ('4.3.6'), ('4.3.5'), ('4.3.4'), ('4.2.20'), ('4.2.19'), ('4.2.18'), ('4.2.17'), ('4.2.16'), ('4.1.25'), ('4.1.24'), ('4.1.23')\n),\n-- Sum total_users for patched versions\nspecific_versions AS (\n    SELECT COALESCE(SUM(total_users), 0) as specific_version_users\n    FROM mastodon_domains\n    WHERE software_version IN (SELECT version FROM target_versions)\n),\n-- Sum total_users for EOL versions\neol_versions_count AS (\n    SELECT COALESCE(SUM(md.total_users), 0) as eol_version_users\n    FROM mastodon_domains md\n    JOIN eol_versions ev ON md.software_version LIKE ev.software_version || '%'\n    WHERE md.software_version NOT IN (SELECT version FROM target_versions)\n),\n-- Sum total_users for all domains\ntotal_users AS (\n    SELECT COALESCE(SUM(total_users), 0) as total_users_count\n    FROM mastodon_domains\n)\n-- Final result with all three sums\nSELECT \n    specific_version_users AS \"Patched\",\n    eol_version_users AS \"EOL\",\n    (total_users_count - specific_version_users - eol_version_users) AS \"Vulnerable\"\nFROM specific_versions, eol_versions_count, total_users;\n",
           "refId": "A",
           "sql": {
             "columns": [
@@ -4470,5 +4536,5 @@
   "timezone": "browser",
   "title": "vmcrawl",
   "uid": "aedqo0q7klrswa",
-  "version": 62
+  "version": 64
 }
