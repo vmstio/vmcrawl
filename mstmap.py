@@ -3,7 +3,7 @@
 from datetime import datetime
 
 # Define backport branches (adjust as needed)
-backport_branches = ["4.3", "4.2", "4.1"]
+backport_branches = ["4.3", "4.2"]
 
 # Define nightly version ranges with their respective start and end dates
 # First date is the date on the -security release or the first nightly
