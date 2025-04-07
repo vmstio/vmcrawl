@@ -576,7 +576,7 @@
       },
       "gridPos": {
         "h": 7,
-        "w": 4,
+        "w": 6,
         "x": 0,
         "y": 6
       },
@@ -713,8 +713,8 @@
       },
       "gridPos": {
         "h": 7,
-        "w": 4,
-        "x": 4,
+        "w": 6,
+        "x": 6,
         "y": 6
       },
       "id": 11,
@@ -851,8 +851,8 @@
       },
       "gridPos": {
         "h": 7,
-        "w": 4,
-        "x": 8,
+        "w": 6,
+        "x": 12,
         "y": 6
       },
       "id": 21,
@@ -984,8 +984,8 @@
       },
       "gridPos": {
         "h": 7,
-        "w": 4,
-        "x": 12,
+        "w": 6,
+        "x": 18,
         "y": 6
       },
       "id": 22,
@@ -1082,164 +1082,6 @@
         "type": "grafana-postgresql-datasource",
         "uid": "aedqwq5gb2ebkc"
       },
-      "description": "Count of instances running latest patches for branch release-2 (deprecated/pending-eol), compared to the total instances on branch release-2.",
-      "fieldConfig": {
-        "defaults": {
-          "color": {
-            "mode": "thresholds"
-          },
-          "fieldMinMax": false,
-          "mappings": [],
-          "min": 0,
-          "thresholds": {
-            "mode": "percentage",
-            "steps": [
-              {
-                "color": "red"
-              },
-              {
-                "color": "orange",
-                "value": 20
-              },
-              {
-                "color": "yellow",
-                "value": 50
-              },
-              {
-                "color": "green",
-                "value": 80
-              }
-            ]
-          },
-          "unit": "locale"
-        },
-        "overrides": []
-      },
-      "gridPos": {
-        "h": 7,
-        "w": 4,
-        "x": 16,
-        "y": 6
-      },
-      "id": 37,
-      "options": {
-        "minVizHeight": 75,
-        "minVizWidth": 75,
-        "orientation": "auto",
-        "reduceOptions": {
-          "calcs": [
-            "lastNotNull"
-          ],
-          "fields": "/.*/",
-          "values": true
-        },
-        "showThresholdLabels": false,
-        "showThresholdMarkers": false,
-        "sizing": "auto"
-      },
-      "pluginVersion": "11.6.0",
-      "targets": [
-        {
-          "editorMode": "code",
-          "format": "table",
-          "rawQuery": true,
-          "rawSql": "SELECT COUNT(DISTINCT domain) as \"Latest Patched\"\nFROM mastodon_domains \nWHERE software_version LIKE (\n    SELECT software_version \n    FROM patch_versions \n    WHERE n_level = 2\n) || '%';\n",
-          "refId": "A",
-          "sql": {
-            "columns": [
-              {
-                "parameters": [],
-                "type": "function"
-              }
-            ],
-            "groupBy": [
-              {
-                "property": {
-                  "type": "string"
-                },
-                "type": "groupBy"
-              }
-            ],
-            "limit": 50
-          }
-        },
-        {
-          "datasource": {
-            "type": "grafana-postgresql-datasource",
-            "uid": "aedqwq5gb2ebkc"
-          },
-          "editorMode": "code",
-          "format": "table",
-          "hide": false,
-          "rawQuery": true,
-          "rawSql": "SELECT COUNT(DISTINCT domain) as \"Latest Total\"\nFROM mastodon_domains \nWHERE software_version LIKE (\n    SELECT branch || '.%'\n    FROM patch_versions \n    WHERE n_level = 2\n);\n",
-          "refId": "B",
-          "sql": {
-            "columns": [
-              {
-                "parameters": [],
-                "type": "function"
-              }
-            ],
-            "groupBy": [
-              {
-                "property": {
-                  "type": "string"
-                },
-                "type": "groupBy"
-              }
-            ],
-            "limit": 50
-          }
-        }
-      ],
-      "title": "Patched Instances, Deprecated",
-      "transformations": [
-        {
-          "id": "configFromData",
-          "options": {
-            "configRefId": "B",
-            "mappings": [
-              {
-                "fieldName": "Latest Total",
-                "handlerKey": "max"
-              }
-            ]
-          }
-        }
-      ],
-      "type": "gauge"
-    },
-    {
-      "fieldConfig": {
-        "defaults": {},
-        "overrides": []
-      },
-      "gridPos": {
-        "h": 7,
-        "w": 4,
-        "x": 20,
-        "y": 6
-      },
-      "id": 56,
-      "options": {
-        "code": {
-          "language": "plaintext",
-          "showLineNumbers": false,
-          "showMiniMap": false
-        },
-        "content": "New graphs will be added here, soon.",
-        "mode": "markdown"
-      },
-      "pluginVersion": "11.6.0",
-      "title": "Placeholder",
-      "type": "text"
-    },
-    {
-      "datasource": {
-        "type": "grafana-postgresql-datasource",
-        "uid": "aedqwq5gb2ebkc"
-      },
       "description": "Count of monthly active users (MAUs) on instances running latest patches for any supported branch, compared to all instances.",
       "fieldConfig": {
         "defaults": {
@@ -1275,7 +1117,7 @@
       },
       "gridPos": {
         "h": 7,
-        "w": 4,
+        "w": 6,
         "x": 0,
         "y": 13
       },
@@ -1412,8 +1254,8 @@
       },
       "gridPos": {
         "h": 7,
-        "w": 4,
-        "x": 4,
+        "w": 6,
+        "x": 6,
         "y": 13
       },
       "id": 32,
@@ -1550,8 +1392,8 @@
       },
       "gridPos": {
         "h": 7,
-        "w": 4,
-        "x": 8,
+        "w": 6,
+        "x": 12,
         "y": 13
       },
       "id": 35,
@@ -1688,8 +1530,8 @@
       },
       "gridPos": {
         "h": 7,
-        "w": 4,
-        "x": 12,
+        "w": 6,
+        "x": 18,
         "y": 13
       },
       "id": 36,
@@ -1791,169 +1633,6 @@
         "type": "grafana-postgresql-datasource",
         "uid": "aedqwq5gb2ebkc"
       },
-      "description": "Count of monthly active users (MAUs) on instances running latest patches for branch release-2 (deprecated/pending-eol), compared to the total instances on branch release-2.",
-      "fieldConfig": {
-        "defaults": {
-          "color": {
-            "mode": "thresholds"
-          },
-          "fieldMinMax": false,
-          "mappings": [],
-          "min": 0,
-          "thresholds": {
-            "mode": "percentage",
-            "steps": [
-              {
-                "color": "red"
-              },
-              {
-                "color": "orange",
-                "value": 20
-              },
-              {
-                "color": "yellow",
-                "value": 50
-              },
-              {
-                "color": "green",
-                "value": 80
-              }
-            ]
-          },
-          "unit": "locale"
-        },
-        "overrides": []
-      },
-      "gridPos": {
-        "h": 7,
-        "w": 4,
-        "x": 16,
-        "y": 13
-      },
-      "id": 38,
-      "options": {
-        "minVizHeight": 75,
-        "minVizWidth": 75,
-        "orientation": "auto",
-        "reduceOptions": {
-          "calcs": [
-            "lastNotNull"
-          ],
-          "fields": "/.*/",
-          "values": true
-        },
-        "showThresholdLabels": false,
-        "showThresholdMarkers": false,
-        "sizing": "auto"
-      },
-      "pluginVersion": "11.6.0",
-      "targets": [
-        {
-          "editorMode": "code",
-          "format": "table",
-          "rawQuery": true,
-          "rawSql": "SELECT SUM(active_users_monthly) as updated_users\nFROM mastodon_domains \nWHERE software_version LIKE ANY (\n    SELECT software_version || '%'\n    FROM patch_versions \n    WHERE n_level = 2\n);\n",
-          "refId": "A",
-          "sql": {
-            "columns": [
-              {
-                "parameters": [],
-                "type": "function"
-              }
-            ],
-            "groupBy": [
-              {
-                "property": {
-                  "type": "string"
-                },
-                "type": "groupBy"
-              }
-            ],
-            "limit": 50
-          }
-        },
-        {
-          "datasource": {
-            "type": "grafana-postgresql-datasource",
-            "uid": "aedqwq5gb2ebkc"
-          },
-          "editorMode": "code",
-          "format": "table",
-          "hide": false,
-          "rawQuery": true,
-          "rawSql": "SELECT SUM(active_users_monthly) as \"Main Total\"\nFROM mastodon_domains\nWHERE software_version LIKE (\nSELECT branch || '.%'\nFROM patch_versions\nWHERE n_level = 2\n);",
-          "refId": "B",
-          "sql": {
-            "columns": [
-              {
-                "parameters": [],
-                "type": "function"
-              }
-            ],
-            "groupBy": [
-              {
-                "property": {
-                  "type": "string"
-                },
-                "type": "groupBy"
-              }
-            ],
-            "limit": 50
-          }
-        }
-      ],
-      "title": "Patched MAUs, Deprecated",
-      "transformations": [
-        {
-          "id": "configFromData",
-          "options": {
-            "applyTo": {
-              "id": "byType",
-              "options": "number"
-            },
-            "configRefId": "B",
-            "mappings": [
-              {
-                "fieldName": "Main Total",
-                "handlerKey": "max",
-                "reducerId": "lastNotNull"
-              }
-            ]
-          }
-        }
-      ],
-      "type": "gauge"
-    },
-    {
-      "fieldConfig": {
-        "defaults": {},
-        "overrides": []
-      },
-      "gridPos": {
-        "h": 7,
-        "w": 4,
-        "x": 20,
-        "y": 13
-      },
-      "id": 57,
-      "options": {
-        "code": {
-          "language": "plaintext",
-          "showLineNumbers": false,
-          "showMiniMap": false
-        },
-        "content": "New graphs will be added here, soon.",
-        "mode": "markdown"
-      },
-      "pluginVersion": "11.6.0",
-      "title": "Placeholder",
-      "type": "text"
-    },
-    {
-      "datasource": {
-        "type": "grafana-postgresql-datasource",
-        "uid": "aedqwq5gb2ebkc"
-      },
       "description": "Count of total users on instances running latest patches for any supported branch, compared to all instances.",
       "fieldConfig": {
         "defaults": {
@@ -1989,7 +1668,7 @@
       },
       "gridPos": {
         "h": 7,
-        "w": 4,
+        "w": 6,
         "x": 0,
         "y": 20
       },
@@ -2126,8 +1805,8 @@
       },
       "gridPos": {
         "h": 7,
-        "w": 4,
-        "x": 4,
+        "w": 6,
+        "x": 6,
         "y": 20
       },
       "id": 60,
@@ -2264,8 +1943,8 @@
       },
       "gridPos": {
         "h": 7,
-        "w": 4,
-        "x": 8,
+        "w": 6,
+        "x": 12,
         "y": 20
       },
       "id": 61,
@@ -2402,8 +2081,8 @@
       },
       "gridPos": {
         "h": 7,
-        "w": 4,
-        "x": 12,
+        "w": 6,
+        "x": 18,
         "y": 20
       },
       "id": 62,
@@ -2499,169 +2178,6 @@
         }
       ],
       "type": "gauge"
-    },
-    {
-      "datasource": {
-        "type": "grafana-postgresql-datasource",
-        "uid": "aedqwq5gb2ebkc"
-      },
-      "description": "Count of total users on instances running latest patches for branch release-2 (deprecated/pending-eol), compared to the total instances on branch release-2.",
-      "fieldConfig": {
-        "defaults": {
-          "color": {
-            "mode": "thresholds"
-          },
-          "fieldMinMax": false,
-          "mappings": [],
-          "min": 0,
-          "thresholds": {
-            "mode": "percentage",
-            "steps": [
-              {
-                "color": "red"
-              },
-              {
-                "color": "orange",
-                "value": 20
-              },
-              {
-                "color": "yellow",
-                "value": 50
-              },
-              {
-                "color": "green",
-                "value": 80
-              }
-            ]
-          },
-          "unit": "locale"
-        },
-        "overrides": []
-      },
-      "gridPos": {
-        "h": 7,
-        "w": 4,
-        "x": 16,
-        "y": 20
-      },
-      "id": 63,
-      "options": {
-        "minVizHeight": 75,
-        "minVizWidth": 75,
-        "orientation": "auto",
-        "reduceOptions": {
-          "calcs": [
-            "lastNotNull"
-          ],
-          "fields": "/.*/",
-          "values": true
-        },
-        "showThresholdLabels": false,
-        "showThresholdMarkers": false,
-        "sizing": "auto"
-      },
-      "pluginVersion": "11.6.0",
-      "targets": [
-        {
-          "editorMode": "code",
-          "format": "table",
-          "rawQuery": true,
-          "rawSql": "SELECT SUM(total_users) as updated_users\nFROM mastodon_domains \nWHERE software_version LIKE ANY (\n    SELECT software_version || '%'\n    FROM patch_versions \n    WHERE n_level = 2\n);\n",
-          "refId": "A",
-          "sql": {
-            "columns": [
-              {
-                "parameters": [],
-                "type": "function"
-              }
-            ],
-            "groupBy": [
-              {
-                "property": {
-                  "type": "string"
-                },
-                "type": "groupBy"
-              }
-            ],
-            "limit": 50
-          }
-        },
-        {
-          "datasource": {
-            "type": "grafana-postgresql-datasource",
-            "uid": "aedqwq5gb2ebkc"
-          },
-          "editorMode": "code",
-          "format": "table",
-          "hide": false,
-          "rawQuery": true,
-          "rawSql": "SELECT SUM(total_users) as \"Main Total\"\nFROM mastodon_domains\nWHERE software_version LIKE (\nSELECT branch || '.%'\nFROM patch_versions\nWHERE n_level = 2\n);",
-          "refId": "B",
-          "sql": {
-            "columns": [
-              {
-                "parameters": [],
-                "type": "function"
-              }
-            ],
-            "groupBy": [
-              {
-                "property": {
-                  "type": "string"
-                },
-                "type": "groupBy"
-              }
-            ],
-            "limit": 50
-          }
-        }
-      ],
-      "title": "Patched Users, Deprecated",
-      "transformations": [
-        {
-          "id": "configFromData",
-          "options": {
-            "applyTo": {
-              "id": "byType",
-              "options": "number"
-            },
-            "configRefId": "B",
-            "mappings": [
-              {
-                "fieldName": "Main Total",
-                "handlerKey": "max",
-                "reducerId": "lastNotNull"
-              }
-            ]
-          }
-        }
-      ],
-      "type": "gauge"
-    },
-    {
-      "fieldConfig": {
-        "defaults": {},
-        "overrides": []
-      },
-      "gridPos": {
-        "h": 7,
-        "w": 4,
-        "x": 20,
-        "y": 20
-      },
-      "id": 64,
-      "options": {
-        "code": {
-          "language": "plaintext",
-          "showLineNumbers": false,
-          "showMiniMap": false
-        },
-        "content": "New graphs will be added here, soon.",
-        "mode": "markdown"
-      },
-      "pluginVersion": "11.6.0",
-      "title": "Placeholder",
-      "type": "text"
     },
     {
       "collapsed": false,
@@ -3617,7 +3133,7 @@
           "editorMode": "code",
           "format": "table",
           "rawQuery": true,
-          "rawSql": "SELECT \n    domain AS \"Domain\",\n    active_users_monthly AS \"Active Users\",\n    software_version AS \"Software Version\"\nFROM mastodon_domains \nWHERE EXISTS (\n    SELECT 1\n    FROM patch_versions\n    WHERE mastodon_domains.software_version LIKE patch_versions.branch || '%'\n    AND patch_versions.n_level >= 2\n)\nORDER BY active_users_monthly DESC\nLIMIT 10;\n",
+          "rawSql": "SELECT \n    domain AS \"Domain\",\n    total_users AS \"Total Users\",\n    software_version AS \"Software Version\"\nFROM mastodon_domains \nWHERE software_version NOT IN (\n    SELECT software_version \n    FROM patch_versions\n)\nAND EXISTS (\n    SELECT 1\n    FROM eol_versions\n    WHERE mastodon_domains.software_version LIKE eol_versions.software_version || '%'\n)\nORDER BY total_users DESC\nLIMIT 10;\n",
           "refId": "A",
           "sql": {
             "columns": [
@@ -3638,7 +3154,7 @@
           }
         }
       ],
-      "title": "Top 10 Deprecated Instances by MAUs",
+      "title": "Top 10 EOL Instances by Total Users",
       "type": "table"
     },
     {
@@ -5764,5 +5280,5 @@
   "timezone": "browser",
   "title": "vmcrawl",
   "uid": "aedqo0q7klrswa",
-  "version": 70
+  "version": 72
 }
