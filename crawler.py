@@ -517,8 +517,8 @@ def check_and_record_domains(domain_list, ignored_domains, baddata_domains, fail
         if is_junk_or_bad_tld(domain, junk_domains, bad_tlds, domain_endings):
             continue
 
-        if is_iftas_domain(domain, iftas_domains):
-            continue
+        # if is_iftas_domain(domain, iftas_domains):
+        #     continue
 
         try:
             process_domain(domain, http_client)
@@ -551,7 +551,6 @@ def should_skip_domain(domain, ignored_domains, baddata_domains, failed_domains,
 def is_junk_or_bad_tld(domain, junk_domains, bad_tlds, domain_endings):
     if any(junk in domain for junk in junk_domains):
         print_colored('Purging known junk domain', 'red')
-        # mark_failed_domain(domain)
         delete_domain_if_known(domain)
         delete_domain_from_raw(domain)
         return True
@@ -631,7 +630,7 @@ def check_robots_txt(domain, http_client):
         # Check for specific HTTP status codes
         elif response.status_code in http_codes_to_hardfail:
             print_colored(f'Responded HTTP {response.status_code} to robots.txt request', 'red')
-            mark_nxdomain_domain(domain)
+            mark_failed_domain(domain)
             delete_domain_if_known(domain)
             return False
     except httpx.RequestError as e:
@@ -1289,7 +1288,7 @@ def print_menu() -> None:
     menu_options = {
         "Process new domains": {"0": "Recently Fetched"},
         "Change process direction": {"1": "Standard", "2": "Reverse", "3": "Random"},
-        "Retry fatal errors": {"6": "Other Platforms", "7": "HTTP 410/418", "8": "IFTAS DNI", "9": "Robots Prohibited"},
+        "Retry fatal errors": {"6": "Other Platforms", "7": "HTTP 410/418", "8": "Bad Domain", "9": "Robots Prohibited"},
         "Retry connection errors": {"10": "SSL", "11": "HTTP", "12": "TCP", "13": "Redirects", "14": "DNS"},
         "Retry HTTP errors": {"20": "2xx", "21": "3xx", "22": "4xx", "23": "5xx"},
         "Retry specific errors": {"30": "###", "31": "JSON", "32": "TXT", "33": "API", "34": "???"},
