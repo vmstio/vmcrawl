@@ -1368,3 +1368,14 @@ except KeyboardInterrupt:
 finally:
     conn.close()
     http_client.close()
+
+if is_running_headless():
+# Re-execute the script when it finishes
+    try:
+        print_colored("Re-executing the script...", "bold")
+        os.execv(sys.executable, ['python3'] + sys.argv)
+    except Exception as e:
+        print(f"Failed to re-execute the script: {e}")
+else:
+    print_colored("Exiting the script...", "bold")
+    sys.exit(0)
