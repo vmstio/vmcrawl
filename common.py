@@ -97,8 +97,8 @@ common_timeout = int(os.getenv("VMCRAWL_COMMON_TIMEOUT", "7"))
 http_custom_user_agent = f'{appname}/{appversion} (https://docs.vmst.io/{appname})'
 http_custom_headers = {'User-Agent': http_custom_user_agent}
 http_client = httpx.Client(http2=True, follow_redirects=True, headers=http_custom_headers, timeout=common_timeout)
-http_codes_to_softfail = [451, 429, 423, 422, 405, 404, 403, 402, 401, 400]
-http_codes_to_hardfail = [418, 410]
+http_codes_to_softfail = [429, 423, 422, 405, 404, 402, 400]
+http_codes_to_hardfail = [451, 418, 410, 403, 401]
 
 
 def get_with_fallback(url, http_client):
