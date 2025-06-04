@@ -167,12 +167,10 @@ def get_highest_mastodon_version():
         releases = response.json()
         highest_version = None
         for release in releases:
-            release_version = release["tag_name"]
-
-            # Preprocess the version string to remove the 'v' symbol
-            if "v" in release_version:
-                release_version = release_version.split("v")[1]
-
+            release_version = release["tag_name"].lstrip("v")
+            # Skip pre-release versions (those with a prerelease segment, e.g., 4.2.0-rc1)
+            if version.parse(release_version).is_prerelease:
+                continue
             if highest_version is None or version.parse(release_version) > version.parse(highest_version):
                 highest_version = release_version
     else:
