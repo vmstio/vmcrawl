@@ -8,7 +8,8 @@ backport_branches = ["4.3", "4.2"]
 # Define nightly version ranges with their respective start and end dates
 # First date is the date on the -security release or the first nightly
 nightly_version_ranges = [
-    ("4.4.0-beta.2", datetime(2025, 6, 18), datetime(2029, 6, 30)),
+    ("4.4.0-rc.1", datetime(2025, 6, 28), datetime(2029, 6, 30)),
+    ("4.4.0-beta.2", datetime(2025, 6, 18), datetime(2025, 6, 27)),
     ("4.4.0-beta.1", datetime(2025, 6, 5), datetime(2025, 6, 17)),
     ("4.4.0-alpha.5", datetime(2025, 5, 7), datetime(2025, 6, 3)),
     ("4.4.0-alpha.4", datetime(2025, 3, 14), datetime(2025, 5, 6)),
