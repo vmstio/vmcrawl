@@ -326,3 +326,24 @@ def get_iftas_dni():
 
 def is_running_headless():
     return not os.isatty(sys.stdout.fileno())
+
+def get_nightly_version_ranges():
+    # Define nightly version ranges with their respective start and end dates
+    # First date is the date on the -security release or the first nightly
+    with conn.cursor() as cur:
+        cur.execute("""
+            SELECT version, start_date, end_date
+            FROM nightly_versions
+            ORDER BY start_date DESC
+        """)
+        nightly_version_ranges = [
+            (row[0], row[1], row[2]) for row in cur.fetchall()
+        ]
+        # Convert start_date and end_date to datetime objects if they aren't already
+        nightly_version_ranges = [
+            (version,
+             start_date if isinstance(start_date, datetime) else datetime.fromisoformat(str(start_date)),
+             end_date if isinstance(end_date, datetime) else datetime.fromisoformat(str(end_date)) if end_date else None)
+            for version, start_date, end_date in nightly_version_ranges
+        ]
+    return nightly_version_ranges

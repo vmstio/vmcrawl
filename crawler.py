@@ -399,7 +399,7 @@ def clean_version_nightly(software_version):
             nightly_date += timedelta(days=1)
 
         for version, start_date, end_date in nightly_version_ranges:
-            if start_date <= nightly_date <= end_date:
+            if start_date is not None and end_date is not None and start_date <= nightly_date <= end_date:
                 return version
 
     return software_version
@@ -507,7 +507,7 @@ def get_norobots_domains():
         cursor.close()
     return norobots_domains
 
-def check_and_record_domains(domain_list, ignored_domains, baddata_domains, failed_domains, user_choice, junk_domains, bad_tlds, domain_endings, http_client, nxdomain_domains, norobots_domains, iftas_domains):
+def check_and_record_domains(domain_list, ignored_domains, baddata_domains, failed_domains, user_choice, junk_domains, bad_tlds, domain_endings, http_client, nxdomain_domains, norobots_domains, iftas_domains, nightly_version_ranges):
     for index, domain in enumerate(domain_list, start=1):
         print_colored(f'Crawling @ {domain} ({index}/{len(domain_list)})', 'bold')
 
@@ -1359,8 +1359,9 @@ try:
     nxdomain_domains = get_nxdomain_domains()
     norobots_domains = get_norobots_domains()
     iftas_domains = get_iftas_dni()
+    nightly_version_ranges = get_nightly_version_ranges()
 
-    check_and_record_domains(domain_list, ignored_domains, baddata_domains, failed_domains, user_choice, junk_domains, bad_tlds, domain_endings, http_client, nxdomain_domains, norobots_domains, iftas_domains)
+    check_and_record_domains(domain_list, ignored_domains, baddata_domains, failed_domains, user_choice, junk_domains, bad_tlds, domain_endings, http_client, nxdomain_domains, norobots_domains, iftas_domains, nightly_version_ranges)
 
     print_colored("Crawling complete!", "bold")
 except KeyboardInterrupt:
