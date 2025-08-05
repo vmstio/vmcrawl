@@ -51,7 +51,8 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "purple"
+                "color": "purple",
+                "value": 0
               }
             ]
           },
@@ -83,7 +84,7 @@
         "textMode": "auto",
         "wideLayout": true
       },
-      "pluginVersion": "12.0.2",
+      "pluginVersion": "12.1.0",
       "targets": [
         {
           "datasource": {
@@ -133,7 +134,8 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "purple"
+                "color": "purple",
+                "value": 0
               }
             ]
           },
@@ -165,7 +167,7 @@
         "textMode": "auto",
         "wideLayout": true
       },
-      "pluginVersion": "12.0.2",
+      "pluginVersion": "12.1.0",
       "targets": [
         {
           "editorMode": "code",
@@ -211,7 +213,8 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "purple"
+                "color": "purple",
+                "value": 0
               }
             ]
           },
@@ -243,7 +246,7 @@
         "textMode": "auto",
         "wideLayout": true
       },
-      "pluginVersion": "12.0.2",
+      "pluginVersion": "12.1.0",
       "targets": [
         {
           "editorMode": "code",
@@ -289,7 +292,8 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "purple"
+                "color": "purple",
+                "value": 0
               }
             ]
           }
@@ -320,7 +324,7 @@
         "textMode": "auto",
         "wideLayout": true
       },
-      "pluginVersion": "12.0.2",
+      "pluginVersion": "12.1.0",
       "targets": [
         {
           "editorMode": "code",
@@ -366,7 +370,8 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "purple"
+                "color": "purple",
+                "value": 0
               }
             ]
           }
@@ -397,7 +402,7 @@
         "textMode": "auto",
         "wideLayout": true
       },
-      "pluginVersion": "12.0.2",
+      "pluginVersion": "12.1.0",
       "targets": [
         {
           "editorMode": "code",
@@ -442,7 +447,8 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "text"
+                "color": "text",
+                "value": 0
               }
             ]
           },
@@ -482,7 +488,7 @@
         "textMode": "auto",
         "wideLayout": true
       },
-      "pluginVersion": "12.0.2",
+      "pluginVersion": "12.1.0",
       "targets": [
         {
           "editorMode": "code",
@@ -554,7 +560,8 @@
             "mode": "percentage",
             "steps": [
               {
-                "color": "red"
+                "color": "red",
+                "value": 0
               },
               {
                 "color": "orange",
@@ -596,7 +603,7 @@
         "showThresholdMarkers": false,
         "sizing": "auto"
       },
-      "pluginVersion": "12.0.2",
+      "pluginVersion": "12.1.0",
       "targets": [
         {
           "editorMode": "code",
@@ -691,7 +698,8 @@
             "mode": "percentage",
             "steps": [
               {
-                "color": "red"
+                "color": "red",
+                "value": 0
               },
               {
                 "color": "orange",
@@ -733,7 +741,7 @@
         "showThresholdMarkers": false,
         "sizing": "auto"
       },
-      "pluginVersion": "12.0.2",
+      "pluginVersion": "12.1.0",
       "targets": [
         {
           "editorMode": "code",
@@ -829,7 +837,8 @@
             "mode": "percentage",
             "steps": [
               {
-                "color": "red"
+                "color": "red",
+                "value": 0
               },
               {
                 "color": "orange",
@@ -871,7 +880,7 @@
         "showThresholdMarkers": false,
         "sizing": "auto"
       },
-      "pluginVersion": "12.0.2",
+      "pluginVersion": "12.1.0",
       "targets": [
         {
           "editorMode": "code",
@@ -962,7 +971,8 @@
             "mode": "percentage",
             "steps": [
               {
-                "color": "red"
+                "color": "red",
+                "value": 0
               },
               {
                 "color": "orange",
@@ -1004,7 +1014,7 @@
         "showThresholdMarkers": false,
         "sizing": "auto"
       },
-      "pluginVersion": "12.0.2",
+      "pluginVersion": "12.1.0",
       "targets": [
         {
           "editorMode": "code",
@@ -1095,7 +1105,8 @@
             "mode": "percentage",
             "steps": [
               {
-                "color": "red"
+                "color": "red",
+                "value": 0
               },
               {
                 "color": "orange",
@@ -1137,7 +1148,7 @@
         "showThresholdMarkers": false,
         "sizing": "auto"
       },
-      "pluginVersion": "12.0.2",
+      "pluginVersion": "12.1.0",
       "targets": [
         {
           "editorMode": "code",
@@ -1232,7 +1243,8 @@
             "mode": "percentage",
             "steps": [
               {
-                "color": "red"
+                "color": "red",
+                "value": 0
               },
               {
                 "color": "orange",
@@ -1274,7 +1286,7 @@
         "showThresholdMarkers": false,
         "sizing": "auto"
       },
-      "pluginVersion": "12.0.2",
+      "pluginVersion": "12.1.0",
       "targets": [
         {
           "editorMode": "code",
@@ -1370,7 +1382,8 @@
             "mode": "percentage",
             "steps": [
               {
-                "color": "red"
+                "color": "red",
+                "value": 0
               },
               {
                 "color": "orange",
@@ -1412,7 +1425,7 @@
         "showThresholdMarkers": false,
         "sizing": "auto"
       },
-      "pluginVersion": "12.0.2",
+      "pluginVersion": "12.1.0",
       "targets": [
         {
           "editorMode": "code",
@@ -1508,7 +1521,8 @@
             "mode": "percentage",
             "steps": [
               {
-                "color": "red"
+                "color": "red",
+                "value": 0
               },
               {
                 "color": "orange",
@@ -1550,7 +1564,7 @@
         "showThresholdMarkers": false,
         "sizing": "auto"
       },
-      "pluginVersion": "12.0.2",
+      "pluginVersion": "12.1.0",
       "targets": [
         {
           "editorMode": "code",
@@ -1646,7 +1660,8 @@
             "mode": "percentage",
             "steps": [
               {
-                "color": "red"
+                "color": "red",
+                "value": 0
               },
               {
                 "color": "orange",
@@ -1688,7 +1703,7 @@
         "showThresholdMarkers": false,
         "sizing": "auto"
       },
-      "pluginVersion": "12.0.2",
+      "pluginVersion": "12.1.0",
       "targets": [
         {
           "editorMode": "code",
@@ -1783,7 +1798,8 @@
             "mode": "percentage",
             "steps": [
               {
-                "color": "red"
+                "color": "red",
+                "value": 0
               },
               {
                 "color": "orange",
@@ -1825,7 +1841,7 @@
         "showThresholdMarkers": false,
         "sizing": "auto"
       },
-      "pluginVersion": "12.0.2",
+      "pluginVersion": "12.1.0",
       "targets": [
         {
           "editorMode": "code",
@@ -1921,7 +1937,8 @@
             "mode": "percentage",
             "steps": [
               {
-                "color": "red"
+                "color": "red",
+                "value": 0
               },
               {
                 "color": "orange",
@@ -1963,7 +1980,7 @@
         "showThresholdMarkers": false,
         "sizing": "auto"
       },
-      "pluginVersion": "12.0.2",
+      "pluginVersion": "12.1.0",
       "targets": [
         {
           "editorMode": "code",
@@ -2059,7 +2076,8 @@
             "mode": "percentage",
             "steps": [
               {
-                "color": "red"
+                "color": "red",
+                "value": 0
               },
               {
                 "color": "orange",
@@ -2101,7 +2119,7 @@
         "showThresholdMarkers": false,
         "sizing": "auto"
       },
-      "pluginVersion": "12.0.2",
+      "pluginVersion": "12.1.0",
       "targets": [
         {
           "editorMode": "code",
@@ -2273,7 +2291,7 @@
           "sort": "none"
         }
       },
-      "pluginVersion": "12.0.2",
+      "pluginVersion": "12.1.0",
       "targets": [
         {
           "editorMode": "code",
@@ -2358,7 +2376,7 @@
           "sort": "none"
         }
       },
-      "pluginVersion": "12.0.2",
+      "pluginVersion": "12.1.0",
       "targets": [
         {
           "editorMode": "code",
@@ -2443,7 +2461,7 @@
           "sort": "none"
         }
       },
-      "pluginVersion": "12.0.2",
+      "pluginVersion": "12.1.0",
       "targets": [
         {
           "editorMode": "code",
@@ -2522,7 +2540,8 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green"
+                "color": "green",
+                "value": 0
               },
               {
                 "color": "red",
@@ -2563,7 +2582,7 @@
         "xTickLabelRotation": 0,
         "xTickLabelSpacing": 0
       },
-      "pluginVersion": "12.0.2",
+      "pluginVersion": "12.1.0",
       "targets": [
         {
           "editorMode": "code",
@@ -2629,7 +2648,8 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green"
+                "color": "green",
+                "value": 0
               },
               {
                 "color": "red",
@@ -2670,7 +2690,7 @@
         "xTickLabelRotation": 0,
         "xTickLabelSpacing": 0
       },
-      "pluginVersion": "12.0.2",
+      "pluginVersion": "12.1.0",
       "targets": [
         {
           "editorMode": "code",
@@ -2737,7 +2757,8 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "blue"
+                "color": "blue",
+                "value": 0
               }
             ]
           },
@@ -2774,7 +2795,7 @@
         "xTickLabelRotation": 0,
         "xTickLabelSpacing": 0
       },
-      "pluginVersion": "12.0.2",
+      "pluginVersion": "12.1.0",
       "targets": [
         {
           "editorMode": "code",
@@ -2841,7 +2862,8 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "blue"
+                "color": "blue",
+                "value": 0
               }
             ]
           },
@@ -2878,7 +2900,7 @@
         "xTickLabelRotation": 0,
         "xTickLabelSpacing": 0
       },
-      "pluginVersion": "12.0.2",
+      "pluginVersion": "12.1.0",
       "targets": [
         {
           "editorMode": "code",
@@ -2930,7 +2952,8 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green"
+                "color": "green",
+                "value": 0
               },
               {
                 "color": "red",
@@ -2961,7 +2984,7 @@
         },
         "showHeader": true
       },
-      "pluginVersion": "12.0.2",
+      "pluginVersion": "12.1.0",
       "targets": [
         {
           "editorMode": "code",
@@ -3013,7 +3036,8 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green"
+                "color": "green",
+                "value": 0
               },
               {
                 "color": "red",
@@ -3044,7 +3068,7 @@
         },
         "showHeader": true
       },
-      "pluginVersion": "12.0.2",
+      "pluginVersion": "12.1.0",
       "targets": [
         {
           "editorMode": "code",
@@ -3096,7 +3120,8 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green"
+                "color": "green",
+                "value": 0
               },
               {
                 "color": "red",
@@ -3127,7 +3152,7 @@
         },
         "showHeader": true
       },
-      "pluginVersion": "12.0.2",
+      "pluginVersion": "12.1.0",
       "targets": [
         {
           "editorMode": "code",
@@ -3179,7 +3204,8 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green"
+                "color": "green",
+                "value": 0
               },
               {
                 "color": "red",
@@ -3210,7 +3236,7 @@
         },
         "showHeader": true
       },
-      "pluginVersion": "12.0.2",
+      "pluginVersion": "12.1.0",
       "targets": [
         {
           "editorMode": "code",
@@ -3290,7 +3316,8 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "purple"
+                "color": "purple",
+                "value": 0
               }
             ]
           },
@@ -3327,7 +3354,7 @@
         "xTickLabelRotation": 0,
         "xTickLabelSpacing": 0
       },
-      "pluginVersion": "12.0.2",
+      "pluginVersion": "12.1.0",
       "targets": [
         {
           "editorMode": "code",
@@ -3473,7 +3500,8 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "purple"
+                "color": "purple",
+                "value": 0
               }
             ]
           },
@@ -3510,7 +3538,7 @@
         "xTickLabelRotation": 0,
         "xTickLabelSpacing": 0
       },
-      "pluginVersion": "12.0.2",
+      "pluginVersion": "12.1.0",
       "targets": [
         {
           "editorMode": "code",
@@ -3656,7 +3684,8 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "purple"
+                "color": "purple",
+                "value": 0
               }
             ]
           },
@@ -3693,7 +3722,7 @@
         "xTickLabelRotation": 0,
         "xTickLabelSpacing": 0
       },
-      "pluginVersion": "12.0.2",
+      "pluginVersion": "12.1.0",
       "targets": [
         {
           "editorMode": "code",
@@ -3839,7 +3868,8 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "purple"
+                "color": "purple",
+                "value": 0
               }
             ]
           },
@@ -3876,7 +3906,7 @@
         "xTickLabelRotation": 0,
         "xTickLabelSpacing": 0
       },
-      "pluginVersion": "12.0.2",
+      "pluginVersion": "12.1.0",
       "targets": [
         {
           "editorMode": "code",
@@ -4022,7 +4052,8 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "purple"
+                "color": "purple",
+                "value": 0
               }
             ]
           },
@@ -4059,7 +4090,7 @@
         "xTickLabelRotation": 0,
         "xTickLabelSpacing": 0
       },
-      "pluginVersion": "12.0.2",
+      "pluginVersion": "12.1.0",
       "targets": [
         {
           "editorMode": "code",
@@ -4205,7 +4236,8 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "purple"
+                "color": "purple",
+                "value": 0
               }
             ]
           },
@@ -4242,7 +4274,7 @@
         "xTickLabelRotation": 0,
         "xTickLabelSpacing": 0
       },
-      "pluginVersion": "12.0.2",
+      "pluginVersion": "12.1.0",
       "targets": [
         {
           "editorMode": "code",
@@ -4382,10 +4414,10 @@
           "showLineNumbers": false,
           "showMiniMap": false
         },
-        "content": "Currently tracking `Patched` as running `>= 4.5.0-alpha.1`, `>= 4.4.0-alpha.5`, `>= 4.3.8`, or `>= 4.2.21` which are uneffected by any known security issues identified by on the [Mastodon GitHub](https://github.com/mastodon/mastodon/security).\n\nModels in this section are manually updated and may not be accurate for a few hours after subsequent to new GHSA/patch releases.",
+        "content": "Currently tracking `Patched` as running `>= 4.5.0-alpha.2`, `>= 4.4.3`, `>= 4.3.11`, or `>= 4.2.24` which are uneffected by any known security issues identified by on the [Mastodon GitHub](https://github.com/mastodon/mastodon/security).\n\nModels in this section are manually updated and may not be accurate for a few hours after subsequent to new GHSA/patch releases.",
         "mode": "markdown"
       },
-      "pluginVersion": "12.0.2",
+      "pluginVersion": "12.1.0",
       "title": "Disclaimer",
       "type": "text"
     },
@@ -4444,13 +4476,13 @@
           "sort": "none"
         }
       },
-      "pluginVersion": "12.0.2",
+      "pluginVersion": "12.1.0",
       "targets": [
         {
           "editorMode": "code",
           "format": "table",
           "rawQuery": true,
-          "rawSql": "WITH \n-- Define the specific versions we want to count (easy to update)\ntarget_versions(version) AS (\n    VALUES ('4.4.1'), ('4.4.0'), ('4.4.0-rc.1'), ('4.4.0-beta.2'), ('4.4.0-beta.1'), ('4.4.0-alpha.5'), ('4.3.9'), ('4.3.8'), ('4.2.22'), ('4.2.21')\n),\n-- Count domains with specific versions\nspecific_versions AS (\n    SELECT COUNT(DISTINCT domain) as specific_version_count\n    FROM mastodon_domains\n    WHERE software_version IN (SELECT version FROM target_versions)\n),\n-- Count domains with EOL versions\neol_versions_count AS (\n    SELECT COUNT(DISTINCT md.domain) as eol_version_count\n    FROM mastodon_domains md\n    JOIN eol_versions ev ON md.software_version LIKE ev.software_version || '%'\n    WHERE md.software_version NOT IN (SELECT version FROM target_versions)\n),\n-- Count all other domains\ntotal_domains AS (\n    SELECT COUNT(DISTINCT domain) as total_count\n    FROM mastodon_domains\n)\n-- Final result with all three counts\nSELECT \n    specific_version_count AS \"Patched\",\n    eol_version_count AS \"EOL\",\n    (total_count - specific_version_count - eol_version_count) AS \"Vulnerable\"\nFROM specific_versions, eol_versions_count, total_domains;\n",
+          "rawSql": "WITH \n-- Define the specific versions we want to count (easy to update)\ntarget_versions(version) AS (\n    VALUES ('4.5.0-alpha.2'), ('4.4.3'), ('4.3.11'), ('4.2.24')\n),\n-- Count domains with specific versions\nspecific_versions AS (\n    SELECT COUNT(DISTINCT domain) as specific_version_count\n    FROM mastodon_domains\n    WHERE software_version IN (SELECT version FROM target_versions)\n),\n-- Count domains with EOL versions\neol_versions_count AS (\n    SELECT COUNT(DISTINCT md.domain) as eol_version_count\n    FROM mastodon_domains md\n    JOIN eol_versions ev ON md.software_version LIKE ev.software_version || '%'\n    WHERE md.software_version NOT IN (SELECT version FROM target_versions)\n),\n-- Count all other domains\ntotal_domains AS (\n    SELECT COUNT(DISTINCT domain) as total_count\n    FROM mastodon_domains\n)\n-- Final result with all three counts\nSELECT \n    specific_version_count AS \"Patched\",\n    eol_version_count AS \"EOL\",\n    (total_count - specific_version_count - eol_version_count) AS \"Vulnerable\"\nFROM specific_versions, eol_versions_count, total_domains;\n",
           "refId": "A",
           "sql": {
             "columns": [
@@ -4529,13 +4561,13 @@
           "sort": "none"
         }
       },
-      "pluginVersion": "12.0.2",
+      "pluginVersion": "12.1.0",
       "targets": [
         {
           "editorMode": "code",
           "format": "table",
           "rawQuery": true,
-          "rawSql": "WITH \n-- Define the specific versions we want to count (easy to update)\ntarget_versions(version) AS (\n    VALUES ('4.4.1'), ('4.4.0'), ('4.4.0-rc.1'), ('4.4.0-beta.2'), ('4.4.0-beta.1'), ('4.4.0-alpha.5'), ('4.3.9'), ('4.3.8'), ('4.2.22'), ('4.2.21')\n),\n-- Sum active_users_monthly for patched versions\nspecific_versions AS (\n    SELECT COALESCE(SUM(active_users_monthly), 0) as specific_version_users\n    FROM mastodon_domains\n    WHERE software_version IN (SELECT version FROM target_versions)\n),\n-- Sum active_users_monthly for EOL versions\neol_versions_count AS (\n    SELECT COALESCE(SUM(md.active_users_monthly), 0) as eol_version_users\n    FROM mastodon_domains md\n    JOIN eol_versions ev ON md.software_version LIKE ev.software_version || '%'\n    WHERE md.software_version NOT IN (SELECT version FROM target_versions)\n),\n-- Sum active_users_monthly for all domains\ntotal_users AS (\n    SELECT COALESCE(SUM(active_users_monthly), 0) as total_users_count\n    FROM mastodon_domains\n)\n-- Final result with all three sums\nSELECT \n    specific_version_users AS \"Patched\",\n    eol_version_users AS \"EOL\",\n    (total_users_count - specific_version_users - eol_version_users) AS \"Vulnerable\"\nFROM specific_versions, eol_versions_count, total_users;\n",
+          "rawSql": "WITH \n-- Define the specific versions we want to count (easy to update)\ntarget_versions(version) AS (\n    VALUES ('4.5.0-alpha.2'), ('4.4.3'), ('4.3.11'), ('4.2.24')\n),\n-- Sum active_users_monthly for patched versions\nspecific_versions AS (\n    SELECT COALESCE(SUM(active_users_monthly), 0) as specific_version_users\n    FROM mastodon_domains\n    WHERE software_version IN (SELECT version FROM target_versions)\n),\n-- Sum active_users_monthly for EOL versions\neol_versions_count AS (\n    SELECT COALESCE(SUM(md.active_users_monthly), 0) as eol_version_users\n    FROM mastodon_domains md\n    JOIN eol_versions ev ON md.software_version LIKE ev.software_version || '%'\n    WHERE md.software_version NOT IN (SELECT version FROM target_versions)\n),\n-- Sum active_users_monthly for all domains\ntotal_users AS (\n    SELECT COALESCE(SUM(active_users_monthly), 0) as total_users_count\n    FROM mastodon_domains\n)\n-- Final result with all three sums\nSELECT \n    specific_version_users AS \"Patched\",\n    eol_version_users AS \"EOL\",\n    (total_users_count - specific_version_users - eol_version_users) AS \"Vulnerable\"\nFROM specific_versions, eol_versions_count, total_users;\n",
           "refId": "A",
           "sql": {
             "columns": [
@@ -4614,13 +4646,13 @@
           "sort": "none"
         }
       },
-      "pluginVersion": "12.0.2",
+      "pluginVersion": "12.1.0",
       "targets": [
         {
           "editorMode": "code",
           "format": "table",
           "rawQuery": true,
-          "rawSql": "WITH \n-- Define the specific versions we want to count (easy to update)\ntarget_versions(version) AS (\n    VALUES ('4.4.1'), ('4.4.0'), ('4.4.0-rc.1'), ('4.4.0-beta.2'), ('4.4.0-beta.1'), ('4.4.0-alpha.5'), ('4.3.9'), ('4.3.8'), ('4.2.22'), ('4.2.21')\n),\n-- Sum total_users for patched versions\nspecific_versions AS (\n    SELECT COALESCE(SUM(total_users), 0) as specific_version_users\n    FROM mastodon_domains\n    WHERE software_version IN (SELECT version FROM target_versions)\n),\n-- Sum total_users for EOL versions\neol_versions_count AS (\n    SELECT COALESCE(SUM(md.total_users), 0) as eol_version_users\n    FROM mastodon_domains md\n    JOIN eol_versions ev ON md.software_version LIKE ev.software_version || '%'\n    WHERE md.software_version NOT IN (SELECT version FROM target_versions)\n),\n-- Sum total_users for all domains\ntotal_users AS (\n    SELECT COALESCE(SUM(total_users), 0) as total_users_count\n    FROM mastodon_domains\n)\n-- Final result with all three sums\nSELECT \n    specific_version_users AS \"Patched\",\n    eol_version_users AS \"EOL\",\n    (total_users_count - specific_version_users - eol_version_users) AS \"Vulnerable\"\nFROM specific_versions, eol_versions_count, total_users;\n",
+          "rawSql": "WITH \n-- Define the specific versions we want to count (easy to update)\ntarget_versions(version) AS (\n    VALUES ('4.5.0-alpha.2'), ('4.4.3'), ('4.3.11'), ('4.2.24')\n),\n-- Sum total_users for patched versions\nspecific_versions AS (\n    SELECT COALESCE(SUM(total_users), 0) as specific_version_users\n    FROM mastodon_domains\n    WHERE software_version IN (SELECT version FROM target_versions)\n),\n-- Sum total_users for EOL versions\neol_versions_count AS (\n    SELECT COALESCE(SUM(md.total_users), 0) as eol_version_users\n    FROM mastodon_domains md\n    JOIN eol_versions ev ON md.software_version LIKE ev.software_version || '%'\n    WHERE md.software_version NOT IN (SELECT version FROM target_versions)\n),\n-- Sum total_users for all domains\ntotal_users AS (\n    SELECT COALESCE(SUM(total_users), 0) as total_users_count\n    FROM mastodon_domains\n)\n-- Final result with all three sums\nSELECT \n    specific_version_users AS \"Patched\",\n    eol_version_users AS \"EOL\",\n    (total_users_count - specific_version_users - eol_version_users) AS \"Vulnerable\"\nFROM specific_versions, eol_versions_count, total_users;\n",
           "refId": "A",
           "sql": {
             "columns": [
@@ -4667,23 +4699,17 @@
           "color": {
             "mode": "thresholds"
           },
-          "custom": {
-            "align": "auto",
-            "cellOptions": {
-              "type": "auto"
-            },
-            "inspect": false
-          },
           "mappings": [],
           "thresholds": {
             "mode": "absolute",
             "steps": [
               {
-                "color": "green"
+                "color": "orange",
+                "value": 0
               },
               {
-                "color": "red",
-                "value": 80
+                "color": "purple",
+                "value": 60
               }
             ]
           }
@@ -4691,31 +4717,43 @@
         "overrides": []
       },
       "gridPos": {
-        "h": 4,
+        "h": 7,
         "w": 24,
         "x": 0,
         "y": 129
       },
       "id": 70,
       "options": {
-        "cellHeight": "sm",
-        "footer": {
-          "countRows": false,
-          "fields": "",
-          "reducer": [
-            "sum"
-          ],
-          "show": false
+        "displayMode": "gradient",
+        "legend": {
+          "calcs": [],
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": false
         },
-        "showHeader": true
+        "maxVizHeight": 300,
+        "minVizHeight": 16,
+        "minVizWidth": 8,
+        "namePlacement": "auto",
+        "orientation": "auto",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "showUnfilled": true,
+        "sizing": "auto",
+        "valueMode": "color"
       },
-      "pluginVersion": "12.0.2",
+      "pluginVersion": "12.1.0",
       "targets": [
         {
           "editorMode": "code",
           "format": "table",
           "rawQuery": true,
-          "rawSql": "SELECT \n    COUNT(CASE WHEN software_version LIKE '4.5%' THEN 1 END) * 100.0 / COUNT(*) AS \"% Instances on v4.5\",\n    \n    COUNT(CASE WHEN \n        software_version LIKE '4.5%' OR\n        software_version LIKE '4.4%'\n    THEN 1 END) * 100.0 / COUNT(*) AS \"% Instances on v4.4+\",\n\n    COUNT(CASE WHEN \n        software_version LIKE '4.5%' OR\n        software_version LIKE '4.4%' OR \n        software_version LIKE '4.3%' \n    THEN 1 END) * 100.0 / COUNT(*) AS \"% Instances on v4.3+\",\n\n    COUNT(CASE WHEN \n        software_version LIKE '4.5%' OR\n        software_version LIKE '4.4%' OR \n        software_version LIKE '4.3%' OR \n        software_version LIKE '4.2%'\n    THEN 1 END) * 100.0 / COUNT(*) AS \"% Instances on v4.2+\",\n\n    COUNT(CASE WHEN \n        software_version LIKE '4.5%' OR\n        software_version LIKE '4.4%' OR \n        software_version LIKE '4.3%' OR \n        software_version LIKE '4.2%' OR\n        software_version LIKE '4.1%'\n    THEN 1 END) * 100.0 / COUNT(*) AS \"% Instances on v4.1+\",\n\n    COUNT(CASE WHEN \n        software_version LIKE '4.%'\n    THEN 1 END) * 100.0 / COUNT(*) AS \"% Instances on v4.0+\"\n\nFROM \n    mastodon_domains\nWHERE \n    software_version IS NOT NULL;\n",
+          "rawSql": "SELECT \n    COUNT(CASE WHEN software_version LIKE '4.5%' THEN 1 END) * 100.0 / COUNT(*) AS \"4.5\",\n    \n    COUNT(CASE WHEN \n        software_version LIKE '4.5%' OR\n        software_version LIKE '4.4%'\n    THEN 1 END) * 100.0 / COUNT(*) AS \"4.4+\",\n\n    COUNT(CASE WHEN \n        software_version LIKE '4.5%' OR\n        software_version LIKE '4.4%' OR \n        software_version LIKE '4.3%' \n    THEN 1 END) * 100.0 / COUNT(*) AS \"4.3+\",\n\n    COUNT(CASE WHEN \n        software_version LIKE '4.5%' OR\n        software_version LIKE '4.4%' OR \n        software_version LIKE '4.3%' OR \n        software_version LIKE '4.2%'\n    THEN 1 END) * 100.0 / COUNT(*) AS \"4.2+\",\n\n    COUNT(CASE WHEN \n        software_version LIKE '4.5%' OR\n        software_version LIKE '4.4%' OR \n        software_version LIKE '4.3%' OR \n        software_version LIKE '4.2%' OR\n        software_version LIKE '4.1%'\n    THEN 1 END) * 100.0 / COUNT(*) AS \"4.1+\",\n\n    COUNT(CASE WHEN \n        software_version LIKE '4.%'\n    THEN 1 END) * 100.0 / COUNT(*) AS \"4.0+\"\n\nFROM \n    mastodon_domains\nWHERE \n    software_version IS NOT NULL;\n",
           "refId": "A",
           "sql": {
             "columns": [
@@ -4737,7 +4775,7 @@
         }
       ],
       "title": "Percent of Instances",
-      "type": "table"
+      "type": "bargauge"
     },
     {
       "datasource": {
@@ -4749,22 +4787,16 @@
           "color": {
             "mode": "thresholds"
           },
-          "custom": {
-            "align": "auto",
-            "cellOptions": {
-              "type": "auto"
-            },
-            "inspect": false
-          },
           "mappings": [],
           "thresholds": {
             "mode": "absolute",
             "steps": [
               {
-                "color": "green"
+                "color": "orange",
+                "value": 0
               },
               {
-                "color": "red",
+                "color": "purple",
                 "value": 80
               }
             ]
@@ -4773,31 +4805,43 @@
         "overrides": []
       },
       "gridPos": {
-        "h": 4,
+        "h": 7,
         "w": 24,
         "x": 0,
-        "y": 133
+        "y": 136
       },
       "id": 71,
       "options": {
-        "cellHeight": "sm",
-        "footer": {
-          "countRows": false,
-          "fields": "",
-          "reducer": [
-            "sum"
-          ],
-          "show": false
+        "displayMode": "gradient",
+        "legend": {
+          "calcs": [],
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": false
         },
-        "showHeader": true
+        "maxVizHeight": 300,
+        "minVizHeight": 16,
+        "minVizWidth": 8,
+        "namePlacement": "auto",
+        "orientation": "auto",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "showUnfilled": true,
+        "sizing": "auto",
+        "valueMode": "color"
       },
-      "pluginVersion": "12.0.2",
+      "pluginVersion": "12.1.0",
       "targets": [
         {
           "editorMode": "code",
           "format": "table",
           "rawQuery": true,
-          "rawSql": "SELECT \n    SUM(CASE WHEN software_version LIKE '4.5%' THEN active_users_monthly ELSE 0 END) * 100.0 / \n        SUM(active_users_monthly) AS \"% MAUs on v4.5\",\n\n    SUM(CASE WHEN \n        software_version LIKE '4.5%' OR \n        software_version LIKE '4.4%' \n    THEN active_users_monthly ELSE 0 END) * 100.0 / \n        SUM(active_users_monthly) AS \"% MAUs on v4.4+\",\n\n    SUM(CASE WHEN \n        software_version LIKE '4.5%' OR \n        software_version LIKE '4.4%' OR \n        software_version LIKE '4.3%' \n    THEN active_users_monthly ELSE 0 END) * 100.0 / \n        SUM(active_users_monthly) AS \"% MAUs on v4.3+\",\n\n    SUM(CASE WHEN\n        software_version LIKE '4.5%' OR \n        software_version LIKE '4.4%' OR \n        software_version LIKE '4.4%' OR \n        software_version LIKE '4.3%' OR \n        software_version LIKE '4.2%'\n    THEN active_users_monthly ELSE 0 END) * 100.0 / \n        SUM(active_users_monthly) AS \"% MAUs on v4.2+\",\n\n    SUM(CASE WHEN \n        software_version LIKE '4.5%' OR \n        software_version LIKE '4.4%' OR \n        software_version LIKE '4.3%' OR \n        software_version LIKE '4.2%' OR\n        software_version LIKE '4.1%'\n    THEN active_users_monthly ELSE 0 END) * 100.0 / \n        SUM(active_users_monthly) AS \"% MAUs on v4.1+\",\n\n    SUM(CASE WHEN \n        software_version LIKE '4.%'\n    THEN active_users_monthly ELSE 0 END) * 100.0 / \n        SUM(active_users_monthly) AS \"% MAUs on v4.0+\"\nFROM \n    mastodon_domains\nWHERE \n    software_version IS NOT NULL\n    AND active_users_monthly IS NOT NULL;\n",
+          "rawSql": "SELECT \n    SUM(CASE WHEN software_version LIKE '4.5%' THEN active_users_monthly ELSE 0 END) * 100.0 / \n        SUM(active_users_monthly) AS \"4.5\",\n\n    SUM(CASE WHEN \n        software_version LIKE '4.5%' OR \n        software_version LIKE '4.4%' \n    THEN active_users_monthly ELSE 0 END) * 100.0 / \n        SUM(active_users_monthly) AS \"4.4+\",\n\n    SUM(CASE WHEN \n        software_version LIKE '4.5%' OR \n        software_version LIKE '4.4%' OR \n        software_version LIKE '4.3%' \n    THEN active_users_monthly ELSE 0 END) * 100.0 / \n        SUM(active_users_monthly) AS \"4.3+\",\n\n    SUM(CASE WHEN\n        software_version LIKE '4.5%' OR \n        software_version LIKE '4.4%' OR \n        software_version LIKE '4.4%' OR \n        software_version LIKE '4.3%' OR \n        software_version LIKE '4.2%'\n    THEN active_users_monthly ELSE 0 END) * 100.0 / \n        SUM(active_users_monthly) AS \"4.2+\",\n\n    SUM(CASE WHEN \n        software_version LIKE '4.5%' OR \n        software_version LIKE '4.4%' OR \n        software_version LIKE '4.3%' OR \n        software_version LIKE '4.2%' OR\n        software_version LIKE '4.1%'\n    THEN active_users_monthly ELSE 0 END) * 100.0 / \n        SUM(active_users_monthly) AS \"4.1+\",\n\n    SUM(CASE WHEN \n        software_version LIKE '4.%'\n    THEN active_users_monthly ELSE 0 END) * 100.0 / \n        SUM(active_users_monthly) AS \"4.0+\"\nFROM \n    mastodon_domains\nWHERE \n    software_version IS NOT NULL\n    AND active_users_monthly IS NOT NULL;\n",
           "refId": "A",
           "sql": {
             "columns": [
@@ -4819,7 +4863,7 @@
         }
       ],
       "title": "Percent of MAUs",
-      "type": "table"
+      "type": "bargauge"
     },
     {
       "datasource": {
@@ -4831,22 +4875,16 @@
           "color": {
             "mode": "thresholds"
           },
-          "custom": {
-            "align": "auto",
-            "cellOptions": {
-              "type": "auto"
-            },
-            "inspect": false
-          },
           "mappings": [],
           "thresholds": {
             "mode": "absolute",
             "steps": [
               {
-                "color": "green"
+                "color": "orange",
+                "value": 0
               },
               {
-                "color": "red",
+                "color": "purple",
                 "value": 80
               }
             ]
@@ -4855,31 +4893,43 @@
         "overrides": []
       },
       "gridPos": {
-        "h": 4,
+        "h": 7,
         "w": 24,
         "x": 0,
-        "y": 137
+        "y": 143
       },
       "id": 72,
       "options": {
-        "cellHeight": "sm",
-        "footer": {
-          "countRows": false,
-          "fields": "",
-          "reducer": [
-            "sum"
-          ],
-          "show": false
+        "displayMode": "gradient",
+        "legend": {
+          "calcs": [],
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": false
         },
-        "showHeader": true
+        "maxVizHeight": 300,
+        "minVizHeight": 16,
+        "minVizWidth": 8,
+        "namePlacement": "auto",
+        "orientation": "auto",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "showUnfilled": true,
+        "sizing": "auto",
+        "valueMode": "color"
       },
-      "pluginVersion": "12.0.2",
+      "pluginVersion": "12.1.0",
       "targets": [
         {
           "editorMode": "code",
           "format": "table",
           "rawQuery": true,
-          "rawSql": "SELECT \n    SUM(CASE WHEN software_version LIKE '4.5%' THEN total_users ELSE 0 END) * 100.0 / \n        SUM(total_users) AS \"% Users on v4.5\",\n\n    SUM(CASE WHEN \n        software_version LIKE '4.5%' OR \n        software_version LIKE '4.4%' \n    THEN total_users ELSE 0 END) * 100.0 / \n        SUM(total_users) AS \"% Users on v4.4+\",\n\n    SUM(CASE WHEN \n        software_version LIKE '4.5%' OR \n        software_version LIKE '4.4%' OR \n        software_version LIKE '4.3%' \n    THEN total_users ELSE 0 END) * 100.0 / \n        SUM(total_users) AS \"% Users on v4.3+\",\n\n    SUM(CASE WHEN \n        software_version LIKE '4.5%' OR \n        software_version LIKE '4.4%' OR \n        software_version LIKE '4.3%' OR \n        software_version LIKE '4.2%'\n    THEN total_users ELSE 0 END) * 100.0 / \n        SUM(total_users) AS \"% Users on v4.2+\",\n\n    SUM(CASE WHEN \n        software_version LIKE '4.5%' OR \n        software_version LIKE '4.4%' OR \n        software_version LIKE '4.3%' OR \n        software_version LIKE '4.2%' OR\n        software_version LIKE '4.1%'\n    THEN total_users ELSE 0 END) * 100.0 / \n        SUM(total_users) AS \"% Users on v4.1+\",\n\n    SUM(CASE WHEN \n        software_version LIKE '4.%'\n    THEN total_users ELSE 0 END) * 100.0 / \n        SUM(total_users) AS \"% Users on v4.0+\"\nFROM \n    mastodon_domains\nWHERE \n    software_version IS NOT NULL\n    AND total_users IS NOT NULL;\n",
+          "rawSql": "SELECT \n    SUM(CASE WHEN software_version LIKE '4.5%' THEN total_users ELSE 0 END) * 100.0 / \n        SUM(total_users) AS \"4.5\",\n\n    SUM(CASE WHEN \n        software_version LIKE '4.5%' OR \n        software_version LIKE '4.4%' \n    THEN total_users ELSE 0 END) * 100.0 / \n        SUM(total_users) AS \"4.4+\",\n\n    SUM(CASE WHEN \n        software_version LIKE '4.5%' OR \n        software_version LIKE '4.4%' OR \n        software_version LIKE '4.3%' \n    THEN total_users ELSE 0 END) * 100.0 / \n        SUM(total_users) AS \"4.3+\",\n\n    SUM(CASE WHEN \n        software_version LIKE '4.5%' OR \n        software_version LIKE '4.4%' OR \n        software_version LIKE '4.3%' OR \n        software_version LIKE '4.2%'\n    THEN total_users ELSE 0 END) * 100.0 / \n        SUM(total_users) AS \"4.2+\",\n\n    SUM(CASE WHEN \n        software_version LIKE '4.5%' OR \n        software_version LIKE '4.4%' OR \n        software_version LIKE '4.3%' OR \n        software_version LIKE '4.2%' OR\n        software_version LIKE '4.1%'\n    THEN total_users ELSE 0 END) * 100.0 / \n        SUM(total_users) AS \"4.1+\",\n\n    SUM(CASE WHEN \n        software_version LIKE '4.%'\n    THEN total_users ELSE 0 END) * 100.0 / \n        SUM(total_users) AS \"4.0+\"\nFROM \n    mastodon_domains\nWHERE \n    software_version IS NOT NULL\n    AND total_users IS NOT NULL;\n",
           "refId": "A",
           "sql": {
             "columns": [
@@ -4901,7 +4951,7 @@
         }
       ],
       "title": "Percent of Total Users",
-      "type": "table"
+      "type": "bargauge"
     },
     {
       "datasource": {
@@ -4931,7 +4981,7 @@
         "h": 18,
         "w": 8,
         "x": 0,
-        "y": 141
+        "y": 150
       },
       "id": 66,
       "options": {
@@ -4958,7 +5008,7 @@
           "sort": "none"
         }
       },
-      "pluginVersion": "12.0.2",
+      "pluginVersion": "12.1.0",
       "targets": [
         {
           "editorMode": "code",
@@ -5016,7 +5066,7 @@
         "h": 18,
         "w": 8,
         "x": 8,
-        "y": 141
+        "y": 150
       },
       "id": 67,
       "options": {
@@ -5043,7 +5093,7 @@
           "sort": "none"
         }
       },
-      "pluginVersion": "12.0.2",
+      "pluginVersion": "12.1.0",
       "targets": [
         {
           "editorMode": "code",
@@ -5101,7 +5151,7 @@
         "h": 18,
         "w": 8,
         "x": 16,
-        "y": 141
+        "y": 150
       },
       "id": 68,
       "options": {
@@ -5128,7 +5178,7 @@
           "sort": "none"
         }
       },
-      "pluginVersion": "12.0.2",
+      "pluginVersion": "12.1.0",
       "targets": [
         {
           "editorMode": "code",
@@ -5164,7 +5214,7 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 159
+        "y": 168
       },
       "id": 9,
       "panels": [],
@@ -5195,7 +5245,8 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green"
+                "color": "green",
+                "value": 0
               },
               {
                 "color": "red",
@@ -5211,7 +5262,7 @@
         "h": 28,
         "w": 24,
         "x": 0,
-        "y": 160
+        "y": 169
       },
       "id": 10,
       "options": {
@@ -5228,7 +5279,7 @@
         "showHeader": true,
         "sortBy": []
       },
-      "pluginVersion": "12.0.2",
+      "pluginVersion": "12.1.0",
       "targets": [
         {
           "editorMode": "code",
@@ -5280,5 +5331,5 @@
   "timezone": "browser",
   "title": "vmcrawl",
   "uid": "aedqo0q7klrswa",
-  "version": 79
+  "version": 82
 }
