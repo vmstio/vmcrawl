@@ -84,7 +84,7 @@
         "textMode": "auto",
         "wideLayout": true
       },
-      "pluginVersion": "12.1.0",
+      "pluginVersion": "12.2.0-16952534486",
       "targets": [
         {
           "datasource": {
@@ -167,7 +167,7 @@
         "textMode": "auto",
         "wideLayout": true
       },
-      "pluginVersion": "12.1.0",
+      "pluginVersion": "12.2.0-16952534486",
       "targets": [
         {
           "editorMode": "code",
@@ -246,7 +246,7 @@
         "textMode": "auto",
         "wideLayout": true
       },
-      "pluginVersion": "12.1.0",
+      "pluginVersion": "12.2.0-16952534486",
       "targets": [
         {
           "editorMode": "code",
@@ -324,7 +324,7 @@
         "textMode": "auto",
         "wideLayout": true
       },
-      "pluginVersion": "12.1.0",
+      "pluginVersion": "12.2.0-16952534486",
       "targets": [
         {
           "editorMode": "code",
@@ -402,7 +402,7 @@
         "textMode": "auto",
         "wideLayout": true
       },
-      "pluginVersion": "12.1.0",
+      "pluginVersion": "12.2.0-16952534486",
       "targets": [
         {
           "editorMode": "code",
@@ -488,7 +488,7 @@
         "textMode": "auto",
         "wideLayout": true
       },
-      "pluginVersion": "12.1.0",
+      "pluginVersion": "12.2.0-16952534486",
       "targets": [
         {
           "editorMode": "code",
@@ -603,7 +603,7 @@
         "showThresholdMarkers": false,
         "sizing": "auto"
       },
-      "pluginVersion": "12.1.0",
+      "pluginVersion": "12.2.0-16952534486",
       "targets": [
         {
           "editorMode": "code",
@@ -741,7 +741,7 @@
         "showThresholdMarkers": false,
         "sizing": "auto"
       },
-      "pluginVersion": "12.1.0",
+      "pluginVersion": "12.2.0-16952534486",
       "targets": [
         {
           "editorMode": "code",
@@ -880,7 +880,7 @@
         "showThresholdMarkers": false,
         "sizing": "auto"
       },
-      "pluginVersion": "12.1.0",
+      "pluginVersion": "12.2.0-16952534486",
       "targets": [
         {
           "editorMode": "code",
@@ -1014,7 +1014,7 @@
         "showThresholdMarkers": false,
         "sizing": "auto"
       },
-      "pluginVersion": "12.1.0",
+      "pluginVersion": "12.2.0-16952534486",
       "targets": [
         {
           "editorMode": "code",
@@ -1148,7 +1148,7 @@
         "showThresholdMarkers": false,
         "sizing": "auto"
       },
-      "pluginVersion": "12.1.0",
+      "pluginVersion": "12.2.0-16952534486",
       "targets": [
         {
           "editorMode": "code",
@@ -1286,7 +1286,7 @@
         "showThresholdMarkers": false,
         "sizing": "auto"
       },
-      "pluginVersion": "12.1.0",
+      "pluginVersion": "12.2.0-16952534486",
       "targets": [
         {
           "editorMode": "code",
@@ -1425,7 +1425,7 @@
         "showThresholdMarkers": false,
         "sizing": "auto"
       },
-      "pluginVersion": "12.1.0",
+      "pluginVersion": "12.2.0-16952534486",
       "targets": [
         {
           "editorMode": "code",
@@ -1564,7 +1564,7 @@
         "showThresholdMarkers": false,
         "sizing": "auto"
       },
-      "pluginVersion": "12.1.0",
+      "pluginVersion": "12.2.0-16952534486",
       "targets": [
         {
           "editorMode": "code",
@@ -1703,7 +1703,7 @@
         "showThresholdMarkers": false,
         "sizing": "auto"
       },
-      "pluginVersion": "12.1.0",
+      "pluginVersion": "12.2.0-16952534486",
       "targets": [
         {
           "editorMode": "code",
@@ -1841,7 +1841,7 @@
         "showThresholdMarkers": false,
         "sizing": "auto"
       },
-      "pluginVersion": "12.1.0",
+      "pluginVersion": "12.2.0-16952534486",
       "targets": [
         {
           "editorMode": "code",
@@ -1980,7 +1980,7 @@
         "showThresholdMarkers": false,
         "sizing": "auto"
       },
-      "pluginVersion": "12.1.0",
+      "pluginVersion": "12.2.0-16952534486",
       "targets": [
         {
           "editorMode": "code",
@@ -2119,7 +2119,7 @@
         "showThresholdMarkers": false,
         "sizing": "auto"
       },
-      "pluginVersion": "12.1.0",
+      "pluginVersion": "12.2.0-16952534486",
       "targets": [
         {
           "editorMode": "code",
@@ -2291,7 +2291,7 @@
           "sort": "none"
         }
       },
-      "pluginVersion": "12.1.0",
+      "pluginVersion": "12.2.0-16952534486",
       "targets": [
         {
           "editorMode": "code",
@@ -2376,7 +2376,7 @@
           "sort": "none"
         }
       },
-      "pluginVersion": "12.1.0",
+      "pluginVersion": "12.2.0-16952534486",
       "targets": [
         {
           "editorMode": "code",
@@ -2461,7 +2461,7 @@
           "sort": "none"
         }
       },
-      "pluginVersion": "12.1.0",
+      "pluginVersion": "12.2.0-16952534486",
       "targets": [
         {
           "editorMode": "code",
@@ -2582,7 +2582,7 @@
         "xTickLabelRotation": 0,
         "xTickLabelSpacing": 0
       },
-      "pluginVersion": "12.1.0",
+      "pluginVersion": "12.2.0-16952534486",
       "targets": [
         {
           "editorMode": "code",
@@ -2690,7 +2690,7 @@
         "xTickLabelRotation": 0,
         "xTickLabelSpacing": 0
       },
-      "pluginVersion": "12.1.0",
+      "pluginVersion": "12.2.0-16952534486",
       "targets": [
         {
           "editorMode": "code",
@@ -2795,7 +2795,7 @@
         "xTickLabelRotation": 0,
         "xTickLabelSpacing": 0
       },
-      "pluginVersion": "12.1.0",
+      "pluginVersion": "12.2.0-16952534486",
       "targets": [
         {
           "editorMode": "code",
@@ -2900,7 +2900,7 @@
         "xTickLabelRotation": 0,
         "xTickLabelSpacing": 0
       },
-      "pluginVersion": "12.1.0",
+      "pluginVersion": "12.2.0-16952534486",
       "targets": [
         {
           "editorMode": "code",
@@ -2984,7 +2984,7 @@
         },
         "showHeader": true
       },
-      "pluginVersion": "12.1.0",
+      "pluginVersion": "12.2.0-16952534486",
       "targets": [
         {
           "editorMode": "code",
@@ -3068,7 +3068,7 @@
         },
         "showHeader": true
       },
-      "pluginVersion": "12.1.0",
+      "pluginVersion": "12.2.0-16952534486",
       "targets": [
         {
           "editorMode": "code",
@@ -3152,7 +3152,7 @@
         },
         "showHeader": true
       },
-      "pluginVersion": "12.1.0",
+      "pluginVersion": "12.2.0-16952534486",
       "targets": [
         {
           "editorMode": "code",
@@ -3236,7 +3236,7 @@
         },
         "showHeader": true
       },
-      "pluginVersion": "12.1.0",
+      "pluginVersion": "12.2.0-16952534486",
       "targets": [
         {
           "editorMode": "code",
@@ -3354,7 +3354,7 @@
         "xTickLabelRotation": 0,
         "xTickLabelSpacing": 0
       },
-      "pluginVersion": "12.1.0",
+      "pluginVersion": "12.2.0-16952534486",
       "targets": [
         {
           "editorMode": "code",
@@ -3538,7 +3538,7 @@
         "xTickLabelRotation": 0,
         "xTickLabelSpacing": 0
       },
-      "pluginVersion": "12.1.0",
+      "pluginVersion": "12.2.0-16952534486",
       "targets": [
         {
           "editorMode": "code",
@@ -3722,7 +3722,7 @@
         "xTickLabelRotation": 0,
         "xTickLabelSpacing": 0
       },
-      "pluginVersion": "12.1.0",
+      "pluginVersion": "12.2.0-16952534486",
       "targets": [
         {
           "editorMode": "code",
@@ -3906,7 +3906,7 @@
         "xTickLabelRotation": 0,
         "xTickLabelSpacing": 0
       },
-      "pluginVersion": "12.1.0",
+      "pluginVersion": "12.2.0-16952534486",
       "targets": [
         {
           "editorMode": "code",
@@ -4090,7 +4090,7 @@
         "xTickLabelRotation": 0,
         "xTickLabelSpacing": 0
       },
-      "pluginVersion": "12.1.0",
+      "pluginVersion": "12.2.0-16952534486",
       "targets": [
         {
           "editorMode": "code",
@@ -4274,7 +4274,7 @@
         "xTickLabelRotation": 0,
         "xTickLabelSpacing": 0
       },
-      "pluginVersion": "12.1.0",
+      "pluginVersion": "12.2.0-16952534486",
       "targets": [
         {
           "editorMode": "code",
@@ -4417,7 +4417,7 @@
         "content": "Currently tracking `Patched` as running `>= 4.5.0-alpha.2`, `>= 4.4.3`, `>= 4.3.11`, or `>= 4.2.24` which are uneffected by any known security issues identified by on the [Mastodon GitHub](https://github.com/mastodon/mastodon/security).\n\nModels in this section are manually updated and may not be accurate for a few hours after subsequent to new GHSA/patch releases.",
         "mode": "markdown"
       },
-      "pluginVersion": "12.1.0",
+      "pluginVersion": "12.2.0-16952534486",
       "title": "Disclaimer",
       "type": "text"
     },
@@ -4476,7 +4476,7 @@
           "sort": "none"
         }
       },
-      "pluginVersion": "12.1.0",
+      "pluginVersion": "12.2.0-16952534486",
       "targets": [
         {
           "editorMode": "code",
@@ -4561,7 +4561,7 @@
           "sort": "none"
         }
       },
-      "pluginVersion": "12.1.0",
+      "pluginVersion": "12.2.0-16952534486",
       "targets": [
         {
           "editorMode": "code",
@@ -4646,7 +4646,7 @@
           "sort": "none"
         }
       },
-      "pluginVersion": "12.1.0",
+      "pluginVersion": "12.2.0-16952534486",
       "targets": [
         {
           "editorMode": "code",
@@ -4700,16 +4700,13 @@
             "mode": "thresholds"
           },
           "mappings": [],
+          "min": 0,
           "thresholds": {
             "mode": "absolute",
             "steps": [
               {
-                "color": "orange",
-                "value": 0
-              },
-              {
                 "color": "purple",
-                "value": 60
+                "value": 0
               }
             ]
           }
@@ -4747,13 +4744,13 @@
         "sizing": "auto",
         "valueMode": "color"
       },
-      "pluginVersion": "12.1.0",
+      "pluginVersion": "12.2.0-16952534486",
       "targets": [
         {
           "editorMode": "code",
           "format": "table",
           "rawQuery": true,
-          "rawSql": "SELECT \n    COUNT(CASE WHEN software_version LIKE '4.5%' THEN 1 END) * 100.0 / COUNT(*) AS \"4.5\",\n    \n    COUNT(CASE WHEN \n        software_version LIKE '4.5%' OR\n        software_version LIKE '4.4%'\n    THEN 1 END) * 100.0 / COUNT(*) AS \"4.4+\",\n\n    COUNT(CASE WHEN \n        software_version LIKE '4.5%' OR\n        software_version LIKE '4.4%' OR \n        software_version LIKE '4.3%' \n    THEN 1 END) * 100.0 / COUNT(*) AS \"4.3+\",\n\n    COUNT(CASE WHEN \n        software_version LIKE '4.5%' OR\n        software_version LIKE '4.4%' OR \n        software_version LIKE '4.3%' OR \n        software_version LIKE '4.2%'\n    THEN 1 END) * 100.0 / COUNT(*) AS \"4.2+\",\n\n    COUNT(CASE WHEN \n        software_version LIKE '4.5%' OR\n        software_version LIKE '4.4%' OR \n        software_version LIKE '4.3%' OR \n        software_version LIKE '4.2%' OR\n        software_version LIKE '4.1%'\n    THEN 1 END) * 100.0 / COUNT(*) AS \"4.1+\",\n\n    COUNT(CASE WHEN \n        software_version LIKE '4.%'\n    THEN 1 END) * 100.0 / COUNT(*) AS \"4.0+\"\n\nFROM \n    mastodon_domains\nWHERE \n    software_version IS NOT NULL;\n",
+          "rawSql": "SELECT \n    COUNT(CASE WHEN software_version LIKE '4.5%' THEN 1 END) * 100.0 / COUNT(*) AS \"4.5\",\n    \n    COUNT(CASE WHEN \n        software_version LIKE '4.5%' OR\n        software_version LIKE '4.4%'\n    THEN 1 END) * 100.0 / COUNT(*) AS \"4.4+\",\n\n    COUNT(CASE WHEN \n        software_version LIKE '4.5%' OR\n        software_version LIKE '4.4%' OR \n        software_version LIKE '4.3%' \n    THEN 1 END) * 100.0 / COUNT(*) AS \"4.3+\",\n\n    COUNT(CASE WHEN \n        software_version LIKE '4.5%' OR\n        software_version LIKE '4.4%' OR \n        software_version LIKE '4.3%' OR \n        software_version LIKE '4.2%'\n    THEN 1 END) * 100.0 / COUNT(*) AS \"4.2+\",\n\n    COUNT(CASE WHEN \n        software_version LIKE '4.5%' OR\n        software_version LIKE '4.4%' OR \n        software_version LIKE '4.3%' OR \n        software_version LIKE '4.2%' OR\n        software_version LIKE '4.1%'\n    THEN 1 END) * 100.0 / COUNT(*) AS \"4.1+\"\n\nFROM \n    mastodon_domains\nWHERE \n    software_version IS NOT NULL;\n",
           "refId": "A",
           "sql": {
             "columns": [
@@ -4787,17 +4784,15 @@
           "color": {
             "mode": "thresholds"
           },
+          "fieldMinMax": false,
           "mappings": [],
+          "min": 0,
           "thresholds": {
             "mode": "absolute",
             "steps": [
               {
-                "color": "orange",
-                "value": 0
-              },
-              {
                 "color": "purple",
-                "value": 80
+                "value": 0
               }
             ]
           }
@@ -4835,13 +4830,13 @@
         "sizing": "auto",
         "valueMode": "color"
       },
-      "pluginVersion": "12.1.0",
+      "pluginVersion": "12.2.0-16952534486",
       "targets": [
         {
           "editorMode": "code",
           "format": "table",
           "rawQuery": true,
-          "rawSql": "SELECT \n    SUM(CASE WHEN software_version LIKE '4.5%' THEN active_users_monthly ELSE 0 END) * 100.0 / \n        SUM(active_users_monthly) AS \"4.5\",\n\n    SUM(CASE WHEN \n        software_version LIKE '4.5%' OR \n        software_version LIKE '4.4%' \n    THEN active_users_monthly ELSE 0 END) * 100.0 / \n        SUM(active_users_monthly) AS \"4.4+\",\n\n    SUM(CASE WHEN \n        software_version LIKE '4.5%' OR \n        software_version LIKE '4.4%' OR \n        software_version LIKE '4.3%' \n    THEN active_users_monthly ELSE 0 END) * 100.0 / \n        SUM(active_users_monthly) AS \"4.3+\",\n\n    SUM(CASE WHEN\n        software_version LIKE '4.5%' OR \n        software_version LIKE '4.4%' OR \n        software_version LIKE '4.4%' OR \n        software_version LIKE '4.3%' OR \n        software_version LIKE '4.2%'\n    THEN active_users_monthly ELSE 0 END) * 100.0 / \n        SUM(active_users_monthly) AS \"4.2+\",\n\n    SUM(CASE WHEN \n        software_version LIKE '4.5%' OR \n        software_version LIKE '4.4%' OR \n        software_version LIKE '4.3%' OR \n        software_version LIKE '4.2%' OR\n        software_version LIKE '4.1%'\n    THEN active_users_monthly ELSE 0 END) * 100.0 / \n        SUM(active_users_monthly) AS \"4.1+\",\n\n    SUM(CASE WHEN \n        software_version LIKE '4.%'\n    THEN active_users_monthly ELSE 0 END) * 100.0 / \n        SUM(active_users_monthly) AS \"4.0+\"\nFROM \n    mastodon_domains\nWHERE \n    software_version IS NOT NULL\n    AND active_users_monthly IS NOT NULL;\n",
+          "rawSql": "SELECT \n    SUM(CASE WHEN software_version LIKE '4.5%' THEN active_users_monthly ELSE 0 END) * 100.0 / \n        SUM(active_users_monthly) AS \"4.5\",\n\n    SUM(CASE WHEN \n        software_version LIKE '4.5%' OR \n        software_version LIKE '4.4%' \n    THEN active_users_monthly ELSE 0 END) * 100.0 / \n        SUM(active_users_monthly) AS \"4.4+\",\n\n    SUM(CASE WHEN \n        software_version LIKE '4.5%' OR \n        software_version LIKE '4.4%' OR \n        software_version LIKE '4.3%' \n    THEN active_users_monthly ELSE 0 END) * 100.0 / \n        SUM(active_users_monthly) AS \"4.3+\",\n\n    SUM(CASE WHEN\n        software_version LIKE '4.5%' OR \n        software_version LIKE '4.4%' OR \n        software_version LIKE '4.4%' OR \n        software_version LIKE '4.3%' OR \n        software_version LIKE '4.2%'\n    THEN active_users_monthly ELSE 0 END) * 100.0 / \n        SUM(active_users_monthly) AS \"4.2+\",\n\n    SUM(CASE WHEN \n        software_version LIKE '4.5%' OR \n        software_version LIKE '4.4%' OR \n        software_version LIKE '4.3%' OR \n        software_version LIKE '4.2%' OR\n        software_version LIKE '4.1%'\n    THEN active_users_monthly ELSE 0 END) * 100.0 / \n        SUM(active_users_monthly) AS \"4.1+\"\nFROM \n    mastodon_domains\nWHERE \n    software_version IS NOT NULL\n    AND active_users_monthly IS NOT NULL;\n",
           "refId": "A",
           "sql": {
             "columns": [
@@ -4876,16 +4871,13 @@
             "mode": "thresholds"
           },
           "mappings": [],
+          "min": 0,
           "thresholds": {
             "mode": "absolute",
             "steps": [
               {
-                "color": "orange",
-                "value": 0
-              },
-              {
                 "color": "purple",
-                "value": 80
+                "value": 0
               }
             ]
           }
@@ -4923,13 +4915,13 @@
         "sizing": "auto",
         "valueMode": "color"
       },
-      "pluginVersion": "12.1.0",
+      "pluginVersion": "12.2.0-16952534486",
       "targets": [
         {
           "editorMode": "code",
           "format": "table",
           "rawQuery": true,
-          "rawSql": "SELECT \n    SUM(CASE WHEN software_version LIKE '4.5%' THEN total_users ELSE 0 END) * 100.0 / \n        SUM(total_users) AS \"4.5\",\n\n    SUM(CASE WHEN \n        software_version LIKE '4.5%' OR \n        software_version LIKE '4.4%' \n    THEN total_users ELSE 0 END) * 100.0 / \n        SUM(total_users) AS \"4.4+\",\n\n    SUM(CASE WHEN \n        software_version LIKE '4.5%' OR \n        software_version LIKE '4.4%' OR \n        software_version LIKE '4.3%' \n    THEN total_users ELSE 0 END) * 100.0 / \n        SUM(total_users) AS \"4.3+\",\n\n    SUM(CASE WHEN \n        software_version LIKE '4.5%' OR \n        software_version LIKE '4.4%' OR \n        software_version LIKE '4.3%' OR \n        software_version LIKE '4.2%'\n    THEN total_users ELSE 0 END) * 100.0 / \n        SUM(total_users) AS \"4.2+\",\n\n    SUM(CASE WHEN \n        software_version LIKE '4.5%' OR \n        software_version LIKE '4.4%' OR \n        software_version LIKE '4.3%' OR \n        software_version LIKE '4.2%' OR\n        software_version LIKE '4.1%'\n    THEN total_users ELSE 0 END) * 100.0 / \n        SUM(total_users) AS \"4.1+\",\n\n    SUM(CASE WHEN \n        software_version LIKE '4.%'\n    THEN total_users ELSE 0 END) * 100.0 / \n        SUM(total_users) AS \"4.0+\"\nFROM \n    mastodon_domains\nWHERE \n    software_version IS NOT NULL\n    AND total_users IS NOT NULL;\n",
+          "rawSql": "SELECT \n    SUM(CASE WHEN software_version LIKE '4.5%' THEN total_users ELSE 0 END) * 100.0 / \n        SUM(total_users) AS \"4.5\",\n\n    SUM(CASE WHEN \n        software_version LIKE '4.5%' OR \n        software_version LIKE '4.4%' \n    THEN total_users ELSE 0 END) * 100.0 / \n        SUM(total_users) AS \"4.4+\",\n\n    SUM(CASE WHEN \n        software_version LIKE '4.5%' OR \n        software_version LIKE '4.4%' OR \n        software_version LIKE '4.3%' \n    THEN total_users ELSE 0 END) * 100.0 / \n        SUM(total_users) AS \"4.3+\",\n\n    SUM(CASE WHEN \n        software_version LIKE '4.5%' OR \n        software_version LIKE '4.4%' OR \n        software_version LIKE '4.3%' OR \n        software_version LIKE '4.2%'\n    THEN total_users ELSE 0 END) * 100.0 / \n        SUM(total_users) AS \"4.2+\",\n\n    SUM(CASE WHEN \n        software_version LIKE '4.5%' OR \n        software_version LIKE '4.4%' OR \n        software_version LIKE '4.3%' OR \n        software_version LIKE '4.2%' OR\n        software_version LIKE '4.1%'\n    THEN total_users ELSE 0 END) * 100.0 / \n        SUM(total_users) AS \"4.1+\"\nFROM \n    mastodon_domains\nWHERE \n    software_version IS NOT NULL\n    AND total_users IS NOT NULL;\n",
           "refId": "A",
           "sql": {
             "columns": [
@@ -5008,7 +5000,7 @@
           "sort": "none"
         }
       },
-      "pluginVersion": "12.1.0",
+      "pluginVersion": "12.2.0-16952534486",
       "targets": [
         {
           "editorMode": "code",
@@ -5093,7 +5085,7 @@
           "sort": "none"
         }
       },
-      "pluginVersion": "12.1.0",
+      "pluginVersion": "12.2.0-16952534486",
       "targets": [
         {
           "editorMode": "code",
@@ -5178,7 +5170,7 @@
           "sort": "none"
         }
       },
-      "pluginVersion": "12.1.0",
+      "pluginVersion": "12.2.0-16952534486",
       "targets": [
         {
           "editorMode": "code",
@@ -5279,7 +5271,7 @@
         "showHeader": true,
         "sortBy": []
       },
-      "pluginVersion": "12.1.0",
+      "pluginVersion": "12.2.0-16952534486",
       "targets": [
         {
           "editorMode": "code",
@@ -5331,5 +5323,5 @@
   "timezone": "browser",
   "title": "vmcrawl",
   "uid": "aedqo0q7klrswa",
-  "version": 82
+  "version": 85
 }
