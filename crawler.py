@@ -4,12 +4,14 @@
 from common import *
 # Import additional modules
 try:
+    import argparse
     import json
     import mimetypes
+    import random
     import unicodedata
     import whois
     from datetime import datetime, timedelta, timezone
-    from lxml import etree
+    from lxml import etree # type: ignore
     from urllib.parse import urlparse, urlunparse
 except ImportError as e:
     print(f"Error importing module: {e}")

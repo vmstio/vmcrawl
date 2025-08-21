@@ -1,20 +1,20 @@
 #!/usr/bin/env python3
 
-from mstmap import *
+# Define backport branches (adjust as needed)
+backport_branches = ["4.4", "4.3", "4.2"]
 
 # Import required modules
 try:
-    import argparse
     import csv
     import hashlib
     import httpx
     import os
-    import random
     import re
     import psycopg
     import sys
     import time
     import toml
+    from datetime import datetime
     from dotenv import load_dotenv
     from io import StringIO
     from packaging import version

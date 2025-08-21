@@ -4,7 +4,9 @@
 from common import *
 # Import additional modules
 try:
+    import argparse
     import ipaddress
+    import random
 except ImportError as e:
     print(f"Error importing module: {e}")
     sys.exit(1)
