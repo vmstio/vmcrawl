@@ -1234,9 +1234,9 @@ def load_from_database(user_choice):
         if user_choice in ["1", "51"]:
             params = [error_threshold]
         elif user_choice == "52":
-            params = [error_threshold, error_threshold * 3]
+            params = [error_threshold, error_buffer]
         elif user_choice == "50":
-            params = [error_threshold * 3]
+            params = [error_buffer]
         # elif user_choice == "40":
         #     params = [error_threshold]
         elif user_choice == "42":
@@ -1295,7 +1295,7 @@ def print_menu() -> None:
         "Retry HTTP errors": {"20": "2xx", "21": "3xx", "22": "4xx", "23": "5xx"},
         "Retry specific errors": {"30": "###", "31": "JSON", "32": "TXT", "33": "API", "34": "???"},
         "Retry good data": {"40": f"Stale ≥1 Week", "41": "Stale ≥1 Day", "42": "Unpatched", "43": "Main", "44": "Inactive", "45": "All Good"},
-        "Retry general errors": {"50": f"Domains w/ >{error_threshold * 3} Errors", "51": f"Domains w/ <{error_threshold} Errors", "52": f"Domains w/ {error_threshold}-{error_threshold * 3} Errors"},
+        "Retry general errors": {"50": f"Domains w/ >{error_buffer} Errors", "51": f"Domains w/ <{error_threshold} Errors", "52": f"Domains w/ {error_threshold}-{error_buffer} Errors"},
     }
 
     for category, options in menu_options.items():

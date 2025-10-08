@@ -270,6 +270,7 @@ def delete_old_patch_versions():
 
 # Common variables
 error_threshold = int(common_timeout)
+error_buffer = error_threshold + error_threshold
 version_main_branch = get_main_version_branch()
 version_main_release = get_main_version_release()
 version_latest_release = get_highest_mastodon_version()
