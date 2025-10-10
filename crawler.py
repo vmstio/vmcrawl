@@ -1375,10 +1375,10 @@ finally:
 if is_running_headless():
     if not (args.file or args.target or args.new or args.buffer):
         try:
-            print_colored("Re-executing the script...", "bold")
+            print_colored(f"Re-executing {appname}...", "bold")
             os.execv(sys.executable, ['python3'] + sys.argv)
         except Exception as e:
-            print(f"Failed to re-execute the script: {e}")
+            print(f"Failed to re-execute {appname}: {e}")
 else:
-    print_colored("Exiting the script...", "bold")
+    print_colored(f"Exiting {appname}...", "bold")
     sys.exit(0)
