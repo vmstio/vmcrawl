@@ -2,6 +2,7 @@
 
 # Import common modules
 from common import *
+
 # Import additional modules
 try:
     import argparse
@@ -15,10 +16,30 @@ except ImportError as e:
 current_filename = os.path.basename(__file__)
 
 parser = argparse.ArgumentParser(description="Fetch peer data from Mastodon instances.")
-parser.add_argument('-l', '--limit', type=int, help=f'limit the number of domains requested from database (default: {int(os.getenv("VMCRAWL_FETCH_LIMIT", "10"))})')
-parser.add_argument('-o', '--offset', type=int, help=f'offset the top of the domains requested from database (default: {int(os.getenv("VMCRAWL_FETCH_OFFSET", "0"))})')
-parser.add_argument('-r', '--random', action='store_true', help='randomize the order of the domains returned (default: disabled)')
-parser.add_argument('-t', '--target', type=str, help='target only a specific domain and ignore the database (ex: vmst.io)')
+parser.add_argument(
+    "-l",
+    "--limit",
+    type=int,
+    help=f'limit the number of domains requested from database (default: {int(os.getenv("VMCRAWL_FETCH_LIMIT", "10"))})',
+)
+parser.add_argument(
+    "-o",
+    "--offset",
+    type=int,
+    help=f'offset the top of the domains requested from database (default: {int(os.getenv("VMCRAWL_FETCH_OFFSET", "0"))})',
+)
+parser.add_argument(
+    "-r",
+    "--random",
+    action="store_true",
+    help="randomize the order of the domains returned (default: disabled)",
+)
+parser.add_argument(
+    "-t",
+    "--target",
+    type=str,
+    help="target only a specific domain and ignore the database (ex: vmst.io)",
+)
 
 args = parser.parse_args()
 
@@ -40,6 +61,7 @@ if args.offset is not None:
 else:
     db_offset = int(os.getenv("VMCRAWL_FETCH_OFFSET", "0"))
 
+
 def fetch_exclude_domains(conn):
     cursor = conn.cursor()
     try:
@@ -52,6 +74,7 @@ def fetch_exclude_domains(conn):
         return None
     finally:
         cursor.close()
+
 
 def fetch_domain_list(conn, exclude_domains_sql):
     cursor = conn.cursor()
@@ -88,9 +111,15 @@ def fetch_domain_list(conn, exclude_domains_sql):
     finally:
         cursor.close()
 
+
 def is_valid_domain(domain):
-    domain_pattern = re.compile(r'^[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$', re.IGNORECASE)
-    return (domain_pattern.match(domain) or "xn--" in domain) and not is_ip_address(domain) and not detect_vowels(domain)
+    domain_pattern = re.compile(r"^[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$", re.IGNORECASE)
+    return (
+        (domain_pattern.match(domain) or "xn--" in domain)
+        and not is_ip_address(domain)
+        and not detect_vowels(domain)
+    )
+
 
 def is_ip_address(domain):
     try:
@@ -99,23 +128,28 @@ def is_ip_address(domain):
     except ValueError:
         return False
 
+
 def detect_vowels(domain):
     try:
-        pattern = r'\.[aeiou]{4}'
+        pattern = r"\.[aeiou]{4}"
         matches = re.findall(pattern, domain)
         return True if len(matches) > 0 else False
     except Exception as e:
         print_colored(f"Error detecting vowels: {e}", "orange")
         return False
 
+
 def import_domains(domains):
     cursor = conn.cursor()
     try:
         if domains:
             values = [(domain.lower(), 0) for domain in domains]
-            args_str = ','.join(['(%s,%s)' for _ in values])
+            args_str = ",".join(["(%s,%s)" for _ in values])
             flattened_values = [item for sublist in values for item in sublist]
-            cursor.execute("INSERT INTO raw_domains (domain, errors) VALUES " + args_str, flattened_values)
+            cursor.execute(
+                "INSERT INTO raw_domains (domain, errors) VALUES " + args_str,
+                flattened_values,
+            )
             print_colored(f"Imported {len(domains)} domains", "green")
             conn.commit()
     except Exception as e:
@@ -124,6 +158,7 @@ def import_domains(domains):
         return None
     finally:
         cursor.close()
+
 
 def get_junk_keywords():
     cursor = conn.cursor()
@@ -139,6 +174,7 @@ def get_junk_keywords():
     finally:
         cursor.close()
 
+
 def get_bad_tld():
     cursor = conn.cursor()
     try:
@@ -153,6 +189,7 @@ def get_bad_tld():
     finally:
         cursor.close()
 
+
 def add_to_no_peers(domain):
     cursor = conn.cursor()
     try:
@@ -165,6 +202,7 @@ def add_to_no_peers(domain):
         return None
     finally:
         cursor.close()
+
 
 def get_existing_domains():
     cursor = conn.cursor()
@@ -180,6 +218,7 @@ def get_existing_domains():
     finally:
         cursor.close()
 
+
 def get_domains(api_url, domain, domain_endings):
     keywords = get_junk_keywords() or []
     bad_tlds = get_bad_tld() or []
@@ -188,10 +227,14 @@ def get_domains(api_url, domain, domain_endings):
         api_response = http_client.get(api_url)
         data = api_response.json()
         filtered_domains = [
-            item for item in data
-            if is_valid_domain(item) and not any(keyword in item for keyword in keywords)
-            and not any(item.endswith(f'.{tld}') for tld in bad_tlds)
-            and any(item.endswith(f'.{domain_ending}') for domain_ending in domain_endings)
+            item
+            for item in data
+            if is_valid_domain(item)
+            and not any(keyword in item for keyword in keywords)
+            and not any(item.endswith(f".{tld}") for tld in bad_tlds)
+            and any(
+                item.endswith(f".{domain_ending}") for domain_ending in domain_endings
+            )
             and item.islower()
         ]
         return filtered_domains
@@ -200,6 +243,7 @@ def get_domains(api_url, domain, domain_endings):
         add_to_no_peers(domain)  # Add domain to no_peers if any other error occurs
     return []
 
+
 def process_domain(domain, counter, total):
     print_colored(f"Fetching peers @ {domain} ({counter}/{total})…", "bold")
 
@@ -207,11 +251,16 @@ def process_domain(domain, counter, total):
 
     existing_domains = get_existing_domains()
     domains = get_domains(api_url, domain, domain_endings)
-    unique_domains = [domain for domain in domains if domain not in existing_domains and domain.isascii()]
+    unique_domains = [
+        domain
+        for domain in domains
+        if domain not in existing_domains and domain.isascii()
+    ]
 
     print(f"Found {len(domains)} domains, {len(unique_domains)} new domains")
 
     import_domains(unique_domains)
+
 
 if __name__ == "__main__":
     try:

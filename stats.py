@@ -218,6 +218,7 @@ def get_total_unique_versions():
     finally:
         cursor.close()
 
+
 def get_total_main_branch_instances():
     cursor = conn.cursor()
     value_to_return = 0
@@ -347,6 +348,7 @@ def get_total_eol_branch_instances():
     finally:
         cursor.close()
 
+
 def get_total_main_patched_instances():
     cursor = conn.cursor()
     value_to_return = 0
@@ -371,6 +373,7 @@ def get_total_main_patched_instances():
         conn.rollback()
     finally:
         cursor.close()
+
 
 def get_total_release_patched_instances():
     cursor = conn.cursor()
@@ -397,6 +400,7 @@ def get_total_release_patched_instances():
     finally:
         cursor.close()
 
+
 def get_total_previous_patched_instances():
     cursor = conn.cursor()
     value_to_return = 0
@@ -422,6 +426,7 @@ def get_total_previous_patched_instances():
     finally:
         cursor.close()
 
+
 def get_total_pending_eol_patched_instances():
     cursor = conn.cursor()
     value_to_return = 0
@@ -446,6 +451,7 @@ def get_total_pending_eol_patched_instances():
         conn.rollback()
     finally:
         cursor.close()
+
 
 def get_total_main_branch_users():
     cursor = conn.cursor()
@@ -576,6 +582,7 @@ def get_total_eol_branch_users():
     finally:
         cursor.close()
 
+
 def get_total_main_patched_users():
     cursor = conn.cursor()
     value_to_return = 0
@@ -600,6 +607,7 @@ def get_total_main_patched_users():
         conn.rollback()
     finally:
         cursor.close()
+
 
 def get_total_release_patched_users():
     cursor = conn.cursor()
@@ -626,6 +634,7 @@ def get_total_release_patched_users():
     finally:
         cursor.close()
 
+
 def get_total_previous_patched_users():
     cursor = conn.cursor()
     value_to_return = 0
@@ -651,6 +660,7 @@ def get_total_previous_patched_users():
     finally:
         cursor.close()
 
+
 def get_total_pending_eol_patched_users():
     cursor = conn.cursor()
     value_to_return = 0
@@ -675,6 +685,7 @@ def get_total_pending_eol_patched_users():
         conn.rollback()
     finally:
         cursor.close()
+
 
 def get_active_main_branch_users():
     cursor = conn.cursor()
@@ -805,6 +816,7 @@ def get_active_eol_branch_users():
     finally:
         cursor.close()
 
+
 def get_active_main_patched_users():
     cursor = conn.cursor()
     value_to_return = 0
@@ -829,6 +841,7 @@ def get_active_main_patched_users():
         conn.rollback()
     finally:
         cursor.close()
+
 
 def get_active_release_patched_users():
     cursor = conn.cursor()
@@ -855,6 +868,7 @@ def get_active_release_patched_users():
     finally:
         cursor.close()
 
+
 def get_active_previous_patched_users():
     cursor = conn.cursor()
     value_to_return = 0
@@ -880,6 +894,7 @@ def get_active_previous_patched_users():
     finally:
         cursor.close()
 
+
 def get_active_pending_eol_patched_users():
     cursor = conn.cursor()
     value_to_return = 0
@@ -904,6 +919,7 @@ def get_active_pending_eol_patched_users():
         conn.rollback()
     finally:
         cursor.close()
+
 
 if __name__ == "__main__":
     try:
@@ -954,7 +970,9 @@ if __name__ == "__main__":
         total_previous_patched_instances = get_total_previous_patched_instances()
         print(f"Total previous patched instances: {total_previous_patched_instances}")
         total_pending_eol_patched_instances = get_total_pending_eol_patched_instances()
-        print(f"Total pending EOL patched instances: {total_pending_eol_patched_instances}")
+        print(
+            f"Total pending EOL patched instances: {total_pending_eol_patched_instances}"
+        )
         total_main_branch_users = get_total_main_branch_users()
         print(f"Total main branch users: {total_main_branch_users}")
         total_release_branch_users = get_total_release_branch_users()
@@ -978,31 +996,42 @@ if __name__ == "__main__":
         total_active_release_branch_users = get_active_release_branch_users()
         print(f"Total active release branch users: {total_active_release_branch_users}")
         total_active_previous_branch_users = get_active_previous_branch_users()
-        print(f"Total active previous branch users: {total_active_previous_branch_users}")
+        print(
+            f"Total active previous branch users: {total_active_previous_branch_users}"
+        )
         total_active_pending_eol_branch_users = get_active_pending_eol_branch_users()
-        print(f"Total active pending EOL branch users: {total_active_pending_eol_branch_users}")
+        print(
+            f"Total active pending EOL branch users: {total_active_pending_eol_branch_users}"
+        )
         total_active_eol_branch_users = get_active_eol_branch_users()
         print(f"Total active EOL branch users: {total_active_eol_branch_users}")
         total_active_main_patched_users = get_active_main_patched_users()
         print(f"Total active main patched users: {total_active_main_patched_users}")
         total_active_release_patched_users = get_active_release_patched_users()
-        print(f"Total active release patched users: {total_active_release_patched_users}")
+        print(
+            f"Total active release patched users: {total_active_release_patched_users}"
+        )
         total_active_previous_patched_users = get_active_previous_patched_users()
-        print(f"Total active previous patched users: {total_active_previous_patched_users}")
+        print(
+            f"Total active previous patched users: {total_active_previous_patched_users}"
+        )
         total_active_pending_eol_patched_users = get_active_pending_eol_patched_users()
-        print(f"Total active pending EOL patched users: {total_active_pending_eol_patched_users}")
+        print(
+            f"Total active pending EOL patched users: {total_active_pending_eol_patched_users}"
+        )
 
         if not is_running_headless():
             print_colored("Write this data to the statistics database? (y/n): ", "pink")
             choice = input()
-            if choice.lower() != 'y' and choice.lower() != 'yes':
+            if choice.lower() != "y" and choice.lower() != "yes":
                 print_colored("Exiting without writing to the database", "pink")
                 sys.exit(0)
 
         # Insert or update statistics in the database
         cursor = conn.cursor()
         try:
-            cursor.execute("""
+            cursor.execute(
+                """
             INSERT INTO statistics (
             date, total_raw_domains, total_failed_domains, total_mastodon_domains,
             total_ignored_domains, total_nxdomains, total_norobots, total_baddata,
@@ -1066,24 +1095,49 @@ if __name__ == "__main__":
             total_active_release_patched_users = EXCLUDED.total_active_release_patched_users,
             total_active_previous_patched_users = EXCLUDED.total_active_previous_patched_users,
             total_active_pending_eol_patched_users = EXCLUDED.total_active_pending_eol_patched_users
-            """, (
-            total_raw_domains, total_failed_domains, total_mastodon_domains,
-            total_ignored_domains, total_nxdomains, total_norobots, total_baddata,
-            total_error_over, total_error_under, total_users, total_active_users,
-            total_unique_versions, total_main_instances, total_release_instances,
-            total_previous_instances, total_pending_eol_instances, total_eol_instances,
-            total_main_patched_instances, total_release_patched_instances,
-            total_previous_patched_instances, total_pending_eol_patched_instances,
-            total_main_branch_users, total_release_branch_users,
-            total_previous_branch_users, total_pending_eol_branch_users,
-            total_eol_branch_users, total_main_patched_users,
-            total_release_patched_users, total_previous_patched_users,
-            total_pending_eol_patched_users, total_active_main_branch_users,
-            total_active_release_branch_users, total_active_previous_branch_users,
-            total_active_pending_eol_branch_users, total_active_eol_branch_users,
-            total_active_main_patched_users, total_active_release_patched_users,
-            total_active_previous_patched_users, total_active_pending_eol_patched_users
-            ))
+            """,
+                (
+                    total_raw_domains,
+                    total_failed_domains,
+                    total_mastodon_domains,
+                    total_ignored_domains,
+                    total_nxdomains,
+                    total_norobots,
+                    total_baddata,
+                    total_error_over,
+                    total_error_under,
+                    total_users,
+                    total_active_users,
+                    total_unique_versions,
+                    total_main_instances,
+                    total_release_instances,
+                    total_previous_instances,
+                    total_pending_eol_instances,
+                    total_eol_instances,
+                    total_main_patched_instances,
+                    total_release_patched_instances,
+                    total_previous_patched_instances,
+                    total_pending_eol_patched_instances,
+                    total_main_branch_users,
+                    total_release_branch_users,
+                    total_previous_branch_users,
+                    total_pending_eol_branch_users,
+                    total_eol_branch_users,
+                    total_main_patched_users,
+                    total_release_patched_users,
+                    total_previous_patched_users,
+                    total_pending_eol_patched_users,
+                    total_active_main_branch_users,
+                    total_active_release_branch_users,
+                    total_active_previous_branch_users,
+                    total_active_pending_eol_branch_users,
+                    total_active_eol_branch_users,
+                    total_active_main_patched_users,
+                    total_active_release_patched_users,
+                    total_active_previous_patched_users,
+                    total_active_pending_eol_patched_users,
+                ),
+            )
             conn.commit()
             print_colored("Statistics inserted/updated successfully", "green")
         except Exception as e:

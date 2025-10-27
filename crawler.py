@@ -2,6 +2,7 @@
 
 # Import common modules
 from common import *
+
 # Import additional modules
 try:
     import argparse
@@ -11,7 +12,7 @@ try:
     import unicodedata
     import whois
     from datetime import datetime, timedelta, timezone
-    from lxml import etree # type: ignore
+    from lxml import etree  # type: ignore
     from urllib.parse import urlparse, urlunparse
 except ImportError as e:
     print(f"Error importing module: {e}")
@@ -20,11 +21,33 @@ except ImportError as e:
 # Detect the current filename
 current_filename = os.path.basename(__file__)
 
-parser = argparse.ArgumentParser(description="Crawl version information from Mastodon instances.")
-parser.add_argument('-f', '--file', type=str, help='bypass database and use a file instead (ex: ~/domains.txt)')
-parser.add_argument('-r', '--new', action='store_true', help='only process new domains added to the database (same as menu item 0)')
-parser.add_argument('-d', '--buffer', action='store_true', help='only process domains which recently reached the error threshold (same as menu item 52)')
-parser.add_argument('-t', '--target', type=str, help='target only a specific domain and ignore the database (ex: vmst.io)')
+parser = argparse.ArgumentParser(
+    description="Crawl version information from Mastodon instances."
+)
+parser.add_argument(
+    "-f",
+    "--file",
+    type=str,
+    help="bypass database and use a file instead (ex: ~/domains.txt)",
+)
+parser.add_argument(
+    "-r",
+    "--new",
+    action="store_true",
+    help="only process new domains added to the database (same as menu item 0)",
+)
+parser.add_argument(
+    "-d",
+    "--buffer",
+    action="store_true",
+    help="only process domains which recently reached the error threshold (same as menu item 52)",
+)
+parser.add_argument(
+    "-t",
+    "--target",
+    type=str,
+    help="target only a specific domain and ignore the database (ex: vmst.io)",
+)
 
 args = parser.parse_args()
 
@@ -32,38 +55,55 @@ if args.file and args.target:
     print_colored("You cannot set both file and target arguments", "red")
     sys.exit(1)
 
+
 def is_valid_email(email):
-    pattern = r'^[\w\.-]+(?:\+[\w\.-]+)?@[\w\.-]+\.\w+$'
+    pattern = r"^[\w\.-]+(?:\+[\w\.-]+)?@[\w\.-]+\.\w+$"
     return re.match(pattern, email) is not None
 
+
 def normalize_email(email):
-    email = re.sub(r'(\[at\]|\(at\)|\{at\}| at | @ |\[@\]| \[at\] | \(at\) | \{at\} )', '@', email, flags=re.IGNORECASE)
-    email = re.sub(r'(\[dot\]|\(dot\)|\{dot\}| dot | \[dot\] | \(dot\) | \{dot\} )', '.', email, flags=re.IGNORECASE)
+    email = re.sub(
+        r"(\[at\]|\(at\)|\{at\}| at | @ |\[@\]| \[at\] | \(at\) | \{at\} )",
+        "@",
+        email,
+        flags=re.IGNORECASE,
+    )
+    email = re.sub(
+        r"(\[dot\]|\(dot\)|\{dot\}| dot | \[dot\] | \(dot\) | \{dot\} )",
+        ".",
+        email,
+        flags=re.IGNORECASE,
+    )
     return email
 
+
 def has_emoji_or_special_chars(domain):
-    if domain.startswith('xn--'):
+    if domain.startswith("xn--"):
         try:
-            domain = domain.encode('ascii').decode('idna')
+            domain = domain.encode("ascii").decode("idna")
         except Exception:
             return True
     try:
         for char in domain:
-            if (unicodedata.category(char) in ['So', 'Cf'] or ord(char) >= 0x1F300):
+            if unicodedata.category(char) in ["So", "Cf"] or ord(char) >= 0x1F300:
                 return True
-            if not (char.isalnum() or char in '-_.'):
+            if not (char.isalnum() or char in "-_."):
                 return True
     except Exception:
         return True
     return False
 
+
 def log_error(domain, error_to_print):
     cursor = conn.cursor()
     try:
-        cursor.execute('''
+        cursor.execute(
+            """
             INSERT INTO error_log (domain, error)
             VALUES (%s, %s)
-        ''', (domain, error_to_print))
+        """,
+            (domain, error_to_print),
+        )
         conn.commit()
     except Exception as e:
         print(f"Failed to log error: {e}")
@@ -71,10 +111,11 @@ def log_error(domain, error_to_print):
     finally:
         cursor.close()
 
+
 def increment_domain_error(domain, error_reason):
     cursor = conn.cursor()
     try:
-        cursor.execute('SELECT errors FROM raw_domains WHERE domain = %s', (domain,))
+        cursor.execute("SELECT errors FROM raw_domains WHERE domain = %s", (domain,))
         result = cursor.fetchone()
         if result:
             current_errors = result[0] if result[0] is not None else 0
@@ -84,7 +125,8 @@ def increment_domain_error(domain, error_reason):
             new_errors = 1
 
         # Insert or update the domain with the new errors count
-        cursor.execute('''
+        cursor.execute(
+            """
             INSERT INTO raw_domains (domain, failed, ignore, errors, reason, nxdomain, norobots)
             VALUES (%s, %s, %s, %s, %s, %s, %s)
             ON CONFLICT(domain) DO UPDATE SET
@@ -94,7 +136,9 @@ def increment_domain_error(domain, error_reason):
             reason = excluded.reason,
             nxdomain = excluded.nxdomain,
             norobots = excluded.norobots
-        ''', (domain, None, None, new_errors, error_reason, None, None))
+        """,
+            (domain, None, None, new_errors, error_reason, None, None),
+        )
         conn.commit()
     except Exception as e:
         print(f"Failed to increment domain error: {e}")
@@ -102,15 +146,25 @@ def increment_domain_error(domain, error_reason):
     finally:
         cursor.close()
 
+
 def delete_if_error_max(domain):
     cursor = conn.cursor()
     try:
-        cursor.execute('SELECT errors FROM raw_domains WHERE domain = %s', (domain,))
+        cursor.execute("SELECT errors FROM raw_domains WHERE domain = %s", (domain,))
         result = cursor.fetchone()
         if result and result[0] >= error_threshold:
-            cursor.execute('SELECT timestamp FROM mastodon_domains WHERE domain = %s', (domain,))
+            cursor.execute(
+                "SELECT timestamp FROM mastodon_domains WHERE domain = %s", (domain,)
+            )
             timestamp = cursor.fetchone()
-            if timestamp and (datetime.now(timezone.utc) - timestamp[0].replace(tzinfo=timezone.utc)).days >= error_threshold:
+            if (
+                timestamp
+                and (
+                    datetime.now(timezone.utc)
+                    - timestamp[0].replace(tzinfo=timezone.utc)
+                ).days
+                >= error_threshold
+            ):
                 delete_domain_if_known(domain)
 
     except Exception as e:
@@ -119,11 +173,13 @@ def delete_if_error_max(domain):
     finally:
         cursor.close()
 
+
 def clear_domain_error(domain):
     cursor = conn.cursor()
     try:
         # Insert or update the domain with the new errors count
-        cursor.execute('''
+        cursor.execute(
+            """
             INSERT INTO raw_domains (domain, failed, ignore, errors, reason, nxdomain, norobots)
             VALUES (%s, %s, %s, %s, %s, %s, %s)
             ON CONFLICT(domain) DO UPDATE SET
@@ -133,7 +189,9 @@ def clear_domain_error(domain):
             reason = excluded.reason,
             nxdomain = excluded.nxdomain,
             norobots = excluded.norobots
-        ''', (domain, None, None, None, None, None, None))
+        """,
+            (domain, None, None, None, None, None, None),
+        )
         conn.commit()
     except Exception as e:
         print(f"Failed to clear domain error: {e}")
@@ -141,11 +199,13 @@ def clear_domain_error(domain):
     finally:
         cursor.close()
 
+
 def mark_ignore_domain(domain):
     cursor = conn.cursor()
     try:
         # Insert or update the domain with the new errors count
-        cursor.execute('''
+        cursor.execute(
+            """
             INSERT INTO raw_domains (domain, failed, ignore, errors, reason, nxdomain, norobots)
             VALUES (%s, %s, %s, %s, %s, %s, %s)
             ON CONFLICT(domain) DO UPDATE SET
@@ -155,7 +215,9 @@ def mark_ignore_domain(domain):
             reason = excluded.reason,
             nxdomain = excluded.nxdomain,
             norobots = excluded.norobots
-        ''', (domain, None, True, None, None, None, None))
+        """,
+            (domain, None, True, None, None, None, None),
+        )
         conn.commit()
     except Exception as e:
         print(f"Failed to mark domain ignored: {e}")
@@ -163,11 +225,13 @@ def mark_ignore_domain(domain):
     finally:
         cursor.close()
 
+
 def mark_failed_domain(domain):
     cursor = conn.cursor()
     try:
         # Insert or update the domain with the new errors count
-        cursor.execute('''
+        cursor.execute(
+            """
             INSERT INTO raw_domains (domain, failed, ignore, errors, reason, nxdomain, norobots)
             VALUES (%s, %s, %s, %s, %s, %s, %s)
             ON CONFLICT(domain) DO UPDATE SET
@@ -177,7 +241,9 @@ def mark_failed_domain(domain):
             reason = excluded.reason,
             nxdomain = excluded.nxdomain,
             norobots = excluded.norobots
-        ''', (domain, True, None, None, None, None, None))
+        """,
+            (domain, True, None, None, None, None, None),
+        )
         conn.commit()
     except Exception as e:
         print(f"Failed to mark domain failed: {e}")
@@ -185,11 +251,13 @@ def mark_failed_domain(domain):
     finally:
         cursor.close()
 
+
 def mark_nxdomain_domain(domain):
     cursor = conn.cursor()
     try:
         # Insert or update the domain with the new errors count
-        cursor.execute('''
+        cursor.execute(
+            """
             INSERT INTO raw_domains (domain, failed, ignore, errors, reason, nxdomain, norobots)
             VALUES (%s, %s, %s, %s, %s, %s, %s)
             ON CONFLICT(domain) DO UPDATE SET
@@ -199,7 +267,9 @@ def mark_nxdomain_domain(domain):
             reason = excluded.reason,
             nxdomain = excluded.nxdomain,
             norobots = excluded.norobots
-        ''', (domain, None, None, None, None, True, None))
+        """,
+            (domain, None, None, None, None, True, None),
+        )
         conn.commit()
     except Exception as e:
         print(f"Failed to mark domain NXDOMAIN: {e}")
@@ -207,11 +277,13 @@ def mark_nxdomain_domain(domain):
     finally:
         cursor.close()
 
+
 def mark_norobots_domain(domain):
     cursor = conn.cursor()
     try:
         # Insert or update the domain with the new errors count
-        cursor.execute('''
+        cursor.execute(
+            """
             INSERT INTO raw_domains (domain, failed, ignore, errors, reason, nxdomain, norobots)
             VALUES (%s, %s, %s, %s, %s, %s, %s)
             ON CONFLICT(domain) DO UPDATE SET
@@ -221,7 +293,9 @@ def mark_norobots_domain(domain):
             reason = excluded.reason,
             nxdomain = excluded.nxdomain,
             norobots = excluded.norobots
-        ''', (domain, None, None, None, None, None, True))
+        """,
+            (domain, None, None, None, None, None, True),
+        )
         conn.commit()
     except Exception as e:
         print(f"Failed to mark domain NoRobots: {e}")
@@ -229,22 +303,27 @@ def mark_norobots_domain(domain):
     finally:
         cursor.close()
 
+
 def limit_url_depth(source_url, depth=2):
     parsed_url = urlparse(source_url)
     # Split the path into parts
-    path_parts = parsed_url.path.split('/')
+    path_parts = parsed_url.path.split("/")
     # Filter out empty strings and limit the depth
-    limited_path = '/' + '/'.join([part for part in path_parts if part][:depth])
+    limited_path = "/" + "/".join([part for part in path_parts if part][:depth])
     # Reconstruct the URL with the limited depth path
     new_url = urlunparse(parsed_url._replace(path=limited_path))
     return new_url
 
+
 def delete_domain_if_known(domain):
     cursor = conn.cursor()
     try:
-        cursor.execute('''
+        cursor.execute(
+            """
             DELETE FROM mastodon_domains WHERE domain = %s
-            ''', (domain,))
+            """,
+            (domain,),
+        )
         conn.commit()
     except Exception as e:
         print(f"Failed to delete known domain: {e}")
@@ -252,18 +331,23 @@ def delete_domain_if_known(domain):
     finally:
         cursor.close()
 
+
 def delete_domain_from_raw(domain):
     cursor = conn.cursor()
     try:
-        cursor.execute('''
+        cursor.execute(
+            """
             DELETE FROM raw_domains WHERE domain = %s
-            ''', (domain,))
+            """,
+            (domain,),
+        )
         conn.commit()
     except Exception as e:
         print(f"Failed to delete known domain: {e}")
         conn.rollback()
     finally:
         cursor.close()
+
 
 def clean_version(software_version_full):
     software_version = clean_version_suffix(software_version_full)
@@ -280,6 +364,7 @@ def clean_version(software_version_full):
     software_version = clean_version_release_with_prerelease(software_version)
     return software_version
 
+
 def clean_version_dumbstring(software_version):
     # List of unwanted strings from versions to filter out
     unwanted_strings = ["-pre", "-theconnector"]
@@ -289,27 +374,36 @@ def clean_version_dumbstring(software_version):
 
     return software_version
 
+
 def clean_version_suffix(software_version_full):
     # Remove any unwanted or invalid suffixes from the version string
-    software_version = software_version_full \
-        .split('+')[0] \
-        .split('~')[0] \
-        .split('_')[0] \
-        .split(' ')[0] \
-        .split('/')[0] \
-        .split('@')[0] \
-        .split('&')[0] \
-        .split('patch')[0]
+    software_version = (
+        software_version_full.split("+")[0]
+        .split("~")[0]
+        .split("_")[0]
+        .split(" ")[0]
+        .split("/")[0]
+        .split("@")[0]
+        .split("&")[0]
+        .split("patch")[0]
+    )
 
     return software_version
+
 
 def clean_version_suffix_more(software_version):
-    if "alpha" not in software_version and "beta" not in software_version and "rc" not in software_version and "nightly" not in software_version:
-        software_version = re.split(r'-[a-zA-Z]', software_version)[0]
+    if (
+        "alpha" not in software_version
+        and "beta" not in software_version
+        and "rc" not in software_version
+        and "nightly" not in software_version
+    ):
+        software_version = re.split(r"-[a-zA-Z]", software_version)[0]
     if "nightly" not in software_version:
-        software_version = re.split(r'-\d', software_version)[0]
+        software_version = re.split(r"-\d", software_version)[0]
 
     return software_version
+
 
 def clean_version_date(software_version):
     # Regular expression to match the pattern "-YYMMDD"
@@ -325,16 +419,15 @@ def clean_version_date(software_version):
     # Return the original version if the pattern is not found
     return software_version
 
+
 def clean_version_development(software_version):
-    patterns = {
-        r'rc(\d+)': r'-rc.\1',
-        r'beta(\d+)': r'-beta.\1'
-    }
+    patterns = {r"rc(\d+)": r"-rc.\1", r"beta(\d+)": r"-beta.\1"}
 
     for pattern, replacement in patterns.items():
         software_version = re.sub(pattern, replacement, software_version)
 
     return software_version
+
 
 def clean_version_hometown(software_version):
     if software_version == "1.0.6":
@@ -346,13 +439,15 @@ def clean_version_hometown(software_version):
 
     return software_version
 
+
 def clean_version_doubledash(software_version):
     if "--" in software_version:
         software_version = software_version.replace("--", "-")
-    if software_version.endswith('-'):
+    if software_version.endswith("-"):
         software_version = software_version[:-1]
 
     return software_version
+
 
 def clean_version_oddstring(software_version):
     if "mastau" in software_version:
@@ -360,17 +455,28 @@ def clean_version_oddstring(software_version):
 
     return software_version
 
+
 def clean_version_wrongpatch(software_version):
-    match = re.match(r'^(\d+)\.(\d+)\.(\d+)(-.+)?$', software_version)
+    match = re.match(r"^(\d+)\.(\d+)\.(\d+)(-.+)?$", software_version)
 
     if match:
         if version_latest_release:
-            a, b, c = int(version_latest_release.split('.')[0]), int(version_latest_release.split('.')[1]), int(version_latest_release.split('.')[2])
+            a, b, c = (
+                int(version_latest_release.split(".")[0]),
+                int(version_latest_release.split(".")[1]),
+                int(version_latest_release.split(".")[2]),
+            )
         else:
-            a, b, c = 0, 0, 0  # Default values or handle the case where version_latest_release is None
-        m = int(version_main_branch.split('.')[1])
+            a, b, c = (
+                0,
+                0,
+                0,
+            )  # Default values or handle the case where version_latest_release is None
+        m = int(version_main_branch.split(".")[1])
         x, y, z = int(match.group(1)), int(match.group(2)), int(match.group(3))
-        additional_data = match.group(4)  # This will be None if no dash and additional data is present
+        additional_data = match.group(
+            4
+        )  # This will be None if no dash and additional data is present
 
         if x == a:
             if y == b:
@@ -390,9 +496,12 @@ def clean_version_wrongpatch(software_version):
     else:
         return software_version
 
+
 def clean_version_nightly(software_version):
     # Handle -nightly with date and -security suffix
-    match = re.match(r"4\.[345]\.0-nightly\.(\d{4}-\d{2}-\d{2})(-security)?", software_version)
+    match = re.match(
+        r"4\.[345]\.0-nightly\.(\d{4}-\d{2}-\d{2})(-security)?", software_version
+    )
     if match:
         nightly_date_str, is_security = match.groups()
         nightly_date = datetime.strptime(nightly_date_str, "%Y-%m-%d")
@@ -401,20 +510,32 @@ def clean_version_nightly(software_version):
             nightly_date += timedelta(days=1)
 
         for version, start_date, end_date in nightly_version_ranges:
-            if start_date is not None and end_date is not None and start_date <= nightly_date <= end_date:
+            if (
+                start_date is not None
+                and end_date is not None
+                and start_date <= nightly_date <= end_date
+            ):
                 return version
 
     return software_version
+
 
 def clean_version_main_missing_prerelease(software_version):
     if software_version.startswith(version_main_branch) and "-" not in software_version:
         software_version = f"{software_version}-alpha.1"
     return software_version
 
+
 def clean_version_release_with_prerelease(software_version):
-    if version_latest_release and software_version.startswith(version_latest_release) and "-" in software_version and not version_latest_release.endswith('.0'):
-        software_version = software_version.split('-')[0]
+    if (
+        version_latest_release
+        and software_version.startswith(version_latest_release)
+        and "-" in software_version
+        and not version_latest_release.endswith(".0")
+    ):
+        software_version = software_version.split("-")[0]
     return software_version
+
 
 def get_junk_keywords():
     cursor = conn.cursor()
@@ -430,6 +551,7 @@ def get_junk_keywords():
         cursor.close()
     return []
 
+
 def get_bad_tld():
     cursor = conn.cursor()
     try:
@@ -444,6 +566,7 @@ def get_bad_tld():
         cursor.close()
     return []
 
+
 def get_failed_domains():
     cursor = conn.cursor()
     try:
@@ -457,11 +580,14 @@ def get_failed_domains():
         cursor.close()
     return failed_domains
 
+
 def get_ignored_domains():
     cursor = conn.cursor()
     try:
         cursor.execute("SELECT domain FROM raw_domains WHERE ignore = TRUE")
-        ignored_domains = [row[0].strip() for row in cursor.fetchall() if row[0].strip()]
+        ignored_domains = [
+            row[0].strip() for row in cursor.fetchall() if row[0].strip()
+        ]
         conn.commit()
     except Exception as e:
         print(f"Failed to obtain ignored domains: {e}")
@@ -470,11 +596,14 @@ def get_ignored_domains():
         cursor.close()
     return ignored_domains
 
+
 def get_baddata_domains():
     cursor = conn.cursor()
     try:
         cursor.execute("SELECT domain FROM raw_domains WHERE baddata = TRUE")
-        baddata_domains = [row[0].strip() for row in cursor.fetchall() if row[0].strip()]
+        baddata_domains = [
+            row[0].strip() for row in cursor.fetchall() if row[0].strip()
+        ]
         conn.commit()
     except Exception as e:
         print(f"Failed to obtain baddata domains: {e}")
@@ -483,11 +612,14 @@ def get_baddata_domains():
         cursor.close()
     return baddata_domains
 
+
 def get_nxdomain_domains():
     cursor = conn.cursor()
     try:
         cursor.execute("SELECT domain FROM raw_domains WHERE nxdomain = TRUE")
-        nxdomain_domains = [row[0].strip() for row in cursor.fetchall() if row[0].strip()]
+        nxdomain_domains = [
+            row[0].strip() for row in cursor.fetchall() if row[0].strip()
+        ]
         conn.commit()
     except Exception as e:
         print(f"Failed to obtain NXDOMAIN domains: {e}")
@@ -496,11 +628,14 @@ def get_nxdomain_domains():
         cursor.close()
     return nxdomain_domains
 
+
 def get_norobots_domains():
     cursor = conn.cursor()
     try:
         cursor.execute("SELECT domain FROM raw_domains WHERE norobots = TRUE")
-        norobots_domains = [row[0].strip() for row in cursor.fetchall() if row[0].strip()]
+        norobots_domains = [
+            row[0].strip() for row in cursor.fetchall() if row[0].strip()
+        ]
         conn.commit()
     except Exception as e:
         print(f"Failed to obtain NoRobots domains: {e}")
@@ -509,11 +644,34 @@ def get_norobots_domains():
         cursor.close()
     return norobots_domains
 
-def check_and_record_domains(domain_list, ignored_domains, baddata_domains, failed_domains, user_choice, junk_domains, bad_tlds, domain_endings, http_client, nxdomain_domains, norobots_domains, iftas_domains, nightly_version_ranges):
-    for index, domain in enumerate(domain_list, start=1):
-        print_colored(f'Crawling @ {domain} ({index}/{len(domain_list)})', 'bold')
 
-        if should_skip_domain(domain, ignored_domains, baddata_domains, failed_domains, nxdomain_domains, norobots_domains, user_choice):
+def check_and_record_domains(
+    domain_list,
+    ignored_domains,
+    baddata_domains,
+    failed_domains,
+    user_choice,
+    junk_domains,
+    bad_tlds,
+    domain_endings,
+    http_client,
+    nxdomain_domains,
+    norobots_domains,
+    iftas_domains,
+    nightly_version_ranges,
+):
+    for index, domain in enumerate(domain_list, start=1):
+        print_colored(f"Crawling @ {domain} ({index}/{len(domain_list)})", "bold")
+
+        if should_skip_domain(
+            domain,
+            ignored_domains,
+            baddata_domains,
+            failed_domains,
+            nxdomain_domains,
+            norobots_domains,
+            user_choice,
+        ):
             continue
 
         if is_junk_or_bad_tld(domain, junk_domains, bad_tlds, domain_endings):
@@ -527,60 +685,74 @@ def check_and_record_domains(domain_list, ignored_domains, baddata_domains, fail
         except Exception as e:
             handle_http_exception(domain, e)
 
-def should_skip_domain(domain, ignored_domains, baddata_domains, failed_domains, nxdomain_domains, norobots_domains, user_choice):
+
+def should_skip_domain(
+    domain,
+    ignored_domains,
+    baddata_domains,
+    failed_domains,
+    nxdomain_domains,
+    norobots_domains,
+    user_choice,
+):
     if user_choice != "6" and domain in ignored_domains:
-        print_colored('Previously IGNORED', 'cyan')
+        print_colored("Previously IGNORED", "cyan")
         delete_domain_if_known(domain)
         return True
     if user_choice != "7" and domain in failed_domains:
-        print_colored('Previously FAILED', 'cyan')
+        print_colored("Previously FAILED", "cyan")
         delete_domain_if_known(domain)
         return True
     if user_choice != "8" and domain in nxdomain_domains:
-        print_colored('Previously NXDOMAIN', 'cyan')
+        print_colored("Previously NXDOMAIN", "cyan")
         delete_domain_if_known(domain)
         return True
     if user_choice != "9" and domain in norobots_domains:
-        print_colored('Previously NOROBOTS', 'cyan')
+        print_colored("Previously NOROBOTS", "cyan")
         delete_domain_if_known(domain)
         return True
     if domain in baddata_domains:
-        print_colored('Previous BADDATA', 'cyan')
+        print_colored("Previous BADDATA", "cyan")
         delete_domain_if_known(domain)
         return True
     return False
+
 
 def is_junk_or_bad_tld(domain, junk_domains, bad_tlds, domain_endings):
     if any(junk in domain for junk in junk_domains):
-        print_colored('Purging known junk domain', 'red')
+        print_colored("Purging known junk domain", "red")
         delete_domain_if_known(domain)
         delete_domain_from_raw(domain)
         return True
-    if any(domain.endswith(f'.{tld}') for tld in bad_tlds):
-        print_colored('Purging prohibited TLD', 'red')
+    if any(domain.endswith(f".{tld}") for tld in bad_tlds):
+        print_colored("Purging prohibited TLD", "red")
         mark_nxdomain_domain(domain)
         delete_domain_if_known(domain)
         delete_domain_from_raw(domain)
         return True
-    if not any(domain.endswith(f'.{domain_ending}') for domain_ending in domain_endings):
-        print_colored('Purging unknown TLD', 'red')
+    if not any(
+        domain.endswith(f".{domain_ending}") for domain_ending in domain_endings
+    ):
+        print_colored("Purging unknown TLD", "red")
         mark_nxdomain_domain(domain)
         delete_domain_if_known(domain)
         delete_domain_from_raw(domain)
         return True
     return False
 
+
 def is_iftas_domain(domain, iftas_domains):
-    if any(domain.endswith(f'{dni}') for dni in iftas_domains):
-        print_colored('Known IFTAS DNI domain', 'red')
+    if any(domain.endswith(f"{dni}") for dni in iftas_domains):
+        print_colored("Known IFTAS DNI domain", "red")
         mark_nxdomain_domain(domain)
         delete_domain_if_known(domain)
         return True
     return False
+
 
 def process_domain(domain, http_client):
     if has_emoji_or_special_chars(domain):
-        print_colored('Domain contains special characters', 'red')
+        print_colored("Domain contains special characters", "red")
         mark_nxdomain_domain(domain)
         delete_domain_if_known(domain)
         return
@@ -592,7 +764,9 @@ def process_domain(domain, http_client):
     if not webfinger_data:
         return
 
-    nodeinfo_data = check_nodeinfo(domain, webfinger_data['backend_domain'], http_client)
+    nodeinfo_data = check_nodeinfo(
+        domain, webfinger_data["backend_domain"], http_client
+    )
     if not nodeinfo_data:
         return
 
@@ -601,18 +775,22 @@ def process_domain(domain, http_client):
     else:
         mark_as_non_mastodon(domain)
 
+
 def check_robots_txt(domain, http_client):
-    url = f'https://{domain}/robots.txt'
+    url = f"https://{domain}/robots.txt"
     try:
         response = get_with_fallback(url, http_client)
         # Check for valid HTTP status code
         if response.status_code in [200]:
-            content_type = response.headers.get('Content-Type', '')
-            if content_type in mimetypes.types_map.values() and not content_type.startswith('text/'):
-                error_message = 'robots.txt is not a text file'
-                print_colored(f'{error_message}', 'magenta')
+            content_type = response.headers.get("Content-Type", "")
+            if (
+                content_type in mimetypes.types_map.values()
+                and not content_type.startswith("text/")
+            ):
+                error_message = "robots.txt is not a text file"
+                print_colored(f"{error_message}", "magenta")
                 log_error(domain, error_message)
-                increment_domain_error(domain, 'TXT')
+                increment_domain_error(domain, "TXT")
                 delete_if_error_max(domain)
                 return False
             robots_txt = response.text
@@ -620,18 +798,22 @@ def check_robots_txt(domain, http_client):
             user_agent = None
             for line in lines:
                 line = line.strip().lower()
-                if line.startswith('user-agent:'):
-                    user_agent = line.split(':', 1)[1].strip()
-                elif line.startswith('disallow:'):
-                    disallow_path = line.split(':', 1)[1].strip()
-                    if user_agent in ['*', appname.lower()] and (disallow_path == '/' or disallow_path == '*'):
-                        print_colored('Crawling prohibited by robots.txt', 'red')
+                if line.startswith("user-agent:"):
+                    user_agent = line.split(":", 1)[1].strip()
+                elif line.startswith("disallow:"):
+                    disallow_path = line.split(":", 1)[1].strip()
+                    if user_agent in ["*", appname.lower()] and (
+                        disallow_path == "/" or disallow_path == "*"
+                    ):
+                        print_colored("Crawling prohibited by robots.txt", "red")
                         mark_norobots_domain(domain)
                         delete_domain_if_known(domain)
                         return False
         # Check for specific HTTP status codes
         elif response.status_code in http_codes_to_hardfail:
-            print_colored(f'Responded HTTP {response.status_code} to robots.txt request', 'red')
+            print_colored(
+                f"Responded HTTP {response.status_code} to robots.txt request", "red"
+            )
             mark_failed_domain(domain)
             delete_domain_if_known(domain)
             return False
@@ -640,83 +822,88 @@ def check_robots_txt(domain, http_client):
         return False
     return True
 
+
 def check_webfinger(domain, http_client):
-    url = f'https://{domain}/.well-known/webfinger?resource=acct:{domain}@{domain}'
+    url = f"https://{domain}/.well-known/webfinger?resource=acct:{domain}@{domain}"
     try:
         response = get_with_fallback(url, http_client)
-        content_type = response.headers.get('Content-Type', '')
-        content_length = response.headers.get('Content-Length', '')
+        content_type = response.headers.get("Content-Type", "")
+        content_length = response.headers.get("Content-Length", "")
         if response.status_code in [200]:
-            if 'json' not in content_type:
-                print('WebFinger reply is not a JSON file…')
+            if "json" not in content_type:
+                print("WebFinger reply is not a JSON file…")
                 hostmeta_result = check_hostmeta(domain, http_client)
                 if hostmeta_result:
-                    backend_domain = hostmeta_result['backend_domain']
-                    return {'backend_domain': backend_domain}
+                    backend_domain = hostmeta_result["backend_domain"]
+                    return {"backend_domain": backend_domain}
                 else:
                     return None
-            if not response.content or content_length == '0':
-                print('WebFinger reply is empty…')
+            if not response.content or content_length == "0":
+                print("WebFinger reply is empty…")
                 hostmeta_result = check_hostmeta(domain, http_client)
                 if hostmeta_result:
-                    backend_domain = hostmeta_result['backend_domain']
-                    return {'backend_domain': backend_domain}
+                    backend_domain = hostmeta_result["backend_domain"]
+                    return {"backend_domain": backend_domain}
                 else:
                     return None
-            if not 'aliases' in response.content.decode('utf-8'):
-                print('WebFinger reply is invalid…')
+            if not "aliases" in response.content.decode("utf-8"):
+                print("WebFinger reply is invalid…")
                 hostmeta_result = check_hostmeta(domain, http_client)
                 if hostmeta_result:
-                    backend_domain = hostmeta_result['backend_domain']
-                    return {'backend_domain': backend_domain}
+                    backend_domain = hostmeta_result["backend_domain"]
+                    return {"backend_domain": backend_domain}
                 else:
                     return None
-            if 'localhost' in response.content.decode('utf-8'):
-                error_message = f'WebFinger alias points to localhost'
-                print_colored(f'{error_message}', 'magenta')
+            if "localhost" in response.content.decode("utf-8"):
+                error_message = f"WebFinger alias points to localhost"
+                print_colored(f"{error_message}", "magenta")
                 log_error(domain, error_message)
-                increment_domain_error(domain, '???')
+                increment_domain_error(domain, "???")
                 delete_domain_if_known(domain)
                 return None
             else:
                 data = response.json()
-            aliases = data.get('aliases', [])
+            aliases = data.get("aliases", [])
             if not aliases:
                 mark_as_non_mastodon(domain)
                 return None
-            first_alias = next((alias for alias in aliases if 'https' in alias), None)
+            first_alias = next((alias for alias in aliases if "https" in alias), None)
             if first_alias:
                 backend_domain = urlparse(first_alias).netloc
-                return {'backend_domain': backend_domain}
+                return {"backend_domain": backend_domain}
                 # Check for specific HTTP status codes
             else:
-                print('WebFinger reply does not contain a valid alias…')
+                print("WebFinger reply does not contain a valid alias…")
                 hostmeta_result = check_hostmeta(domain, http_client)
                 if hostmeta_result:
-                    backend_domain = hostmeta_result['backend_domain']
-                    return {'backend_domain': backend_domain}
+                    backend_domain = hostmeta_result["backend_domain"]
+                    return {"backend_domain": backend_domain}
                 else:
                     return None
         elif response.status_code in http_codes_to_hardfail:
-            print_colored(f'Responded HTTP {response.status_code} to Webfinger request', 'red')
+            print_colored(
+                f"Responded HTTP {response.status_code} to Webfinger request", "red"
+            )
             mark_failed_domain(domain)
             delete_domain_if_known(domain)
             return False
         elif response.status_code in http_codes_to_softfail:
-            if 'json' in content_type:
+            if "json" in content_type:
                 mark_as_non_mastodon(domain)
                 return None
             else:
-                print(f'Responded HTTP {response.status_code} to WebFinger request…')
+                print(f"Responded HTTP {response.status_code} to WebFinger request…")
                 hostmeta_result = check_hostmeta(domain, http_client)
                 if hostmeta_result:
-                    backend_domain = hostmeta_result['backend_domain']
-                    return {'backend_domain': backend_domain}
+                    backend_domain = hostmeta_result["backend_domain"]
+                    return {"backend_domain": backend_domain}
                 else:
                     return None
         else:
-            error_message = f'Responded HTTP {response.status_code} to WebFinger request'
-            print_colored(f'{error_message}', 'yellow')
+            error_message = (
+                f"Responded HTTP {response.status_code} to WebFinger request"
+            )
+            print_colored(f"{error_message}", "yellow")
             log_error(domain, error_message)
             increment_domain_error(domain, str(response.status_code))
             delete_if_error_max(domain)
@@ -726,24 +913,25 @@ def check_webfinger(domain, http_client):
         handle_json_exception(domain, e)
     return None
 
+
 def check_hostmeta(domain, http_client):
-    url = f'https://{domain}/.well-known/host-meta'
+    url = f"https://{domain}/.well-known/host-meta"
     try:
         response = get_with_fallback(url, http_client)
         if response.status_code in [200]:
-            content_type = response.headers.get('Content-Type', '')
-            if 'xml' not in content_type:
-                error_message = 'HostMeta reply is not an XML file…'
-                print(f'{error_message}')
-                return {'backend_domain': domain}
-            if 'xhtml' in content_type:
-                error_message = 'HostMeta reply is an XHTML file…'
-                print(f'{error_message}')
-                return {'backend_domain': domain}
+            content_type = response.headers.get("Content-Type", "")
+            if "xml" not in content_type:
+                error_message = "HostMeta reply is not an XML file…"
+                print(f"{error_message}")
+                return {"backend_domain": domain}
+            if "xhtml" in content_type:
+                error_message = "HostMeta reply is an XHTML file…"
+                print(f"{error_message}")
+                return {"backend_domain": domain}
             if not response.content:
-                error_message = 'HostMeta reply is empty…'
-                print(f'{error_message}')
-                return {'backend_domain': domain}
+                error_message = "HostMeta reply is empty…"
+                print(f"{error_message}")
+                return {"backend_domain": domain}
             else:
                 content = response.content.strip()
                 content = content.lower()
@@ -751,60 +939,63 @@ def check_hostmeta(domain, http_client):
                 try:
                     xmldata = etree.fromstring(content, parser=parser)
                 except etree.XMLSyntaxError as e:
-                    error_message = f'Invalid XML: {e}'
-                    print(f'{error_message}')
-                    return {'backend_domain': domain}
-                ns = {'xrd': 'http://docs.oasis-open.org/ns/xri/xrd-1.0'}  # Namespace
+                    error_message = f"Invalid XML: {e}"
+                    print(f"{error_message}")
+                    return {"backend_domain": domain}
+                ns = {"xrd": "http://docs.oasis-open.org/ns/xri/xrd-1.0"}  # Namespace
                 try:
                     link = xmldata.find(".//xrd:link[@rel='lrdd']", namespaces=ns)
                 except AttributeError as e:
                     print(f"Error finding 'lrdd' link in HostMeta XML…")
-                    return {'backend_domain': domain}
+                    return {"backend_domain": domain}
                 except etree.XMLSyntaxError as e:
                     print(f"XML syntax error while parsing HostMeta…")
-                    return {'backend_domain': domain}
+                    return {"backend_domain": domain}
                 if link is None:
-                    print('Unable to find lrdd link in HostMeta…')
-                    return {'backend_domain': domain}
+                    print("Unable to find lrdd link in HostMeta…")
+                    return {"backend_domain": domain}
                 else:
-                    parsed_link = urlparse(link.get('template'))
+                    parsed_link = urlparse(link.get("template"))
                     backend_domain = parsed_link.netloc
-                    return {'backend_domain': backend_domain}
+                    return {"backend_domain": backend_domain}
         elif response.status_code in http_codes_to_hardfail:
-            print_colored(f'Responded HTTP {response.status_code} to HostMeta request', 'red')
+            print_colored(
+                f"Responded HTTP {response.status_code} to HostMeta request", "red"
+            )
             mark_failed_domain(domain)
             delete_domain_if_known(domain)
             return False
         elif response.status_code in http_codes_to_softfail:
-            print(f'Responded HTTP {response.status_code} to HostMeta request…')
-            return {'backend_domain': domain}
+            print(f"Responded HTTP {response.status_code} to HostMeta request…")
+            return {"backend_domain": domain}
         else:
-            error_message = f'Responded HTTP {response.status_code} to HostMeta request'
-            print_colored(f'{error_message}', 'yellow')
-            log_error(domain, f'{error_message}')
+            error_message = f"Responded HTTP {response.status_code} to HostMeta request"
+            print_colored(f"{error_message}", "yellow")
+            log_error(domain, f"{error_message}")
             increment_domain_error(domain, str(response.status_code))
             delete_if_error_max(domain)
     except httpx.RequestError as e:
         handle_http_exception(domain, e)
 
+
 def check_nodeinfo(domain, backend_domain, http_client):
-    url = f'https://{backend_domain}/.well-known/nodeinfo'
+    url = f"https://{backend_domain}/.well-known/nodeinfo"
     try:
         response = get_with_fallback(url, http_client)
         if response.status_code in [200]:
-            content_type = response.headers.get('Content-Type', '')
-            if 'json' not in content_type:
-                error_message = 'NodeInfo reply is not a JSON file'
-                print_colored(f'{error_message}', 'magenta')
+            content_type = response.headers.get("Content-Type", "")
+            if "json" not in content_type:
+                error_message = "NodeInfo reply is not a JSON file"
+                print_colored(f"{error_message}", "magenta")
                 log_error(domain, error_message)
-                increment_domain_error(domain, 'JSON')
+                increment_domain_error(domain, "JSON")
                 delete_if_error_max(domain)
                 return None
             if not response.content:
-                error_message = 'NodeInfo reply is empty'
-                print_colored(f'{error_message}', 'magenta')
+                error_message = "NodeInfo reply is empty"
+                print_colored(f"{error_message}", "magenta")
                 log_error(domain, error_message)
-                increment_domain_error(domain, 'JSON')
+                increment_domain_error(domain, "JSON")
                 delete_if_error_max(domain)
                 return None
             else:
@@ -817,62 +1008,85 @@ def check_nodeinfo(domain, backend_domain, http_client):
                     increment_domain_error(domain, "JSON")
                     delete_if_error_max(domain)
                     return None
-            if 'links' in data and len(data['links']) > 0:
-                nodeinfo_2_url = next((link['href'] for link in data['links']
-                                    if link.get('rel') == 'http://nodeinfo.diaspora.software/ns/schema/2.0'
-                                    and 'href' in link), None)
+            if "links" in data and len(data["links"]) > 0:
+                nodeinfo_2_url = next(
+                    (
+                        link["href"]
+                        for link in data["links"]
+                        if link.get("rel")
+                        == "http://nodeinfo.diaspora.software/ns/schema/2.0"
+                        and "href" in link
+                    ),
+                    None,
+                )
                 if not nodeinfo_2_url:
-                    rel_index = next((i for i, link in enumerate(data['links'])
-                                    if link.get('rel') == 'http://nodeinfo.diaspora.software/ns/schema/2.0'
-                                    and 'href' not in link), None)
-                    if rel_index is not None and rel_index + 1 < len(data['links']):
-                        next_obj = data['links'][rel_index + 1]
-                        if 'href' in next_obj and 'rel' not in next_obj:
-                            nodeinfo_2_url = next_obj['href']
+                    rel_index = next(
+                        (
+                            i
+                            for i, link in enumerate(data["links"])
+                            if link.get("rel")
+                            == "http://nodeinfo.diaspora.software/ns/schema/2.0"
+                            and "href" not in link
+                        ),
+                        None,
+                    )
+                    if rel_index is not None and rel_index + 1 < len(data["links"]):
+                        next_obj = data["links"][rel_index + 1]
+                        if "href" in next_obj and "rel" not in next_obj:
+                            nodeinfo_2_url = next_obj["href"]
 
-                if nodeinfo_2_url and 'wp-json' not in nodeinfo_2_url:
+                if nodeinfo_2_url and "wp-json" not in nodeinfo_2_url:
                     nodeinfo_response = get_with_fallback(nodeinfo_2_url, http_client)
                     if nodeinfo_response.status_code in [200]:
-                        nodeinfo_response_content_type = nodeinfo_response.headers.get('Content-Type', '')
-                        if 'json' not in nodeinfo_response_content_type:
-                            error_message = 'NodeInfo V2 reply is not a JSON file'
-                            print_colored(f'{error_message}', 'magenta')
+                        nodeinfo_response_content_type = nodeinfo_response.headers.get(
+                            "Content-Type", ""
+                        )
+                        if "json" not in nodeinfo_response_content_type:
+                            error_message = "NodeInfo V2 reply is not a JSON file"
+                            print_colored(f"{error_message}", "magenta")
                             log_error(domain, error_message)
-                            increment_domain_error(domain, 'JSON')
+                            increment_domain_error(domain, "JSON")
                             delete_if_error_max(domain)
                             return None
                         if not nodeinfo_response.content:
-                            error_message = 'NodeInfo V2 reply is empty'
-                            print_colored(f'{error_message}', 'magenta')
+                            error_message = "NodeInfo V2 reply is empty"
+                            print_colored(f"{error_message}", "magenta")
                             log_error(domain, error_message)
-                            increment_domain_error(domain, 'JSON')
+                            increment_domain_error(domain, "JSON")
                             delete_if_error_max(domain)
                             return None
                         else:
                             return nodeinfo_response.json()
                     elif nodeinfo_response.status_code in http_codes_to_hardfail:
-                        print_colored(f'Responded HTTP {response.status_code} to NodeInfo request', 'red')
+                        print_colored(
+                            f"Responded HTTP {response.status_code} to NodeInfo request",
+                            "red",
+                        )
                         mark_failed_domain(domain)
                         delete_domain_if_known(domain)
                         return False
                     else:
-                        error_message = f'Responded HTTP {nodeinfo_response.status_code} to NodeInfo request'
-                        print_colored(f'{error_message}', 'yellow')
-                        log_error(domain, f'{error_message}')
-                        increment_domain_error(domain, str(nodeinfo_response.status_code))
+                        error_message = f"Responded HTTP {nodeinfo_response.status_code} to NodeInfo request"
+                        print_colored(f"{error_message}", "yellow")
+                        log_error(domain, f"{error_message}")
+                        increment_domain_error(
+                            domain, str(nodeinfo_response.status_code)
+                        )
                         delete_if_error_max(domain)
                 else:
                     mark_as_non_mastodon(domain)
             else:
                 mark_as_non_mastodon(domain)
         elif response.status_code in http_codes_to_hardfail:
-            print_colored(f'Responded HTTP {response.status_code} to NodeInfo request', 'red')
+            print_colored(
+                f"Responded HTTP {response.status_code} to NodeInfo request", "red"
+            )
             mark_failed_domain(domain)
             delete_domain_if_known(domain)
         else:
-            error_message = f'Responded HTTP {response.status_code} to NodeInfo request'
-            print_colored(f'{error_message}', 'yellow')
-            log_error(domain, f'{error_message}')
+            error_message = f"Responded HTTP {response.status_code} to NodeInfo request"
+            print_colored(f"{error_message}", "yellow")
+            log_error(domain, f"{error_message}")
             increment_domain_error(domain, str(response.status_code))
             delete_if_error_max(domain)
     except httpx.RequestError as e:
@@ -881,50 +1095,56 @@ def check_nodeinfo(domain, backend_domain, http_client):
         handle_json_exception(domain, e)
     return None
 
+
 def is_mastodon_instance(nodeinfo_data: dict) -> bool:
     """Check if the given NodeInfo response indicates a Mastodon instance."""
     if not isinstance(nodeinfo_data, dict):
         return False
 
-    software = nodeinfo_data.get('software')
+    software = nodeinfo_data.get("software")
     if software is None:
         return False
 
-    software_name = software.get('name')
+    software_name = software.get("name")
     if software_name is None:
         return False
 
-    return software_name.lower() in {'mastodon', 'hometown', 'kmyblue', 'glitchcafe'}
+    return software_name.lower() in {"mastodon", "hometown", "kmyblue", "glitchcafe"}
+
 
 def process_mastodon_instance(domain, webfinger_data, nodeinfo_data, http_client):
-    software_name = nodeinfo_data['software']['name'].lower()
-    software_version_full = nodeinfo_data['software']['version']
-    software_version = clean_version(nodeinfo_data['software']['version'])
+    software_name = nodeinfo_data["software"]["name"].lower()
+    software_version_full = nodeinfo_data["software"]["version"]
+    software_version = clean_version(nodeinfo_data["software"]["version"])
 
-    if 'usage' not in nodeinfo_data or 'users' not in nodeinfo_data['usage']:
-        error_to_print = f'Mastodon v{software_version} but not reporting user count'
-        print_colored(error_to_print, 'magenta')
+    if "usage" not in nodeinfo_data or "users" not in nodeinfo_data["usage"]:
+        error_to_print = f"Mastodon v{software_version} but not reporting user count"
+        print_colored(error_to_print, "magenta")
         log_error(domain, error_to_print)
-        increment_domain_error(domain, '###')
+        increment_domain_error(domain, "###")
         delete_domain_if_known(domain)
         return
 
-    if 'total' in nodeinfo_data['usage']['users']:
-        total_users = nodeinfo_data['usage']['users']['total']
+    if "total" in nodeinfo_data["usage"]["users"]:
+        total_users = nodeinfo_data["usage"]["users"]["total"]
     else:
-        error_to_print = f'Mastodon v{software_version} but not reporting total user count'
-        print_colored(error_to_print, 'magenta')
+        error_to_print = (
+            f"Mastodon v{software_version} but not reporting total user count"
+        )
+        print_colored(error_to_print, "magenta")
         log_error(domain, error_to_print)
-        increment_domain_error(domain, '###')
+        increment_domain_error(domain, "###")
         delete_domain_if_known(domain)
         return
-    if 'activeMonth' in nodeinfo_data['usage']['users']:
-        active_month_users = nodeinfo_data['usage']['users']['activeMonth']
+    if "activeMonth" in nodeinfo_data["usage"]["users"]:
+        active_month_users = nodeinfo_data["usage"]["users"]["activeMonth"]
     else:
-        error_to_print = f'Mastodon v{software_version} but not reporting active user count'
-        print_colored(error_to_print, 'magenta')
+        error_to_print = (
+            f"Mastodon v{software_version} but not reporting active user count"
+        )
+        print_colored(error_to_print, "magenta")
         log_error(domain, error_to_print)
-        increment_domain_error(domain, '###')
+        increment_domain_error(domain, "###")
         delete_domain_if_known(domain)
         return
 
@@ -936,55 +1156,59 @@ def process_mastodon_instance(domain, webfinger_data, nodeinfo_data, http_client
     try:
         response = get_with_fallback(instance_api_url, http_client)
         if response.status_code in [200]:
-            content_type = response.headers.get('Content-Type', '')
+            content_type = response.headers.get("Content-Type", "")
             if not response.content:
-                error_message = 'Instance API reply is empty'
-                print_colored(f'{error_message}', 'magenta')
+                error_message = "Instance API reply is empty"
+                print_colored(f"{error_message}", "magenta")
                 log_error(domain, error_message)
-                increment_domain_error(domain, 'API')
+                increment_domain_error(domain, "API")
                 delete_if_error_max(domain)
                 return None
-            elif 'json' not in content_type:
-                error_message = 'Instance API reply is not a JSON file'
-                print_colored(f'{error_message}', 'magenta')
+            elif "json" not in content_type:
+                error_message = "Instance API reply is not a JSON file"
+                print_colored(f"{error_message}", "magenta")
                 log_error(domain, error_message)
-                increment_domain_error(domain, 'API')
+                increment_domain_error(domain, "API")
                 delete_if_error_max(domain)
                 return None
 
             response_json = response.json()
-            if 'error' in response_json:
-                error_message = 'Instance API returned an error'
-                print_colored(f'{error_message}', 'magenta')
+            if "error" in response_json:
+                error_message = "Instance API returned an error"
+                print_colored(f"{error_message}", "magenta")
                 log_error(domain, error_message)
-                increment_domain_error(domain, 'API')
+                increment_domain_error(domain, "API")
                 delete_if_error_max(domain)
                 return None
             else:
                 instance_api_data = response_json
 
             if software_version.startswith("4"):
-                actual_domain = instance_api_data['domain'].lower()
-                if 'email' in instance_api_data['contact']:
-                    contact_account = normalize_email(instance_api_data['contact']['email']).lower()
+                actual_domain = instance_api_data["domain"].lower()
+                if "email" in instance_api_data["contact"]:
+                    contact_account = normalize_email(
+                        instance_api_data["contact"]["email"]
+                    ).lower()
                 else:
                     contact_account = None
-                if 'created_at' in instance_api_data['contact']:
-                    admin_creation = instance_api_data['contact']['created_at']
+                if "created_at" in instance_api_data["contact"]:
+                    admin_creation = instance_api_data["contact"]["created_at"]
                 else:
                     admin_creation = None
-                if 'source_url' in instance_api_data:
-                    source_url = instance_api_data['source_url']
+                if "source_url" in instance_api_data:
+                    source_url = instance_api_data["source_url"]
                 else:
                     source_url = None
             else:
-                actual_domain = instance_api_data['uri'].lower()
-                if 'email' in instance_api_data:
-                    contact_account = normalize_email(instance_api_data['email']).lower()
+                actual_domain = instance_api_data["uri"].lower()
+                if "email" in instance_api_data:
+                    contact_account = normalize_email(
+                        instance_api_data["email"]
+                    ).lower()
                 else:
                     contact_account = None
-                if 'created_at' in instance_api_data:
-                    admin_creation = instance_api_data['contact_account']['created_at']
+                if "created_at" in instance_api_data:
+                    admin_creation = instance_api_data["contact_account"]["created_at"]
                 else:
                     admin_creation = None
                 source_url = None
@@ -995,48 +1219,64 @@ def process_mastodon_instance(domain, webfinger_data, nodeinfo_data, http_client
             if source_url:
                 source_url = limit_url_depth(source_url)
 
-            if source_url == '/source.tar.gz':
-                source_url = f'https://{actual_domain}{source_url}'
+            if source_url == "/source.tar.gz":
+                source_url = f"https://{actual_domain}{source_url}"
 
-            if software_name == 'hometown':
-                source_url = 'https://github.com/hometown-fork/hometown'
+            if software_name == "hometown":
+                source_url = "https://github.com/hometown-fork/hometown"
 
             if actual_domain == "gc2.jp":
                 source_url = "https://github.com/gc2-jp/freespeech"
 
             # Check for invalid user counts
-            if active_month_users > max(total_users + 6, total_users + (total_users * 0.25)):
-                error_to_print = f'Mastodon v{software_version} but contains invalid active user counts ({active_month_users}/{total_users})'
-                print_colored(error_to_print, 'magenta')
+            if active_month_users > max(
+                total_users + 6, total_users + (total_users * 0.25)
+            ):
+                error_to_print = f"Mastodon v{software_version} but contains invalid active user counts ({active_month_users}/{total_users})"
+                print_colored(error_to_print, "magenta")
                 log_error(domain, error_to_print)
-                increment_domain_error(domain, '###')
+                increment_domain_error(domain, "###")
                 delete_domain_if_known(domain)
                 return
 
             # Check for invalid software versions
-            if version.parse(software_version.split("-")[0]) > version.parse(version_main_branch):
+            if version.parse(software_version.split("-")[0]) > version.parse(
+                version_main_branch
+            ):
                 error_to_print = f'Mastodon v{software_version.split("-")[0]} is higher than main branch version v{version_main_branch}.0'
-                print_colored(error_to_print, 'magenta')
+                print_colored(error_to_print, "magenta")
                 log_error(domain, error_to_print)
-                increment_domain_error(domain, '???')
+                increment_domain_error(domain, "???")
                 delete_domain_if_known(domain)
                 return
 
             # Update database
-            update_mastodon_domain(actual_domain, software_version, software_version_full, total_users, active_month_users, contact_account, source_url, admin_creation)
+            update_mastodon_domain(
+                actual_domain,
+                software_version,
+                software_version_full,
+                total_users,
+                active_month_users,
+                contact_account,
+                source_url,
+                admin_creation,
+            )
             # add_registration_date(actual_domain)
             clear_domain_error(domain)
 
-            if software_version == nodeinfo_data['software']['version']:
-                print_colored(f'Mastodon v{software_version}', 'green')
+            if software_version == nodeinfo_data["software"]["version"]:
+                print_colored(f"Mastodon v{software_version}", "green")
             else:
-                print_colored(f'Mastodon v{software_version} ({nodeinfo_data["software"]["version"]})', 'green')
+                print_colored(
+                    f'Mastodon v{software_version} ({nodeinfo_data["software"]["version"]})',
+                    "green",
+                )
 
         else:
-            error_message = f'Failed to respond to API request'
-            print_colored(f'{error_message}', 'magenta')
+            error_message = f"Failed to respond to API request"
+            print_colored(f"{error_message}", "magenta")
             log_error(domain, error_message)
-            increment_domain_error(domain, 'API')
+            increment_domain_error(domain, "API")
             delete_if_error_max(domain)
 
     except httpx.RequestError as e:
@@ -1044,10 +1284,21 @@ def process_mastodon_instance(domain, webfinger_data, nodeinfo_data, http_client
     except json.JSONDecodeError as e:
         handle_json_exception(domain, e)
 
-def update_mastodon_domain(actual_domain, software_version, software_version_full, total_users, active_month_users, contact_account, source_url, admin_creation):
+
+def update_mastodon_domain(
+    actual_domain,
+    software_version,
+    software_version_full,
+    total_users,
+    active_month_users,
+    contact_account,
+    source_url,
+    admin_creation,
+):
     cursor = conn.cursor()
     try:
-        cursor.execute('''
+        cursor.execute(
+            """
             INSERT INTO mastodon_domains
             (domain, software_version, total_users, active_users_monthly, timestamp, contact, source, full_version, registration_date)
             VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
@@ -1060,8 +1311,19 @@ def update_mastodon_domain(actual_domain, software_version, software_version_ful
             source = excluded.source,
             full_version = excluded.full_version,
             registration_date = excluded.registration_date
-        ''', (actual_domain, software_version, total_users, active_month_users,
-              datetime.now(timezone.utc), contact_account, source_url, software_version_full, admin_creation))
+        """,
+            (
+                actual_domain,
+                software_version,
+                total_users,
+                active_month_users,
+                datetime.now(timezone.utc),
+                contact_account,
+                source_url,
+                software_version_full,
+                admin_creation,
+            ),
+        )
         conn.commit()
     except Exception as e:
         print(f"Failed to update Mastodon domain data: {e}")
@@ -1069,11 +1331,15 @@ def update_mastodon_domain(actual_domain, software_version, software_version_ful
     finally:
         cursor.close()
 
+
 def add_registration_date(actual_domain):
     cursor = conn.cursor()
     try:
         # Check if registration_date is already set
-        cursor.execute('SELECT registration_date FROM mastodon_domains WHERE domain = %s', (actual_domain,))
+        cursor.execute(
+            "SELECT registration_date FROM mastodon_domains WHERE domain = %s",
+            (actual_domain,),
+        )
         result = cursor.fetchone()
         if result and result[0] is not None:
             return
@@ -1082,13 +1348,16 @@ def add_registration_date(actual_domain):
         if not registration_date:
             registration_date = datetime.now(timezone.utc)
         # Insert or update registration_date if not already set
-        cursor.execute('''
+        cursor.execute(
+            """
             INSERT INTO mastodon_domains
             (domain, registration_date)
             VALUES (%s, %s)
             ON CONFLICT(domain) DO UPDATE SET
             registration_date = excluded.registration_date
-        ''', (actual_domain, registration_date))
+        """,
+            (actual_domain, registration_date),
+        )
         conn.commit()
     except Exception as e:
         print(f"Failed to update Mastodon domain data: {e}")
@@ -1096,67 +1365,77 @@ def add_registration_date(actual_domain):
     finally:
         cursor.close()
 
+
 def mark_as_non_mastodon(domain):
-    print_colored('Not using Mastodon', 'red')
+    print_colored("Not using Mastodon", "red")
     mark_ignore_domain(domain)
     delete_domain_if_known(domain)
 
+
 def handle_http_exception(domain, exception):
     error_message = str(exception)
-    if '_ssl.c' in error_message.casefold():
-        error_reason = 'SSL'
-        print_colored(f'{error_message}', 'orange')
+    if "_ssl.c" in error_message.casefold():
+        error_reason = "SSL"
+        print_colored(f"{error_message}", "orange")
         log_error(domain, error_message)
         increment_domain_error(domain, error_reason)
         delete_if_error_max(domain)
-    elif 'maximum allowed redirects' in error_message.casefold():
-        error_reason = 'MAX'
-        error_message = error_message.strip('.')
-        print_colored(f'{error_message}', 'orange')
+    elif "maximum allowed redirects" in error_message.casefold():
+        error_reason = "MAX"
+        error_message = error_message.strip(".")
+        print_colored(f"{error_message}", "orange")
         log_error(domain, error_message)
         increment_domain_error(domain, error_reason)
         delete_if_error_max(domain)
-    elif any(msg in error_message.casefold() for msg in [
-        'nodename nor servname provided',
-        'name or service not known',
-        'no address associated with hostname',
-        'temporary failure in name resolution',
-        'address family not supported'
-    ]):
-        error_reason = 'DNS'
-        print_colored(f'DNS failure: {error_message}', 'orange')
+    elif any(
+        msg in error_message.casefold()
+        for msg in [
+            "nodename nor servname provided",
+            "name or service not known",
+            "no address associated with hostname",
+            "temporary failure in name resolution",
+            "address family not supported",
+        ]
+    ):
+        error_reason = "DNS"
+        print_colored(f"DNS failure: {error_message}", "orange")
         log_error(domain, error_message)
         increment_domain_error(domain, error_reason)
         delete_if_error_max(domain)
-    elif any(msg in error_message.casefold() for msg in [
-        'timed out',
-        'connection reset by peer',
-        'network is unreachable',
-        'connection refused',
-        'could not connect to host',
-        'no route to host',
-        'streamreset',
-        'server disconnected'
-    ]):
-        error_reason = 'TCP'
-        print_colored(f'TCP failure: {error_message}', 'orange')
+    elif any(
+        msg in error_message.casefold()
+        for msg in [
+            "timed out",
+            "connection reset by peer",
+            "network is unreachable",
+            "connection refused",
+            "could not connect to host",
+            "no route to host",
+            "streamreset",
+            "server disconnected",
+        ]
+    ):
+        error_reason = "TCP"
+        print_colored(f"TCP failure: {error_message}", "orange")
         log_error(domain, error_message)
         increment_domain_error(domain, error_reason)
         delete_if_error_max(domain)
     else:
-        error_reason = 'HTTP'
-        print_colored(f'HTTPX failure: {error_message}', 'orange')
+        error_reason = "HTTP"
+        print_colored(f"HTTPX failure: {error_message}", "orange")
         log_error(domain, error_message)
         increment_domain_error(domain, error_reason)
         delete_if_error_max(domain)
 
+
 def handle_json_exception(domain, exception):
     error_message = str(exception)
-    error_reason = 'JSON'
-    print_colored(error_message, 'magenta')
+    error_reason = "JSON"
+    print_colored(error_message, "magenta")
     log_error(domain, error_message)
     increment_domain_error(domain, error_reason)
     delete_if_error_max(domain)
+
 
 def get_domain_registration_date(actual_domain):
     try:
@@ -1185,9 +1464,11 @@ def get_domain_registration_date(actual_domain):
         print(f"Error retrieving domain information: {str(e)}")
         return None
 
+
 def read_domain_list(file_path):
-    with open(file_path, 'r') as file:
+    with open(file_path, "r") as file:
         return [line.strip() for line in file]
+
 
 def load_from_database(user_choice):
     # PostgreSQL uses SIMILAR TO instead of GLOB, and different timestamp functions
@@ -1223,7 +1504,7 @@ def load_from_database(user_choice):
         "52": f"SELECT domain FROM raw_domains WHERE errors >= %s AND errors <= %s ORDER BY errors ASC",
     }
 
-    if user_choice in ["2", "3"]: # Reverse or Random
+    if user_choice in ["2", "3"]:  # Reverse or Random
         query = query_map["1"]  # Default query
         params = [error_threshold]
     else:
@@ -1240,21 +1521,23 @@ def load_from_database(user_choice):
         # elif user_choice == "40":
         #     params = [error_threshold]
         elif user_choice == "42":
-            params = {'versions': all_patched_versions}
+            params = {"versions": all_patched_versions}
             print("Exclusing versions:")
-            for version in params['versions']:
+            for version in params["versions"]:
                 print(f" - {version}")
         elif user_choice == "43":
             params = [f"{version_main_branch}%"]
 
     if not query:
-        print_colored(f"Choice {user_choice} was not available, using default query…", "pink")
+        print_colored(
+            f"Choice {user_choice} was not available, using default query…", "pink"
+        )
         query = query_map["1"]  # Default query
         params = [error_threshold]
 
     cursor = conn.cursor()
     try:
-        cursor.execute(query, params if params else None) # type: ignore
+        cursor.execute(query, params if params else None)  # type: ignore
         domain_list = [row[0].strip() for row in cursor.fetchall() if row[0].strip()]
         conn.commit()
     except Exception as e:
@@ -1266,36 +1549,71 @@ def load_from_database(user_choice):
 
     return domain_list
 
+
 def load_from_file(file_name):
     cursor = conn.cursor()
     domain_list = []
-    with open(file_name, 'r') as file:
+    with open(file_name, "r") as file:
         for line in file:
             domain = line.strip()
             if domain:  # Ensure the domain is not empty
                 domain_list.append(domain)
                 # Check if the domain already exists in the database
-                cursor.execute('SELECT COUNT(*) FROM raw_domains WHERE domain = %s', (domain,))
+                cursor.execute(
+                    "SELECT COUNT(*) FROM raw_domains WHERE domain = %s", (domain,)
+                )
                 result = cursor.fetchone()
                 exists = result is not None and result[0] > 0
 
                 # If not, insert the new domain into the database
                 if not exists:
-                    cursor.execute('INSERT INTO raw_domains (domain, errors) VALUES (%s, %s)', (domain, None))
+                    cursor.execute(
+                        "INSERT INTO raw_domains (domain, errors) VALUES (%s, %s)",
+                        (domain, None),
+                    )
                     cursor.close()
                 conn.commit()
     return domain_list
+
 
 def print_menu() -> None:
     menu_options = {
         "Process new domains": {"0": "Recently Fetched"},
         "Change process direction": {"1": "Standard", "2": "Reverse", "3": "Random"},
-        "Retry fatal errors": {"6": "Other Platforms", "7": "HTTP 410/418", "8": "Bad Domain", "9": "Robots Prohibited"},
-        "Retry connection errors": {"10": "SSL", "11": "HTTP", "12": "TCP", "13": "Redirects", "14": "DNS"},
+        "Retry fatal errors": {
+            "6": "Other Platforms",
+            "7": "HTTP 410/418",
+            "8": "Bad Domain",
+            "9": "Robots Prohibited",
+        },
+        "Retry connection errors": {
+            "10": "SSL",
+            "11": "HTTP",
+            "12": "TCP",
+            "13": "Redirects",
+            "14": "DNS",
+        },
         "Retry HTTP errors": {"20": "2xx", "21": "3xx", "22": "4xx", "23": "5xx"},
-        "Retry specific errors": {"30": "###", "31": "JSON", "32": "TXT", "33": "API", "34": "???"},
-        "Retry good data": {"40": f"Stale ≥1 Week", "41": "Stale ≥1 Day", "42": "Unpatched", "43": "Main", "44": "Inactive", "45": "All Good"},
-        "Retry general errors": {"50": f"Domains w/ >{error_buffer} Errors", "51": f"Domains w/ <{error_threshold} Errors", "52": f"Domains w/ {error_threshold}-{error_buffer} Errors"},
+        "Retry specific errors": {
+            "30": "###",
+            "31": "JSON",
+            "32": "TXT",
+            "33": "API",
+            "34": "???",
+        },
+        "Retry good data": {
+            "40": f"Stale ≥1 Week",
+            "41": "Stale ≥1 Day",
+            "42": "Unpatched",
+            "43": "Main",
+            "44": "Inactive",
+            "45": "All Good",
+        },
+        "Retry general errors": {
+            "50": f"Domains w/ >{error_buffer} Errors",
+            "51": f"Domains w/ <{error_threshold} Errors",
+            "52": f"Domains w/ {error_threshold}-{error_buffer} Errors",
+        },
     }
 
     for category, options in menu_options.items():
@@ -1305,8 +1623,10 @@ def print_menu() -> None:
     print_colored("Enter your choice (1, 2, 3, etc):", "bold", end=" ")
     sys.stdout.flush()
 
+
 def get_user_choice() -> str:
     return sys.stdin.readline().strip()
+
 
 # Main program starts here
 print_colored(f"{appname} v{appversion} ({current_filename})", "bold")
@@ -1324,7 +1644,7 @@ try:
             print("Crawling domains from file…")
         elif single_domain_target:  # Single domain provided as argument
             user_choice = 1
-            domain_list = single_domain_target.replace(' ', '').split(',')
+            domain_list = single_domain_target.replace(" ", "").split(",")
             print(f"Crawling domain{'s' if len(domain_list) > 1 else ''} from target…")
         else:  # Load from database by default
             if args.new:
@@ -1337,7 +1657,9 @@ try:
                 print_menu()
                 user_choice = get_user_choice()
 
-            print_colored(f"Crawling domains from database choice {user_choice}…", "pink")
+            print_colored(
+                f"Crawling domains from database choice {user_choice}…", "pink"
+            )
             domain_list = load_from_database(user_choice)
 
         if user_choice == "2":
@@ -1363,7 +1685,21 @@ try:
     iftas_domains = get_iftas_dni()
     nightly_version_ranges = get_nightly_version_ranges()
 
-    check_and_record_domains(domain_list, ignored_domains, baddata_domains, failed_domains, user_choice, junk_domains, bad_tlds, domain_endings, http_client, nxdomain_domains, norobots_domains, iftas_domains, nightly_version_ranges)
+    check_and_record_domains(
+        domain_list,
+        ignored_domains,
+        baddata_domains,
+        failed_domains,
+        user_choice,
+        junk_domains,
+        bad_tlds,
+        domain_endings,
+        http_client,
+        nxdomain_domains,
+        norobots_domains,
+        iftas_domains,
+        nightly_version_ranges,
+    )
 
     print_colored("Crawling complete!", "bold")
 except KeyboardInterrupt:
@@ -1376,7 +1712,7 @@ if is_running_headless():
     if not (args.file or args.target or args.new or args.buffer):
         try:
             print_colored(f"Re-executing {appname}...", "bold")
-            os.execv(sys.executable, ['python3'] + sys.argv)
+            os.execv(sys.executable, ["python3"] + sys.argv)
         except Exception as e:
             print(f"Failed to re-execute {appname}: {e}")
 else:
