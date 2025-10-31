@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 
 # Define backport branches (adjust as needed)
-backport_branches = ["4.4", "4.3", "4.2"]
+backport_branches = ["4.5", "4.4", "4.3", "4.2"]
 
 # Import required modules
 try:

@@ -500,7 +500,7 @@ def clean_version_wrongpatch(software_version):
 def clean_version_nightly(software_version):
     # Handle -nightly with date and -security suffix
     match = re.match(
-        r"4\.[345]\.0-nightly\.(\d{4}-\d{2}-\d{2})(-security)?", software_version
+        r"4\.[3456]\.0-nightly\.(\d{4}-\d{2}-\d{2})(-security)?", software_version
     )
     if match:
         nightly_date_str, is_security = match.groups()
