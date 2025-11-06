@@ -305,10 +305,11 @@ def get_total_pending_eol_branch_instances():
             """
             SELECT COUNT(DISTINCT domain) as "Latest Total"
             FROM mastodon_domains
-            WHERE software_version LIKE (
-                SELECT branch || '.%'
+            WHERE EXISTS (
+                SELECT 1
                 FROM patch_versions
-                WHERE n_level = 2
+                WHERE n_level >= 2
+                  AND mastodon_domains.software_version LIKE patch_versions.branch || '.%'
             );
         """
         )
@@ -426,7 +427,6 @@ def get_total_previous_patched_instances():
     finally:
         cursor.close()
 
-
 def get_total_pending_eol_patched_instances():
     cursor = conn.cursor()
     value_to_return = 0
@@ -435,11 +435,12 @@ def get_total_pending_eol_patched_instances():
             """
             SELECT COUNT(DISTINCT domain) as "Pending EOL Patched"
             FROM mastodon_domains
-            WHERE software_version LIKE (
-                SELECT software_version
+            WHERE EXISTS (
+                SELECT 1
                 FROM patch_versions
-                WHERE n_level = 2
-            ) || '%';
+                WHERE n_level >= 2
+                  AND mastodon_domains.software_version LIKE patch_versions.software_version || '%'
+            );
         """
         )
         result = cursor.fetchone()
@@ -529,8 +530,6 @@ def get_total_previous_branch_users():
         conn.rollback()
     finally:
         cursor.close()
-
-
 def get_total_pending_eol_branch_users():
     cursor = conn.cursor()
     value_to_return = 0
@@ -539,10 +538,11 @@ def get_total_pending_eol_branch_users():
             """
             SELECT SUM(total_users) as "Latest Total"
             FROM mastodon_domains
-            WHERE software_version LIKE (
-                SELECT branch || '.%'
+            WHERE EXISTS (
+                SELECT 1
                 FROM patch_versions
-                WHERE n_level = 2
+                WHERE n_level >= 2
+                  AND mastodon_domains.software_version LIKE patch_versions.branch || '.%'
             );
         """
         )
@@ -659,8 +659,6 @@ def get_total_previous_patched_users():
         conn.rollback()
     finally:
         cursor.close()
-
-
 def get_total_pending_eol_patched_users():
     cursor = conn.cursor()
     value_to_return = 0
@@ -669,11 +667,12 @@ def get_total_pending_eol_patched_users():
             """
             SELECT SUM(total_users) as "Pending EOL Patched"
             FROM mastodon_domains
-            WHERE software_version LIKE (
-                SELECT software_version
+            WHERE EXISTS (
+                SELECT 1
                 FROM patch_versions
-                WHERE n_level = 2
-            ) || '%';
+                WHERE n_level >= 2
+                  AND mastodon_domains.software_version LIKE patch_versions.software_version || '%'
+            );
         """
         )
         result = cursor.fetchone()
@@ -685,7 +684,6 @@ def get_total_pending_eol_patched_users():
         conn.rollback()
     finally:
         cursor.close()
-
 
 def get_active_main_branch_users():
     cursor = conn.cursor()
@@ -761,10 +759,6 @@ def get_active_previous_branch_users():
     except Exception as e:
         print(f"Failed to obtain active previous instances users: {e}")
         conn.rollback()
-    finally:
-        cursor.close()
-
-
 def get_active_pending_eol_branch_users():
     cursor = conn.cursor()
     value_to_return = 0
@@ -773,10 +767,11 @@ def get_active_pending_eol_branch_users():
             """
             SELECT SUM(active_users_monthly) as "Latest Total"
             FROM mastodon_domains
-            WHERE software_version LIKE (
-                SELECT branch || '.%'
+            WHERE EXISTS (
+                SELECT 1
                 FROM patch_versions
-                WHERE n_level = 2
+                WHERE n_level >= 2
+                  AND mastodon_domains.software_version LIKE patch_versions.branch || '.%'
             );
         """
         )
@@ -890,11 +885,6 @@ def get_active_previous_patched_users():
         return value_to_return
     except Exception as e:
         print(f"Failed to obtain active previous patched instances users: {e}")
-        conn.rollback()
-    finally:
-        cursor.close()
-
-
 def get_active_pending_eol_patched_users():
     cursor = conn.cursor()
     value_to_return = 0
@@ -903,11 +893,12 @@ def get_active_pending_eol_patched_users():
             """
             SELECT SUM(active_users_monthly) as "Pending EOL Patched"
             FROM mastodon_domains
-            WHERE software_version LIKE (
-                SELECT software_version
+            WHERE EXISTS (
+                SELECT 1
                 FROM patch_versions
-                WHERE n_level = 2
-            ) || '%';
+                WHERE n_level >= 2
+                  AND mastodon_domains.software_version LIKE patch_versions.software_version || '%'
+            );
         """
         )
         result = cursor.fetchone()
