@@ -1475,14 +1475,12 @@ def load_from_database(user_choice):
             params = [error_threshold, error_buffer]
         elif user_choice == "50":
             params = [error_buffer]
-        # elif user_choice == "40":
-        #     params = [error_threshold]
-        elif user_choice == "42":
+        elif user_choice == "40":
             params = {"versions": all_patched_versions}
-            print("Exclusing versions:")
+            print("Excluding versions:")
             for version in params["versions"]:
                 print(f" - {version}")
-        elif user_choice == "43":
+        elif user_choice == "41":
             params = [f"{version_main_branch}%"]
 
     if not query:
