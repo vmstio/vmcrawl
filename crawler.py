@@ -1464,6 +1464,28 @@ def get_domain_registration_date(actual_domain):
         print(f"Error retrieving domain information: {str(e)}")
         return None
 
+def cleanup_old_domains():
+    cursor = conn.cursor()
+    try:
+        # Delete known domains older than 1 week
+        cursor.execute(
+            """
+            DELETE FROM mastodon_domains
+            WHERE timestamp <= (CURRENT_TIMESTAMP - INTERVAL '1 week') AT TIME ZONE 'UTC'
+            RETURNING domain
+            """
+        )
+        deleted_domains = [row[0] for row in cursor.fetchall()]
+        if deleted_domains:
+            for d in deleted_domains:
+                print_colored(f"Deleted stale domain {d}", "yellow")
+        conn.commit()
+    except Exception as e:
+        print(f"Failed to clean up old domains: {e}")
+        conn.rollback()
+    finally:
+        cursor.close()
+
 
 def read_domain_list(file_path):
     with open(file_path, "r") as file:
@@ -1700,7 +1722,7 @@ try:
         iftas_domains,
         nightly_version_ranges,
     )
-
+    cleanup_old_domains()
     print_colored("Crawling complete!", "bold")
 except KeyboardInterrupt:
     print_colored(f"\n{appname} interrupted by user", "bold")
