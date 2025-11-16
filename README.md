@@ -92,11 +92,15 @@ Retry specific errors:
 - `33` XML
 
 Retry good data:
-- `40` Refresh Stale Instances
-- `41` Refresh Outdated Instances
-- `42` Refresh Instances Running Main
-- `43` Refresh Inactive Instances (0 Active Users)
-- `44` Refresh All Known Good Instances
+- `40` Refresh Outdated Instances
+- `41` Refresh Instances Running Main
+- `42` Refresh Inactive Instances (0 Active Users)
+- `43` Refresh All Known Good Instances
+
+Retry general errors:
+- `50` Domains with more than 14 Errors
+- `51` Domains with less than 7 Errors
+- `52` Domains with between 7 and 14 Errors
 
 ### Headless Crawling
 
@@ -154,6 +158,11 @@ python fetch.py --random
 ```
 
 You can combine `random` with the `limit` command, but not with `target` or `offset`.
+
+## Nightly Versions
+
+You will need to manually maintain the `nightly_versions` table as new development release versions drop.
+This may be automated in the future.
 
 ## Contributing
 
