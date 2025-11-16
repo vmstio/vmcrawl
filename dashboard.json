@@ -3,19 +3,10 @@
   "kind": "Dashboard",
   "metadata": {
     "name": "aedqo0q7klrswa",
-    "namespace": "default",
-    "uid": "iX4gD7eXtwsCdcdtXxW6EThvcmNup6AODD7rZnZj8KUX",
-    "resourceVersion": "89",
-    "generation": 89,
+    "generation": 92,
     "creationTimestamp": "2025-02-21T16:03:06Z",
-    "labels": {
-      "grafana.app/deprecatedInternalID": "3"
-    },
-    "annotations": {
-      "grafana.app/createdBy": "user:aedqwc9aizocge",
-      "grafana.app/updatedBy": "user:aedqwc9aizocge",
-      "grafana.app/updatedTimestamp": "2025-10-09T18:26:19Z"
-    }
+    "labels": {},
+    "annotations": {}
   },
   "spec": {
     "annotations": [
@@ -28,9 +19,6 @@
           "iconColor": "rgba(0, 211, 255, 1)",
           "name": "Annotations & Alerts",
           "query": {
-            "datasource": {
-              "name": "-- Grafana --"
-            },
             "group": "grafana",
             "kind": "DataQuery",
             "spec": {},
@@ -55,9 +43,6 @@
                   "spec": {
                     "hidden": false,
                     "query": {
-                      "datasource": {
-                        "name": "aedqwq5gb2ebkc"
-                      },
                       "group": "grafana-postgresql-datasource",
                       "kind": "DataQuery",
                       "spec": {
@@ -137,7 +122,7 @@
                 "wideLayout": true
               }
             },
-            "version": "12.2.0"
+            "version": "12.2.1"
           }
         }
       },
@@ -153,9 +138,6 @@
                   "spec": {
                     "hidden": false,
                     "query": {
-                      "datasource": {
-                        "name": "aedqwq5gb2ebkc"
-                      },
                       "group": "grafana-postgresql-datasource",
                       "kind": "DataQuery",
                       "spec": {
@@ -216,6 +198,9 @@
                       "type": "auto"
                     },
                     "filterable": true,
+                    "footer": {
+                      "reducers": []
+                    },
                     "inspect": false
                   },
                   "thresholds": {
@@ -237,20 +222,12 @@
               },
               "options": {
                 "cellHeight": "sm",
-                "footer": {
-                  "countRows": false,
-                  "enablePagination": true,
-                  "fields": "",
-                  "reducer": [
-                    "sum"
-                  ],
-                  "show": false
-                },
+                "enablePagination": true,
                 "showHeader": true,
                 "sortBy": []
               }
             },
-            "version": "12.2.0-16952534486"
+            "version": "12.2.1"
           }
         }
       },
@@ -266,9 +243,6 @@
                   "spec": {
                     "hidden": false,
                     "query": {
-                      "datasource": {
-                        "name": "aedqwq5gb2ebkc"
-                      },
                       "group": "grafana-postgresql-datasource",
                       "kind": "DataQuery",
                       "spec": {
@@ -304,9 +278,6 @@
                   "spec": {
                     "hidden": false,
                     "query": {
-                      "datasource": {
-                        "name": "aedqwq5gb2ebkc"
-                      },
                       "group": "grafana-postgresql-datasource",
                       "kind": "DataQuery",
                       "spec": {
@@ -419,7 +390,7 @@
                 "sizing": "auto"
               }
             },
-            "version": "12.2.0"
+            "version": "12.2.1"
           }
         }
       },
@@ -435,9 +406,6 @@
                   "spec": {
                     "hidden": false,
                     "query": {
-                      "datasource": {
-                        "name": "aedqwq5gb2ebkc"
-                      },
                       "group": "grafana-postgresql-datasource",
                       "kind": "DataQuery",
                       "spec": {
@@ -548,7 +516,7 @@
                 "xTickLabelSpacing": 0
               }
             },
-            "version": "12.2.0-16952534486"
+            "version": "12.2.1"
           }
         }
       },
@@ -564,9 +532,6 @@
                   "spec": {
                     "hidden": false,
                     "query": {
-                      "datasource": {
-                        "name": "aedqwq5gb2ebkc"
-                      },
                       "group": "grafana-postgresql-datasource",
                       "kind": "DataQuery",
                       "spec": {
@@ -620,6 +585,9 @@
                     "cellOptions": {
                       "type": "auto"
                     },
+                    "footer": {
+                      "reducers": []
+                    },
                     "inspect": false
                   },
                   "thresholds": {
@@ -641,18 +609,10 @@
               },
               "options": {
                 "cellHeight": "sm",
-                "footer": {
-                  "countRows": false,
-                  "fields": "",
-                  "reducer": [
-                    "sum"
-                  ],
-                  "show": false
-                },
                 "showHeader": true
               }
             },
-            "version": "12.2.0-16952534486"
+            "version": "12.2.1"
           }
         }
       },
@@ -668,9 +628,6 @@
                   "spec": {
                     "hidden": false,
                     "query": {
-                      "datasource": {
-                        "name": "aedqwq5gb2ebkc"
-                      },
                       "group": "grafana-postgresql-datasource",
                       "kind": "DataQuery",
                       "spec": {
@@ -771,7 +728,7 @@
                 "wideLayout": true
               }
             },
-            "version": "12.2.0"
+            "version": "12.2.1"
           }
         }
       },
@@ -787,9 +744,6 @@
                   "spec": {
                     "hidden": false,
                     "query": {
-                      "datasource": {
-                        "name": "aedqwq5gb2ebkc"
-                      },
                       "group": "grafana-postgresql-datasource",
                       "kind": "DataQuery",
                       "spec": {
@@ -896,7 +850,7 @@
                 "xTickLabelSpacing": 0
               }
             },
-            "version": "12.2.0-16952534486"
+            "version": "12.2.1"
           }
         }
       },
@@ -912,16 +866,13 @@
                   "spec": {
                     "hidden": false,
                     "query": {
-                      "datasource": {
-                        "name": "aedqwq5gb2ebkc"
-                      },
                       "group": "grafana-postgresql-datasource",
                       "kind": "DataQuery",
                       "spec": {
                         "editorMode": "code",
                         "format": "table",
                         "rawQuery": true,
-                        "rawSql": "SELECT COUNT(DISTINCT domain) as \"Latest Patched\"\nFROM mastodon_domains \nWHERE software_version LIKE (\n    SELECT software_version \n    FROM patch_versions \n    WHERE n_level = 0\n) || '%';\n",
+                        "rawSql": "SELECT COUNT(DISTINCT domain) AS \"Latest Patched\"\nFROM mastodon_domains\nWHERE software_version =\n(\n    SELECT software_version\n    FROM patch_versions\n    WHERE n_level = 0\n);\n",
                         "sql": {
                           "columns": [
                             {
@@ -950,9 +901,6 @@
                   "spec": {
                     "hidden": false,
                     "query": {
-                      "datasource": {
-                        "name": "aedqwq5gb2ebkc"
-                      },
                       "group": "grafana-postgresql-datasource",
                       "kind": "DataQuery",
                       "spec": {
@@ -1060,7 +1008,7 @@
                 "sizing": "auto"
               }
             },
-            "version": "12.2.0"
+            "version": "12.2.1"
           }
         }
       },
@@ -1076,9 +1024,6 @@
                   "spec": {
                     "hidden": false,
                     "query": {
-                      "datasource": {
-                        "name": "aedqwq5gb2ebkc"
-                      },
                       "group": "grafana-postgresql-datasource",
                       "kind": "DataQuery",
                       "spec": {
@@ -1114,9 +1059,6 @@
                   "spec": {
                     "hidden": false,
                     "query": {
-                      "datasource": {
-                        "name": "aedqwq5gb2ebkc"
-                      },
                       "group": "grafana-postgresql-datasource",
                       "kind": "DataQuery",
                       "spec": {
@@ -1224,7 +1166,7 @@
                 "sizing": "auto"
               }
             },
-            "version": "12.2.0"
+            "version": "12.2.1"
           }
         }
       },
@@ -1240,9 +1182,6 @@
                   "spec": {
                     "hidden": false,
                     "query": {
-                      "datasource": {
-                        "name": "aedqwq5gb2ebkc"
-                      },
                       "group": "grafana-postgresql-datasource",
                       "kind": "DataQuery",
                       "spec": {
@@ -1293,9 +1232,6 @@
                   "spec": {
                     "hidden": false,
                     "query": {
-                      "datasource": {
-                        "name": "aedqwq5gb2ebkc"
-                      },
                       "group": "grafana-postgresql-datasource",
                       "kind": "DataQuery",
                       "spec": {
@@ -1445,7 +1381,7 @@
                 "xTickLabelSpacing": 0
               }
             },
-            "version": "12.2.0-16952534486"
+            "version": "12.2.1"
           }
         }
       },
@@ -1461,9 +1397,6 @@
                   "spec": {
                     "hidden": false,
                     "query": {
-                      "datasource": {
-                        "name": "aedqwq5gb2ebkc"
-                      },
                       "group": "grafana-postgresql-datasource",
                       "kind": "DataQuery",
                       "spec": {
@@ -1514,9 +1447,6 @@
                   "spec": {
                     "hidden": false,
                     "query": {
-                      "datasource": {
-                        "name": "aedqwq5gb2ebkc"
-                      },
                       "group": "grafana-postgresql-datasource",
                       "kind": "DataQuery",
                       "spec": {
@@ -1666,7 +1596,7 @@
                 "xTickLabelSpacing": 0
               }
             },
-            "version": "12.2.0-16952534486"
+            "version": "12.2.1"
           }
         }
       },
@@ -1682,9 +1612,6 @@
                   "spec": {
                     "hidden": false,
                     "query": {
-                      "datasource": {
-                        "name": "aedqwq5gb2ebkc"
-                      },
                       "group": "grafana-postgresql-datasource",
                       "kind": "DataQuery",
                       "spec": {
@@ -1735,9 +1662,6 @@
                   "spec": {
                     "hidden": false,
                     "query": {
-                      "datasource": {
-                        "name": "aedqwq5gb2ebkc"
-                      },
                       "group": "grafana-postgresql-datasource",
                       "kind": "DataQuery",
                       "spec": {
@@ -1887,7 +1811,7 @@
                 "xTickLabelSpacing": 0
               }
             },
-            "version": "12.2.0-16952534486"
+            "version": "12.2.1"
           }
         }
       },
@@ -1903,9 +1827,6 @@
                   "spec": {
                     "hidden": false,
                     "query": {
-                      "datasource": {
-                        "name": "aedqwq5gb2ebkc"
-                      },
                       "group": "grafana-postgresql-datasource",
                       "kind": "DataQuery",
                       "spec": {
@@ -1956,9 +1877,6 @@
                   "spec": {
                     "hidden": false,
                     "query": {
-                      "datasource": {
-                        "name": "aedqwq5gb2ebkc"
-                      },
                       "group": "grafana-postgresql-datasource",
                       "kind": "DataQuery",
                       "spec": {
@@ -2108,7 +2026,7 @@
                 "xTickLabelSpacing": 0
               }
             },
-            "version": "12.2.0-16952534486"
+            "version": "12.2.1"
           }
         }
       },
@@ -2124,9 +2042,6 @@
                   "spec": {
                     "hidden": false,
                     "query": {
-                      "datasource": {
-                        "name": "aedqwq5gb2ebkc"
-                      },
                       "group": "grafana-postgresql-datasource",
                       "kind": "DataQuery",
                       "spec": {
@@ -2177,9 +2092,6 @@
                   "spec": {
                     "hidden": false,
                     "query": {
-                      "datasource": {
-                        "name": "aedqwq5gb2ebkc"
-                      },
                       "group": "grafana-postgresql-datasource",
                       "kind": "DataQuery",
                       "spec": {
@@ -2329,7 +2241,7 @@
                 "xTickLabelSpacing": 0
               }
             },
-            "version": "12.2.0-16952534486"
+            "version": "12.2.1"
           }
         }
       },
@@ -2345,9 +2257,6 @@
                   "spec": {
                     "hidden": false,
                     "query": {
-                      "datasource": {
-                        "name": "aedqwq5gb2ebkc"
-                      },
                       "group": "grafana-postgresql-datasource",
                       "kind": "DataQuery",
                       "spec": {
@@ -2398,9 +2307,6 @@
                   "spec": {
                     "hidden": false,
                     "query": {
-                      "datasource": {
-                        "name": "aedqwq5gb2ebkc"
-                      },
                       "group": "grafana-postgresql-datasource",
                       "kind": "DataQuery",
                       "spec": {
@@ -2550,7 +2456,7 @@
                 "xTickLabelSpacing": 0
               }
             },
-            "version": "12.2.0-16952534486"
+            "version": "12.2.1"
           }
         }
       },
@@ -2566,9 +2472,6 @@
                   "spec": {
                     "hidden": false,
                     "query": {
-                      "datasource": {
-                        "name": "aedqwq5gb2ebkc"
-                      },
                       "group": "grafana-postgresql-datasource",
                       "kind": "DataQuery",
                       "spec": {
@@ -2604,9 +2507,6 @@
                   "spec": {
                     "hidden": false,
                     "query": {
-                      "datasource": {
-                        "name": "aedqwq5gb2ebkc"
-                      },
                       "group": "grafana-postgresql-datasource",
                       "kind": "DataQuery",
                       "spec": {
@@ -2719,7 +2619,7 @@
                 "sizing": "auto"
               }
             },
-            "version": "12.2.0"
+            "version": "12.2.1"
           }
         }
       },
@@ -2735,16 +2635,13 @@
                   "spec": {
                     "hidden": false,
                     "query": {
-                      "datasource": {
-                        "name": "aedqwq5gb2ebkc"
-                      },
                       "group": "grafana-postgresql-datasource",
                       "kind": "DataQuery",
                       "spec": {
                         "editorMode": "code",
                         "format": "table",
                         "rawQuery": true,
-                        "rawSql": "SELECT SUM(active_users_monthly) as updated_users\nFROM mastodon_domains \nWHERE software_version LIKE ANY (\n    SELECT software_version || '%'\n    FROM patch_versions \n    WHERE n_level = 0\n);\n",
+                        "rawSql": "SELECT SUM(active_users_monthly) AS updated_users\nFROM mastodon_domains\nWHERE software_version =\n(\n    SELECT software_version\n    FROM patch_versions\n    WHERE n_level = 0\n);\n",
                         "sql": {
                           "columns": [
                             {
@@ -2773,9 +2670,6 @@
                   "spec": {
                     "hidden": false,
                     "query": {
-                      "datasource": {
-                        "name": "aedqwq5gb2ebkc"
-                      },
                       "group": "grafana-postgresql-datasource",
                       "kind": "DataQuery",
                       "spec": {
@@ -2888,7 +2782,7 @@
                 "sizing": "auto"
               }
             },
-            "version": "12.2.0"
+            "version": "12.2.1"
           }
         }
       },
@@ -2904,9 +2798,6 @@
                   "spec": {
                     "hidden": false,
                     "query": {
-                      "datasource": {
-                        "name": "aedqwq5gb2ebkc"
-                      },
                       "group": "grafana-postgresql-datasource",
                       "kind": "DataQuery",
                       "spec": {
@@ -2942,9 +2833,6 @@
                   "spec": {
                     "hidden": false,
                     "query": {
-                      "datasource": {
-                        "name": "aedqwq5gb2ebkc"
-                      },
                       "group": "grafana-postgresql-datasource",
                       "kind": "DataQuery",
                       "spec": {
@@ -3057,7 +2945,7 @@
                 "sizing": "auto"
               }
             },
-            "version": "12.2.0"
+            "version": "12.2.1"
           }
         }
       },
@@ -3073,9 +2961,6 @@
                   "spec": {
                     "hidden": false,
                     "query": {
-                      "datasource": {
-                        "name": "aedqwq5gb2ebkc"
-                      },
                       "group": "grafana-postgresql-datasource",
                       "kind": "DataQuery",
                       "spec": {
@@ -3154,7 +3039,7 @@
                 "wideLayout": true
               }
             },
-            "version": "12.2.0"
+            "version": "12.2.1"
           }
         }
       },
@@ -3170,9 +3055,6 @@
                   "spec": {
                     "hidden": false,
                     "query": {
-                      "datasource": {
-                        "name": "aedqwq5gb2ebkc"
-                      },
                       "group": "grafana-postgresql-datasource",
                       "kind": "DataQuery",
                       "spec": {
@@ -3252,7 +3134,7 @@
                 "wideLayout": true
               }
             },
-            "version": "12.2.0"
+            "version": "12.2.1"
           }
         }
       },
@@ -3268,9 +3150,6 @@
                   "spec": {
                     "hidden": false,
                     "query": {
-                      "datasource": {
-                        "name": "aedqwq5gb2ebkc"
-                      },
                       "group": "grafana-postgresql-datasource",
                       "kind": "DataQuery",
                       "spec": {
@@ -3350,7 +3229,7 @@
                 "wideLayout": true
               }
             },
-            "version": "12.2.0"
+            "version": "12.2.1"
           }
         }
       },
@@ -3366,16 +3245,13 @@
                   "spec": {
                     "hidden": false,
                     "query": {
-                      "datasource": {
-                        "name": "aedqwq5gb2ebkc"
-                      },
                       "group": "grafana-postgresql-datasource",
                       "kind": "DataQuery",
                       "spec": {
                         "editorMode": "code",
                         "format": "table",
                         "rawQuery": true,
-                        "rawSql": "SELECT COUNT(DISTINCT domain) as \"All Patched\"\nFROM mastodon_domains\nWHERE software_version IN (\n    SELECT software_version\n    FROM patch_versions\n    WHERE n_level >= -1\n);\n",
+                        "rawSql": "SELECT COUNT(DISTINCT domain) as \"All Patched\"\nFROM mastodon_domains\nWHERE software_version IN (\n    SELECT software_version\n    FROM patch_versions\n    WHERE n_level >= -1\n);",
                         "sql": {
                           "columns": [
                             {
@@ -3404,9 +3280,6 @@
                   "spec": {
                     "hidden": false,
                     "query": {
-                      "datasource": {
-                        "name": "aedqwq5gb2ebkc"
-                      },
                       "group": "grafana-postgresql-datasource",
                       "kind": "DataQuery",
                       "spec": {
@@ -3518,7 +3391,7 @@
                 "sizing": "auto"
               }
             },
-            "version": "12.2.0"
+            "version": "12.2.1"
           }
         }
       },
@@ -3534,9 +3407,6 @@
                   "spec": {
                     "hidden": false,
                     "query": {
-                      "datasource": {
-                        "name": "aedqwq5gb2ebkc"
-                      },
                       "group": "grafana-postgresql-datasource",
                       "kind": "DataQuery",
                       "spec": {
@@ -3572,9 +3442,6 @@
                   "spec": {
                     "hidden": false,
                     "query": {
-                      "datasource": {
-                        "name": "aedqwq5gb2ebkc"
-                      },
                       "group": "grafana-postgresql-datasource",
                       "kind": "DataQuery",
                       "spec": {
@@ -3686,7 +3553,7 @@
                 "sizing": "auto"
               }
             },
-            "version": "12.2.0"
+            "version": "12.2.1"
           }
         }
       },
@@ -3702,9 +3569,6 @@
                   "spec": {
                     "hidden": false,
                     "query": {
-                      "datasource": {
-                        "name": "aedqwq5gb2ebkc"
-                      },
                       "group": "grafana-postgresql-datasource",
                       "kind": "DataQuery",
                       "spec": {
@@ -3811,7 +3675,7 @@
                 "xTickLabelSpacing": 0
               }
             },
-            "version": "12.2.0-16952534486"
+            "version": "12.2.1"
           }
         }
       },
@@ -3827,9 +3691,6 @@
                   "spec": {
                     "hidden": false,
                     "query": {
-                      "datasource": {
-                        "name": "aedqwq5gb2ebkc"
-                      },
                       "group": "grafana-postgresql-datasource",
                       "kind": "DataQuery",
                       "spec": {
@@ -3883,6 +3744,9 @@
                     "cellOptions": {
                       "type": "auto"
                     },
+                    "footer": {
+                      "reducers": []
+                    },
                     "inspect": false
                   },
                   "thresholds": {
@@ -3904,18 +3768,10 @@
               },
               "options": {
                 "cellHeight": "sm",
-                "footer": {
-                  "countRows": false,
-                  "fields": "",
-                  "reducer": [
-                    "sum"
-                  ],
-                  "show": false
-                },
                 "showHeader": true
               }
             },
-            "version": "12.2.0-16952534486"
+            "version": "12.2.1"
           }
         }
       },
@@ -3931,9 +3787,6 @@
                   "spec": {
                     "hidden": false,
                     "query": {
-                      "datasource": {
-                        "name": "aedqwq5gb2ebkc"
-                      },
                       "group": "grafana-postgresql-datasource",
                       "kind": "DataQuery",
                       "spec": {
@@ -4044,7 +3897,7 @@
                 "xTickLabelSpacing": 0
               }
             },
-            "version": "12.2.0-16952534486"
+            "version": "12.2.1"
           }
         }
       },
@@ -4060,9 +3913,6 @@
                   "spec": {
                     "hidden": false,
                     "query": {
-                      "datasource": {
-                        "name": "aedqwq5gb2ebkc"
-                      },
                       "group": "grafana-postgresql-datasource",
                       "kind": "DataQuery",
                       "spec": {
@@ -4116,6 +3966,9 @@
                     "cellOptions": {
                       "type": "auto"
                     },
+                    "footer": {
+                      "reducers": []
+                    },
                     "inspect": false
                   },
                   "thresholds": {
@@ -4137,18 +3990,10 @@
               },
               "options": {
                 "cellHeight": "sm",
-                "footer": {
-                  "countRows": false,
-                  "fields": "",
-                  "reducer": [
-                    "sum"
-                  ],
-                  "show": false
-                },
                 "showHeader": true
               }
             },
-            "version": "12.2.0-16952534486"
+            "version": "12.2.1"
           }
         }
       },
@@ -4164,9 +4009,6 @@
                   "spec": {
                     "hidden": false,
                     "query": {
-                      "datasource": {
-                        "name": "aedqwq5gb2ebkc"
-                      },
                       "group": "grafana-postgresql-datasource",
                       "kind": "DataQuery",
                       "spec": {
@@ -4280,7 +4122,7 @@
                 }
               }
             },
-            "version": "12.2.0"
+            "version": "12.2.1"
           }
         }
       },
@@ -4296,9 +4138,6 @@
                   "spec": {
                     "hidden": false,
                     "query": {
-                      "datasource": {
-                        "name": "aedqwq5gb2ebkc"
-                      },
                       "group": "grafana-postgresql-datasource",
                       "kind": "DataQuery",
                       "spec": {
@@ -4352,6 +4191,9 @@
                     "cellOptions": {
                       "type": "auto"
                     },
+                    "footer": {
+                      "reducers": []
+                    },
                     "inspect": false
                   },
                   "thresholds": {
@@ -4373,18 +4215,10 @@
               },
               "options": {
                 "cellHeight": "sm",
-                "footer": {
-                  "countRows": false,
-                  "fields": "",
-                  "reducer": [
-                    "sum"
-                  ],
-                  "show": false
-                },
                 "showHeader": true
               }
             },
-            "version": "12.2.0-16952534486"
+            "version": "12.2.1"
           }
         }
       },
@@ -4400,9 +4234,6 @@
                   "spec": {
                     "hidden": false,
                     "query": {
-                      "datasource": {
-                        "name": "aedqwq5gb2ebkc"
-                      },
                       "group": "grafana-postgresql-datasource",
                       "kind": "DataQuery",
                       "spec": {
@@ -4438,9 +4269,6 @@
                   "spec": {
                     "hidden": false,
                     "query": {
-                      "datasource": {
-                        "name": "aedqwq5gb2ebkc"
-                      },
                       "group": "grafana-postgresql-datasource",
                       "kind": "DataQuery",
                       "spec": {
@@ -4552,7 +4380,7 @@
                 "sizing": "auto"
               }
             },
-            "version": "12.2.0"
+            "version": "12.2.1"
           }
         }
       },
@@ -4568,9 +4396,6 @@
                   "spec": {
                     "hidden": false,
                     "query": {
-                      "datasource": {
-                        "name": "aedqwq5gb2ebkc"
-                      },
                       "group": "grafana-postgresql-datasource",
                       "kind": "DataQuery",
                       "spec": {
@@ -4658,7 +4483,7 @@
                 }
               }
             },
-            "version": "12.2.0"
+            "version": "12.2.1"
           }
         }
       },
@@ -4674,9 +4499,6 @@
                   "spec": {
                     "hidden": false,
                     "query": {
-                      "datasource": {
-                        "name": "aedqwq5gb2ebkc"
-                      },
                       "group": "grafana-postgresql-datasource",
                       "kind": "DataQuery",
                       "spec": {
@@ -4712,9 +4534,6 @@
                   "spec": {
                     "hidden": false,
                     "query": {
-                      "datasource": {
-                        "name": "aedqwq5gb2ebkc"
-                      },
                       "group": "grafana-postgresql-datasource",
                       "kind": "DataQuery",
                       "spec": {
@@ -4827,7 +4646,7 @@
                 "sizing": "auto"
               }
             },
-            "version": "12.2.0"
+            "version": "12.2.1"
           }
         }
       },
@@ -4843,16 +4662,13 @@
                   "spec": {
                     "hidden": false,
                     "query": {
-                      "datasource": {
-                        "name": "aedqwq5gb2ebkc"
-                      },
                       "group": "grafana-postgresql-datasource",
                       "kind": "DataQuery",
                       "spec": {
                         "editorMode": "code",
                         "format": "table",
                         "rawQuery": true,
-                        "rawSql": "SELECT SUM(total_users) as updated_users\nFROM mastodon_domains \nWHERE software_version LIKE ANY (\n    SELECT software_version || '%'\n    FROM patch_versions \n    WHERE n_level = 0\n);\n",
+                        "rawSql": "SELECT SUM(total_users) AS updated_users\nFROM mastodon_domains\nWHERE software_version =\n(\n    SELECT software_version\n    FROM patch_versions\n    WHERE n_level = 0\n);\n",
                         "sql": {
                           "columns": [
                             {
@@ -4881,9 +4697,6 @@
                   "spec": {
                     "hidden": false,
                     "query": {
-                      "datasource": {
-                        "name": "aedqwq5gb2ebkc"
-                      },
                       "group": "grafana-postgresql-datasource",
                       "kind": "DataQuery",
                       "spec": {
@@ -4996,7 +4809,7 @@
                 "sizing": "auto"
               }
             },
-            "version": "12.2.0"
+            "version": "12.2.1"
           }
         }
       },
@@ -5012,9 +4825,6 @@
                   "spec": {
                     "hidden": false,
                     "query": {
-                      "datasource": {
-                        "name": "aedqwq5gb2ebkc"
-                      },
                       "group": "grafana-postgresql-datasource",
                       "kind": "DataQuery",
                       "spec": {
@@ -5050,9 +4860,6 @@
                   "spec": {
                     "hidden": false,
                     "query": {
-                      "datasource": {
-                        "name": "aedqwq5gb2ebkc"
-                      },
                       "group": "grafana-postgresql-datasource",
                       "kind": "DataQuery",
                       "spec": {
@@ -5165,7 +4972,7 @@
                 "sizing": "auto"
               }
             },
-            "version": "12.2.0"
+            "version": "12.2.1"
           }
         }
       },
@@ -5181,9 +4988,6 @@
                   "spec": {
                     "hidden": false,
                     "query": {
-                      "datasource": {
-                        "name": "aedqwq5gb2ebkc"
-                      },
                       "group": "grafana-postgresql-datasource",
                       "kind": "DataQuery",
                       "spec": {
@@ -5263,6 +5067,7 @@
                   "fields": "",
                   "values": true
                 },
+                "sort": "desc",
                 "tooltip": {
                   "hideZeros": false,
                   "mode": "single",
@@ -5270,7 +5075,7 @@
                 }
               }
             },
-            "version": "12.2.0-16952534486"
+            "version": "12.2.1"
           }
         }
       },
@@ -5286,9 +5091,6 @@
                   "spec": {
                     "hidden": false,
                     "query": {
-                      "datasource": {
-                        "name": "aedqwq5gb2ebkc"
-                      },
                       "group": "grafana-postgresql-datasource",
                       "kind": "DataQuery",
                       "spec": {
@@ -5368,6 +5170,7 @@
                   "fields": "",
                   "values": true
                 },
+                "sort": "desc",
                 "tooltip": {
                   "hideZeros": false,
                   "mode": "single",
@@ -5375,7 +5178,7 @@
                 }
               }
             },
-            "version": "12.2.0-16952534486"
+            "version": "12.2.1"
           }
         }
       },
@@ -5391,9 +5194,6 @@
                   "spec": {
                     "hidden": false,
                     "query": {
-                      "datasource": {
-                        "name": "aedqwq5gb2ebkc"
-                      },
                       "group": "grafana-postgresql-datasource",
                       "kind": "DataQuery",
                       "spec": {
@@ -5473,6 +5273,7 @@
                   "fields": "",
                   "values": true
                 },
+                "sort": "desc",
                 "tooltip": {
                   "hideZeros": false,
                   "mode": "single",
@@ -5480,7 +5281,7 @@
                 }
               }
             },
-            "version": "12.2.0-16952534486"
+            "version": "12.2.1"
           }
         }
       },
@@ -5496,9 +5297,6 @@
                   "spec": {
                     "hidden": false,
                     "query": {
-                      "datasource": {
-                        "name": "aedqwq5gb2ebkc"
-                      },
                       "group": "grafana-postgresql-datasource",
                       "kind": "DataQuery",
                       "spec": {
@@ -5586,7 +5384,7 @@
                 }
               }
             },
-            "version": "12.2.0"
+            "version": "12.2.1"
           }
         }
       },
@@ -5602,16 +5400,13 @@
                   "spec": {
                     "hidden": false,
                     "query": {
-                      "datasource": {
-                        "name": "aedqwq5gb2ebkc"
-                      },
                       "group": "grafana-postgresql-datasource",
                       "kind": "DataQuery",
                       "spec": {
                         "editorMode": "code",
                         "format": "table",
                         "rawQuery": true,
-                        "rawSql": "SELECT \n    COUNT(CASE WHEN software_version LIKE '4.5%' THEN 1 END) * 100.0 / COUNT(*) AS \"4.5\",\n    \n    COUNT(CASE WHEN \n        software_version LIKE '4.5%' OR\n        software_version LIKE '4.4%'\n    THEN 1 END) * 100.0 / COUNT(*) AS \"4.4+\",\n\n    COUNT(CASE WHEN \n        software_version LIKE '4.5%' OR\n        software_version LIKE '4.4%' OR \n        software_version LIKE '4.3%' \n    THEN 1 END) * 100.0 / COUNT(*) AS \"4.3+\",\n\n    COUNT(CASE WHEN \n        software_version LIKE '4.5%' OR\n        software_version LIKE '4.4%' OR \n        software_version LIKE '4.3%' OR \n        software_version LIKE '4.2%'\n    THEN 1 END) * 100.0 / COUNT(*) AS \"4.2+\",\n\n    COUNT(CASE WHEN \n        software_version LIKE '4.5%' OR\n        software_version LIKE '4.4%' OR \n        software_version LIKE '4.3%' OR \n        software_version LIKE '4.2%' OR\n        software_version LIKE '4.1%'\n    THEN 1 END) * 100.0 / COUNT(*) AS \"4.1+\"\n\nFROM \n    mastodon_domains\nWHERE \n    software_version IS NOT NULL;\n",
+                        "rawSql": "SELECT \n    COUNT(CASE WHEN software_version LIKE '4.6%' THEN 1 END) * 100.0 / COUNT(*) AS \"4.6\",\n    \n    COUNT(CASE WHEN \n        software_version LIKE '4.6%' OR\n        software_version LIKE '4.5%'\n    THEN 1 END) * 100.0 / COUNT(*) AS \"4.5+\",\n\n    COUNT(CASE WHEN \n        software_version LIKE '4.6%' OR\n        software_version LIKE '4.5%' OR \n        software_version LIKE '4.4%' \n    THEN 1 END) * 100.0 / COUNT(*) AS \"4.4+\",\n\n    COUNT(CASE WHEN \n        software_version LIKE '4.6%' OR\n        software_version LIKE '4.5%' OR \n        software_version LIKE '4.4%' OR \n        software_version LIKE '4.3%'\n    THEN 1 END) * 100.0 / COUNT(*) AS \"4.3+\",\n\n    COUNT(CASE WHEN \n        software_version LIKE '4.6%' OR\n        software_version LIKE '4.5%' OR \n        software_version LIKE '4.4%' OR \n        software_version LIKE '4.3%' OR\n        software_version LIKE '4.2%'\n    THEN 1 END) * 100.0 / COUNT(*) AS \"4.2+\",\n\n    COUNT(CASE WHEN \n        software_version LIKE '4.6%' OR\n        software_version LIKE '4.5%' OR \n        software_version LIKE '4.4%' OR \n        software_version LIKE '4.3%' OR\n        software_version LIKE '4.2%' OR\n        software_version LIKE '4.1%'\n    THEN 1 END) * 100.0 / COUNT(*) AS \"4.1+\"\n\nFROM \n    mastodon_domains\nWHERE \n    software_version IS NOT NULL;\n",
                         "sql": {
                           "columns": [
                             {
@@ -5691,7 +5486,7 @@
                 "valueMode": "color"
               }
             },
-            "version": "12.2.0-16952534486"
+            "version": "12.2.1"
           }
         }
       },
@@ -5707,16 +5502,13 @@
                   "spec": {
                     "hidden": false,
                     "query": {
-                      "datasource": {
-                        "name": "aedqwq5gb2ebkc"
-                      },
                       "group": "grafana-postgresql-datasource",
                       "kind": "DataQuery",
                       "spec": {
                         "editorMode": "code",
                         "format": "table",
                         "rawQuery": true,
-                        "rawSql": "SELECT \n    SUM(CASE WHEN software_version LIKE '4.5%' THEN active_users_monthly ELSE 0 END) * 100.0 / \n        SUM(active_users_monthly) AS \"4.5\",\n\n    SUM(CASE WHEN \n        software_version LIKE '4.5%' OR \n        software_version LIKE '4.4%' \n    THEN active_users_monthly ELSE 0 END) * 100.0 / \n        SUM(active_users_monthly) AS \"4.4+\",\n\n    SUM(CASE WHEN \n        software_version LIKE '4.5%' OR \n        software_version LIKE '4.4%' OR \n        software_version LIKE '4.3%' \n    THEN active_users_monthly ELSE 0 END) * 100.0 / \n        SUM(active_users_monthly) AS \"4.3+\",\n\n    SUM(CASE WHEN\n        software_version LIKE '4.5%' OR \n        software_version LIKE '4.4%' OR \n        software_version LIKE '4.4%' OR \n        software_version LIKE '4.3%' OR \n        software_version LIKE '4.2%'\n    THEN active_users_monthly ELSE 0 END) * 100.0 / \n        SUM(active_users_monthly) AS \"4.2+\",\n\n    SUM(CASE WHEN \n        software_version LIKE '4.5%' OR \n        software_version LIKE '4.4%' OR \n        software_version LIKE '4.3%' OR \n        software_version LIKE '4.2%' OR\n        software_version LIKE '4.1%'\n    THEN active_users_monthly ELSE 0 END) * 100.0 / \n        SUM(active_users_monthly) AS \"4.1+\"\nFROM \n    mastodon_domains\nWHERE \n    software_version IS NOT NULL\n    AND active_users_monthly IS NOT NULL;\n",
+                        "rawSql": "SELECT \n    SUM(CASE WHEN software_version LIKE '4.6%' THEN active_users_monthly ELSE 0 END) * 100.0 / \n        SUM(active_users_monthly) AS \"4.6\",\n\n    SUM(CASE WHEN \n        software_version LIKE '4.6%' OR \n        software_version LIKE '4.5%' \n    THEN active_users_monthly ELSE 0 END) * 100.0 / \n        SUM(active_users_monthly) AS \"4.5+\",\n\n    SUM(CASE WHEN \n        software_version LIKE '4.6%' OR \n        software_version LIKE '4.5%' OR \n        software_version LIKE '4.4%' \n    THEN active_users_monthly ELSE 0 END) * 100.0 / \n        SUM(active_users_monthly) AS \"4.4+\",\n\n    SUM(CASE WHEN\n        software_version LIKE '4.6%' OR \n        software_version LIKE '4.5%' OR \n        software_version LIKE '4.4%' OR \n        software_version LIKE '4.3%'\n    THEN active_users_monthly ELSE 0 END) * 100.0 / \n        SUM(active_users_monthly) AS \"4.3+\",\n\n    SUM(CASE WHEN \n        software_version LIKE '4.6%' OR \n        software_version LIKE '4.5%' OR \n        software_version LIKE '4.4%' OR \n        software_version LIKE '4.3%' OR\n        software_version LIKE '4.2%'\n    THEN active_users_monthly ELSE 0 END) * 100.0 / \n        SUM(active_users_monthly) AS \"4.2+\",\n\n    SUM(CASE WHEN \n        software_version LIKE '4.6%' OR \n        software_version LIKE '4.5%' OR \n        software_version LIKE '4.4%' OR \n        software_version LIKE '4.3%' OR\n        software_version LIKE '4.2%' OR\n        software_version LIKE '4.1%'\n    THEN active_users_monthly ELSE 0 END) * 100.0 / \n        SUM(active_users_monthly) AS \"4.1+\"\nFROM \n    mastodon_domains\nWHERE \n    software_version IS NOT NULL\n    AND active_users_monthly IS NOT NULL;\n",
                         "sql": {
                           "columns": [
                             {
@@ -5797,7 +5589,7 @@
                 "valueMode": "color"
               }
             },
-            "version": "12.2.0-16952534486"
+            "version": "12.2.1"
           }
         }
       },
@@ -5813,16 +5605,13 @@
                   "spec": {
                     "hidden": false,
                     "query": {
-                      "datasource": {
-                        "name": "aedqwq5gb2ebkc"
-                      },
                       "group": "grafana-postgresql-datasource",
                       "kind": "DataQuery",
                       "spec": {
                         "editorMode": "code",
                         "format": "table",
                         "rawQuery": true,
-                        "rawSql": "SELECT \n    SUM(CASE WHEN software_version LIKE '4.5%' THEN total_users ELSE 0 END) * 100.0 / \n        SUM(total_users) AS \"4.5\",\n\n    SUM(CASE WHEN \n        software_version LIKE '4.5%' OR \n        software_version LIKE '4.4%' \n    THEN total_users ELSE 0 END) * 100.0 / \n        SUM(total_users) AS \"4.4+\",\n\n    SUM(CASE WHEN \n        software_version LIKE '4.5%' OR \n        software_version LIKE '4.4%' OR \n        software_version LIKE '4.3%' \n    THEN total_users ELSE 0 END) * 100.0 / \n        SUM(total_users) AS \"4.3+\",\n\n    SUM(CASE WHEN \n        software_version LIKE '4.5%' OR \n        software_version LIKE '4.4%' OR \n        software_version LIKE '4.3%' OR \n        software_version LIKE '4.2%'\n    THEN total_users ELSE 0 END) * 100.0 / \n        SUM(total_users) AS \"4.2+\",\n\n    SUM(CASE WHEN \n        software_version LIKE '4.5%' OR \n        software_version LIKE '4.4%' OR \n        software_version LIKE '4.3%' OR \n        software_version LIKE '4.2%' OR\n        software_version LIKE '4.1%'\n    THEN total_users ELSE 0 END) * 100.0 / \n        SUM(total_users) AS \"4.1+\"\nFROM \n    mastodon_domains\nWHERE \n    software_version IS NOT NULL\n    AND total_users IS NOT NULL;\n",
+                        "rawSql": "SELECT \n    SUM(CASE WHEN software_version LIKE '4.6%' THEN total_users ELSE 0 END) * 100.0 / \n        SUM(total_users) AS \"4.6\",\n\n    SUM(CASE WHEN \n        software_version LIKE '4.6%' OR \n        software_version LIKE '4.5%' \n    THEN total_users ELSE 0 END) * 100.0 / \n        SUM(total_users) AS \"4.5+\",\n\n    SUM(CASE WHEN \n        software_version LIKE '4.6%' OR \n        software_version LIKE '4.5%' OR \n        software_version LIKE '4.4%' \n    THEN total_users ELSE 0 END) * 100.0 / \n        SUM(total_users) AS \"4.4+\",\n\n    SUM(CASE WHEN \n        software_version LIKE '4.6%' OR \n        software_version LIKE '4.5%' OR \n        software_version LIKE '4.4%' OR \n        software_version LIKE '4.3%'\n    THEN total_users ELSE 0 END) * 100.0 / \n        SUM(total_users) AS \"4.3+\",\n\n    SUM(CASE WHEN \n        software_version LIKE '4.6%' OR \n        software_version LIKE '4.5%' OR \n        software_version LIKE '4.4%' OR \n        software_version LIKE '4.3%' OR\n        software_version LIKE '4.2%'\n    THEN total_users ELSE 0 END) * 100.0 / \n        SUM(total_users) AS \"4.2+\",\n\n    SUM(CASE WHEN \n        software_version LIKE '4.6%' OR \n        software_version LIKE '4.5%' OR \n        software_version LIKE '4.4%' OR \n        software_version LIKE '4.3%' OR\n        software_version LIKE '4.2%' OR\n        software_version LIKE '4.1%'\n    THEN total_users ELSE 0 END) * 100.0 / \n        SUM(total_users) AS \"4.1+\"\nFROM \n    mastodon_domains\nWHERE \n    software_version IS NOT NULL\n    AND total_users IS NOT NULL;\n",
                         "sql": {
                           "columns": [
                             {
@@ -5902,7 +5691,7 @@
                 "valueMode": "color"
               }
             },
-            "version": "12.2.0-16952534486"
+            "version": "12.2.1"
           }
         }
       }
