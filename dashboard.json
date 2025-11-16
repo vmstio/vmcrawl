@@ -3,10 +3,20 @@
   "kind": "Dashboard",
   "metadata": {
     "name": "aedqo0q7klrswa",
-    "generation": 92,
+    "namespace": "default",
+    "uid": "iX4gD7eXtwsCdcdtXxW6EThvcmNup6AODD7rZnZj8KUX",
+    "resourceVersion": "92",
+    "generation": 94,
     "creationTimestamp": "2025-02-21T16:03:06Z",
-    "labels": {},
-    "annotations": {}
+    "labels": {
+      "grafana.app/deprecatedInternalID": "3"
+    },
+    "annotations": {
+      "grafana.app/createdBy": "user:aedqwc9aizocge",
+      "grafana.app/updatedBy": "user:aedqwc9aizocge",
+      "grafana.app/updatedTimestamp": "2025-11-16T17:31:10Z",
+      "grafana.app/saved-from-ui": "Grafana v12.2.1 (563109b696)"
+    }
   },
   "spec": {
     "annotations": [
@@ -19,6 +29,9 @@
           "iconColor": "rgba(0, 211, 255, 1)",
           "name": "Annotations & Alerts",
           "query": {
+            "datasource": {
+              "name": "-- Grafana --"
+            },
             "group": "grafana",
             "kind": "DataQuery",
             "spec": {},
@@ -43,6 +56,9 @@
                   "spec": {
                     "hidden": false,
                     "query": {
+                      "datasource": {
+                        "name": "aedqwq5gb2ebkc"
+                      },
                       "group": "grafana-postgresql-datasource",
                       "kind": "DataQuery",
                       "spec": {
@@ -138,6 +154,9 @@
                   "spec": {
                     "hidden": false,
                     "query": {
+                      "datasource": {
+                        "name": "aedqwq5gb2ebkc"
+                      },
                       "group": "grafana-postgresql-datasource",
                       "kind": "DataQuery",
                       "spec": {
@@ -243,6 +262,9 @@
                   "spec": {
                     "hidden": false,
                     "query": {
+                      "datasource": {
+                        "name": "aedqwq5gb2ebkc"
+                      },
                       "group": "grafana-postgresql-datasource",
                       "kind": "DataQuery",
                       "spec": {
@@ -278,6 +300,9 @@
                   "spec": {
                     "hidden": false,
                     "query": {
+                      "datasource": {
+                        "name": "aedqwq5gb2ebkc"
+                      },
                       "group": "grafana-postgresql-datasource",
                       "kind": "DataQuery",
                       "spec": {
@@ -406,6 +431,9 @@
                   "spec": {
                     "hidden": false,
                     "query": {
+                      "datasource": {
+                        "name": "aedqwq5gb2ebkc"
+                      },
                       "group": "grafana-postgresql-datasource",
                       "kind": "DataQuery",
                       "spec": {
@@ -532,6 +560,9 @@
                   "spec": {
                     "hidden": false,
                     "query": {
+                      "datasource": {
+                        "name": "aedqwq5gb2ebkc"
+                      },
                       "group": "grafana-postgresql-datasource",
                       "kind": "DataQuery",
                       "spec": {
@@ -628,6 +659,9 @@
                   "spec": {
                     "hidden": false,
                     "query": {
+                      "datasource": {
+                        "name": "aedqwq5gb2ebkc"
+                      },
                       "group": "grafana-postgresql-datasource",
                       "kind": "DataQuery",
                       "spec": {
@@ -744,6 +778,9 @@
                   "spec": {
                     "hidden": false,
                     "query": {
+                      "datasource": {
+                        "name": "aedqwq5gb2ebkc"
+                      },
                       "group": "grafana-postgresql-datasource",
                       "kind": "DataQuery",
                       "spec": {
@@ -866,6 +903,9 @@
                   "spec": {
                     "hidden": false,
                     "query": {
+                      "datasource": {
+                        "name": "aedqwq5gb2ebkc"
+                      },
                       "group": "grafana-postgresql-datasource",
                       "kind": "DataQuery",
                       "spec": {
@@ -901,6 +941,9 @@
                   "spec": {
                     "hidden": false,
                     "query": {
+                      "datasource": {
+                        "name": "aedqwq5gb2ebkc"
+                      },
                       "group": "grafana-postgresql-datasource",
                       "kind": "DataQuery",
                       "spec": {
@@ -1024,13 +1067,16 @@
                   "spec": {
                     "hidden": false,
                     "query": {
+                      "datasource": {
+                        "name": "aedqwq5gb2ebkc"
+                      },
                       "group": "grafana-postgresql-datasource",
                       "kind": "DataQuery",
                       "spec": {
                         "editorMode": "code",
                         "format": "table",
                         "rawQuery": true,
-                        "rawSql": "SELECT COUNT(DISTINCT domain) as \"Latest Patched\" \nFROM mastodon_domains md\nWHERE md.software_version LIKE ANY (\n    SELECT software_version || '%'\n    FROM patch_versions \n    WHERE n_level >= 1\n);\n",
+                        "rawSql": "SELECT COUNT(DISTINCT domain) as \"Latest Patched\" \nFROM mastodon_domains md\nWHERE md.software_version LIKE ANY (\n    SELECT software_version || '%'\n    FROM patch_versions \n    WHERE n_level = 1\n);\n",
                         "sql": {
                           "columns": [
                             {
@@ -1059,6 +1105,9 @@
                   "spec": {
                     "hidden": false,
                     "query": {
+                      "datasource": {
+                        "name": "aedqwq5gb2ebkc"
+                      },
                       "group": "grafana-postgresql-datasource",
                       "kind": "DataQuery",
                       "spec": {
@@ -1110,7 +1159,7 @@
               ]
             }
           },
-          "description": "Count of instances running latest patches for branch release-1 (previous) or older, compared to the total instances on branch release-1.",
+          "description": "Count of instances running latest patches for branch release-1 (previous), compared to the total instances on branch release-1.",
           "id": 22,
           "links": [],
           "title": "Patched Instances, Previous",
@@ -1182,6 +1231,9 @@
                   "spec": {
                     "hidden": false,
                     "query": {
+                      "datasource": {
+                        "name": "aedqwq5gb2ebkc"
+                      },
                       "group": "grafana-postgresql-datasource",
                       "kind": "DataQuery",
                       "spec": {
@@ -1232,6 +1284,9 @@
                   "spec": {
                     "hidden": false,
                     "query": {
+                      "datasource": {
+                        "name": "aedqwq5gb2ebkc"
+                      },
                       "group": "grafana-postgresql-datasource",
                       "kind": "DataQuery",
                       "spec": {
@@ -1397,6 +1452,9 @@
                   "spec": {
                     "hidden": false,
                     "query": {
+                      "datasource": {
+                        "name": "aedqwq5gb2ebkc"
+                      },
                       "group": "grafana-postgresql-datasource",
                       "kind": "DataQuery",
                       "spec": {
@@ -1447,6 +1505,9 @@
                   "spec": {
                     "hidden": false,
                     "query": {
+                      "datasource": {
+                        "name": "aedqwq5gb2ebkc"
+                      },
                       "group": "grafana-postgresql-datasource",
                       "kind": "DataQuery",
                       "spec": {
@@ -1612,6 +1673,9 @@
                   "spec": {
                     "hidden": false,
                     "query": {
+                      "datasource": {
+                        "name": "aedqwq5gb2ebkc"
+                      },
                       "group": "grafana-postgresql-datasource",
                       "kind": "DataQuery",
                       "spec": {
@@ -1662,6 +1726,9 @@
                   "spec": {
                     "hidden": false,
                     "query": {
+                      "datasource": {
+                        "name": "aedqwq5gb2ebkc"
+                      },
                       "group": "grafana-postgresql-datasource",
                       "kind": "DataQuery",
                       "spec": {
@@ -1827,6 +1894,9 @@
                   "spec": {
                     "hidden": false,
                     "query": {
+                      "datasource": {
+                        "name": "aedqwq5gb2ebkc"
+                      },
                       "group": "grafana-postgresql-datasource",
                       "kind": "DataQuery",
                       "spec": {
@@ -1877,6 +1947,9 @@
                   "spec": {
                     "hidden": false,
                     "query": {
+                      "datasource": {
+                        "name": "aedqwq5gb2ebkc"
+                      },
                       "group": "grafana-postgresql-datasource",
                       "kind": "DataQuery",
                       "spec": {
@@ -2042,6 +2115,9 @@
                   "spec": {
                     "hidden": false,
                     "query": {
+                      "datasource": {
+                        "name": "aedqwq5gb2ebkc"
+                      },
                       "group": "grafana-postgresql-datasource",
                       "kind": "DataQuery",
                       "spec": {
@@ -2092,6 +2168,9 @@
                   "spec": {
                     "hidden": false,
                     "query": {
+                      "datasource": {
+                        "name": "aedqwq5gb2ebkc"
+                      },
                       "group": "grafana-postgresql-datasource",
                       "kind": "DataQuery",
                       "spec": {
@@ -2257,6 +2336,9 @@
                   "spec": {
                     "hidden": false,
                     "query": {
+                      "datasource": {
+                        "name": "aedqwq5gb2ebkc"
+                      },
                       "group": "grafana-postgresql-datasource",
                       "kind": "DataQuery",
                       "spec": {
@@ -2307,6 +2389,9 @@
                   "spec": {
                     "hidden": false,
                     "query": {
+                      "datasource": {
+                        "name": "aedqwq5gb2ebkc"
+                      },
                       "group": "grafana-postgresql-datasource",
                       "kind": "DataQuery",
                       "spec": {
@@ -2472,6 +2557,9 @@
                   "spec": {
                     "hidden": false,
                     "query": {
+                      "datasource": {
+                        "name": "aedqwq5gb2ebkc"
+                      },
                       "group": "grafana-postgresql-datasource",
                       "kind": "DataQuery",
                       "spec": {
@@ -2507,6 +2595,9 @@
                   "spec": {
                     "hidden": false,
                     "query": {
+                      "datasource": {
+                        "name": "aedqwq5gb2ebkc"
+                      },
                       "group": "grafana-postgresql-datasource",
                       "kind": "DataQuery",
                       "spec": {
@@ -2635,6 +2726,9 @@
                   "spec": {
                     "hidden": false,
                     "query": {
+                      "datasource": {
+                        "name": "aedqwq5gb2ebkc"
+                      },
                       "group": "grafana-postgresql-datasource",
                       "kind": "DataQuery",
                       "spec": {
@@ -2670,6 +2764,9 @@
                   "spec": {
                     "hidden": false,
                     "query": {
+                      "datasource": {
+                        "name": "aedqwq5gb2ebkc"
+                      },
                       "group": "grafana-postgresql-datasource",
                       "kind": "DataQuery",
                       "spec": {
@@ -2798,13 +2895,16 @@
                   "spec": {
                     "hidden": false,
                     "query": {
+                      "datasource": {
+                        "name": "aedqwq5gb2ebkc"
+                      },
                       "group": "grafana-postgresql-datasource",
                       "kind": "DataQuery",
                       "spec": {
                         "editorMode": "code",
                         "format": "table",
                         "rawQuery": true,
-                        "rawSql": "SELECT SUM(active_users_monthly) as updated_users\nFROM mastodon_domains md\nWHERE md.software_version LIKE ANY (\n    SELECT software_version || '%'\n    FROM patch_versions \n    WHERE n_level >= 1\n);",
+                        "rawSql": "SELECT SUM(active_users_monthly) as updated_users\nFROM mastodon_domains md\nWHERE md.software_version LIKE ANY (\n    SELECT software_version || '%'\n    FROM patch_versions \n    WHERE n_level = 1\n);",
                         "sql": {
                           "columns": [
                             {
@@ -2833,6 +2933,9 @@
                   "spec": {
                     "hidden": false,
                     "query": {
+                      "datasource": {
+                        "name": "aedqwq5gb2ebkc"
+                      },
                       "group": "grafana-postgresql-datasource",
                       "kind": "DataQuery",
                       "spec": {
@@ -2889,7 +2992,7 @@
               ]
             }
           },
-          "description": "Count of monthly active users (MAUs) on instances running latest patches for branch release-1 (latest) or older, compared to the total instances on branch release-1.",
+          "description": "Count of monthly active users (MAUs) on instances running latest patches for branch release-1 (latest), compared to the MAUs on branch release-1.",
           "id": 36,
           "links": [],
           "title": "Patched MAUs, Previous",
@@ -2961,6 +3064,9 @@
                   "spec": {
                     "hidden": false,
                     "query": {
+                      "datasource": {
+                        "name": "aedqwq5gb2ebkc"
+                      },
                       "group": "grafana-postgresql-datasource",
                       "kind": "DataQuery",
                       "spec": {
@@ -3055,6 +3161,9 @@
                   "spec": {
                     "hidden": false,
                     "query": {
+                      "datasource": {
+                        "name": "aedqwq5gb2ebkc"
+                      },
                       "group": "grafana-postgresql-datasource",
                       "kind": "DataQuery",
                       "spec": {
@@ -3150,6 +3259,9 @@
                   "spec": {
                     "hidden": false,
                     "query": {
+                      "datasource": {
+                        "name": "aedqwq5gb2ebkc"
+                      },
                       "group": "grafana-postgresql-datasource",
                       "kind": "DataQuery",
                       "spec": {
@@ -3233,330 +3345,6 @@
           }
         }
       },
-      "panel-42": {
-        "kind": "Panel",
-        "spec": {
-          "data": {
-            "kind": "QueryGroup",
-            "spec": {
-              "queries": [
-                {
-                  "kind": "PanelQuery",
-                  "spec": {
-                    "hidden": false,
-                    "query": {
-                      "group": "grafana-postgresql-datasource",
-                      "kind": "DataQuery",
-                      "spec": {
-                        "editorMode": "code",
-                        "format": "table",
-                        "rawQuery": true,
-                        "rawSql": "SELECT COUNT(DISTINCT domain) as \"All Patched\"\nFROM mastodon_domains\nWHERE software_version IN (\n    SELECT software_version\n    FROM patch_versions\n    WHERE n_level >= -1\n);",
-                        "sql": {
-                          "columns": [
-                            {
-                              "parameters": [],
-                              "type": "function"
-                            }
-                          ],
-                          "groupBy": [
-                            {
-                              "property": {
-                                "type": "string"
-                              },
-                              "type": "groupBy"
-                            }
-                          ],
-                          "limit": 50
-                        }
-                      },
-                      "version": "v0"
-                    },
-                    "refId": "A"
-                  }
-                },
-                {
-                  "kind": "PanelQuery",
-                  "spec": {
-                    "hidden": false,
-                    "query": {
-                      "group": "grafana-postgresql-datasource",
-                      "kind": "DataQuery",
-                      "spec": {
-                        "editorMode": "code",
-                        "format": "table",
-                        "rawQuery": true,
-                        "rawSql": "SELECT COUNT(DISTINCT domain) AS unique_domain_count\nFROM mastodon_domains;",
-                        "sql": {
-                          "columns": [
-                            {
-                              "parameters": [],
-                              "type": "function"
-                            }
-                          ],
-                          "groupBy": [
-                            {
-                              "property": {
-                                "type": "string"
-                              },
-                              "type": "groupBy"
-                            }
-                          ],
-                          "limit": 50
-                        }
-                      },
-                      "version": "v0"
-                    },
-                    "refId": "B"
-                  }
-                }
-              ],
-              "queryOptions": {},
-              "transformations": [
-                {
-                  "kind": "configFromData",
-                  "spec": {
-                    "id": "configFromData",
-                    "options": {
-                      "applyTo": {
-                        "id": "byType",
-                        "options": "number"
-                      },
-                      "configRefId": "B",
-                      "mappings": [
-                        {
-                          "fieldName": "unique_domain_count",
-                          "handlerKey": "max"
-                        }
-                      ]
-                    }
-                  }
-                }
-              ]
-            }
-          },
-          "description": "Count of instances running latest patches for any supported branch, compared to all instances.",
-          "id": 42,
-          "links": [],
-          "title": "Patched Instances, All",
-          "vizConfig": {
-            "group": "gauge",
-            "kind": "VizConfig",
-            "spec": {
-              "fieldConfig": {
-                "defaults": {
-                  "color": {
-                    "mode": "thresholds"
-                  },
-                  "fieldMinMax": false,
-                  "min": 0,
-                  "thresholds": {
-                    "mode": "percentage",
-                    "steps": [
-                      {
-                        "color": "red",
-                        "value": 0
-                      },
-                      {
-                        "color": "orange",
-                        "value": 20
-                      },
-                      {
-                        "color": "yellow",
-                        "value": 50
-                      },
-                      {
-                        "color": "green",
-                        "value": 80
-                      }
-                    ]
-                  },
-                  "unit": "locale"
-                },
-                "overrides": []
-              },
-              "options": {
-                "minVizHeight": 75,
-                "minVizWidth": 75,
-                "orientation": "auto",
-                "reduceOptions": {
-                  "calcs": [
-                    "lastNotNull"
-                  ],
-                  "fields": "/.*/",
-                  "values": true
-                },
-                "showThresholdLabels": false,
-                "showThresholdMarkers": false,
-                "sizing": "auto"
-              }
-            },
-            "version": "12.2.1"
-          }
-        }
-      },
-      "panel-43": {
-        "kind": "Panel",
-        "spec": {
-          "data": {
-            "kind": "QueryGroup",
-            "spec": {
-              "queries": [
-                {
-                  "kind": "PanelQuery",
-                  "spec": {
-                    "hidden": false,
-                    "query": {
-                      "group": "grafana-postgresql-datasource",
-                      "kind": "DataQuery",
-                      "spec": {
-                        "editorMode": "code",
-                        "format": "table",
-                        "rawQuery": true,
-                        "rawSql": "SELECT SUM(active_users_monthly) as updated_users\nFROM mastodon_domains \nWHERE software_version LIKE ANY (\n    SELECT software_version || '%'\n    FROM patch_versions \n    WHERE n_level >= -1\n);\n",
-                        "sql": {
-                          "columns": [
-                            {
-                              "parameters": [],
-                              "type": "function"
-                            }
-                          ],
-                          "groupBy": [
-                            {
-                              "property": {
-                                "type": "string"
-                              },
-                              "type": "groupBy"
-                            }
-                          ],
-                          "limit": 50
-                        }
-                      },
-                      "version": "v0"
-                    },
-                    "refId": "A"
-                  }
-                },
-                {
-                  "kind": "PanelQuery",
-                  "spec": {
-                    "hidden": false,
-                    "query": {
-                      "group": "grafana-postgresql-datasource",
-                      "kind": "DataQuery",
-                      "spec": {
-                        "editorMode": "code",
-                        "format": "table",
-                        "rawQuery": true,
-                        "rawSql": "SELECT SUM(active_users_monthly) AS total_users FROM mastodon_domains;",
-                        "sql": {
-                          "columns": [
-                            {
-                              "parameters": [],
-                              "type": "function"
-                            }
-                          ],
-                          "groupBy": [
-                            {
-                              "property": {
-                                "type": "string"
-                              },
-                              "type": "groupBy"
-                            }
-                          ],
-                          "limit": 50
-                        }
-                      },
-                      "version": "v0"
-                    },
-                    "refId": "B"
-                  }
-                }
-              ],
-              "queryOptions": {},
-              "transformations": [
-                {
-                  "kind": "configFromData",
-                  "spec": {
-                    "id": "configFromData",
-                    "options": {
-                      "applyTo": {
-                        "id": "byType",
-                        "options": "number"
-                      },
-                      "configRefId": "B",
-                      "mappings": [
-                        {
-                          "fieldName": "total_users",
-                          "handlerKey": "max"
-                        }
-                      ]
-                    }
-                  }
-                }
-              ]
-            }
-          },
-          "description": "Count of monthly active users (MAUs) on instances running latest patches for any supported branch, compared to all instances.",
-          "id": 43,
-          "links": [],
-          "title": "Patched MAUs, All",
-          "vizConfig": {
-            "group": "gauge",
-            "kind": "VizConfig",
-            "spec": {
-              "fieldConfig": {
-                "defaults": {
-                  "color": {
-                    "mode": "thresholds"
-                  },
-                  "fieldMinMax": false,
-                  "min": 0,
-                  "thresholds": {
-                    "mode": "percentage",
-                    "steps": [
-                      {
-                        "color": "red",
-                        "value": 0
-                      },
-                      {
-                        "color": "orange",
-                        "value": 20
-                      },
-                      {
-                        "color": "yellow",
-                        "value": 50
-                      },
-                      {
-                        "color": "green",
-                        "value": 80
-                      }
-                    ]
-                  },
-                  "unit": "locale"
-                },
-                "overrides": []
-              },
-              "options": {
-                "minVizHeight": 75,
-                "minVizWidth": 75,
-                "orientation": "auto",
-                "reduceOptions": {
-                  "calcs": [
-                    "lastNotNull"
-                  ],
-                  "fields": "/.*/",
-                  "values": true
-                },
-                "showThresholdLabels": false,
-                "showThresholdMarkers": false,
-                "sizing": "auto"
-              }
-            },
-            "version": "12.2.1"
-          }
-        }
-      },
       "panel-46": {
         "kind": "Panel",
         "spec": {
@@ -3569,6 +3357,9 @@
                   "spec": {
                     "hidden": false,
                     "query": {
+                      "datasource": {
+                        "name": "aedqwq5gb2ebkc"
+                      },
                       "group": "grafana-postgresql-datasource",
                       "kind": "DataQuery",
                       "spec": {
@@ -3691,6 +3482,9 @@
                   "spec": {
                     "hidden": false,
                     "query": {
+                      "datasource": {
+                        "name": "aedqwq5gb2ebkc"
+                      },
                       "group": "grafana-postgresql-datasource",
                       "kind": "DataQuery",
                       "spec": {
@@ -3787,6 +3581,9 @@
                   "spec": {
                     "hidden": false,
                     "query": {
+                      "datasource": {
+                        "name": "aedqwq5gb2ebkc"
+                      },
                       "group": "grafana-postgresql-datasource",
                       "kind": "DataQuery",
                       "spec": {
@@ -3913,6 +3710,9 @@
                   "spec": {
                     "hidden": false,
                     "query": {
+                      "datasource": {
+                        "name": "aedqwq5gb2ebkc"
+                      },
                       "group": "grafana-postgresql-datasource",
                       "kind": "DataQuery",
                       "spec": {
@@ -4009,6 +3809,9 @@
                   "spec": {
                     "hidden": false,
                     "query": {
+                      "datasource": {
+                        "name": "aedqwq5gb2ebkc"
+                      },
                       "group": "grafana-postgresql-datasource",
                       "kind": "DataQuery",
                       "spec": {
@@ -4138,6 +3941,9 @@
                   "spec": {
                     "hidden": false,
                     "query": {
+                      "datasource": {
+                        "name": "aedqwq5gb2ebkc"
+                      },
                       "group": "grafana-postgresql-datasource",
                       "kind": "DataQuery",
                       "spec": {
@@ -4222,168 +4028,6 @@
           }
         }
       },
-      "panel-59": {
-        "kind": "Panel",
-        "spec": {
-          "data": {
-            "kind": "QueryGroup",
-            "spec": {
-              "queries": [
-                {
-                  "kind": "PanelQuery",
-                  "spec": {
-                    "hidden": false,
-                    "query": {
-                      "group": "grafana-postgresql-datasource",
-                      "kind": "DataQuery",
-                      "spec": {
-                        "editorMode": "code",
-                        "format": "table",
-                        "rawQuery": true,
-                        "rawSql": "SELECT SUM(total_users) as updated_users\nFROM mastodon_domains \nWHERE software_version LIKE ANY (\n    SELECT software_version || '%'\n    FROM patch_versions \n    WHERE n_level >= -1\n);\n",
-                        "sql": {
-                          "columns": [
-                            {
-                              "parameters": [],
-                              "type": "function"
-                            }
-                          ],
-                          "groupBy": [
-                            {
-                              "property": {
-                                "type": "string"
-                              },
-                              "type": "groupBy"
-                            }
-                          ],
-                          "limit": 50
-                        }
-                      },
-                      "version": "v0"
-                    },
-                    "refId": "A"
-                  }
-                },
-                {
-                  "kind": "PanelQuery",
-                  "spec": {
-                    "hidden": false,
-                    "query": {
-                      "group": "grafana-postgresql-datasource",
-                      "kind": "DataQuery",
-                      "spec": {
-                        "editorMode": "code",
-                        "format": "table",
-                        "rawQuery": true,
-                        "rawSql": "SELECT SUM(total_users) AS total_users FROM mastodon_domains;",
-                        "sql": {
-                          "columns": [
-                            {
-                              "parameters": [],
-                              "type": "function"
-                            }
-                          ],
-                          "groupBy": [
-                            {
-                              "property": {
-                                "type": "string"
-                              },
-                              "type": "groupBy"
-                            }
-                          ],
-                          "limit": 50
-                        }
-                      },
-                      "version": "v0"
-                    },
-                    "refId": "B"
-                  }
-                }
-              ],
-              "queryOptions": {},
-              "transformations": [
-                {
-                  "kind": "configFromData",
-                  "spec": {
-                    "id": "configFromData",
-                    "options": {
-                      "applyTo": {
-                        "id": "byType",
-                        "options": "number"
-                      },
-                      "configRefId": "B",
-                      "mappings": [
-                        {
-                          "fieldName": "total_users",
-                          "handlerKey": "max"
-                        }
-                      ]
-                    }
-                  }
-                }
-              ]
-            }
-          },
-          "description": "Count of total users on instances running latest patches for any supported branch, compared to all instances.",
-          "id": 59,
-          "links": [],
-          "title": "Patched Users, All",
-          "vizConfig": {
-            "group": "gauge",
-            "kind": "VizConfig",
-            "spec": {
-              "fieldConfig": {
-                "defaults": {
-                  "color": {
-                    "mode": "thresholds"
-                  },
-                  "fieldMinMax": false,
-                  "min": 0,
-                  "thresholds": {
-                    "mode": "percentage",
-                    "steps": [
-                      {
-                        "color": "red",
-                        "value": 0
-                      },
-                      {
-                        "color": "orange",
-                        "value": 20
-                      },
-                      {
-                        "color": "yellow",
-                        "value": 50
-                      },
-                      {
-                        "color": "green",
-                        "value": 80
-                      }
-                    ]
-                  },
-                  "unit": "locale"
-                },
-                "overrides": []
-              },
-              "options": {
-                "minVizHeight": 75,
-                "minVizWidth": 75,
-                "orientation": "auto",
-                "reduceOptions": {
-                  "calcs": [
-                    "lastNotNull"
-                  ],
-                  "fields": "/.*/",
-                  "values": true
-                },
-                "showThresholdLabels": false,
-                "showThresholdMarkers": false,
-                "sizing": "auto"
-              }
-            },
-            "version": "12.2.1"
-          }
-        }
-      },
       "panel-6": {
         "kind": "Panel",
         "spec": {
@@ -4396,6 +4040,9 @@
                   "spec": {
                     "hidden": false,
                     "query": {
+                      "datasource": {
+                        "name": "aedqwq5gb2ebkc"
+                      },
                       "group": "grafana-postgresql-datasource",
                       "kind": "DataQuery",
                       "spec": {
@@ -4499,6 +4146,9 @@
                   "spec": {
                     "hidden": false,
                     "query": {
+                      "datasource": {
+                        "name": "aedqwq5gb2ebkc"
+                      },
                       "group": "grafana-postgresql-datasource",
                       "kind": "DataQuery",
                       "spec": {
@@ -4534,6 +4184,9 @@
                   "spec": {
                     "hidden": false,
                     "query": {
+                      "datasource": {
+                        "name": "aedqwq5gb2ebkc"
+                      },
                       "group": "grafana-postgresql-datasource",
                       "kind": "DataQuery",
                       "spec": {
@@ -4662,6 +4315,9 @@
                   "spec": {
                     "hidden": false,
                     "query": {
+                      "datasource": {
+                        "name": "aedqwq5gb2ebkc"
+                      },
                       "group": "grafana-postgresql-datasource",
                       "kind": "DataQuery",
                       "spec": {
@@ -4697,6 +4353,9 @@
                   "spec": {
                     "hidden": false,
                     "query": {
+                      "datasource": {
+                        "name": "aedqwq5gb2ebkc"
+                      },
                       "group": "grafana-postgresql-datasource",
                       "kind": "DataQuery",
                       "spec": {
@@ -4825,13 +4484,16 @@
                   "spec": {
                     "hidden": false,
                     "query": {
+                      "datasource": {
+                        "name": "aedqwq5gb2ebkc"
+                      },
                       "group": "grafana-postgresql-datasource",
                       "kind": "DataQuery",
                       "spec": {
                         "editorMode": "code",
                         "format": "table",
                         "rawQuery": true,
-                        "rawSql": "SELECT SUM(total_users) as updated_users\nFROM mastodon_domains md\nWHERE md.software_version LIKE ANY (\n    SELECT software_version || '%'\n    FROM patch_versions \n    WHERE n_level >= 1\n);\n",
+                        "rawSql": "SELECT SUM(total_users) as updated_users\nFROM mastodon_domains md\nWHERE md.software_version LIKE ANY (\n    SELECT software_version || '%'\n    FROM patch_versions \n    WHERE n_level = 1\n);\n",
                         "sql": {
                           "columns": [
                             {
@@ -4860,6 +4522,9 @@
                   "spec": {
                     "hidden": false,
                     "query": {
+                      "datasource": {
+                        "name": "aedqwq5gb2ebkc"
+                      },
                       "group": "grafana-postgresql-datasource",
                       "kind": "DataQuery",
                       "spec": {
@@ -4916,7 +4581,7 @@
               ]
             }
           },
-          "description": "Count of total users on instances running latest patches for branch release-1 (latest) or older, compared to the total instances on branch release-1.",
+          "description": "Count of total users on instances running latest patches for branch release-1 (previous), compared to the total users on branch release-1.",
           "id": 62,
           "links": [],
           "title": "Patched Users, Previous",
@@ -4988,6 +4653,9 @@
                   "spec": {
                     "hidden": false,
                     "query": {
+                      "datasource": {
+                        "name": "aedqwq5gb2ebkc"
+                      },
                       "group": "grafana-postgresql-datasource",
                       "kind": "DataQuery",
                       "spec": {
@@ -5091,6 +4759,9 @@
                   "spec": {
                     "hidden": false,
                     "query": {
+                      "datasource": {
+                        "name": "aedqwq5gb2ebkc"
+                      },
                       "group": "grafana-postgresql-datasource",
                       "kind": "DataQuery",
                       "spec": {
@@ -5194,6 +4865,9 @@
                   "spec": {
                     "hidden": false,
                     "query": {
+                      "datasource": {
+                        "name": "aedqwq5gb2ebkc"
+                      },
                       "group": "grafana-postgresql-datasource",
                       "kind": "DataQuery",
                       "spec": {
@@ -5297,6 +4971,9 @@
                   "spec": {
                     "hidden": false,
                     "query": {
+                      "datasource": {
+                        "name": "aedqwq5gb2ebkc"
+                      },
                       "group": "grafana-postgresql-datasource",
                       "kind": "DataQuery",
                       "spec": {
@@ -5400,6 +5077,9 @@
                   "spec": {
                     "hidden": false,
                     "query": {
+                      "datasource": {
+                        "name": "aedqwq5gb2ebkc"
+                      },
                       "group": "grafana-postgresql-datasource",
                       "kind": "DataQuery",
                       "spec": {
@@ -5502,6 +5182,9 @@
                   "spec": {
                     "hidden": false,
                     "query": {
+                      "datasource": {
+                        "name": "aedqwq5gb2ebkc"
+                      },
                       "group": "grafana-postgresql-datasource",
                       "kind": "DataQuery",
                       "spec": {
@@ -5605,6 +5288,9 @@
                   "spec": {
                     "hidden": false,
                     "query": {
+                      "datasource": {
+                        "name": "aedqwq5gb2ebkc"
+                      },
                       "group": "grafana-postgresql-datasource",
                       "kind": "DataQuery",
                       "spec": {
@@ -5689,6 +5375,508 @@
                 "showUnfilled": true,
                 "sizing": "auto",
                 "valueMode": "color"
+              }
+            },
+            "version": "12.2.1"
+          }
+        }
+      },
+      "panel-73": {
+        "kind": "Panel",
+        "spec": {
+          "data": {
+            "kind": "QueryGroup",
+            "spec": {
+              "queries": [
+                {
+                  "kind": "PanelQuery",
+                  "spec": {
+                    "hidden": false,
+                    "query": {
+                      "datasource": {
+                        "name": "aedqwq5gb2ebkc"
+                      },
+                      "group": "grafana-postgresql-datasource",
+                      "kind": "DataQuery",
+                      "spec": {
+                        "editorMode": "code",
+                        "format": "table",
+                        "rawQuery": true,
+                        "rawSql": "SELECT COUNT(DISTINCT domain) as \"Latest Patched\" \nFROM mastodon_domains md\nWHERE md.software_version LIKE ANY (\n    SELECT software_version || '%'\n    FROM patch_versions \n    WHERE n_level >= 2\n);\n",
+                        "sql": {
+                          "columns": [
+                            {
+                              "parameters": [],
+                              "type": "function"
+                            }
+                          ],
+                          "groupBy": [
+                            {
+                              "property": {
+                                "type": "string"
+                              },
+                              "type": "groupBy"
+                            }
+                          ],
+                          "limit": 50
+                        }
+                      },
+                      "version": "v0"
+                    },
+                    "refId": "A"
+                  }
+                },
+                {
+                  "kind": "PanelQuery",
+                  "spec": {
+                    "hidden": false,
+                    "query": {
+                      "datasource": {
+                        "name": "aedqwq5gb2ebkc"
+                      },
+                      "group": "grafana-postgresql-datasource",
+                      "kind": "DataQuery",
+                      "spec": {
+                        "editorMode": "code",
+                        "format": "table",
+                        "rawQuery": true,
+                        "rawSql": "SELECT COUNT(DISTINCT domain) as \"Latest Total\"\nFROM mastodon_domains \nWHERE software_version LIKE ANY (\n    SELECT branch || '.%'\n    FROM patch_versions \n    WHERE n_level >= 2\n);\n",
+                        "sql": {
+                          "columns": [
+                            {
+                              "parameters": [],
+                              "type": "function"
+                            }
+                          ],
+                          "groupBy": [
+                            {
+                              "property": {
+                                "type": "string"
+                              },
+                              "type": "groupBy"
+                            }
+                          ],
+                          "limit": 50
+                        }
+                      },
+                      "version": "v0"
+                    },
+                    "refId": "B"
+                  }
+                }
+              ],
+              "queryOptions": {},
+              "transformations": [
+                {
+                  "kind": "configFromData",
+                  "spec": {
+                    "id": "configFromData",
+                    "options": {
+                      "configRefId": "B",
+                      "mappings": [
+                        {
+                          "fieldName": "Latest Total",
+                          "handlerKey": "max"
+                        }
+                      ]
+                    }
+                  }
+                }
+              ]
+            }
+          },
+          "description": "Count of instances running latest patches for branch release-2 (deprecated) or older, compared to the total instances on branch release-2 or older.",
+          "id": 73,
+          "links": [],
+          "title": "Patched Instances, Deprecated",
+          "vizConfig": {
+            "group": "gauge",
+            "kind": "VizConfig",
+            "spec": {
+              "fieldConfig": {
+                "defaults": {
+                  "color": {
+                    "mode": "thresholds"
+                  },
+                  "fieldMinMax": false,
+                  "min": 0,
+                  "thresholds": {
+                    "mode": "percentage",
+                    "steps": [
+                      {
+                        "color": "red",
+                        "value": 0
+                      },
+                      {
+                        "color": "orange",
+                        "value": 20
+                      },
+                      {
+                        "color": "yellow",
+                        "value": 50
+                      },
+                      {
+                        "color": "green",
+                        "value": 80
+                      }
+                    ]
+                  },
+                  "unit": "locale"
+                },
+                "overrides": []
+              },
+              "options": {
+                "minVizHeight": 75,
+                "minVizWidth": 75,
+                "orientation": "auto",
+                "reduceOptions": {
+                  "calcs": [
+                    "lastNotNull"
+                  ],
+                  "fields": "/.*/",
+                  "values": true
+                },
+                "showThresholdLabels": false,
+                "showThresholdMarkers": false,
+                "sizing": "auto"
+              }
+            },
+            "version": "12.2.1"
+          }
+        }
+      },
+      "panel-74": {
+        "kind": "Panel",
+        "spec": {
+          "data": {
+            "kind": "QueryGroup",
+            "spec": {
+              "queries": [
+                {
+                  "kind": "PanelQuery",
+                  "spec": {
+                    "hidden": false,
+                    "query": {
+                      "datasource": {
+                        "name": "aedqwq5gb2ebkc"
+                      },
+                      "group": "grafana-postgresql-datasource",
+                      "kind": "DataQuery",
+                      "spec": {
+                        "editorMode": "code",
+                        "format": "table",
+                        "rawQuery": true,
+                        "rawSql": "SELECT SUM(active_users_monthly) as updated_users\nFROM mastodon_domains md\nWHERE md.software_version LIKE ANY (\n    SELECT software_version || '%'\n    FROM patch_versions \n    WHERE n_level >= 2\n);",
+                        "sql": {
+                          "columns": [
+                            {
+                              "parameters": [],
+                              "type": "function"
+                            }
+                          ],
+                          "groupBy": [
+                            {
+                              "property": {
+                                "type": "string"
+                              },
+                              "type": "groupBy"
+                            }
+                          ],
+                          "limit": 50
+                        }
+                      },
+                      "version": "v0"
+                    },
+                    "refId": "A"
+                  }
+                },
+                {
+                  "kind": "PanelQuery",
+                  "spec": {
+                    "hidden": false,
+                    "query": {
+                      "datasource": {
+                        "name": "aedqwq5gb2ebkc"
+                      },
+                      "group": "grafana-postgresql-datasource",
+                      "kind": "DataQuery",
+                      "spec": {
+                        "editorMode": "code",
+                        "format": "table",
+                        "rawQuery": true,
+                        "rawSql": "SELECT SUM(active_users_monthly) as \"Main Total\"\nFROM mastodon_domains\nWHERE software_version LIKE ANY (\nSELECT branch || '.%'\nFROM patch_versions\nWHERE n_level >= 1\n);",
+                        "sql": {
+                          "columns": [
+                            {
+                              "parameters": [],
+                              "type": "function"
+                            }
+                          ],
+                          "groupBy": [
+                            {
+                              "property": {
+                                "type": "string"
+                              },
+                              "type": "groupBy"
+                            }
+                          ],
+                          "limit": 50
+                        }
+                      },
+                      "version": "v0"
+                    },
+                    "refId": "B"
+                  }
+                }
+              ],
+              "queryOptions": {},
+              "transformations": [
+                {
+                  "kind": "configFromData",
+                  "spec": {
+                    "id": "configFromData",
+                    "options": {
+                      "applyTo": {
+                        "id": "byType",
+                        "options": "number"
+                      },
+                      "configRefId": "B",
+                      "mappings": [
+                        {
+                          "fieldName": "Main Total",
+                          "handlerKey": "max",
+                          "reducerId": "lastNotNull"
+                        }
+                      ]
+                    }
+                  }
+                }
+              ]
+            }
+          },
+          "description": "Count of monthly active users (MAUs) on  instances running latest patches for branch release-2 (deprecated) or older, compared to the MAUs on branch release-2 or older.",
+          "id": 74,
+          "links": [],
+          "title": "Patched MAUs, Deprecated",
+          "vizConfig": {
+            "group": "gauge",
+            "kind": "VizConfig",
+            "spec": {
+              "fieldConfig": {
+                "defaults": {
+                  "color": {
+                    "mode": "thresholds"
+                  },
+                  "fieldMinMax": false,
+                  "min": 0,
+                  "thresholds": {
+                    "mode": "percentage",
+                    "steps": [
+                      {
+                        "color": "red",
+                        "value": 0
+                      },
+                      {
+                        "color": "orange",
+                        "value": 20
+                      },
+                      {
+                        "color": "yellow",
+                        "value": 50
+                      },
+                      {
+                        "color": "green",
+                        "value": 80
+                      }
+                    ]
+                  },
+                  "unit": "locale"
+                },
+                "overrides": []
+              },
+              "options": {
+                "minVizHeight": 75,
+                "minVizWidth": 75,
+                "orientation": "auto",
+                "reduceOptions": {
+                  "calcs": [
+                    "lastNotNull"
+                  ],
+                  "fields": "/.*/",
+                  "values": true
+                },
+                "showThresholdLabels": false,
+                "showThresholdMarkers": false,
+                "sizing": "auto"
+              }
+            },
+            "version": "12.2.1"
+          }
+        }
+      },
+      "panel-75": {
+        "kind": "Panel",
+        "spec": {
+          "data": {
+            "kind": "QueryGroup",
+            "spec": {
+              "queries": [
+                {
+                  "kind": "PanelQuery",
+                  "spec": {
+                    "hidden": false,
+                    "query": {
+                      "datasource": {
+                        "name": "aedqwq5gb2ebkc"
+                      },
+                      "group": "grafana-postgresql-datasource",
+                      "kind": "DataQuery",
+                      "spec": {
+                        "editorMode": "code",
+                        "format": "table",
+                        "rawQuery": true,
+                        "rawSql": "SELECT SUM(total_users) as updated_users\nFROM mastodon_domains md\nWHERE md.software_version LIKE ANY (\n    SELECT software_version || '%'\n    FROM patch_versions \n    WHERE n_level >= 2\n);\n",
+                        "sql": {
+                          "columns": [
+                            {
+                              "parameters": [],
+                              "type": "function"
+                            }
+                          ],
+                          "groupBy": [
+                            {
+                              "property": {
+                                "type": "string"
+                              },
+                              "type": "groupBy"
+                            }
+                          ],
+                          "limit": 50
+                        }
+                      },
+                      "version": "v0"
+                    },
+                    "refId": "A"
+                  }
+                },
+                {
+                  "kind": "PanelQuery",
+                  "spec": {
+                    "hidden": false,
+                    "query": {
+                      "datasource": {
+                        "name": "aedqwq5gb2ebkc"
+                      },
+                      "group": "grafana-postgresql-datasource",
+                      "kind": "DataQuery",
+                      "spec": {
+                        "editorMode": "code",
+                        "format": "table",
+                        "rawQuery": true,
+                        "rawSql": "SELECT SUM(total_users) as \"Main Total\"\nFROM mastodon_domains\nWHERE software_version LIKE ANY (\nSELECT branch || '.%'\nFROM patch_versions\nWHERE n_level >= 2\n);",
+                        "sql": {
+                          "columns": [
+                            {
+                              "parameters": [],
+                              "type": "function"
+                            }
+                          ],
+                          "groupBy": [
+                            {
+                              "property": {
+                                "type": "string"
+                              },
+                              "type": "groupBy"
+                            }
+                          ],
+                          "limit": 50
+                        }
+                      },
+                      "version": "v0"
+                    },
+                    "refId": "B"
+                  }
+                }
+              ],
+              "queryOptions": {},
+              "transformations": [
+                {
+                  "kind": "configFromData",
+                  "spec": {
+                    "id": "configFromData",
+                    "options": {
+                      "applyTo": {
+                        "id": "byType",
+                        "options": "number"
+                      },
+                      "configRefId": "B",
+                      "mappings": [
+                        {
+                          "fieldName": "Main Total",
+                          "handlerKey": "max",
+                          "reducerId": "lastNotNull"
+                        }
+                      ]
+                    }
+                  }
+                }
+              ]
+            }
+          },
+          "description": "Count of total users running latest patches for branch release-2 (deprecated) or older, compared to the total users on branch release-2 or older.",
+          "id": 75,
+          "links": [],
+          "title": "Patched Users, Deprecated",
+          "vizConfig": {
+            "group": "gauge",
+            "kind": "VizConfig",
+            "spec": {
+              "fieldConfig": {
+                "defaults": {
+                  "color": {
+                    "mode": "thresholds"
+                  },
+                  "fieldMinMax": false,
+                  "min": 0,
+                  "thresholds": {
+                    "mode": "percentage",
+                    "steps": [
+                      {
+                        "color": "red",
+                        "value": 0
+                      },
+                      {
+                        "color": "orange",
+                        "value": 20
+                      },
+                      {
+                        "color": "yellow",
+                        "value": 50
+                      },
+                      {
+                        "color": "green",
+                        "value": 80
+                      }
+                    ]
+                  },
+                  "unit": "locale"
+                },
+                "overrides": []
+              },
+              "options": {
+                "minVizHeight": 75,
+                "minVizWidth": 75,
+                "orientation": "auto",
+                "reduceOptions": {
+                  "calcs": [
+                    "lastNotNull"
+                  ],
+                  "fields": "/.*/",
+                  "values": true
+                },
+                "showThresholdLabels": false,
+                "showThresholdMarkers": false,
+                "sizing": "auto"
               }
             },
             "version": "12.2.1"
