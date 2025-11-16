@@ -362,12 +362,13 @@ def clean_version(software_version_full):
     software_version = clean_version_nightly(software_version)
     software_version = clean_version_main_missing_prerelease(software_version)
     software_version = clean_version_release_with_prerelease(software_version)
+    software_version = clean_version_strip_incorrect_prerelease(software_version)
     return software_version
 
 
 def clean_version_dumbstring(software_version):
     # List of unwanted strings from versions to filter out
-    unwanted_strings = ["-pre", "-theconnector"]
+    unwanted_strings = ["-pre", "-theconnector", "-theatlsocial"]
 
     for unwanted_string in unwanted_strings:
         software_version = software_version.replace(unwanted_string, "")
@@ -498,6 +499,9 @@ def clean_version_wrongpatch(software_version):
 
 
 def clean_version_nightly(software_version):
+    # Remove incorrect date-based nightly suffixes like -nightly-YYYYMMDD (YYYYMMDD = 8 digits)
+    software_version = re.sub(r"-nightly-\d{8}", "", software_version)
+
     # Handle -nightly with date and -security suffix
     match = re.match(
         r"4\.[3456]\.0-nightly\.(\d{4}-\d{2}-\d{2})(-security)?", software_version
@@ -536,6 +540,13 @@ def clean_version_release_with_prerelease(software_version):
         software_version = software_version.split("-")[0]
     return software_version
 
+def clean_version_strip_incorrect_prerelease(software_version):
+    match = re.match(r"^(\d+)\.(\d+)\.(\d+)(-.+)?$", software_version)
+    if match:
+        x, y, z, prerelease = match.groups()
+        if int(z) != 0 and prerelease:
+            return f"{x}.{y}.{z}"
+    return software_version
 
 def get_junk_keywords():
     cursor = conn.cursor()
@@ -548,6 +559,7 @@ def get_junk_keywords():
         print(f"Failed to obtain junk keywords: {e}")
         conn.rollback()
     finally:
+
         cursor.close()
     return []
 
