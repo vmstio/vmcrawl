@@ -318,7 +318,7 @@ def get_total_pending_eol_branch_instances():
         conn.commit()
         return value_to_return
     except Exception as e:
-        print(f"Failed to obtain total pending EOL instances: {e}")
+        print(f"Failed to obtain total deprecated instances: {e}")
         conn.rollback()
     finally:
         cursor.close()
@@ -433,7 +433,7 @@ def get_total_pending_eol_patched_instances():
     try:
         cursor.execute(
             """
-            SELECT COUNT(DISTINCT domain) as "Pending EOL Patched"
+            SELECT COUNT(DISTINCT domain) as "Deprecated Patched"
             FROM mastodon_domains
             WHERE EXISTS (
                 SELECT 1
@@ -448,7 +448,7 @@ def get_total_pending_eol_patched_instances():
         conn.commit()
         return value_to_return
     except Exception as e:
-        print(f"Failed to obtain ending EOL patched instances: {e}")
+        print(f"Failed to obtain deprecated patched instances: {e}")
         conn.rollback()
     finally:
         cursor.close()
@@ -551,7 +551,7 @@ def get_total_pending_eol_branch_users():
         conn.commit()
         return value_to_return
     except Exception as e:
-        print(f"Failed to obtain total pending EOL instances users: {e}")
+        print(f"Failed to obtain total deprecated instances users: {e}")
         conn.rollback()
     finally:
         cursor.close()
@@ -665,7 +665,7 @@ def get_total_pending_eol_patched_users():
     try:
         cursor.execute(
             """
-            SELECT SUM(total_users) as "Pending EOL Patched"
+            SELECT SUM(total_users) as "Deprecated Patched"
             FROM mastodon_domains
             WHERE EXISTS (
                 SELECT 1
@@ -680,7 +680,7 @@ def get_total_pending_eol_patched_users():
         conn.commit()
         return value_to_return
     except Exception as e:
-        print(f"Failed to obtain pending EOL patched instances users: {e}")
+        print(f"Failed to obtain deprecated patched instances users: {e}")
         conn.rollback()
     finally:
         cursor.close()
@@ -780,7 +780,7 @@ def get_active_pending_eol_branch_users():
         conn.commit()
         return value_to_return
     except Exception as e:
-        print(f"Failed to obtain active pending EOL instances users: {e}")
+        print(f"Failed to obtain active deprecated instances users: {e}")
         conn.rollback()
     finally:
         cursor.close()
@@ -891,7 +891,7 @@ def get_active_pending_eol_patched_users():
     try:
         cursor.execute(
             """
-            SELECT SUM(active_users_monthly) as "Pending EOL Patched"
+            SELECT SUM(active_users_monthly) as "Deprecated Patched"
             FROM mastodon_domains
             WHERE EXISTS (
                 SELECT 1
@@ -906,7 +906,7 @@ def get_active_pending_eol_patched_users():
         conn.commit()
         return value_to_return
     except Exception as e:
-        print(f"Failed to obtain active pending EOL patched instances users: {e}")
+        print(f"Failed to obtain active deprecated patched instances users: {e}")
         conn.rollback()
     finally:
         cursor.close()
@@ -936,30 +936,30 @@ if __name__ == "__main__":
             ("total_main_instances", get_total_main_branch_instances, "Total main branch instances"),
             ("total_release_instances", get_total_release_branch_instances, "Total release branch instances"),
             ("total_previous_instances", get_total_previous_branch_instances, "Total previous branch instances"),
-            ("total_pending_eol_instances", get_total_pending_eol_branch_instances, "Total pending EOL branch instances"),
+            ("total_pending_eol_instances", get_total_pending_eol_branch_instances, "Total deprecated branch instances"),
             ("total_eol_instances", get_total_eol_branch_instances, "Total EOL branch instances"),
             ("total_main_patched_instances", get_total_main_patched_instances, "Total main patched instances"),
             ("total_release_patched_instances", get_total_release_patched_instances, "Total release patched instances"),
             ("total_previous_patched_instances", get_total_previous_patched_instances, "Total previous patched instances"),
-            ("total_pending_eol_patched_instances", get_total_pending_eol_patched_instances, "Total pending EOL patched instances"),
+            ("total_pending_eol_patched_instances", get_total_pending_eol_patched_instances, "Total deprecated patched instances"),
             ("total_main_branch_users", get_total_main_branch_users, "Total main branch users"),
             ("total_release_branch_users", get_total_release_branch_users, "Total release branch users"),
             ("total_previous_branch_users", get_total_previous_branch_users, "Total previous branch users"),
-            ("total_pending_eol_branch_users", get_total_pending_eol_branch_users, "Total pending EOL branch users"),
+            ("total_pending_eol_branch_users", get_total_pending_eol_branch_users, "Total deprecated branch users"),
             ("total_eol_branch_users", get_total_eol_branch_users, "Total EOL branch users"),
             ("total_main_patched_users", get_total_main_patched_users, "Total main patched users"),
             ("total_release_patched_users", get_total_release_patched_users, "Total release patched users"),
             ("total_previous_patched_users", get_total_previous_patched_users, "Total previous patched users"),
-            ("total_pending_eol_patched_users", get_total_pending_eol_patched_users, "Total pending EOL patched users"),
+            ("total_pending_eol_patched_users", get_total_pending_eol_patched_users, "Total deprecated patched users"),
             ("total_active_main_branch_users", get_active_main_branch_users, "Total active main branch users"),
             ("total_active_release_branch_users", get_active_release_branch_users, "Total active release branch users"),
             ("total_active_previous_branch_users", get_active_previous_branch_users, "Total active previous branch users"),
-            ("total_active_pending_eol_branch_users", get_active_pending_eol_branch_users, "Total active pending EOL branch users"),
+            ("total_active_pending_eol_branch_users", get_active_pending_eol_branch_users, "Total active deprecated branch users"),
             ("total_active_eol_branch_users", get_active_eol_branch_users, "Total active EOL branch users"),
             ("total_active_main_patched_users", get_active_main_patched_users, "Total active main patched users"),
             ("total_active_release_patched_users", get_active_release_patched_users, "Total active release patched users"),
             ("total_active_previous_patched_users", get_active_previous_patched_users, "Total active previous patched users"),
-            ("total_active_pending_eol_patched_users", get_active_pending_eol_patched_users, "Total active pending EOL patched users"),
+            ("total_active_pending_eol_patched_users", get_active_pending_eol_patched_users, "Total active deprecated patched users"),
         ]
 
         for name, fn, label in stats:
