@@ -962,6 +962,47 @@ if __name__ == "__main__":
             ("total_active_pending_eol_patched_users", get_active_pending_eol_patched_users, "Total active deprecated patched users"),
         ]
 
+        # Initialize statistics variables with defaults to avoid NameError if evaluation fails
+        total_raw_domains = 0
+        total_failed_domains = 0
+        total_mastodon_domains = 0
+        total_ignored_domains = 0
+        total_nxdomains = 0
+        total_norobots = 0
+        total_baddata = 0
+        total_error_over = 0
+        total_error_under = 0
+        total_users = 0
+        total_active_users = 0
+        total_unique_versions = 0
+        total_main_instances = 0
+        total_release_instances = 0
+        total_previous_instances = 0
+        total_pending_eol_instances = 0
+        total_eol_instances = 0
+        total_main_patched_instances = 0
+        total_release_patched_instances = 0
+        total_previous_patched_instances = 0
+        total_pending_eol_patched_instances = 0
+        total_main_branch_users = 0
+        total_release_branch_users = 0
+        total_previous_branch_users = 0
+        total_pending_eol_branch_users = 0
+        total_eol_branch_users = 0
+        total_main_patched_users = 0
+        total_release_patched_users = 0
+        total_previous_patched_users = 0
+        total_pending_eol_patched_users = 0
+        total_active_main_branch_users = 0
+        total_active_release_branch_users = 0
+        total_active_previous_branch_users = 0
+        total_active_pending_eol_branch_users = 0
+        total_active_eol_branch_users = 0
+        total_active_main_patched_users = 0
+        total_active_release_patched_users = 0
+        total_active_previous_patched_users = 0
+        total_active_pending_eol_patched_users = 0
+
         for name, fn, label in stats:
             value = fn()
             globals()[name] = value
