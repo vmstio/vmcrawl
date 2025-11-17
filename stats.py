@@ -926,7 +926,7 @@ if __name__ == "__main__":
             ("total_mastodon_domains", get_total_mastodon_domains, "Total Mastodon domains"),
             ("total_ignored_domains", get_total_ignored_domains, "Total ignored (non-Masto) domains"),
             ("total_nxdomains", get_total_nxdomains, "Total nxdomain domains"),
-            ("total_norobots", get_total_norobots, "Total crawling prohibited by robots.txt domains"),
+            ("total_norobots", get_total_norobots, "Total robots.txt prohibited domains"),
             ("total_baddata", get_total_baddata, "Total baddata domains"),
             ("total_error_over", get_total_error_over, "Total error over domains"),
             ("total_error_under", get_total_error_under, "Total error under domains"),
@@ -1009,10 +1009,10 @@ if __name__ == "__main__":
             print(f"{label}: {value}")
 
         if not is_running_headless():
-            print_colored("Write this data to the statistics database? (y/n): ", "pink")
-            choice = input()
-            if choice.lower() != "y" and choice.lower() != "yes":
-                print_colored("Exiting without writing to the database", "pink")
+            print_colored("Write this data to the statistics database?", "pink")
+            choice = input("yes/no: ").strip().lower()
+            if choice not in ("y", "yes"):
+                print_colored("Exiting without writing to the database", "yellow")
                 sys.exit(0)
 
         # Insert or update statistics in the database
