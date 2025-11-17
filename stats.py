@@ -915,7 +915,7 @@ def get_active_pending_eol_patched_users():
 if __name__ == "__main__":
     try:
         print_colored(f"{appname} v{appversion} ({current_filename})", "bold")
-        if not is_running_headless():
+        if is_running_headless():
             print_colored("Running in headless mode", "pink")
         else:
             print_colored("Running in interactive mode", "pink")
