@@ -7,16 +7,17 @@ backport_branches = ["4.5", "4.4", "4.3", "4.2"]
 try:
     import csv
     import hashlib
-    import httpx
     import os
     import re
-    import psycopg
     import sys
     import time
-    import toml
     from datetime import datetime
-    from dotenv import load_dotenv
     from io import StringIO
+
+    import httpx
+    import psycopg
+    import toml
+    from dotenv import load_dotenv
     from packaging import version
 except ImportError as e:
     print(f"Error importing module: {e}")

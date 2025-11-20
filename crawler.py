@@ -2,21 +2,23 @@
 
 # Import required modules
 try:
-    import common as vmcc
     import argparse
     import json
     import mimetypes
+    import os
     import random
+    import re
+    import sys
     import unicodedata
     from datetime import datetime, timedelta, timezone
-    from lxml import etree  # type: ignore
     from urllib.parse import urlparse, urlunparse
+
     import httpx
-    import os
-    import re
     import psycopg
-    import sys
+    from lxml import etree  # type: ignore
     from packaging import version
+
+    import common as vmcc
 except ImportError as e:
     print(f"Error importing module: {e}")
     sys.exit(1)
@@ -881,7 +883,7 @@ def check_webfinger(domain, http_client):
                     return {"backend_domain": backend_domain}
                 else:
                     return None
-            if not "aliases" in response.content.decode("utf-8"):
+            if "aliases" not in response.content.decode("utf-8"):
                 print("WebFinger reply is invalid…")
                 hostmeta_result = check_hostmeta(domain, http_client)
                 if hostmeta_result:
@@ -890,7 +892,7 @@ def check_webfinger(domain, http_client):
                 else:
                     return None
             if "localhost" in response.content.decode("utf-8"):
-                error_message = f"WebFinger alias points to localhost"
+                error_message = "WebFinger alias points to localhost"
                 print_colored(f"{error_message}", "magenta")
                 log_error(domain, error_message)
                 increment_domain_error(domain, "???")
@@ -980,11 +982,11 @@ def check_hostmeta(domain, http_client):
                 ns = {"xrd": "http://docs.oasis-open.org/ns/xri/xrd-1.0"}  # Namespace
                 try:
                     link = xmldata.find(".//xrd:link[@rel='lrdd']", namespaces=ns)
-                except AttributeError as e:
-                    print(f"Error finding 'lrdd' link in HostMeta XML…")
+                except AttributeError:
+                    print("Error finding 'lrdd' link in HostMeta XML…")
                     return {"backend_domain": domain}
-                except etree.XMLSyntaxError as e:
-                    print(f"XML syntax error while parsing HostMeta…")
+                except etree.XMLSyntaxError:
+                    print("XML syntax error while parsing HostMeta…")
                     return {"backend_domain": domain}
                 if link is None:
                     print("Unable to find lrdd link in HostMeta…")
@@ -1308,7 +1310,7 @@ def process_mastodon_instance(domain, webfinger_data, nodeinfo_data, http_client
                 )
 
         else:
-            error_message = f"Failed to respond to API request"
+            error_message = "Failed to respond to API request"
             print_colored(f"{error_message}", "magenta")
             log_error(domain, error_message)
             increment_domain_error(domain, "API")
@@ -1468,7 +1470,7 @@ def load_from_database(user_choice):
     # PostgreSQL uses SIMILAR TO instead of GLOB, and different timestamp functions
     query_map = {
         "0": "SELECT domain FROM raw_domains WHERE errors = 0 ORDER BY LENGTH(DOMAIN) ASC",
-        "1": f"SELECT domain FROM raw_domains WHERE (failed IS NULL OR failed = FALSE) AND (ignore IS NULL OR ignore = FALSE) AND (nxdomain IS NULL OR nxdomain = FALSE) AND (norobots IS NULL OR norobots = FALSE) AND (baddata IS NULL OR baddata = FALSE) AND (errors <= %s OR errors IS NULL) ORDER BY domain ASC",
+        "1": "SELECT domain FROM raw_domains WHERE (failed IS NULL OR failed = FALSE) AND (ignore IS NULL OR ignore = FALSE) AND (nxdomain IS NULL OR nxdomain = FALSE) AND (norobots IS NULL OR norobots = FALSE) AND (baddata IS NULL OR baddata = FALSE) AND (errors <= %s OR errors IS NULL) ORDER BY domain ASC",
         "6": "SELECT domain FROM raw_domains WHERE ignore = TRUE ORDER BY domain",
         "7": "SELECT domain FROM raw_domains WHERE failed = TRUE ORDER BY domain",
         "8": "SELECT domain FROM raw_domains WHERE nxdomain = TRUE ORDER BY domain",
@@ -1488,12 +1490,12 @@ def load_from_database(user_choice):
         "33": "SELECT domain FROM raw_domains WHERE reason = 'API' ORDER BY errors ASC",
         "34": "SELECT domain FROM raw_domains WHERE reason = '???' ORDER BY errors ASC",
         "40": "SELECT domain FROM mastodon_domains WHERE software_version != ALL(%(versions)s::text[]) ORDER BY active_users_monthly DESC",
-        "41": f"SELECT domain FROM mastodon_domains WHERE software_version LIKE %s ORDER BY active_users_monthly DESC",
+        "41": "SELECT domain FROM mastodon_domains WHERE software_version LIKE %s ORDER BY active_users_monthly DESC",
         "42": "SELECT domain FROM mastodon_domains WHERE active_users_monthly = '0' ORDER BY active_users_monthly DESC",
         "43": "SELECT domain FROM mastodon_domains ORDER BY active_users_monthly DESC",
-        "50": f"SELECT domain FROM raw_domains WHERE errors > %s ORDER BY errors ASC",
-        "51": f"SELECT domain FROM raw_domains WHERE errors < %s ORDER BY errors ASC",
-        "52": f"SELECT domain FROM raw_domains WHERE errors >= %s AND errors <= %s ORDER BY errors ASC",
+        "50": "SELECT domain FROM raw_domains WHERE errors > %s ORDER BY errors ASC",
+        "51": "SELECT domain FROM raw_domains WHERE errors < %s ORDER BY errors ASC",
+        "52": "SELECT domain FROM raw_domains WHERE errors >= %s AND errors <= %s ORDER BY errors ASC",
     }
 
     if user_choice in ["2", "3"]:  # Reverse or Random

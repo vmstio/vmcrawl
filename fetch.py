@@ -2,13 +2,14 @@
 
 # Import required modules
 try:
-    import common as vmcc
     import argparse
     import ipaddress
-    import random
     import os
+    import random
     import re
     import sys
+
+    import common as vmcc
 except ImportError as e:
     print(f"Error importing module: {e}")
     sys.exit(1)

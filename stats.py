@@ -2,9 +2,10 @@
 
 # Import required modules
 try:
-    import common as vmcc
     import os
     import sys
+
+    import common as vmcc
 except ImportError as e:
     print(f"Error importing module: {e}")
     sys.exit(1)
