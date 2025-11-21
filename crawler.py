@@ -42,6 +42,7 @@ http_codes_to_hardfail = vmcc.http_codes_to_hardfail
 http_codes_to_softfail = vmcc.http_codes_to_softfail
 
 get_with_fallback = vmcc.get_with_fallback
+
 get_domain_endings = vmcc.get_domain_endings
 get_iftas_dni = vmcc.get_iftas_dni
 get_nightly_version_ranges = vmcc.get_nightly_version_ranges

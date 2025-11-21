@@ -32,6 +32,8 @@ all_patched_versions = vmcc.all_patched_versions
 http_codes_to_hardfail = vmcc.http_codes_to_hardfail
 http_codes_to_softfail = vmcc.http_codes_to_softfail
 
+get_with_fallback = vmcc.get_with_fallback
+
 parser = argparse.ArgumentParser(description="Fetch peer data from Mastodon instances.")
 parser.add_argument(
     "-l",
@@ -241,7 +243,7 @@ def get_domains(api_url, domain, domain_endings):
     bad_tlds = get_bad_tld() or []
 
     try:
-        api_response = http_client.get(api_url)
+        api_response = get_with_fallback(api_url, http_client)
         data = api_response.json()
         filtered_domains = [
             item
@@ -318,4 +320,3 @@ if __name__ == "__main__":
         print_colored(f"\n{appname} interrupted by user", "bold")
     finally:
         conn.close()
-        http_client.close()
