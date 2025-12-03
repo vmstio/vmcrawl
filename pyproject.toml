@@ -18,4 +18,5 @@ py-modules = [
     "crawler",
     "fetch",
     "stats",
+    "nightly",
 ]
