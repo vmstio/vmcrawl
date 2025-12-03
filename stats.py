@@ -5,7 +5,7 @@ try:
     import os
     import sys
 
-    import common as vmcc
+    import crawler as vmc
 except ImportError as e:
     print(f"Error importing module: {e}")
     sys.exit(1)
@@ -14,19 +14,19 @@ except ImportError as e:
 current_filename = os.path.basename(__file__)
 
 # Application variables & functions from common module
-appname = vmcc.appname
-appversion = vmcc.appversion
-conn = vmcc.conn
-print_colored = vmcc.print_colored
-is_running_headless = vmcc.is_running_headless
-http_client = vmcc.http_client
-error_threshold = vmcc.error_threshold
-error_buffer = vmcc.error_buffer
-version_latest_release = vmcc.version_latest_release
-version_main_branch = vmcc.version_main_branch
-all_patched_versions = vmcc.all_patched_versions
-http_codes_to_hardfail = vmcc.http_codes_to_hardfail
-http_codes_to_softfail = vmcc.http_codes_to_softfail
+appname = vmc.appname
+appversion = vmc.appversion
+conn = vmc.conn
+print_colored = vmc.print_colored
+is_running_headless = vmc.is_running_headless
+http_client = vmc.http_client
+error_threshold = vmc.error_threshold
+error_buffer = vmc.error_buffer
+version_latest_release = vmc.version_latest_release
+version_main_branch = vmc.version_main_branch
+all_patched_versions = vmc.all_patched_versions
+http_codes_to_hardfail = vmc.http_codes_to_hardfail
+http_codes_to_softfail = vmc.http_codes_to_softfail
 
 def get_total_raw_domains():
     cursor = conn.cursor()
