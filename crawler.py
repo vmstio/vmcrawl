@@ -863,7 +863,7 @@ def clean_version_wrongpatch(software_version):
         return software_version
 
 
-def clean_version_nightly(software_version):
+def clean_version_nightly(software_version, nightly_version_ranges):
     # Remove incorrect date-based nightly suffixes like -nightly-YYYYMMDD (YYYYMMDD = 8 digits)
     software_version = re.sub(r"-nightly-\d{8}", "", software_version)
 
