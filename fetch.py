@@ -9,30 +9,22 @@ try:
     import re
     import sys
 
-    import crawler as vmc
+    from crawler import (
+        appname,
+        appversion,
+        conn,
+        print_colored,
+        is_running_headless,
+        http_client,
+        get_with_fallback,
+        get_domain_endings,
+    )
 except ImportError as e:
     print(f"Error importing module: {e}")
     sys.exit(1)
 
 # Detect the current filename
 current_filename = os.path.basename(__file__)
-
-# Application variables & functions from common module
-appname = vmc.appname
-appversion = vmc.appversion
-conn = vmc.conn
-print_colored = vmc.print_colored
-is_running_headless = vmc.is_running_headless
-http_client = vmc.http_client
-error_threshold = vmc.error_threshold
-error_buffer = vmc.error_buffer
-version_latest_release = vmc.version_latest_release
-version_main_branch = vmc.version_main_branch
-all_patched_versions = vmc.all_patched_versions
-http_codes_to_hardfail = vmc.http_codes_to_hardfail
-http_codes_to_softfail = vmc.http_codes_to_softfail
-
-get_with_fallback = vmc.get_with_fallback
 
 parser = argparse.ArgumentParser(description="Fetch peer data from Mastodon instances.")
 parser.add_argument(
@@ -290,7 +282,7 @@ if __name__ == "__main__":
             print_colored("Running in interactive mode", "pink")
 
         exclude_domains_sql = fetch_exclude_domains(conn)
-        domain_endings = vmc.get_domain_endings()
+        domain_endings = get_domain_endings()
 
         if exclude_domains_sql is None:
             print_colored("Failed to fetch excluded list, exiting…", "pink")

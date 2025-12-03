@@ -5,28 +5,20 @@ try:
     import os
     import sys
 
-    import crawler as vmc
+    from crawler import (
+        appname,
+        appversion,
+        conn,
+        print_colored,
+        is_running_headless,
+        http_client,
+    )
 except ImportError as e:
     print(f"Error importing module: {e}")
     sys.exit(1)
 
 # Detect the current filename
 current_filename = os.path.basename(__file__)
-
-# Application variables & functions from common module
-appname = vmc.appname
-appversion = vmc.appversion
-conn = vmc.conn
-print_colored = vmc.print_colored
-is_running_headless = vmc.is_running_headless
-http_client = vmc.http_client
-error_threshold = vmc.error_threshold
-error_buffer = vmc.error_buffer
-version_latest_release = vmc.version_latest_release
-version_main_branch = vmc.version_main_branch
-all_patched_versions = vmc.all_patched_versions
-http_codes_to_hardfail = vmc.http_codes_to_hardfail
-http_codes_to_softfail = vmc.http_codes_to_softfail
 
 def get_total_raw_domains():
     cursor = conn.cursor()

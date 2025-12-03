@@ -1957,128 +1957,131 @@ def print_menu() -> None:
 def get_user_choice() -> str:
     return sys.stdin.readline().strip()
 
-
-# Main program starts here
-parser = argparse.ArgumentParser(
-    description="Crawl version information from Mastodon instances."
-)
-parser.add_argument(
-    "-f",
-    "--file",
-    type=str,
-    help="bypass database and use a file instead (ex: ~/domains.txt)",
-)
-parser.add_argument(
-    "-r",
-    "--new",
-    action="store_true",
-    help="only process new domains added to the database (same as menu item 0)",
-)
-parser.add_argument(
-    "-d",
-    "--buffer",
-    action="store_true",
-    help="only process domains which recently reached the error threshold (same as menu item 52)",
-)
-parser.add_argument(
-    "-t",
-    "--target",
-    type=str,
-    help="target only a specific domain and ignore the database (ex: vmst.io)",
-)
-
-args = parser.parse_args()
-
-if args.file and args.target:
-    print_colored("You cannot set both file and target arguments", "red")
-    sys.exit(1)
-
-print_colored(f"{appname} v{appversion} ({current_filename})", "bold")
-if is_running_headless():
-    print_colored("Running in headless mode", "pink")
-else:
-    print_colored("Running in interactive mode", "pink")
-try:
-    domain_list_file = args.file if args.file is not None else None
-    single_domain_target = args.target if args.target is not None else None
-    try:
-        if domain_list_file:  # File name provided as argument
-            user_choice = 1
-            domain_list = load_from_file(domain_list_file)
-            print("Crawling domains from file…")
-        elif single_domain_target:  # Single domain provided as argument
-            user_choice = 1
-            domain_list = single_domain_target.replace(" ", "").split(",")
-            print(f"Crawling domain{'s' if len(domain_list) > 1 else ''} from target…")
-        else:  # Load from database by default
-            if args.new:
-                user_choice = "0"
-            elif args.buffer:
-                user_choice = "52"
-            elif is_running_headless():
-                user_choice = "3"  # Default to random crawl in headless mode
-            else:
-                print_menu()
-                user_choice = get_user_choice()
-
-            print_colored(
-                f"Crawling domains from database choice {user_choice}…", "pink"
-            )
-            domain_list = load_from_database(user_choice)
-
-        if user_choice == "2":
-            domain_list.reverse()
-        elif user_choice == "3":  # Assuming "3" is the option for randomizing
-            random.shuffle(domain_list)
-
-    except FileNotFoundError:
-        print(f"File not found: {domain_list_file}")
-        sys.exit(1)
-    except psycopg.Error as e:
-        print(f"Database error: {e}")
-        sys.exit(1)
-
-    junk_domains = get_junk_keywords()
-    bad_tlds = get_bad_tld()
-    domain_endings = get_domain_endings()
-    failed_domains = get_failed_domains()
-    ignored_domains = get_ignored_domains()
-    baddata_domains = get_baddata_domains()
-    nxdomain_domains = get_nxdomain_domains()
-    norobots_domains = get_norobots_domains()
-    iftas_domains = get_iftas_dni()
-    nightly_version_ranges = get_nightly_version_ranges()
-
-    check_and_record_domains(
-        domain_list,
-        ignored_domains,
-        baddata_domains,
-        failed_domains,
-        user_choice,
-        junk_domains,
-        bad_tlds,
-        domain_endings,
-        http_client,
-        nxdomain_domains,
-        norobots_domains,
-        iftas_domains,
-        nightly_version_ranges,
+def main():
+    parser = argparse.ArgumentParser(
+        description="Crawl version information from Mastodon instances."
     )
-    cleanup_old_domains()
-    print_colored("Crawling complete!", "bold")
-except KeyboardInterrupt:
-    print_colored(f"\n{appname} interrupted by user", "bold")
-finally:
-    conn.close()
-    http_client.close()
+    parser.add_argument(
+        "-f",
+        "--file",
+        type=str,
+        help="bypass database and use a file instead (ex: ~/domains.txt)",
+    )
+    parser.add_argument(
+        "-r",
+        "--new",
+        action="store_true",
+        help="only process new domains added to the database (same as menu item 0)",
+    )
+    parser.add_argument(
+        "-d",
+        "--buffer",
+        action="store_true",
+        help="only process domains which recently reached the error threshold (same as menu item 52)",
+    )
+    parser.add_argument(
+        "-t",
+        "--target",
+        type=str,
+        help="target only a specific domain and ignore the database (ex: vmst.io)",
+    )
 
-if is_running_headless():
-    if not (args.file or args.target or args.new or args.buffer):
+    args = parser.parse_args()
+
+    if args.file and args.target:
+        print_colored("You cannot set both file and target arguments", "red")
+        sys.exit(1)
+
+    print_colored(f"{appname} v{appversion} ({current_filename})", "bold")
+    if is_running_headless():
+        print_colored("Running in headless mode", "pink")
+    else:
+        print_colored("Running in interactive mode", "pink")
+    try:
+        domain_list_file = args.file if args.file is not None else None
+        single_domain_target = args.target if args.target is not None else None
         try:
-            print_colored(f"Re-executing {appname}...", "bold")
-            os.execv(sys.executable, ["python3"] + sys.argv)
-        except Exception as e:
-            print(f"Failed to re-execute {appname}: {e}")
-else:
-    print_colored(f"Exiting {appname}...", "bold")
-    sys.exit(0)
+            if domain_list_file:  # File name provided as argument
+                user_choice = 1
+                domain_list = load_from_file(domain_list_file)
+                print("Crawling domains from file…")
+            elif single_domain_target:  # Single domain provided as argument
+                user_choice = 1
+                domain_list = single_domain_target.replace(" ", "").split(",")
+                print(f"Crawling domain{'s' if len(domain_list) > 1 else ''} from target…")
+            else:  # Load from database by default
+                if args.new:
+                    user_choice = "0"
+                elif args.buffer:
+                    user_choice = "52"
+                elif is_running_headless():
+                    user_choice = "3"  # Default to random crawl in headless mode
+                else:
+                    print_menu()
+                    user_choice = get_user_choice()
+
+                print_colored(
+                    f"Crawling domains from database choice {user_choice}…", "pink"
+                )
+                domain_list = load_from_database(user_choice)
+
+            if user_choice == "2":
+                domain_list.reverse()
+            elif user_choice == "3":  # Assuming "3" is the option for randomizing
+                random.shuffle(domain_list)
+
+        except FileNotFoundError:
+            print(f"File not found: {domain_list_file}")
+            sys.exit(1)
+        except psycopg.Error as e:
+            print(f"Database error: {e}")
+            sys.exit(1)
+
+        junk_domains = get_junk_keywords()
+        bad_tlds = get_bad_tld()
+        domain_endings = get_domain_endings()
+        failed_domains = get_failed_domains()
+        ignored_domains = get_ignored_domains()
+        baddata_domains = get_baddata_domains()
+        nxdomain_domains = get_nxdomain_domains()
+        norobots_domains = get_norobots_domains()
+        iftas_domains = get_iftas_dni()
+        nightly_version_ranges = get_nightly_version_ranges()
+
+        check_and_record_domains(
+            domain_list,
+            ignored_domains,
+            baddata_domains,
+            failed_domains,
+            user_choice,
+            junk_domains,
+            bad_tlds,
+            domain_endings,
+            http_client,
+            nxdomain_domains,
+            norobots_domains,
+            iftas_domains,
+            nightly_version_ranges,
+        )
+        cleanup_old_domains()
+        print_colored("Crawling complete!", "bold")
+    except KeyboardInterrupt:
+        print_colored(f"\n{appname} interrupted by user", "bold")
+    finally:
+        conn.close()
+        http_client.close()
+
+    if is_running_headless():
+        if not (args.file or args.target or args.new or args.buffer):
+            try:
+                print_colored(f"Re-executing {appname}...", "bold")
+                os.execv(sys.executable, ["python3"] + sys.argv)
+            except Exception as e:
+                print(f"Failed to re-execute {appname}: {e}")
+    else:
+        print_colored(f"Exiting {appname}...", "bold")
+        sys.exit(0)
+    pass
+
+if __name__ == "__main__":
+    main()
