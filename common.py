@@ -1,8 +1,5 @@
 #!/usr/bin/env python3
 
-# Define maintained branches (adjust as needed)
-backport_branches = ["4.5", "4.4", "4.3", "4.2"]
-
 # Import required modules
 try:
     import csv
@@ -46,6 +43,9 @@ try:
 except psycopg.Error as e:
     print(f"Error connecting to PostgreSQL database: {e}")
     sys.exit(1)
+
+# Define maintained branches (adjust as needed)
+backport_branches = os.getenv("VMCRAWL_BACKPORTS", "4.5").split(",")
 
 # Versioning information
 toml_file_path = os.path.join(os.path.dirname(__file__), "pyproject.toml")
