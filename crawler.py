@@ -185,7 +185,7 @@ def read_main_version_info(url):
 
 def get_highest_mastodon_version():
     release_url = "https://api.github.com/repos/mastodon/mastodon/releases"
-    response = http_client.get(release_url)
+    response = get_with_fallback(release_url, http_client)
     if response.status_code == 200:
         releases = response.json()
         highest_version = None
