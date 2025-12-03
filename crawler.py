@@ -724,7 +724,7 @@ def clean_version(software_version_full):
     software_version = clean_version_development(software_version)
     software_version = clean_version_wrongpatch(software_version)
     software_version = clean_version_doubledash(software_version)
-    software_version = clean_version_nightly(software_version)
+    software_version = clean_version_nightly(software_version, get_nightly_version_ranges())
     software_version = clean_version_main_missing_prerelease(software_version)
     software_version = clean_version_release_with_prerelease(software_version)
     software_version = clean_version_strip_incorrect_prerelease(software_version)

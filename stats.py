@@ -11,7 +11,6 @@ try:
         conn,
         print_colored,
         is_running_headless,
-        http_client,
     )
 except ImportError as e:
     print(f"Error importing module: {e}")
@@ -1149,4 +1148,3 @@ if __name__ == "__main__":
         print_colored(f"\n{appname} interrupted by user", "bold")
     finally:
         conn.close()
-        http_client.close()
