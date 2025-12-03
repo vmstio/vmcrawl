@@ -164,6 +164,16 @@ You can combine `random` with the `limit` command, but not with `target` or `off
 You will need to manually maintain the `nightly_versions` table as new development release versions drop.
 This may be automated in the future.
 
+## Backport Branches
+
+You will need to maintain the environment variable `VMCRAWL_BACKPORTS` in a comma seperated list with the branches you wish to maintain backport information for.
+
+Example:
+
+```bash
+4.5,4.4,4.3,4.2
+```
+
 ## Contributing
 
 We welcome contributions! Please read our [contributing guidelines](CONTRIBUTING.md) for more details.
