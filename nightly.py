@@ -28,8 +28,8 @@ def display_current_versions():
         with conn.cursor() as cur:
             cur.execute(
                 """
-                SELECT version, start_date, end_date 
-                FROM nightly_versions 
+                SELECT version, start_date, end_date
+                FROM nightly_versions
                 ORDER BY start_date DESC
             """
             )
@@ -61,8 +61,8 @@ def get_active_version():
         with conn.cursor() as cur:
             cur.execute(
                 """
-                SELECT version, start_date, end_date 
-                FROM nightly_versions 
+                SELECT version, start_date, end_date
+                FROM nightly_versions
                 WHERE end_date = '2099-12-31'
                 ORDER BY start_date DESC
                 LIMIT 1
@@ -138,8 +138,8 @@ def add_nightly_version(
                 with conn.cursor() as cur:
                     cur.execute(
                         """
-                        UPDATE nightly_versions 
-                        SET end_date = %s 
+                        UPDATE nightly_versions
+                        SET end_date = %s
                         WHERE version = %s
                     """,
                         (new_end_date, old_version),
@@ -184,8 +184,8 @@ def update_end_date(version, new_end_date):
         with conn.cursor() as cur:
             cur.execute(
                 """
-                UPDATE nightly_versions 
-                SET end_date = %s 
+                UPDATE nightly_versions
+                SET end_date = %s
                 WHERE version = %s
             """,
                 (new_end_date, version),
@@ -221,7 +221,9 @@ def interactive_add():
 
     # Get start date
     default_start_date = datetime.now().strftime("%Y-%m-%d")
-    start_date_input = input(f"Enter start date (YYYY-MM-DD) [default: {default_start_date}]: ").strip()
+    start_date_input = input(
+        f"Enter start date (YYYY-MM-DD) [default: {default_start_date}]: "
+    ).strip()
     start_date = start_date_input if start_date_input else default_start_date
 
     # Get end date (optional)
