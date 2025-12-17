@@ -98,6 +98,7 @@ color_pink = "\033[38;5;198m"
 color_purple = "\033[94m"
 color_red = "\033[91m"
 color_yellow = "\033[93m"
+color_gray = "\033[90m"
 
 # Used to easily reference color constants
 colors = {
@@ -112,6 +113,7 @@ colors = {
     "red": f"{color_red}",
     "yellow": f"{color_yellow}",
     "white": f"{color_reset}",
+    "gray": f"{color_gray}",
 }
 
 # HTTP client configuration
@@ -1212,7 +1214,7 @@ def check_robots_txt(domain, http_client):
                 and not content_type.startswith("text/")
             ):
                 error_message = "robots.txt invalid"
-                vmc_output(f"{domain}: {error_message}", "orange", use_tqdm=True)
+                vmc_output(f"{domain}: {error_message}", "white", use_tqdm=True)
                 log_error(domain, error_message)
                 increment_domain_error(domain, "TXT")
                 delete_if_error_max(domain)
@@ -1284,7 +1286,7 @@ def check_webfinger(domain, http_client):
                     return None
             if "localhost" in response.content.decode("utf-8"):
                 error_message = "WebFinger alias points to localhost"
-                vmc_output(f"{domain}: {error_message}", "orange", use_tqdm=True)
+                vmc_output(f"{domain}: {error_message}", "white", use_tqdm=True)
                 log_error(domain, error_message)
                 increment_domain_error(domain, "???")
                 delete_domain_if_known(domain)
@@ -1331,7 +1333,7 @@ def check_webfinger(domain, http_client):
                     return None
         else:
             error_message = f"HTTP {response.status_code} on WebFinger"
-            vmc_output(f"{domain}: {error_message}", "orange", use_tqdm=True)
+            vmc_output(f"{domain}: {error_message}", "white", use_tqdm=True)
             log_error(domain, error_message)
             increment_domain_error(domain, str(response.status_code))
             delete_if_error_max(domain)
@@ -1364,8 +1366,7 @@ def check_hostmeta(domain, http_client):
                 try:
                     xmldata = etree.fromstring(content, parser=parser)
                 except etree.XMLSyntaxError as e:
-                    error_message = f"Invalid XML: {e}"
-                    vmc_output(f"{domain}: {error_message}", "orange", use_tqdm=True)
+                    # XML syntax error while parsing HostMeta
                     return {"backend_domain": domain}
                 ns = {"xrd": "http://docs.oasis-open.org/ns/xri/xrd-1.0"}  # Namespace
                 try:
@@ -1375,7 +1376,6 @@ def check_hostmeta(domain, http_client):
                     return {"backend_domain": domain}
                 except etree.XMLSyntaxError:
                     # XML syntax error while parsing HostMeta
-                    return {"backend_domain": domain}
                     return {"backend_domain": domain}
                 if link is None:
                     # No lrdd link found in HostMeta
@@ -1387,7 +1387,7 @@ def check_hostmeta(domain, http_client):
         elif response.status_code in http_codes_to_hardfail:
             vmc_output(
                 f"{domain}: HTTP {response.status_code} on HostMeta",
-                "cyan",
+                "orange",
                 use_tqdm=True,
             )
             mark_failed_domain(domain)
@@ -1414,14 +1414,14 @@ def check_nodeinfo(domain, backend_domain, http_client):
             content_type = response.headers.get("Content-Type", "")
             if "json" not in content_type:
                 error_message = "NodeInfo reply is not a JSON file"
-                vmc_output(f"{domain}: {error_message}", "orange", use_tqdm=True)
+                vmc_output(f"{domain}: {error_message}", "white", use_tqdm=True)
                 log_error(domain, error_message)
                 increment_domain_error(domain, "JSON")
                 delete_if_error_max(domain)
                 return None
             if not response.content:
                 error_message = "NodeInfo reply is empty"
-                vmc_output(f"{domain}: {error_message}", "orange", use_tqdm=True)
+                vmc_output(f"{domain}: {error_message}", "white", use_tqdm=True)
                 log_error(domain, error_message)
                 increment_domain_error(domain, "JSON")
                 delete_if_error_max(domain)
@@ -1431,7 +1431,7 @@ def check_nodeinfo(domain, backend_domain, http_client):
                     data = response.json()
                 except json.JSONDecodeError as e:
                     error_message = f"Invalid JSON response: {e}"
-                    vmc_output(f"{domain}: {error_message}", "orange", use_tqdm=True)
+                    vmc_output(f"{domain}: {error_message}", "white", use_tqdm=True)
                     log_error(domain, error_message)
                     increment_domain_error(domain, "JSON")
                     delete_if_error_max(domain)
@@ -1472,7 +1472,7 @@ def check_nodeinfo(domain, backend_domain, http_client):
                         if "json" not in nodeinfo_response_content_type:
                             error_message = "NodeInfo V2 reply not JSON"
                             vmc_output(
-                                f"{domain}: {error_message}", "orange", use_tqdm=True
+                                f"{domain}: {error_message}", "white", use_tqdm=True
                             )
                             log_error(domain, error_message)
                             increment_domain_error(domain, "JSON")
@@ -1481,7 +1481,7 @@ def check_nodeinfo(domain, backend_domain, http_client):
                         if not nodeinfo_response.content:
                             error_message = "NodeInfo V2 reply empty"
                             vmc_output(
-                                f"{domain}: {error_message}", "orange", use_tqdm=True
+                                f"{domain}: {error_message}", "white", use_tqdm=True
                             )
                             log_error(domain, error_message)
                             increment_domain_error(domain, "JSON")
@@ -1594,14 +1594,14 @@ def process_mastodon_instance(domain, webfinger_data, nodeinfo_data, http_client
             content_type = response.headers.get("Content-Type", "")
             if not response.content:
                 error_message = "Instance API reply is empty"
-                vmc_output(f"{domain}: {error_message}", "orange", use_tqdm=True)
+                vmc_output(f"{domain}: {error_message}", "white", use_tqdm=True)
                 log_error(domain, error_message)
                 increment_domain_error(domain, "API")
                 delete_if_error_max(domain)
                 return None
             elif "json" not in content_type:
                 error_message = "Instance API reply not JSON"
-                vmc_output(f"{domain}: {error_message}", "orange", use_tqdm=True)
+                vmc_output(f"{domain}: {error_message}", "white", use_tqdm=True)
                 log_error(domain, error_message)
                 increment_domain_error(domain, "API")
                 delete_if_error_max(domain)
@@ -1610,7 +1610,7 @@ def process_mastodon_instance(domain, webfinger_data, nodeinfo_data, http_client
             response_json = response.json()
             if "error" in response_json:
                 error_message = "Instance API returned an error"
-                vmc_output(f"{domain}: {error_message}", "orange", use_tqdm=True)
+                vmc_output(f"{domain}: {error_message}", "white", use_tqdm=True)
                 log_error(domain, error_message)
                 increment_domain_error(domain, "API")
                 delete_if_error_max(domain)
@@ -1710,7 +1710,7 @@ def process_mastodon_instance(domain, webfinger_data, nodeinfo_data, http_client
 
         else:
             error_message = "API request failed"
-            vmc_output(f"{domain}: {error_message}", "orange", use_tqdm=True)
+            vmc_output(f"{domain}: {error_message}", "white", use_tqdm=True)
             log_error(domain, error_message)
             increment_domain_error(domain, "API")
             delete_if_error_max(domain)
@@ -1863,7 +1863,7 @@ def handle_http_exception(domain, exception):
 def handle_json_exception(domain, exception):
     error_message = str(exception)
     error_reason = "JSON"
-    vmc_output(f"{domain}: {error_message}", "orange", use_tqdm=True)
+    vmc_output(f"{domain}: {error_message}", "white", use_tqdm=True)
     log_error(domain, error_message)
     increment_domain_error(domain, error_reason)
     delete_if_error_max(domain)
