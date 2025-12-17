@@ -90,7 +90,7 @@ except KeyError as e:
 color_bold = "\033[1m"
 color_reset = "\033[0m"
 color_cyan = "\033[96m"
-color_dark_green = "\033[32m"
+color_light_green = "\033[92m"
 color_green = "\033[92m"
 color_magenta = "\033[95m"
 color_orange = "\033[38;5;208m"
@@ -105,6 +105,7 @@ colors = {
     "bold": f"{color_bold}",
     "reset": f"{color_reset}",
     "cyan": f"{color_cyan}",
+    "light_green": f"{color_light_green}",
     "green": f"{color_green}",
     "magenta": f"{color_magenta}",
     "orange": f"{color_orange}",
@@ -1214,7 +1215,7 @@ def check_robots_txt(domain, http_client):
                 and not content_type.startswith("text/")
             ):
                 error_message = "robots.txt invalid"
-                vmc_output(f"{domain}: {error_message}", "white", use_tqdm=True)
+                vmc_output(f"{domain}: {error_message}", "orange", use_tqdm=True)
                 log_error(domain, error_message)
                 increment_domain_error(domain, "TXT")
                 delete_if_error_max(domain)
@@ -1241,7 +1242,7 @@ def check_robots_txt(domain, http_client):
         elif response.status_code in http_codes_to_hardfail:
             vmc_output(
                 f"{domain}: HTTP {response.status_code} on robots.txt",
-                "cyan",
+                "yellow",
                 use_tqdm=True,
             )
             mark_failed_domain(domain)
@@ -1286,7 +1287,7 @@ def check_webfinger(domain, http_client):
                     return None
             if "localhost" in response.content.decode("utf-8"):
                 error_message = "WebFinger alias points to localhost"
-                vmc_output(f"{domain}: {error_message}", "white", use_tqdm=True)
+                vmc_output(f"{domain}: {error_message}", "orange", use_tqdm=True)
                 log_error(domain, error_message)
                 increment_domain_error(domain, "???")
                 delete_domain_if_known(domain)
@@ -1313,7 +1314,7 @@ def check_webfinger(domain, http_client):
         elif response.status_code in http_codes_to_hardfail:
             vmc_output(
                 f"{domain}: HTTP {response.status_code} on WebFinger",
-                "cyan",
+                "yellow",
                 use_tqdm=True,
             )
             mark_failed_domain(domain)
@@ -1333,7 +1334,7 @@ def check_webfinger(domain, http_client):
                     return None
         else:
             error_message = f"HTTP {response.status_code} on WebFinger"
-            vmc_output(f"{domain}: {error_message}", "white", use_tqdm=True)
+            vmc_output(f"{domain}: {error_message}", "yellow", use_tqdm=True)
             log_error(domain, error_message)
             increment_domain_error(domain, str(response.status_code))
             delete_if_error_max(domain)
@@ -1387,7 +1388,7 @@ def check_hostmeta(domain, http_client):
         elif response.status_code in http_codes_to_hardfail:
             vmc_output(
                 f"{domain}: HTTP {response.status_code} on HostMeta",
-                "orange",
+                "yellow",
                 use_tqdm=True,
             )
             mark_failed_domain(domain)
@@ -1398,7 +1399,7 @@ def check_hostmeta(domain, http_client):
             return {"backend_domain": domain}
         else:
             error_message = f"HTTP {response.status_code} on HostMeta"
-            vmc_output(f"{domain}: {error_message}", "orange", use_tqdm=True)
+            vmc_output(f"{domain}: {error_message}", "yellow", use_tqdm=True)
             log_error(domain, f"{error_message}")
             increment_domain_error(domain, str(response.status_code))
             delete_if_error_max(domain)
@@ -1414,14 +1415,14 @@ def check_nodeinfo(domain, backend_domain, http_client):
             content_type = response.headers.get("Content-Type", "")
             if "json" not in content_type:
                 error_message = "NodeInfo reply is not a JSON file"
-                vmc_output(f"{domain}: {error_message}", "white", use_tqdm=True)
+                vmc_output(f"{domain}: {error_message}", "orange", use_tqdm=True)
                 log_error(domain, error_message)
                 increment_domain_error(domain, "JSON")
                 delete_if_error_max(domain)
                 return None
             if not response.content:
                 error_message = "NodeInfo reply is empty"
-                vmc_output(f"{domain}: {error_message}", "white", use_tqdm=True)
+                vmc_output(f"{domain}: {error_message}", "orange", use_tqdm=True)
                 log_error(domain, error_message)
                 increment_domain_error(domain, "JSON")
                 delete_if_error_max(domain)
@@ -1431,7 +1432,7 @@ def check_nodeinfo(domain, backend_domain, http_client):
                     data = response.json()
                 except json.JSONDecodeError as e:
                     error_message = f"Invalid JSON response: {e}"
-                    vmc_output(f"{domain}: {error_message}", "white", use_tqdm=True)
+                    vmc_output(f"{domain}: {error_message}", "orange", use_tqdm=True)
                     log_error(domain, error_message)
                     increment_domain_error(domain, "JSON")
                     delete_if_error_max(domain)
@@ -1472,7 +1473,7 @@ def check_nodeinfo(domain, backend_domain, http_client):
                         if "json" not in nodeinfo_response_content_type:
                             error_message = "NodeInfo V2 reply not JSON"
                             vmc_output(
-                                f"{domain}: {error_message}", "white", use_tqdm=True
+                                f"{domain}: {error_message}", "orange", use_tqdm=True
                             )
                             log_error(domain, error_message)
                             increment_domain_error(domain, "JSON")
@@ -1481,7 +1482,7 @@ def check_nodeinfo(domain, backend_domain, http_client):
                         if not nodeinfo_response.content:
                             error_message = "NodeInfo V2 reply empty"
                             vmc_output(
-                                f"{domain}: {error_message}", "white", use_tqdm=True
+                                f"{domain}: {error_message}", "orange", use_tqdm=True
                             )
                             log_error(domain, error_message)
                             increment_domain_error(domain, "JSON")
@@ -1492,7 +1493,7 @@ def check_nodeinfo(domain, backend_domain, http_client):
                     elif nodeinfo_response.status_code in http_codes_to_hardfail:
                         vmc_output(
                             f"HTTP {response.status_code} on NodeInfo",
-                            "cyan",
+                            "yellow",
                             use_tqdm=True,
                         )
                         mark_failed_domain(domain)
@@ -1503,7 +1504,7 @@ def check_nodeinfo(domain, backend_domain, http_client):
                             f"HTTP {nodeinfo_response.status_code} on NodeInfo"
                         )
                         vmc_output(
-                            f"{domain}: {error_message}", "orange", use_tqdm=True
+                            f"{domain}: {error_message}", "yellow", use_tqdm=True
                         )
                         log_error(domain, f"{error_message}")
                         increment_domain_error(
@@ -1517,14 +1518,14 @@ def check_nodeinfo(domain, backend_domain, http_client):
         elif response.status_code in http_codes_to_hardfail:
             vmc_output(
                 f"{domain}: HTTP {response.status_code} on NodeInfo",
-                "cyan",
+                "yellow",
                 use_tqdm=True,
             )
             mark_failed_domain(domain)
             delete_domain_if_known(domain)
         else:
             error_message = f"HTTP {response.status_code} on NodeInfo"
-            vmc_output(f"{domain}: {error_message}", "orange", use_tqdm=True)
+            vmc_output(f"{domain}: {error_message}", "yellow", use_tqdm=True)
             log_error(domain, f"{error_message}")
             increment_domain_error(domain, str(response.status_code))
             delete_if_error_max(domain)
@@ -1558,7 +1559,7 @@ def process_mastodon_instance(domain, webfinger_data, nodeinfo_data, http_client
 
     if "usage" not in nodeinfo_data or "users" not in nodeinfo_data["usage"]:
         error_to_print = f"v{software_version} (no user count)"
-        vmc_output(f"{domain}: {error_to_print}", "yellow", use_tqdm=True)
+        vmc_output(f"{domain}: {error_to_print}", "light_green", use_tqdm=True)
         log_error(domain, error_to_print)
         increment_domain_error(domain, "###")
         delete_domain_if_known(domain)
@@ -1568,7 +1569,7 @@ def process_mastodon_instance(domain, webfinger_data, nodeinfo_data, http_client
         total_users = nodeinfo_data["usage"]["users"]["total"]
     else:
         error_to_print = f"v{software_version} (no total user count)"
-        vmc_output(f"{domain}: {error_to_print}", "yellow", use_tqdm=True)
+        vmc_output(f"{domain}: {error_to_print}", "light_green", use_tqdm=True)
         log_error(domain, error_to_print)
         increment_domain_error(domain, "###")
         delete_domain_if_known(domain)
@@ -1577,7 +1578,7 @@ def process_mastodon_instance(domain, webfinger_data, nodeinfo_data, http_client
         active_month_users = nodeinfo_data["usage"]["users"]["activeMonth"]
     else:
         error_to_print = f"v{software_version} (no active month user count)"
-        vmc_output(f"{domain}: {error_to_print}", "yellow", use_tqdm=True)
+        vmc_output(f"{domain}: {error_to_print}", "light_green", use_tqdm=True)
         log_error(domain, error_to_print)
         increment_domain_error(domain, "###")
         delete_domain_if_known(domain)
@@ -1594,14 +1595,14 @@ def process_mastodon_instance(domain, webfinger_data, nodeinfo_data, http_client
             content_type = response.headers.get("Content-Type", "")
             if not response.content:
                 error_message = "Instance API reply is empty"
-                vmc_output(f"{domain}: {error_message}", "white", use_tqdm=True)
+                vmc_output(f"{domain}: {error_message}", "orange", use_tqdm=True)
                 log_error(domain, error_message)
                 increment_domain_error(domain, "API")
                 delete_if_error_max(domain)
                 return None
             elif "json" not in content_type:
                 error_message = "Instance API reply not JSON"
-                vmc_output(f"{domain}: {error_message}", "white", use_tqdm=True)
+                vmc_output(f"{domain}: {error_message}", "orange", use_tqdm=True)
                 log_error(domain, error_message)
                 increment_domain_error(domain, "API")
                 delete_if_error_max(domain)
@@ -1610,7 +1611,7 @@ def process_mastodon_instance(domain, webfinger_data, nodeinfo_data, http_client
             response_json = response.json()
             if "error" in response_json:
                 error_message = "Instance API returned an error"
-                vmc_output(f"{domain}: {error_message}", "white", use_tqdm=True)
+                vmc_output(f"{domain}: {error_message}", "orange", use_tqdm=True)
                 log_error(domain, error_message)
                 increment_domain_error(domain, "API")
                 delete_if_error_max(domain)
@@ -1668,7 +1669,7 @@ def process_mastodon_instance(domain, webfinger_data, nodeinfo_data, http_client
                 total_users + 6, total_users + (total_users * 0.25)
             ):
                 error_to_print = f"v{software_version} (invalid MAU count)"
-                vmc_output(f"{domain}: {error_to_print}", "yellow", use_tqdm=True)
+                vmc_output(f"{domain}: {error_to_print}", "light_green", use_tqdm=True)
                 log_error(domain, error_to_print)
                 increment_domain_error(domain, "###")
                 delete_domain_if_known(domain)
@@ -1679,7 +1680,7 @@ def process_mastodon_instance(domain, webfinger_data, nodeinfo_data, http_client
                 version_main_branch
             ):
                 error_to_print = f'v{software_version.split("-")[0]} (version invalid)'
-                vmc_output(f"{domain}: {error_to_print}", "yellow", use_tqdm=True)
+                vmc_output(f"{domain}: {error_to_print}", "light_green", use_tqdm=True)
                 log_error(domain, error_to_print)
                 increment_domain_error(domain, "???")
                 delete_domain_if_known(domain)
@@ -1710,7 +1711,7 @@ def process_mastodon_instance(domain, webfinger_data, nodeinfo_data, http_client
 
         else:
             error_message = "API request failed"
-            vmc_output(f"{domain}: {error_message}", "white", use_tqdm=True)
+            vmc_output(f"{domain}: {error_message}", "orange", use_tqdm=True)
             log_error(domain, error_message)
             increment_domain_error(domain, "API")
             delete_if_error_max(domain)
@@ -1784,14 +1785,14 @@ def handle_http_exception(domain, exception):
             .lstrip()
             .rstrip(" .")
         )
-        vmc_output(f"{domain}: {error_message}", "orange", use_tqdm=True)
+        vmc_output(f"{domain}: {error_message}", "yellow", use_tqdm=True)
         log_error(domain, error_message)
         increment_domain_error(domain, error_reason)
         delete_if_error_max(domain)
     elif "maximum allowed redirects" in error_message.casefold():
         error_reason = "MAX"
         error_message = error_message.strip(".")
-        vmc_output(f"{domain}: {error_message}", "orange", use_tqdm=True)
+        vmc_output(f"{domain}: {error_message}", "yellow", use_tqdm=True)
         log_error(domain, error_message)
         increment_domain_error(domain, error_reason)
         delete_if_error_max(domain)
@@ -1814,7 +1815,7 @@ def handle_http_exception(domain, exception):
             .lstrip()
             .rstrip(" .")
         )
-        vmc_output(f"{domain}: {error_message}", "orange", use_tqdm=True)
+        vmc_output(f"{domain}: {error_message}", "yellow", use_tqdm=True)
         log_error(domain, error_message)
         increment_domain_error(domain, error_reason)
         delete_if_error_max(domain)
@@ -1832,6 +1833,8 @@ def handle_http_exception(domain, exception):
         ]
     ):
         error_reason = "TCP"
+        if "streamreset" in error_message.casefold():
+            error_message = "HTTP/2 stream was abruptly terminated"
         error_message = (
             re.sub(r"\s*(\[[^\]]*\]|\([^)]*\))", "", error_message)
             .replace(":", "")
@@ -1840,7 +1843,7 @@ def handle_http_exception(domain, exception):
             .lstrip()
             .rstrip(" .")
         )
-        vmc_output(f"{domain}: {error_message}", "orange", use_tqdm=True)
+        vmc_output(f"{domain}: {error_message}", "yellow", use_tqdm=True)
         log_error(domain, error_message)
         increment_domain_error(domain, error_reason)
         delete_if_error_max(domain)
@@ -1854,7 +1857,7 @@ def handle_http_exception(domain, exception):
             .lstrip()
             .rstrip(" .")
         )
-        vmc_output(f"{domain}: {error_message}", "orange", use_tqdm=True)
+        vmc_output(f"{domain}: {error_message}", "yellow", use_tqdm=True)
         log_error(domain, error_message)
         increment_domain_error(domain, error_reason)
         delete_if_error_max(domain)
@@ -1863,7 +1866,7 @@ def handle_http_exception(domain, exception):
 def handle_json_exception(domain, exception):
     error_message = str(exception)
     error_reason = "JSON"
-    vmc_output(f"{domain}: {error_message}", "white", use_tqdm=True)
+    vmc_output(f"{domain}: {error_message}", "orange", use_tqdm=True)
     log_error(domain, error_message)
     increment_domain_error(domain, error_reason)
     delete_if_error_max(domain)
