@@ -1098,8 +1098,8 @@ def check_and_record_domains(
         for future in tqdm(
             as_completed(futures),
             total=len(domain_list),
-            desc="vmcrawl progress",
-            unit="instances",
+            desc="vmcrawl",
+            unit="d",
         ):
             try:
                 future.result()  # Get result or raise exception if any
