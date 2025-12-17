@@ -274,9 +274,6 @@ def process_domain(domain, counter, total):
 
 
 if __name__ == "__main__":
-    # Clear the terminal screen
-    os.system("clear" if os.name != "nt" else "cls")
-
     try:
         vmc_output(f"{appname} v{appversion} ({current_filename})", "bold")
         if is_running_headless():

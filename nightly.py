@@ -332,7 +332,4 @@ def main():
 
 
 if __name__ == "__main__":
-    # Clear the terminal screen
-    os.system("clear" if os.name != "nt" else "cls")
-
     main()

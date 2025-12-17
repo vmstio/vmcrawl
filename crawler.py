@@ -1206,7 +1206,7 @@ def check_robots_txt(domain, http_client):
         # Check for specific HTTP status codes
         elif response.status_code in http_codes_to_hardfail:
             vmc_output(
-                f"{domain}: HTTP {response.status_code} to robots.txt request",
+                f"{domain}: HTTP {response.status_code} on robots.txt",
                 "red",
                 use_tqdm=True,
             )
@@ -1227,11 +1227,7 @@ def check_webfinger(domain, http_client):
         content_length = response.headers.get("Content-Length", "")
         if response.status_code in [200]:
             if "json" not in content_type:
-                vmc_output(
-                    f"{domain}: WebFinger reply is not a JSON file",
-                    "white",
-                    use_tqdm=True,
-                )
+                # WebFinger reply is not JSON
                 hostmeta_result = check_hostmeta(domain, http_client)
                 if hostmeta_result:
                     backend_domain = hostmeta_result["backend_domain"]
@@ -1239,9 +1235,7 @@ def check_webfinger(domain, http_client):
                 else:
                     return None
             if not response.content or content_length == "0":
-                vmc_output(
-                    f"{domain}: WebFinger reply is empty", "white", use_tqdm=True
-                )
+                # WebFinger reply is empty
                 hostmeta_result = check_hostmeta(domain, http_client)
                 if hostmeta_result:
                     backend_domain = hostmeta_result["backend_domain"]
@@ -1249,9 +1243,7 @@ def check_webfinger(domain, http_client):
                 else:
                     return None
             if "aliases" not in response.content.decode("utf-8"):
-                vmc_output(
-                    f"{domain}: WebFinger reply is invalid", "white", use_tqdm=True
-                )
+                # WebFinger reply is invalid
                 hostmeta_result = check_hostmeta(domain, http_client)
                 if hostmeta_result:
                     backend_domain = hostmeta_result["backend_domain"]
@@ -1277,11 +1269,7 @@ def check_webfinger(domain, http_client):
                 return {"backend_domain": backend_domain}
                 # Check for specific HTTP status codes
             else:
-                vmc_output(
-                    f"{domain}: WebFinger reply does not contain a valid alias",
-                    "white",
-                    use_tqdm=True,
-                )
+                # WebFinger reply has no valid alias
                 hostmeta_result = check_hostmeta(domain, http_client)
                 if hostmeta_result:
                     backend_domain = hostmeta_result["backend_domain"]
@@ -1290,7 +1278,7 @@ def check_webfinger(domain, http_client):
                     return None
         elif response.status_code in http_codes_to_hardfail:
             vmc_output(
-                f"{domain}: HTTP {response.status_code} to WebFinger request",
+                f"{domain}: HTTP {response.status_code} on WebFinger",
                 "red",
                 use_tqdm=True,
             )
@@ -1302,11 +1290,7 @@ def check_webfinger(domain, http_client):
                 mark_as_non_mastodon(domain)
                 return None
             else:
-                vmc_output(
-                    f"{domain}: HTTP {response.status_code} to WebFinger request",
-                    "white",
-                    use_tqdm=True,
-                )
+                # WebFinger didn't reply
                 hostmeta_result = check_hostmeta(domain, http_client)
                 if hostmeta_result:
                     backend_domain = hostmeta_result["backend_domain"]
@@ -1314,7 +1298,7 @@ def check_webfinger(domain, http_client):
                 else:
                     return None
         else:
-            error_message = f"HTTP {response.status_code} to WebFinger request"
+            error_message = f"HTTP {response.status_code} on WebFinger"
             vmc_output(f"{domain}: {error_message}", "yellow", use_tqdm=True)
             log_error(domain, error_message)
             increment_domain_error(domain, str(response.status_code))
@@ -1333,16 +1317,13 @@ def check_hostmeta(domain, http_client):
         if response.status_code in [200]:
             content_type = response.headers.get("Content-Type", "")
             if "xml" not in content_type:
-                error_message = "HostMeta reply is not an XML file"
-                vmc_output(f"{domain}: {error_message}", "white", use_tqdm=True)
+                # HostMeta reply is not XML
                 return {"backend_domain": domain}
             if "xhtml" in content_type:
-                error_message = "HostMeta reply is an XHTML file"
-                vmc_output(f"{domain}: {error_message}", "white", use_tqdm=True)
+                # HostMeta reply is an XHTML file
                 return {"backend_domain": domain}
             if not response.content:
-                error_message = "HostMeta reply is empty"
-                vmc_output(f"{domain}: {error_message}", "white", use_tqdm=True)
+                # HostMeta reply is empty
                 return {"backend_domain": domain}
             else:
                 content = response.content.strip()
@@ -1358,25 +1339,14 @@ def check_hostmeta(domain, http_client):
                 try:
                     link = xmldata.find(".//xrd:link[@rel='lrdd']", namespaces=ns)
                 except AttributeError:
-                    vmc_output(
-                        f"{domain}: Error finding 'lrdd' link in HostMeta XML",
-                        "white",
-                        use_tqdm=True,
-                    )
+                    # Unable to find lrdd link due to XML structure
                     return {"backend_domain": domain}
                 except etree.XMLSyntaxError:
-                    vmc_output(
-                        f"{domain}: XML syntax error while parsing HostMeta",
-                        "white",
-                        use_tqdm=True,
-                    )
+                    # XML syntax error while parsing HostMeta
+                    return {"backend_domain": domain}
                     return {"backend_domain": domain}
                 if link is None:
-                    vmc_output(
-                        f"{domain}: Unable to find lrdd link in HostMeta",
-                        "white",
-                        use_tqdm=True,
-                    )
+                    # No lrdd link found in HostMeta
                     return {"backend_domain": domain}
                 else:
                     parsed_link = urlparse(link.get("template"))
@@ -1384,7 +1354,7 @@ def check_hostmeta(domain, http_client):
                     return {"backend_domain": backend_domain}
         elif response.status_code in http_codes_to_hardfail:
             vmc_output(
-                f"{domain}: HTTP {response.status_code} to HostMeta request",
+                f"{domain}: HTTP {response.status_code} on HostMeta",
                 "red",
                 use_tqdm=True,
             )
@@ -1392,14 +1362,10 @@ def check_hostmeta(domain, http_client):
             delete_domain_if_known(domain)
             return False
         elif response.status_code in http_codes_to_softfail:
-            vmc_output(
-                f"{domain}: HTTP {response.status_code} to HostMeta request",
-                "white",
-                use_tqdm=True,
-            )
+            # HostMeta didn't reply
             return {"backend_domain": domain}
         else:
-            error_message = f"HTTP {response.status_code} to HostMeta request"
+            error_message = f"HTTP {response.status_code} on HostMeta"
             vmc_output(f"{domain}: {error_message}", "yellow", use_tqdm=True)
             log_error(domain, f"{error_message}")
             increment_domain_error(domain, str(response.status_code))
@@ -1493,7 +1459,7 @@ def check_nodeinfo(domain, backend_domain, http_client):
                             return nodeinfo_response.json()
                     elif nodeinfo_response.status_code in http_codes_to_hardfail:
                         vmc_output(
-                            f"HTTP {response.status_code} to NodeInfo request",
+                            f"HTTP {response.status_code} on NodeInfo",
                             "red",
                             use_tqdm=True,
                         )
@@ -1502,7 +1468,7 @@ def check_nodeinfo(domain, backend_domain, http_client):
                         return False
                     else:
                         error_message = (
-                            f"HTTP {nodeinfo_response.status_code} to NodeInfo request"
+                            f"HTTP {nodeinfo_response.status_code} on NodeInfo"
                         )
                         vmc_output(
                             f"{domain}: {error_message}", "yellow", use_tqdm=True
@@ -1518,14 +1484,14 @@ def check_nodeinfo(domain, backend_domain, http_client):
                 mark_as_non_mastodon(domain)
         elif response.status_code in http_codes_to_hardfail:
             vmc_output(
-                f"{domain}: HTTP {response.status_code} to NodeInfo request",
+                f"{domain}: HTTP {response.status_code} on NodeInfo",
                 "red",
                 use_tqdm=True,
             )
             mark_failed_domain(domain)
             delete_domain_if_known(domain)
         else:
-            error_message = f"HTTP {response.status_code} to NodeInfo request"
+            error_message = f"HTTP {response.status_code} on NodeInfo"
             vmc_output(f"{domain}: {error_message}", "yellow", use_tqdm=True)
             log_error(domain, f"{error_message}")
             increment_domain_error(domain, str(response.status_code))
@@ -1715,7 +1681,7 @@ def process_mastodon_instance(domain, webfinger_data, nodeinfo_data, http_client
                 )
 
         else:
-            error_message = "Failed to respond to API request"
+            error_message = "API request failed"
             vmc_output(f"{domain}: {error_message}", "magenta", use_tqdm=True)
             log_error(domain, error_message)
             increment_domain_error(domain, "API")
@@ -1784,6 +1750,7 @@ def handle_http_exception(domain, exception):
     error_message = str(exception)
     if "_ssl.c" in error_message.casefold():
         error_reason = "SSL"
+        error_message = re.sub(r"\s*(\[[^\]]*\]|\([^)]*\))", "", error_message).lstrip()
         vmc_output(f"{domain}: {error_message}", "orange", use_tqdm=True)
         log_error(domain, error_message)
         increment_domain_error(domain, error_reason)
@@ -1806,7 +1773,8 @@ def handle_http_exception(domain, exception):
         ]
     ):
         error_reason = "DNS"
-        vmc_output(f"{domain}: DNS {error_message}", "orange", use_tqdm=True)
+        error_message = re.sub(r"\s*(\[[^\]]*\]|\([^)]*\))", "", error_message).lstrip()
+        vmc_output(f"{domain}: {error_message}", "orange", use_tqdm=True)
         log_error(domain, error_message)
         increment_domain_error(domain, error_reason)
         delete_if_error_max(domain)
@@ -1824,13 +1792,14 @@ def handle_http_exception(domain, exception):
         ]
     ):
         error_reason = "TCP"
-        vmc_output(f"{domain}: TCP {error_message}", "orange", use_tqdm=True)
+        error_message = re.sub(r"\s*(\[[^\]]*\]|\([^)]*\))", "", error_message).lstrip()
+        vmc_output(f"{domain}: {error_message}", "orange", use_tqdm=True)
         log_error(domain, error_message)
         increment_domain_error(domain, error_reason)
         delete_if_error_max(domain)
     else:
         error_reason = "HTTP"
-        vmc_output(f"{domain}: HTTPX {error_message}", "orange", use_tqdm=True)
+        vmc_output(f"{domain}: {error_message}", "orange", use_tqdm=True)
         log_error(domain, error_message)
         increment_domain_error(domain, error_reason)
         delete_if_error_max(domain)
@@ -2026,9 +1995,6 @@ def get_user_choice() -> str:
 
 
 def main():
-    # Clear the terminal screen
-    os.system("clear" if os.name != "nt" else "cls")
-
     parser = argparse.ArgumentParser(
         description="Crawl version information from Mastodon instances."
     )
