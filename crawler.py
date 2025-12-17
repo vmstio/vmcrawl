@@ -2159,9 +2159,9 @@ def main():
             nightly_version_ranges,
         )
         cleanup_old_domains()
-        vmc_output("Crawling complete!", "bold")
+        vmc_output("Crawling complete!", "pink")
     except KeyboardInterrupt:
-        vmc_output(f"\n{appname} interrupted by user", "bold")
+        vmc_output(f"\n{appname} interrupted by user", "red")
     finally:
         conn.close()
         http_client.close()
@@ -2169,12 +2169,11 @@ def main():
     if is_running_headless():
         if not (args.file or args.target or args.new or args.buffer):
             try:
-                vmc_output(f"Re-executing {appname}...", "bold")
+                vmc_output(f"Re-executing {appname}...", "pink")
                 os.execv(sys.executable, ["python3"] + sys.argv)
             except Exception as e:
                 vmc_output(f"Failed to re-execute {appname}: {e}", "red")
     else:
-        vmc_output(f"Exiting {appname}...", "bold")
         sys.exit(0)
     pass
 
