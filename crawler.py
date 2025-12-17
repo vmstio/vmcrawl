@@ -22,12 +22,23 @@ try:
     from io import StringIO
     from lxml import etree  # type: ignore
     from packaging import version
+    from tqdm import tqdm
 except ImportError as e:
     print(f"Error importing module: {e}")
     sys.exit(1)
 
 # Detect the current filename
 current_filename = os.path.basename(__file__)
+
+
+# tqdm-aware print function to prevent progress bar disruption
+def tqdm_print(text, color=None):
+    """Print text without disrupting tqdm progress bars."""
+    if color:
+        vmc_output(text, color, use_tqdm=True)
+    else:
+        tqdm.write(text)
+
 
 # Import the dotenv file
 try:
@@ -100,6 +111,7 @@ colors = {
     "purple": f"{color_purple}",
     "red": f"{color_red}",
     "yellow": f"{color_yellow}",
+    "white": f"{color_reset}",
 }
 
 # HTTP client configuration
@@ -126,9 +138,6 @@ def get_with_fallback(url, http_client):
         http2_error_indicators = ["connectionterminated"]
 
         if any(indicator in error_str for indicator in http2_error_indicators):
-            print_colored(
-                f"HTTP/2 request failed: {e}, falling back to HTTP/1.1", "yellow"
-            )
             # Create a new client with HTTP/2 explicitly disabled
             fallback_client = httpx.Client(
                 http2=False,
@@ -177,7 +186,7 @@ def read_main_version_info(url):
                     if value.isnumeric() or re.match(r"'[^']+'", value):
                         version_info[key] = value.replace("'", "")
     except httpx.HTTPError as e:
-        print(f"Failed to retrieve Mastodon main version: {e}")
+        vmc_output(f"Failed to retrieve Mastodon main version: {e}", "white")
         return {}
 
     return version_info
@@ -199,9 +208,9 @@ def get_highest_mastodon_version():
             ) > version.parse(highest_version):
                 highest_version = release_version
     else:
-        print(
-            "Failed to retrieve latest Mastodon release version. HTTP Status Code:",
-            response.status_code,
+        vmc_output(
+            f"Failed to retrieve latest Mastodon release version. HTTP Status Code: {response.status_code}",
+            "white",
         )
         return None
 
@@ -327,8 +336,12 @@ update_patch_versions()
 delete_old_patch_versions()
 
 
-def print_colored(text: str, color: str, **kwargs) -> None:
-    print(f"{colors.get(color, '')}{text}{colors['reset']}", **kwargs)
+def vmc_output(text: str, color: str, use_tqdm: bool = False, **kwargs) -> None:
+    colored_text = f"{colors.get(color, '')}{text}{colors['reset']}"
+    if use_tqdm:
+        tqdm.write(colored_text, **kwargs)
+    else:
+        print(colored_text, **kwargs)
 
 
 def get_domain_endings():
@@ -471,7 +484,7 @@ def log_error(domain, error_to_print):
         )
         conn.commit()
     except Exception as e:
-        print(f"Failed to log error: {e}")
+        vmc_output(f"Failed to log error: {e}", "white")
         conn.rollback()
     finally:
         cursor.close()
@@ -506,7 +519,7 @@ def increment_domain_error(domain, error_reason):
         )
         conn.commit()
     except Exception as e:
-        print(f"Failed to increment domain error: {e}")
+        vmc_output(f"Failed to increment domain error: {e}", "white")
         conn.rollback()
     finally:
         cursor.close()
@@ -533,7 +546,7 @@ def delete_if_error_max(domain):
                 delete_domain_if_known(domain)
 
     except Exception as e:
-        print(f"Failed to delete maxed out domain: {e}")
+        vmc_output(f"Failed to delete maxed out domain: {e}", "white")
         conn.rollback()
     finally:
         cursor.close()
@@ -559,7 +572,7 @@ def clear_domain_error(domain):
         )
         conn.commit()
     except Exception as e:
-        print(f"Failed to clear domain error: {e}")
+        vmc_output(f"Failed to clear domain error: {e}", "white")
         conn.rollback()
     finally:
         cursor.close()
@@ -585,7 +598,7 @@ def mark_ignore_domain(domain):
         )
         conn.commit()
     except Exception as e:
-        print(f"Failed to mark domain ignored: {e}")
+        vmc_output(f"Failed to mark domain ignored: {e}", "white")
         conn.rollback()
     finally:
         cursor.close()
@@ -611,7 +624,7 @@ def mark_failed_domain(domain):
         )
         conn.commit()
     except Exception as e:
-        print(f"Failed to mark domain failed: {e}")
+        vmc_output(f"Failed to mark domain failed: {e}", "white")
         conn.rollback()
     finally:
         cursor.close()
@@ -637,7 +650,7 @@ def mark_nxdomain_domain(domain):
         )
         conn.commit()
     except Exception as e:
-        print(f"Failed to mark domain NXDOMAIN: {e}")
+        vmc_output(f"Failed to mark domain NXDOMAIN: {e}", "white")
         conn.rollback()
     finally:
         cursor.close()
@@ -663,7 +676,7 @@ def mark_norobots_domain(domain):
         )
         conn.commit()
     except Exception as e:
-        print(f"Failed to mark domain NoRobots: {e}")
+        vmc_output(f"Failed to mark domain NoRobots: {e}", "white")
         conn.rollback()
     finally:
         cursor.close()
@@ -691,7 +704,7 @@ def delete_domain_if_known(domain):
         )
         conn.commit()
     except Exception as e:
-        print(f"Failed to delete known domain: {e}")
+        vmc_output(f"Failed to delete known domain: {e}", "white")
         conn.rollback()
     finally:
         cursor.close()
@@ -708,7 +721,7 @@ def delete_domain_from_raw(domain):
         )
         conn.commit()
     except Exception as e:
-        print(f"Failed to delete known domain: {e}")
+        vmc_output(f"Failed to delete known domain: {e}", "white")
         conn.rollback()
     finally:
         cursor.close()
@@ -724,7 +737,9 @@ def clean_version(software_version_full):
     software_version = clean_version_development(software_version)
     software_version = clean_version_wrongpatch(software_version)
     software_version = clean_version_doubledash(software_version)
-    software_version = clean_version_nightly(software_version, get_nightly_version_ranges())
+    software_version = clean_version_nightly(
+        software_version, get_nightly_version_ranges()
+    )
     software_version = clean_version_main_missing_prerelease(software_version)
     software_version = clean_version_release_with_prerelease(software_version)
     software_version = clean_version_strip_incorrect_prerelease(software_version)
@@ -905,6 +920,7 @@ def clean_version_release_with_prerelease(software_version):
         software_version = software_version.split("-")[0]
     return software_version
 
+
 def clean_version_strip_incorrect_prerelease(software_version):
     match = re.match(r"^(\d+)\.(\d+)\.(\d+)(-.+)?$", software_version)
     if match:
@@ -912,6 +928,7 @@ def clean_version_strip_incorrect_prerelease(software_version):
         if int(z) != 0 and prerelease:
             return f"{x}.{y}.{z}"
     return software_version
+
 
 def get_junk_keywords():
     cursor = conn.cursor()
@@ -921,7 +938,7 @@ def get_junk_keywords():
         conn.commit()
         return junk_domains
     except Exception as e:
-        print(f"Failed to obtain junk keywords: {e}")
+        vmc_output(f"Failed to obtain junk keywords: {e}", "white")
         conn.rollback()
     finally:
 
@@ -937,7 +954,7 @@ def get_bad_tld():
         conn.commit()
         return bad_tlds
     except Exception as e:
-        print(f"Failed to obtain bad TLDs: {e}")
+        vmc_output(f"Failed to obtain bad TLDs: {e}", "white")
         conn.rollback()
     finally:
         cursor.close()
@@ -951,7 +968,7 @@ def get_failed_domains():
         failed_domains = [row[0].strip() for row in cursor.fetchall() if row[0].strip()]
         conn.commit()
     except Exception as e:
-        print(f"Failed to obtain failed domains: {e}")
+        vmc_output(f"Failed to obtain failed domains: {e}", "white")
         conn.rollback()
     finally:
         cursor.close()
@@ -967,7 +984,7 @@ def get_ignored_domains():
         ]
         conn.commit()
     except Exception as e:
-        print(f"Failed to obtain ignored domains: {e}")
+        vmc_output(f"Failed to obtain ignored domains: {e}", "white")
         conn.rollback()
     finally:
         cursor.close()
@@ -983,7 +1000,7 @@ def get_baddata_domains():
         ]
         conn.commit()
     except Exception as e:
-        print(f"Failed to obtain baddata domains: {e}")
+        vmc_output(f"Failed to obtain baddata domains: {e}", "white")
         conn.rollback()
     finally:
         cursor.close()
@@ -999,7 +1016,7 @@ def get_nxdomain_domains():
         ]
         conn.commit()
     except Exception as e:
-        print(f"Failed to obtain NXDOMAIN domains: {e}")
+        vmc_output(f"Failed to obtain NXDOMAIN domains: {e}", "white")
         conn.rollback()
     finally:
         cursor.close()
@@ -1015,7 +1032,7 @@ def get_norobots_domains():
         ]
         conn.commit()
     except Exception as e:
-        print(f"Failed to obtain NoRobots domains: {e}")
+        vmc_output(f"Failed to obtain NoRobots domains: {e}", "white")
         conn.rollback()
     finally:
         cursor.close()
@@ -1037,9 +1054,7 @@ def check_and_record_domains(
     iftas_domains,
     nightly_version_ranges,
 ):
-    for index, domain in enumerate(domain_list, start=1):
-        print_colored(f"Crawling @ {domain} ({index}/{len(domain_list)})", "bold")
-
+    for domain in tqdm(domain_list, desc="Processing domains", unit="domain"):
         if should_skip_domain(
             domain,
             ignored_domains,
@@ -1073,23 +1088,23 @@ def should_skip_domain(
     user_choice,
 ):
     if user_choice != "6" and domain in ignored_domains:
-        print_colored("Previously IGNORED", "cyan")
+        vmc_output(f"{domain}: Previously IGNORED", "cyan", use_tqdm=True)
         delete_domain_if_known(domain)
         return True
     if user_choice != "7" and domain in failed_domains:
-        print_colored("Previously FAILED", "cyan")
+        vmc_output(f"{domain}: Previously FAILED", "cyan", use_tqdm=True)
         delete_domain_if_known(domain)
         return True
     if user_choice != "8" and domain in nxdomain_domains:
-        print_colored("Previously NXDOMAIN", "cyan")
+        vmc_output(f"{domain}: Previously NXDOMAIN", "cyan", use_tqdm=True)
         delete_domain_if_known(domain)
         return True
     if user_choice != "9" and domain in norobots_domains:
-        print_colored("Previously NOROBOTS", "cyan")
+        vmc_output(f"{domain}: Previously NOROBOTS", "cyan", use_tqdm=True)
         delete_domain_if_known(domain)
         return True
     if domain in baddata_domains:
-        print_colored("Previous BADDATA", "cyan")
+        vmc_output(f"{domain}: Previously BADDATA", "cyan", use_tqdm=True)
         delete_domain_if_known(domain)
         return True
     return False
@@ -1097,12 +1112,12 @@ def should_skip_domain(
 
 def is_junk_or_bad_tld(domain, junk_domains, bad_tlds, domain_endings):
     if any(junk in domain for junk in junk_domains):
-        print_colored("Purging known junk domain", "red")
+        vmc_output(f"{domain}: Purging known junk domain", "red", use_tqdm=True)
         delete_domain_if_known(domain)
         delete_domain_from_raw(domain)
         return True
     if any(domain.endswith(f".{tld}") for tld in bad_tlds):
-        print_colored("Purging prohibited TLD", "red")
+        vmc_output(f"{domain}: Purging prohibited TLD", "red", use_tqdm=True)
         mark_nxdomain_domain(domain)
         delete_domain_if_known(domain)
         delete_domain_from_raw(domain)
@@ -1110,7 +1125,7 @@ def is_junk_or_bad_tld(domain, junk_domains, bad_tlds, domain_endings):
     if not any(
         domain.endswith(f".{domain_ending}") for domain_ending in domain_endings
     ):
-        print_colored("Purging unknown TLD", "red")
+        vmc_output(f"{domain}: Purging unknown TLD", "red", use_tqdm=True)
         mark_nxdomain_domain(domain)
         delete_domain_if_known(domain)
         delete_domain_from_raw(domain)
@@ -1120,7 +1135,7 @@ def is_junk_or_bad_tld(domain, junk_domains, bad_tlds, domain_endings):
 
 def is_iftas_domain(domain, iftas_domains):
     if any(domain.endswith(f"{dni}") for dni in iftas_domains):
-        print_colored("Known IFTAS DNI domain", "red")
+        vmc_output(f"{domain}: Known IFTAS DNI domain", "red", use_tqdm=True)
         mark_nxdomain_domain(domain)
         delete_domain_if_known(domain)
         return True
@@ -1129,7 +1144,7 @@ def is_iftas_domain(domain, iftas_domains):
 
 def process_domain(domain, http_client):
     if has_emoji_or_special_chars(domain):
-        print_colored("Domain contains special characters", "red")
+        vmc_output(f"{domain}: Contains special characters", "red", use_tqdm=True)
         mark_nxdomain_domain(domain)
         delete_domain_if_known(domain)
         return
@@ -1165,7 +1180,7 @@ def check_robots_txt(domain, http_client):
                 and not content_type.startswith("text/")
             ):
                 error_message = "robots.txt is not a text file"
-                print_colored(f"{error_message}", "magenta")
+                vmc_output(f"{domain}: {error_message}", "magenta", use_tqdm=True)
                 log_error(domain, error_message)
                 increment_domain_error(domain, "TXT")
                 delete_if_error_max(domain)
@@ -1182,14 +1197,18 @@ def check_robots_txt(domain, http_client):
                     if user_agent in ["*", appname.lower()] and (
                         disallow_path == "/" or disallow_path == "*"
                     ):
-                        print_colored("Crawling prohibited by robots.txt", "red")
+                        vmc_output(
+                            f"{domain}: Prohibited by robots.txt", "red", use_tqdm=True
+                        )
                         mark_norobots_domain(domain)
                         delete_domain_if_known(domain)
                         return False
         # Check for specific HTTP status codes
         elif response.status_code in http_codes_to_hardfail:
-            print_colored(
-                f"Responded HTTP {response.status_code} to robots.txt request", "red"
+            vmc_output(
+                f"{domain}: HTTP {response.status_code} to robots.txt request",
+                "red",
+                use_tqdm=True,
             )
             mark_failed_domain(domain)
             delete_domain_if_known(domain)
@@ -1208,7 +1227,11 @@ def check_webfinger(domain, http_client):
         content_length = response.headers.get("Content-Length", "")
         if response.status_code in [200]:
             if "json" not in content_type:
-                print("WebFinger reply is not a JSON file…")
+                vmc_output(
+                    f"{domain}: WebFinger reply is not a JSON file",
+                    "white",
+                    use_tqdm=True,
+                )
                 hostmeta_result = check_hostmeta(domain, http_client)
                 if hostmeta_result:
                     backend_domain = hostmeta_result["backend_domain"]
@@ -1216,7 +1239,9 @@ def check_webfinger(domain, http_client):
                 else:
                     return None
             if not response.content or content_length == "0":
-                print("WebFinger reply is empty…")
+                vmc_output(
+                    f"{domain}: WebFinger reply is empty", "white", use_tqdm=True
+                )
                 hostmeta_result = check_hostmeta(domain, http_client)
                 if hostmeta_result:
                     backend_domain = hostmeta_result["backend_domain"]
@@ -1224,7 +1249,9 @@ def check_webfinger(domain, http_client):
                 else:
                     return None
             if "aliases" not in response.content.decode("utf-8"):
-                print("WebFinger reply is invalid…")
+                vmc_output(
+                    f"{domain}: WebFinger reply is invalid", "white", use_tqdm=True
+                )
                 hostmeta_result = check_hostmeta(domain, http_client)
                 if hostmeta_result:
                     backend_domain = hostmeta_result["backend_domain"]
@@ -1233,7 +1260,7 @@ def check_webfinger(domain, http_client):
                     return None
             if "localhost" in response.content.decode("utf-8"):
                 error_message = "WebFinger alias points to localhost"
-                print_colored(f"{error_message}", "magenta")
+                vmc_output(f"{domain}: {error_message}", "magenta", use_tqdm=True)
                 log_error(domain, error_message)
                 increment_domain_error(domain, "???")
                 delete_domain_if_known(domain)
@@ -1250,7 +1277,11 @@ def check_webfinger(domain, http_client):
                 return {"backend_domain": backend_domain}
                 # Check for specific HTTP status codes
             else:
-                print("WebFinger reply does not contain a valid alias…")
+                vmc_output(
+                    f"{domain}: WebFinger reply does not contain a valid alias",
+                    "white",
+                    use_tqdm=True,
+                )
                 hostmeta_result = check_hostmeta(domain, http_client)
                 if hostmeta_result:
                     backend_domain = hostmeta_result["backend_domain"]
@@ -1258,8 +1289,10 @@ def check_webfinger(domain, http_client):
                 else:
                     return None
         elif response.status_code in http_codes_to_hardfail:
-            print_colored(
-                f"Responded HTTP {response.status_code} to Webfinger request", "red"
+            vmc_output(
+                f"{domain}: HTTP {response.status_code} to WebFinger request",
+                "red",
+                use_tqdm=True,
             )
             mark_failed_domain(domain)
             delete_domain_if_known(domain)
@@ -1269,7 +1302,11 @@ def check_webfinger(domain, http_client):
                 mark_as_non_mastodon(domain)
                 return None
             else:
-                print(f"Responded HTTP {response.status_code} to WebFinger request…")
+                vmc_output(
+                    f"{domain}: HTTP {response.status_code} to WebFinger request",
+                    "white",
+                    use_tqdm=True,
+                )
                 hostmeta_result = check_hostmeta(domain, http_client)
                 if hostmeta_result:
                     backend_domain = hostmeta_result["backend_domain"]
@@ -1277,10 +1314,8 @@ def check_webfinger(domain, http_client):
                 else:
                     return None
         else:
-            error_message = (
-                f"Responded HTTP {response.status_code} to WebFinger request"
-            )
-            print_colored(f"{error_message}", "yellow")
+            error_message = f"HTTP {response.status_code} to WebFinger request"
+            vmc_output(f"{domain}: {error_message}", "yellow", use_tqdm=True)
             log_error(domain, error_message)
             increment_domain_error(domain, str(response.status_code))
             delete_if_error_max(domain)
@@ -1298,16 +1333,16 @@ def check_hostmeta(domain, http_client):
         if response.status_code in [200]:
             content_type = response.headers.get("Content-Type", "")
             if "xml" not in content_type:
-                error_message = "HostMeta reply is not an XML file…"
-                print(f"{error_message}")
+                error_message = "HostMeta reply is not an XML file"
+                vmc_output(f"{domain}: {error_message}", "white", use_tqdm=True)
                 return {"backend_domain": domain}
             if "xhtml" in content_type:
-                error_message = "HostMeta reply is an XHTML file…"
-                print(f"{error_message}")
+                error_message = "HostMeta reply is an XHTML file"
+                vmc_output(f"{domain}: {error_message}", "white", use_tqdm=True)
                 return {"backend_domain": domain}
             if not response.content:
-                error_message = "HostMeta reply is empty…"
-                print(f"{error_message}")
+                error_message = "HostMeta reply is empty"
+                vmc_output(f"{domain}: {error_message}", "white", use_tqdm=True)
                 return {"backend_domain": domain}
             else:
                 content = response.content.strip()
@@ -1317,37 +1352,55 @@ def check_hostmeta(domain, http_client):
                     xmldata = etree.fromstring(content, parser=parser)
                 except etree.XMLSyntaxError as e:
                     error_message = f"Invalid XML: {e}"
-                    print(f"{error_message}")
+                    vmc_output(f"{domain}: {error_message}", "magenta", use_tqdm=True)
                     return {"backend_domain": domain}
                 ns = {"xrd": "http://docs.oasis-open.org/ns/xri/xrd-1.0"}  # Namespace
                 try:
                     link = xmldata.find(".//xrd:link[@rel='lrdd']", namespaces=ns)
                 except AttributeError:
-                    print("Error finding 'lrdd' link in HostMeta XML…")
+                    vmc_output(
+                        f"{domain}: Error finding 'lrdd' link in HostMeta XML",
+                        "white",
+                        use_tqdm=True,
+                    )
                     return {"backend_domain": domain}
                 except etree.XMLSyntaxError:
-                    print("XML syntax error while parsing HostMeta…")
+                    vmc_output(
+                        f"{domain}: XML syntax error while parsing HostMeta",
+                        "white",
+                        use_tqdm=True,
+                    )
                     return {"backend_domain": domain}
                 if link is None:
-                    print("Unable to find lrdd link in HostMeta…")
+                    vmc_output(
+                        f"{domain}: Unable to find lrdd link in HostMeta",
+                        "white",
+                        use_tqdm=True,
+                    )
                     return {"backend_domain": domain}
                 else:
                     parsed_link = urlparse(link.get("template"))
                     backend_domain = parsed_link.netloc
                     return {"backend_domain": backend_domain}
         elif response.status_code in http_codes_to_hardfail:
-            print_colored(
-                f"Responded HTTP {response.status_code} to HostMeta request", "red"
+            vmc_output(
+                f"{domain}: HTTP {response.status_code} to HostMeta request",
+                "red",
+                use_tqdm=True,
             )
             mark_failed_domain(domain)
             delete_domain_if_known(domain)
             return False
         elif response.status_code in http_codes_to_softfail:
-            print(f"Responded HTTP {response.status_code} to HostMeta request…")
+            vmc_output(
+                f"{domain}: HTTP {response.status_code} to HostMeta request",
+                "white",
+                use_tqdm=True,
+            )
             return {"backend_domain": domain}
         else:
-            error_message = f"Responded HTTP {response.status_code} to HostMeta request"
-            print_colored(f"{error_message}", "yellow")
+            error_message = f"HTTP {response.status_code} to HostMeta request"
+            vmc_output(f"{domain}: {error_message}", "yellow", use_tqdm=True)
             log_error(domain, f"{error_message}")
             increment_domain_error(domain, str(response.status_code))
             delete_if_error_max(domain)
@@ -1363,14 +1416,14 @@ def check_nodeinfo(domain, backend_domain, http_client):
             content_type = response.headers.get("Content-Type", "")
             if "json" not in content_type:
                 error_message = "NodeInfo reply is not a JSON file"
-                print_colored(f"{error_message}", "magenta")
+                vmc_output(f"{domain}: {error_message}", "magenta", use_tqdm=True)
                 log_error(domain, error_message)
                 increment_domain_error(domain, "JSON")
                 delete_if_error_max(domain)
                 return None
             if not response.content:
                 error_message = "NodeInfo reply is empty"
-                print_colored(f"{error_message}", "magenta")
+                vmc_output(f"{domain}: {error_message}", "magenta", use_tqdm=True)
                 log_error(domain, error_message)
                 increment_domain_error(domain, "JSON")
                 delete_if_error_max(domain)
@@ -1380,7 +1433,7 @@ def check_nodeinfo(domain, backend_domain, http_client):
                     data = response.json()
                 except json.JSONDecodeError as e:
                     error_message = f"Invalid JSON response: {e}"
-                    print_colored(error_message, "magenta")
+                    vmc_output(error_message, "magenta", use_tqdm=True)
                     log_error(domain, error_message)
                     increment_domain_error(domain, "JSON")
                     delete_if_error_max(domain)
@@ -1420,14 +1473,18 @@ def check_nodeinfo(domain, backend_domain, http_client):
                         )
                         if "json" not in nodeinfo_response_content_type:
                             error_message = "NodeInfo V2 reply is not a JSON file"
-                            print_colored(f"{error_message}", "magenta")
+                            vmc_output(
+                                f"{domain}: {error_message}", "magenta", use_tqdm=True
+                            )
                             log_error(domain, error_message)
                             increment_domain_error(domain, "JSON")
                             delete_if_error_max(domain)
                             return None
                         if not nodeinfo_response.content:
                             error_message = "NodeInfo V2 reply is empty"
-                            print_colored(f"{error_message}", "magenta")
+                            vmc_output(
+                                f"{domain}: {error_message}", "magenta", use_tqdm=True
+                            )
                             log_error(domain, error_message)
                             increment_domain_error(domain, "JSON")
                             delete_if_error_max(domain)
@@ -1435,16 +1492,21 @@ def check_nodeinfo(domain, backend_domain, http_client):
                         else:
                             return nodeinfo_response.json()
                     elif nodeinfo_response.status_code in http_codes_to_hardfail:
-                        print_colored(
-                            f"Responded HTTP {response.status_code} to NodeInfo request",
+                        vmc_output(
+                            f"HTTP {response.status_code} to NodeInfo request",
                             "red",
+                            use_tqdm=True,
                         )
                         mark_failed_domain(domain)
                         delete_domain_if_known(domain)
                         return False
                     else:
-                        error_message = f"Responded HTTP {nodeinfo_response.status_code} to NodeInfo request"
-                        print_colored(f"{error_message}", "yellow")
+                        error_message = (
+                            f"HTTP {nodeinfo_response.status_code} to NodeInfo request"
+                        )
+                        vmc_output(
+                            f"{domain}: {error_message}", "yellow", use_tqdm=True
+                        )
                         log_error(domain, f"{error_message}")
                         increment_domain_error(
                             domain, str(nodeinfo_response.status_code)
@@ -1455,14 +1517,16 @@ def check_nodeinfo(domain, backend_domain, http_client):
             else:
                 mark_as_non_mastodon(domain)
         elif response.status_code in http_codes_to_hardfail:
-            print_colored(
-                f"Responded HTTP {response.status_code} to NodeInfo request", "red"
+            vmc_output(
+                f"{domain}: HTTP {response.status_code} to NodeInfo request",
+                "red",
+                use_tqdm=True,
             )
             mark_failed_domain(domain)
             delete_domain_if_known(domain)
         else:
-            error_message = f"Responded HTTP {response.status_code} to NodeInfo request"
-            print_colored(f"{error_message}", "yellow")
+            error_message = f"HTTP {response.status_code} to NodeInfo request"
+            vmc_output(f"{domain}: {error_message}", "yellow", use_tqdm=True)
             log_error(domain, f"{error_message}")
             increment_domain_error(domain, str(response.status_code))
             delete_if_error_max(domain)
@@ -1496,7 +1560,7 @@ def process_mastodon_instance(domain, webfinger_data, nodeinfo_data, http_client
 
     if "usage" not in nodeinfo_data or "users" not in nodeinfo_data["usage"]:
         error_to_print = f"Mastodon v{software_version} but not reporting user count"
-        print_colored(error_to_print, "magenta")
+        vmc_output(f"{domain}: {error_to_print}", "magenta", use_tqdm=True)
         log_error(domain, error_to_print)
         increment_domain_error(domain, "###")
         delete_domain_if_known(domain)
@@ -1508,7 +1572,7 @@ def process_mastodon_instance(domain, webfinger_data, nodeinfo_data, http_client
         error_to_print = (
             f"Mastodon v{software_version} but not reporting total user count"
         )
-        print_colored(error_to_print, "magenta")
+        vmc_output(f"{domain}: {error_to_print}", "magenta", use_tqdm=True)
         log_error(domain, error_to_print)
         increment_domain_error(domain, "###")
         delete_domain_if_known(domain)
@@ -1519,7 +1583,7 @@ def process_mastodon_instance(domain, webfinger_data, nodeinfo_data, http_client
         error_to_print = (
             f"Mastodon v{software_version} but not reporting active user count"
         )
-        print_colored(error_to_print, "magenta")
+        vmc_output(f"{domain}: {error_to_print}", "magenta", use_tqdm=True)
         log_error(domain, error_to_print)
         increment_domain_error(domain, "###")
         delete_domain_if_known(domain)
@@ -1536,14 +1600,14 @@ def process_mastodon_instance(domain, webfinger_data, nodeinfo_data, http_client
             content_type = response.headers.get("Content-Type", "")
             if not response.content:
                 error_message = "Instance API reply is empty"
-                print_colored(f"{error_message}", "magenta")
+                vmc_output(f"{domain}: {error_message}", "magenta", use_tqdm=True)
                 log_error(domain, error_message)
                 increment_domain_error(domain, "API")
                 delete_if_error_max(domain)
                 return None
             elif "json" not in content_type:
                 error_message = "Instance API reply is not a JSON file"
-                print_colored(f"{error_message}", "magenta")
+                vmc_output(f"{domain}: {error_message}", "magenta", use_tqdm=True)
                 log_error(domain, error_message)
                 increment_domain_error(domain, "API")
                 delete_if_error_max(domain)
@@ -1552,7 +1616,7 @@ def process_mastodon_instance(domain, webfinger_data, nodeinfo_data, http_client
             response_json = response.json()
             if "error" in response_json:
                 error_message = "Instance API returned an error"
-                print_colored(f"{error_message}", "magenta")
+                vmc_output(f"{domain}: {error_message}", "magenta", use_tqdm=True)
                 log_error(domain, error_message)
                 increment_domain_error(domain, "API")
                 delete_if_error_max(domain)
@@ -1610,7 +1674,7 @@ def process_mastodon_instance(domain, webfinger_data, nodeinfo_data, http_client
                 total_users + 6, total_users + (total_users * 0.25)
             ):
                 error_to_print = f"Mastodon v{software_version} but contains invalid active user counts ({active_month_users}/{total_users})"
-                print_colored(error_to_print, "magenta")
+                vmc_output(f"{domain}: {error_to_print}", "magenta", use_tqdm=True)
                 log_error(domain, error_to_print)
                 increment_domain_error(domain, "###")
                 delete_domain_if_known(domain)
@@ -1621,7 +1685,7 @@ def process_mastodon_instance(domain, webfinger_data, nodeinfo_data, http_client
                 version_main_branch
             ):
                 error_to_print = f'Mastodon v{software_version.split("-")[0]} is higher than main branch version v{version_main_branch}.0'
-                print_colored(error_to_print, "magenta")
+                vmc_output(f"{domain}: {error_to_print}", "magenta", use_tqdm=True)
                 log_error(domain, error_to_print)
                 increment_domain_error(domain, "???")
                 delete_domain_if_known(domain)
@@ -1642,16 +1706,17 @@ def process_mastodon_instance(domain, webfinger_data, nodeinfo_data, http_client
             clear_domain_error(domain)
 
             if software_version == nodeinfo_data["software"]["version"]:
-                print_colored(f"Mastodon v{software_version}", "green")
+                vmc_output(f"{domain}: v{software_version}", "green", use_tqdm=True)
             else:
-                print_colored(
-                    f'Mastodon v{software_version} ({nodeinfo_data["software"]["version"]})',
+                vmc_output(
+                    f'{domain}: v{software_version} ({nodeinfo_data["software"]["version"]})',
                     "green",
+                    use_tqdm=True,
                 )
 
         else:
             error_message = "Failed to respond to API request"
-            print_colored(f"{error_message}", "magenta")
+            vmc_output(f"{domain}: {error_message}", "magenta", use_tqdm=True)
             log_error(domain, error_message)
             increment_domain_error(domain, "API")
             delete_if_error_max(domain)
@@ -1696,19 +1761,21 @@ def update_mastodon_domain(
                 datetime.now(timezone.utc),
                 contact_account,
                 source_url,
-                software_version_full
+                software_version_full,
             ),
         )
         conn.commit()
     except Exception as e:
-        print(f"Failed to update Mastodon domain data: {e}")
+        vmc_output(
+            f"Failed to update Mastodon domain data: {e}", "white", use_tqdm=True
+        )
         conn.rollback()
     finally:
         cursor.close()
 
 
 def mark_as_non_mastodon(domain):
-    print_colored("Not using Mastodon", "red")
+    vmc_output(f"{domain}: Not using Mastodon", "red", use_tqdm=True)
     mark_ignore_domain(domain)
     delete_domain_if_known(domain)
 
@@ -1717,14 +1784,14 @@ def handle_http_exception(domain, exception):
     error_message = str(exception)
     if "_ssl.c" in error_message.casefold():
         error_reason = "SSL"
-        print_colored(f"{error_message}", "orange")
+        vmc_output(f"{domain}: {error_message}", "orange", use_tqdm=True)
         log_error(domain, error_message)
         increment_domain_error(domain, error_reason)
         delete_if_error_max(domain)
     elif "maximum allowed redirects" in error_message.casefold():
         error_reason = "MAX"
         error_message = error_message.strip(".")
-        print_colored(f"{error_message}", "orange")
+        vmc_output(f"{domain}: {error_message}", "orange", use_tqdm=True)
         log_error(domain, error_message)
         increment_domain_error(domain, error_reason)
         delete_if_error_max(domain)
@@ -1739,7 +1806,7 @@ def handle_http_exception(domain, exception):
         ]
     ):
         error_reason = "DNS"
-        print_colored(f"DNS failure: {error_message}", "orange")
+        vmc_output(f"{domain}: DNS {error_message}", "orange", use_tqdm=True)
         log_error(domain, error_message)
         increment_domain_error(domain, error_reason)
         delete_if_error_max(domain)
@@ -1757,13 +1824,13 @@ def handle_http_exception(domain, exception):
         ]
     ):
         error_reason = "TCP"
-        print_colored(f"TCP failure: {error_message}", "orange")
+        vmc_output(f"{domain}: TCP {error_message}", "orange", use_tqdm=True)
         log_error(domain, error_message)
         increment_domain_error(domain, error_reason)
         delete_if_error_max(domain)
     else:
         error_reason = "HTTP"
-        print_colored(f"HTTPX failure: {error_message}", "orange")
+        vmc_output(f"{domain}: HTTPX {error_message}", "orange", use_tqdm=True)
         log_error(domain, error_message)
         increment_domain_error(domain, error_reason)
         delete_if_error_max(domain)
@@ -1772,7 +1839,7 @@ def handle_http_exception(domain, exception):
 def handle_json_exception(domain, exception):
     error_message = str(exception)
     error_reason = "JSON"
-    print_colored(error_message, "magenta")
+    vmc_output(f"{domain}: {error_message}", "magenta", use_tqdm=True)
     log_error(domain, error_message)
     increment_domain_error(domain, error_reason)
     delete_if_error_max(domain)
@@ -1792,10 +1859,10 @@ def cleanup_old_domains():
         deleted_domains = [row[0] for row in cursor.fetchall()]
         if deleted_domains:
             for d in deleted_domains:
-                print_colored(f"Deleted stale domain {d}", "yellow")
+                vmc_output(f"Deleted stale domain {d}", "yellow")
         conn.commit()
     except Exception as e:
-        print(f"Failed to clean up old domains: {e}")
+        vmc_output(f"Failed to clean up old domains: {e}", "white")
         conn.rollback()
     finally:
         cursor.close()
@@ -1854,15 +1921,15 @@ def load_from_database(user_choice):
             params = [error_buffer]
         elif user_choice == "40":
             params = {"versions": all_patched_versions}
-            print("Excluding versions:")
+            vmc_output("Excluding versions:", "white")
             for version in params["versions"]:
-                print(f" - {version}")
+                vmc_output(f" - {version}", "white")
         elif user_choice == "41":
             params = [f"{version_main_branch}%"]
 
     if not query:
-        print_colored(
-            f"Choice {user_choice} was not available, using default query…", "pink"
+        vmc_output(
+            f"Choice {user_choice} was not available, using default query", "pink"
         )
         query = query_map["1"]  # Default query
         params = [error_threshold]
@@ -1873,7 +1940,7 @@ def load_from_database(user_choice):
         domain_list = [row[0].strip() for row in cursor.fetchall() if row[0].strip()]
         conn.commit()
     except Exception as e:
-        print(f"Failed to obtain selected domain list: {e}")
+        vmc_output(f"Failed to obtain selected domain list: {e}", "white")
         conn.rollback()
         domain_list = []
     finally:
@@ -1948,16 +2015,20 @@ def print_menu() -> None:
 
     for category, options in menu_options.items():
         options_str = " ".join(f"({key}) {value}" for key, value in options.items())
-        print_colored(f"{category}: ", "bold", end="")
-        print_colored(options_str, "")  # Print options without bold
-    print_colored("Enter your choice (1, 2, 3, etc):", "bold", end=" ")
+        vmc_output(f"{category}: ", "bold", end="")
+        vmc_output(options_str, "")  # Print options without bold
+    vmc_output("Enter your choice (1, 2, 3, etc):", "bold", end=" ")
     sys.stdout.flush()
 
 
 def get_user_choice() -> str:
     return sys.stdin.readline().strip()
 
+
 def main():
+    # Clear the terminal screen
+    os.system("clear" if os.name != "nt" else "cls")
+
     parser = argparse.ArgumentParser(
         description="Crawl version information from Mastodon instances."
     )
@@ -1989,14 +2060,14 @@ def main():
     args = parser.parse_args()
 
     if args.file and args.target:
-        print_colored("You cannot set both file and target arguments", "red")
+        vmc_output("You cannot set both file and target arguments", "red")
         sys.exit(1)
 
-    print_colored(f"{appname} v{appversion} ({current_filename})", "bold")
+    vmc_output(f"{appname} v{appversion} ({current_filename})", "bold")
     if is_running_headless():
-        print_colored("Running in headless mode", "pink")
+        vmc_output("Running in headless mode", "pink")
     else:
-        print_colored("Running in interactive mode", "pink")
+        vmc_output("Running in interactive mode", "pink")
     try:
         domain_list_file = args.file if args.file is not None else None
         single_domain_target = args.target if args.target is not None else None
@@ -2004,11 +2075,14 @@ def main():
             if domain_list_file:  # File name provided as argument
                 user_choice = 1
                 domain_list = load_from_file(domain_list_file)
-                print("Crawling domains from file…")
+                vmc_output("Crawling domains from file…", "white")
             elif single_domain_target:  # Single domain provided as argument
                 user_choice = 1
                 domain_list = single_domain_target.replace(" ", "").split(",")
-                print(f"Crawling domain{'s' if len(domain_list) > 1 else ''} from target…")
+                vmc_output(
+                    f"Crawling domain{'s' if len(domain_list) > 1 else ''} from target…",
+                    "white",
+                )
             else:  # Load from database by default
                 if args.new:
                     user_choice = "0"
@@ -2020,7 +2094,7 @@ def main():
                     print_menu()
                     user_choice = get_user_choice()
 
-                print_colored(
+                vmc_output(
                     f"Crawling domains from database choice {user_choice}…", "pink"
                 )
                 domain_list = load_from_database(user_choice)
@@ -2031,10 +2105,10 @@ def main():
                 random.shuffle(domain_list)
 
         except FileNotFoundError:
-            print(f"File not found: {domain_list_file}")
+            vmc_output(f"File not found: {domain_list_file}", "white")
             sys.exit(1)
         except psycopg.Error as e:
-            print(f"Database error: {e}")
+            vmc_output(f"Database error: {e}", "white")
             sys.exit(1)
 
         junk_domains = get_junk_keywords()
@@ -2064,9 +2138,9 @@ def main():
             nightly_version_ranges,
         )
         cleanup_old_domains()
-        print_colored("Crawling complete!", "bold")
+        vmc_output("Crawling complete!", "bold")
     except KeyboardInterrupt:
-        print_colored(f"\n{appname} interrupted by user", "bold")
+        vmc_output(f"\n{appname} interrupted by user", "bold")
     finally:
         conn.close()
         http_client.close()
@@ -2074,14 +2148,15 @@ def main():
     if is_running_headless():
         if not (args.file or args.target or args.new or args.buffer):
             try:
-                print_colored(f"Re-executing {appname}...", "bold")
+                vmc_output(f"Re-executing {appname}...", "bold")
                 os.execv(sys.executable, ["python3"] + sys.argv)
             except Exception as e:
-                print(f"Failed to re-execute {appname}: {e}")
+                vmc_output(f"Failed to re-execute {appname}: {e}", "white")
     else:
-        print_colored(f"Exiting {appname}...", "bold")
+        vmc_output(f"Exiting {appname}...", "bold")
         sys.exit(0)
     pass
+
 
 if __name__ == "__main__":
     main()

@@ -13,7 +13,7 @@ try:
         appname,
         appversion,
         conn,
-        print_colored,
+        vmc_output,
         is_running_headless,
         http_client,
         get_with_fallback,
@@ -55,11 +55,11 @@ parser.add_argument(
 args = parser.parse_args()
 
 if (args.limit or args.offset) and args.target:
-    print_colored("You cannot set both limit/offset and target arguments", "pink")
+    vmc_output("You cannot set both limit/offset and target arguments", "pink")
     sys.exit(1)
 
 if args.offset and args.random:
-    print_colored("You cannot set both offset and random arguments", "pink")
+    vmc_output("You cannot set both offset and random arguments", "pink")
     sys.exit(1)
 
 if args.limit is not None:
@@ -146,7 +146,7 @@ def detect_vowels(domain):
         matches = re.findall(pattern, domain)
         return True if len(matches) > 0 else False
     except Exception as e:
-        print_colored(f"Error detecting vowels: {e}", "orange")
+        vmc_output(f"Error detecting vowels: {e}", "orange")
         return False
 
 
@@ -161,10 +161,10 @@ def import_domains(domains):
                 "INSERT INTO raw_domains (domain, errors) VALUES " + args_str,
                 flattened_values,
             )
-            print_colored(f"Imported {len(domains)} domains", "green")
+            vmc_output(f"Imported {len(domains)} domains", "green")
             conn.commit()
     except Exception as e:
-        print_colored(f"Failed to import domain list: {e}", "orange")
+        vmc_output(f"Failed to import domain list: {e}", "orange")
         conn.rollback()
         return None
     finally:
@@ -179,7 +179,7 @@ def get_junk_keywords():
         conn.commit()
         return keywords
     except Exception as e:
-        print_colored(f"Failed to obtain junk domain list: {e}", "orange")
+        vmc_output(f"Failed to obtain junk domain list: {e}", "orange")
         conn.rollback()
         return None
     finally:
@@ -194,7 +194,7 @@ def get_bad_tld():
         conn.commit()
         return tlds
     except Exception as e:
-        print_colored(f"Failed to obtain bad TLD list: {e}", "orange")
+        vmc_output(f"Failed to obtain bad TLD list: {e}", "orange")
         conn.rollback()
         return None
     finally:
@@ -206,9 +206,9 @@ def add_to_no_peers(domain):
     try:
         cursor.execute("INSERT INTO no_peers (domain) VALUES (%s)", (domain,))
         conn.commit()
-        print_colored(f"{domain} added to no_peers table", "red")
+        vmc_output(f"{domain} added to no_peers table", "red")
     except Exception as e:
-        print_colored(f"Failed to add domain to no_peers list: {e}", "orange")
+        vmc_output(f"Failed to add domain to no_peers list: {e}", "orange")
         conn.rollback()
         return None
     finally:
@@ -223,7 +223,7 @@ def get_existing_domains():
         conn.commit()
         return existing_domains
     except Exception as e:
-        print_colored(f"Failed to get list of existing domains: {e}", "orange")
+        vmc_output(f"Failed to get list of existing domains: {e}", "orange")
         conn.rollback()
         return None
     finally:
@@ -250,13 +250,13 @@ def get_domains(api_url, domain, domain_endings):
         ]
         return filtered_domains
     except Exception as e:
-        print_colored(f"{e}", "orange")
+        vmc_output(f"{e}", "orange")
         add_to_no_peers(domain)  # Add domain to no_peers if any other error occurs
     return []
 
 
 def process_domain(domain, counter, total):
-    print_colored(f"Fetching peers @ {domain} ({counter}/{total})…", "bold")
+    vmc_output(f"Fetching peers @ {domain} ({counter}/{total})…", "bold")
 
     api_url = f"https://{domain}/api/v1/instance/peers"
 
@@ -274,18 +274,21 @@ def process_domain(domain, counter, total):
 
 
 if __name__ == "__main__":
+    # Clear the terminal screen
+    os.system("clear" if os.name != "nt" else "cls")
+
     try:
-        print_colored(f"{appname} v{appversion} ({current_filename})", "bold")
+        vmc_output(f"{appname} v{appversion} ({current_filename})", "bold")
         if is_running_headless():
-            print_colored("Running in headless mode", "pink")
+            vmc_output("Running in headless mode", "pink")
         else:
-            print_colored("Running in interactive mode", "pink")
+            vmc_output("Running in interactive mode", "pink")
 
         exclude_domains_sql = fetch_exclude_domains(conn)
         domain_endings = get_domain_endings()
 
         if exclude_domains_sql is None:
-            print_colored("Failed to fetch excluded list, exiting…", "pink")
+            vmc_output("Failed to fetch excluded list, exiting…", "pink")
             sys.exit(1)
 
         if args.target is not None:
@@ -294,7 +297,7 @@ if __name__ == "__main__":
             domain_list = fetch_domain_list(conn, exclude_domains_sql)
 
         if not domain_list:
-            print_colored("No domains fetched, exiting…", "pink")
+            vmc_output("No domains fetched, exiting…", "pink")
             sys.exit(1)
 
         print(f"Fetching peer data from {len(domain_list)} instances…")
@@ -304,11 +307,11 @@ if __name__ == "__main__":
             try:
                 process_domain(domain, counter, total)
             except Exception as e:
-                print_colored(f"Error processing domain {domain}: {e}", "orange")
+                vmc_output(f"Error processing domain {domain}: {e}", "orange")
                 continue
 
-        print_colored("Fetching complete!", "bold")
+        vmc_output("Fetching complete!", "bold")
     except KeyboardInterrupt:
-        print_colored(f"\n{appname} interrupted by user", "bold")
+        vmc_output(f"\n{appname} interrupted by user", "bold")
     finally:
         conn.close()

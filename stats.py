@@ -9,7 +9,7 @@ try:
         appname,
         appversion,
         conn,
-        print_colored,
+        vmc_output,
         is_running_headless,
     )
 except ImportError as e:
@@ -923,12 +923,15 @@ def get_active_pending_eol_patched_users():
 
 
 if __name__ == "__main__":
+    # Clear the terminal screen
+    os.system("clear" if os.name != "nt" else "cls")
+
     try:
-        print_colored(f"{appname} v{appversion} ({current_filename})", "bold")
+        vmc_output(f"{appname} v{appversion} ({current_filename})", "bold")
         if is_running_headless():
-            print_colored("Running in headless mode", "pink")
+            vmc_output("Running in headless mode", "pink")
         else:
-            print_colored("Running in interactive mode", "pink")
+            vmc_output("Running in interactive mode", "pink")
 
         stats = [
             ("total_raw_domains", get_total_raw_domains, "Total raw domains"),
@@ -1019,10 +1022,10 @@ if __name__ == "__main__":
             print(f"{label}: {value}")
 
         if not is_running_headless():
-            print_colored("Write this data to the statistics database?", "pink")
+            vmc_output("Write this data to the statistics database?", "pink")
             choice = input("yes/no: ").strip().lower()
             if choice not in ("y", "yes"):
-                print_colored("Exiting without writing to the database", "yellow")
+                vmc_output("Exiting without writing to the database", "yellow")
                 sys.exit(0)
 
         # Insert or update statistics in the database
@@ -1137,7 +1140,7 @@ if __name__ == "__main__":
                 ),
             )
             conn.commit()
-            print_colored("Statistics inserted/updated successfully", "green")
+            vmc_output("Statistics inserted/updated successfully", "green")
         except Exception as e:
             print(f"Failed to insert/update statistics: {e}")
             conn.rollback()
@@ -1145,6 +1148,6 @@ if __name__ == "__main__":
             cursor.close()
 
     except KeyboardInterrupt:
-        print_colored(f"\n{appname} interrupted by user", "bold")
+        vmc_output(f"\n{appname} interrupted by user", "bold")
     finally:
         conn.close()

@@ -11,7 +11,7 @@ try:
         appname,
         appversion,
         conn,
-        print_colored,
+        vmc_output,
         is_running_headless,
     )
 except ImportError as e:
@@ -36,22 +36,22 @@ def display_current_versions():
             versions = cur.fetchall()
 
             if not versions:
-                print_colored("No nightly versions found in database", "yellow")
+                vmc_output("No nightly versions found in database", "yellow")
                 return
 
-            print_colored("\nCurrent Nightly Versions:", "cyan")
-            print_colored("-" * 70, "cyan")
-            print_colored(
+            vmc_output("\nCurrent Nightly Versions:", "cyan")
+            vmc_output("-" * 70, "cyan")
+            vmc_output(
                 f"{'Version':<20} {'Start Date':<15} {'End Date':<15}", "bold"
             )
-            print_colored("-" * 70, "cyan")
+            vmc_output("-" * 70, "cyan")
 
             for version, start_date, end_date in versions:
                 print(f"{version:<20} {start_date} {end_date}")
             print()
 
     except Exception as e:
-        print_colored(f"Error fetching nightly versions: {e}", "red")
+        vmc_output(f"Error fetching nightly versions: {e}", "red")
         sys.exit(1)
 
 
@@ -71,7 +71,7 @@ def get_active_version():
             result = cur.fetchone()
             return result if result else None
     except Exception as e:
-        print_colored(f"Error fetching active version: {e}", "red")
+        vmc_output(f"Error fetching active version: {e}", "red")
         return None
 
 
@@ -99,13 +99,13 @@ def add_nightly_version(
     try:
         # Validate dates
         if not validate_date(start_date):
-            print_colored(
+            vmc_output(
                 f"Invalid start_date format: {start_date}. Use YYYY-MM-DD", "red"
             )
             return False
 
         if not validate_date(end_date):
-            print_colored(f"Invalid end_date format: {end_date}. Use YYYY-MM-DD", "red")
+            vmc_output(f"Invalid end_date format: {end_date}. Use YYYY-MM-DD", "red")
             return False
 
         # Check if version already exists
@@ -117,7 +117,7 @@ def add_nightly_version(
                 (version,),
             )
             if cur.fetchone():
-                print_colored(f"Version {version} already exists in database", "yellow")
+                vmc_output(f"Version {version} already exists in database", "yellow")
                 return False
 
         # If auto-update is enabled, update the previous active version
@@ -130,10 +130,10 @@ def add_nightly_version(
                     datetime.strptime(start_date, "%Y-%m-%d") - timedelta(days=1)
                 ).strftime("%Y-%m-%d")
 
-                print_colored(f"\nUpdating previous active version:", "cyan")
-                print_colored(f"  Version: {old_version}", "cyan")
-                print_colored(f"  Old end date: {old_end}", "cyan")
-                print_colored(f"  New end date: {new_end_date}", "cyan")
+                vmc_output(f"\nUpdating previous active version:", "cyan")
+                vmc_output(f"  Version: {old_version}", "cyan")
+                vmc_output(f"  Old end date: {old_end}", "cyan")
+                vmc_output(f"  New end date: {new_end_date}", "cyan")
 
                 with conn.cursor() as cur:
                     cur.execute(
@@ -146,7 +146,7 @@ def add_nightly_version(
                     )
                     conn.commit()
 
-                print_colored(
+                vmc_output(
                     f"✓ Updated {old_version} end date to {new_end_date}", "green"
                 )
 
@@ -161,16 +161,16 @@ def add_nightly_version(
             )
             conn.commit()
 
-        print_colored(f"\n✓ Successfully added nightly version:", "green")
-        print_colored(f"  Version: {version}", "green")
-        print_colored(f"  Start date: {start_date}", "green")
-        print_colored(f"  End date: {end_date}", "green")
+        vmc_output(f"\n✓ Successfully added nightly version:", "green")
+        vmc_output(f"  Version: {version}", "green")
+        vmc_output(f"  Start date: {start_date}", "green")
+        vmc_output(f"  End date: {end_date}", "green")
 
         return True
 
     except Exception as e:
         conn.rollback()
-        print_colored(f"Error adding nightly version: {e}", "red")
+        vmc_output(f"Error adding nightly version: {e}", "red")
         return False
 
 
@@ -178,7 +178,7 @@ def update_end_date(version, new_end_date):
     """Update the end_date for a specific version."""
     try:
         if not validate_date(new_end_date):
-            print_colored(f"Invalid date format: {new_end_date}. Use YYYY-MM-DD", "red")
+            vmc_output(f"Invalid date format: {new_end_date}. Use YYYY-MM-DD", "red")
             return False
 
         with conn.cursor() as cur:
@@ -192,23 +192,23 @@ def update_end_date(version, new_end_date):
             )
 
             if cur.rowcount == 0:
-                print_colored(f"Version {version} not found in database", "yellow")
+                vmc_output(f"Version {version} not found in database", "yellow")
                 return False
 
             conn.commit()
 
-        print_colored(f"✓ Updated {version} end date to {new_end_date}", "green")
+        vmc_output(f"✓ Updated {version} end date to {new_end_date}", "green")
         return True
 
     except Exception as e:
         conn.rollback()
-        print_colored(f"Error updating end date: {e}", "red")
+        vmc_output(f"Error updating end date: {e}", "red")
         return False
 
 
 def interactive_add():
     """Interactive mode for adding a new nightly version."""
-    print_colored("\n=== Add New Nightly Version ===", "bold")
+    vmc_output("\n=== Add New Nightly Version ===", "bold")
 
     # Show current versions
     display_current_versions()
@@ -216,7 +216,7 @@ def interactive_add():
     # Get version
     version = input("Enter version (e.g., 4.9.0-alpha.7): ").strip()
     if not version:
-        print_colored("Version cannot be empty", "red")
+        vmc_output("Version cannot be empty", "red")
         return
 
     # Get start date
@@ -239,12 +239,12 @@ def interactive_add():
             datetime.strptime(start_date, "%Y-%m-%d") - timedelta(days=1)
         ).strftime("%Y-%m-%d")
 
-        print_colored(f"\nThis will update the previous active version:", "yellow")
-        print_colored(f"  {old_version}: {old_end} → {new_end}", "yellow")
+        vmc_output(f"\nThis will update the previous active version:", "yellow")
+        vmc_output(f"  {old_version}: {old_end} → {new_end}", "yellow")
 
         confirm = input("Continue? (y/n): ").strip().lower()
         if confirm != "y":
-            print_colored("Operation cancelled", "pink")
+            vmc_output("Operation cancelled", "pink")
             return
 
     # Add the version
@@ -296,11 +296,11 @@ def main():
     args = parser.parse_args()
 
     # Print header
-    print_colored(f"{appname} v{appversion} ({current_filename})", "bold")
+    vmc_output(f"{appname} v{appversion} ({current_filename})", "bold")
     if is_running_headless():
-        print_colored("Running in headless mode", "pink")
+        vmc_output("Running in headless mode", "pink")
     else:
-        print_colored("Running in interactive mode", "pink")
+        vmc_output("Running in interactive mode", "pink")
 
     try:
         # List versions
@@ -326,10 +326,13 @@ def main():
             interactive_add()
 
     except KeyboardInterrupt:
-        print_colored(f"\n{appname} interrupted by user", "bold")
+        vmc_output(f"\n{appname} interrupted by user", "bold")
     finally:
         conn.close()
 
 
 if __name__ == "__main__":
+    # Clear the terminal screen
+    os.system("clear" if os.name != "nt" else "cls")
+
     main()

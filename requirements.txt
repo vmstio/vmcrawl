@@ -4,3 +4,4 @@ python-dotenv
 toml
 lxml
 packaging
+tqdm
