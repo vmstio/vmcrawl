@@ -16,6 +16,7 @@ try:
     import unicodedata
     import httpx
     import psycopg
+    from concurrent.futures import ThreadPoolExecutor, as_completed
     from datetime import datetime, timedelta, timezone
     from urllib.parse import urlparse, urlunparse
     from dotenv import load_dotenv
@@ -1058,7 +1059,11 @@ def check_and_record_domains(
     iftas_domains,
     nightly_version_ranges,
 ):
-    for domain in tqdm(domain_list, desc="Processing domains", unit="domain"):
+    # Get max workers from environment or default to 2
+    max_workers = int(os.getenv("VMCRAWL_MAX_THREADS", "2"))
+
+    def process_single_domain(domain):
+        """Process a single domain with all checks."""
         if should_skip_domain(
             domain,
             ignored_domains,
@@ -1068,18 +1073,41 @@ def check_and_record_domains(
             norobots_domains,
             user_choice,
         ):
-            continue
+            return
 
         if is_junk_or_bad_tld(domain, junk_domains, bad_tlds, domain_endings):
-            continue
+            return
 
         # if is_iftas_domain(domain, iftas_domains):
-        #     continue
+        #     return
 
         try:
             process_domain(domain, http_client)
         except Exception as e:
             handle_http_exception(domain, e)
+
+    # Use ThreadPoolExecutor for concurrent processing
+    with ThreadPoolExecutor(max_workers=max_workers) as executor:
+        # Submit all tasks and wrap with tqdm for progress tracking
+        futures = {
+            executor.submit(process_single_domain, domain): domain
+            for domain in domain_list
+        }
+
+        # Process completed tasks with progress bar
+        for future in tqdm(
+            as_completed(futures),
+            total=len(domain_list),
+            desc="vmcrawl progress",
+            unit="instances",
+        ):
+            try:
+                future.result()  # Get result or raise exception if any
+            except Exception as e:
+                domain = futures[future]
+                vmc_output(
+                    f"{domain}: Unexpected error in thread: {e}", "red", use_tqdm=True
+                )
 
 
 def should_skip_domain(
@@ -1539,9 +1567,7 @@ def process_mastodon_instance(domain, webfinger_data, nodeinfo_data, http_client
     if "total" in nodeinfo_data["usage"]["users"]:
         total_users = nodeinfo_data["usage"]["users"]["total"]
     else:
-        error_to_print = (
-            f"v{software_version} (no total user count)"
-        )
+        error_to_print = f"v{software_version} (no total user count)"
         vmc_output(f"{domain}: {error_to_print}", "yellow", use_tqdm=True)
         log_error(domain, error_to_print)
         increment_domain_error(domain, "###")
@@ -1550,9 +1576,7 @@ def process_mastodon_instance(domain, webfinger_data, nodeinfo_data, http_client
     if "activeMonth" in nodeinfo_data["usage"]["users"]:
         active_month_users = nodeinfo_data["usage"]["users"]["activeMonth"]
     else:
-        error_to_print = (
-            f"v{software_version} (no active month user count)"
-        )
+        error_to_print = f"v{software_version} (no active month user count)"
         vmc_output(f"{domain}: {error_to_print}", "yellow", use_tqdm=True)
         log_error(domain, error_to_print)
         increment_domain_error(domain, "###")
@@ -1736,9 +1760,7 @@ def update_mastodon_domain(
         )
         conn.commit()
     except Exception as e:
-        vmc_output(
-            f"Failed to update Mastodon domain data: {e}", "red", use_tqdm=True
-        )
+        vmc_output(f"Failed to update Mastodon domain data: {e}", "red", use_tqdm=True)
         conn.rollback()
     finally:
         cursor.close()
@@ -1784,7 +1806,14 @@ def handle_http_exception(domain, exception):
         ]
     ):
         error_reason = "DNS"
-        error_message = re.sub(r"\s*(\[[^\]]*\]|\([^)]*\))", "", error_message).lstrip()
+        error_message = (
+            re.sub(r"\s*(\[[^\]]*\]|\([^)]*\))", "", error_message)
+            .replace(":", "")
+            .replace(",", "")
+            .split(" for ", 1)[0]
+            .lstrip()
+            .rstrip(" .")
+        )
         vmc_output(f"{domain}: {error_message}", "orange", use_tqdm=True)
         log_error(domain, error_message)
         increment_domain_error(domain, error_reason)
@@ -1803,13 +1832,28 @@ def handle_http_exception(domain, exception):
         ]
     ):
         error_reason = "TCP"
-        error_message = re.sub(r"\s*(\[[^\]]*\]|\([^)]*\))", "", error_message).lstrip()
+        error_message = (
+            re.sub(r"\s*(\[[^\]]*\]|\([^)]*\))", "", error_message)
+            .replace(":", "")
+            .replace(",", "")
+            .split(" for ", 1)[0]
+            .lstrip()
+            .rstrip(" .")
+        )
         vmc_output(f"{domain}: {error_message}", "orange", use_tqdm=True)
         log_error(domain, error_message)
         increment_domain_error(domain, error_reason)
         delete_if_error_max(domain)
     else:
         error_reason = "HTTP"
+        error_message = (
+            re.sub(r"\s*(\[[^\]]*\]|\([^)]*\))", "", error_message)
+            .replace(":", "")
+            .replace(",", "")
+            .split(" for ", 1)[0]
+            .lstrip()
+            .rstrip(" .")
+        )
         vmc_output(f"{domain}: {error_message}", "orange", use_tqdm=True)
         log_error(domain, error_message)
         increment_domain_error(domain, error_reason)
