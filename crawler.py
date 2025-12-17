@@ -2039,8 +2039,8 @@ def print_menu() -> None:
 
     for category, options in menu_options.items():
         options_str = " ".join(f"({key}) {value}" for key, value in options.items())
-        vmc_output(f"{category}: ", "bold", end="")
-        vmc_output(options_str, "")  # Print options without bold
+        vmc_output(f"{category}: ", "cyan", end="")
+        vmc_output(options_str, "")  # Print options without color
     vmc_output("Enter your choice (1, 2, 3, etc):", "bold", end=" ")
     sys.stdout.flush()
 
