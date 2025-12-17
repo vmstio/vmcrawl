@@ -1122,24 +1122,25 @@ def should_skip_domain(
     norobots_domains,
     user_choice,
 ):
+    # Check against user choices and known domain lists
     if user_choice != "6" and domain in ignored_domains:
-        vmc_output(f"{domain}: Previously IGNORED", "cyan", use_tqdm=True)
+        vmc_output(f"{domain}: Other Platform", "cyan", use_tqdm=True)
         delete_domain_if_known(domain)
         return True
     if user_choice != "7" and domain in failed_domains:
-        vmc_output(f"{domain}: Previously FAILED", "cyan", use_tqdm=True)
+        vmc_output(f"{domain}: HTTP Blocked", "cyan", use_tqdm=True)
         delete_domain_if_known(domain)
         return True
     if user_choice != "8" and domain in nxdomain_domains:
-        vmc_output(f"{domain}: Previously NXDOMAIN", "cyan", use_tqdm=True)
+        vmc_output(f"{domain}: Bad Domain", "cyan", use_tqdm=True)
         delete_domain_if_known(domain)
         return True
     if user_choice != "9" and domain in norobots_domains:
-        vmc_output(f"{domain}: Previously NOROBOTS", "cyan", use_tqdm=True)
+        vmc_output(f"{domain}: Crawling Prohibited", "cyan", use_tqdm=True)
         delete_domain_if_known(domain)
         return True
     if domain in baddata_domains:
-        vmc_output(f"{domain}: Previously BADDATA", "cyan", use_tqdm=True)
+        vmc_output(f"{domain}: Really Bad Domain", "cyan", use_tqdm=True)
         delete_domain_if_known(domain)
         return True
     return False
@@ -1178,11 +1179,11 @@ def is_iftas_domain(domain, iftas_domains):
 
 
 def process_domain(domain, http_client):
-    if has_emoji_or_special_chars(domain):
-        vmc_output(f"{domain}: Bad Domain", "cyan", use_tqdm=True)
-        mark_nxdomain_domain(domain)
-        delete_domain_if_known(domain)
-        return
+    # if has_emoji_or_special_chars(domain):
+    #     vmc_output(f"{domain}: Bad Domain", "cyan", use_tqdm=True)
+    #     mark_nxdomain_domain(domain)
+    #     delete_domain_if_known(domain)
+    #     return
 
     if not check_robots_txt(domain, http_client):
         return  # Stop processing this domain
