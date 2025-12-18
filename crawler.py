@@ -1443,8 +1443,13 @@ def check_nodeinfo(domain, backend_domain, http_client):
         response = get_with_fallback(url, http_client)
         if response.status_code in [200]:
             content_type = response.headers.get("Content-Type", "")
+            if "text/plain" in content_type:
+                # This is likey Wafrn
+                mark_as_non_mastodon(domain)
+                return None
             if "json" not in content_type:
-                error_message = "NodeInfo reply is not a JSON file"
+                content_type_clean = content_type.split(';')[0].strip()
+                error_message = f"NodeInfo reply is {content_type_clean}"
                 vmc_output(f"{domain}: {error_message}", "orange", use_tqdm=True)
                 log_error(domain, error_message)
                 increment_domain_error(domain, "JSON")
@@ -1461,7 +1466,7 @@ def check_nodeinfo(domain, backend_domain, http_client):
                 try:
                     data = response.json()
                 except json.JSONDecodeError as e:
-                    error_message = f"Invalid JSON response: {e}"
+                    error_message = f"{e}"
                     vmc_output(f"{domain}: {error_message}", "orange", use_tqdm=True)
                     log_error(domain, error_message)
                     increment_domain_error(domain, "JSON")
@@ -1501,7 +1506,8 @@ def check_nodeinfo(domain, backend_domain, http_client):
                             "Content-Type", ""
                         )
                         if "json" not in nodeinfo_response_content_type:
-                            error_message = "NodeInfo V2 reply not JSON"
+                            content_type_clean = nodeinfo_response_content_type.split(';')[0].strip()
+                            error_message = f"NodeInfo V2 reply is {content_type_clean}"
                             vmc_output(
                                 f"{domain}: {error_message}", "orange", use_tqdm=True
                             )
@@ -1631,7 +1637,7 @@ def process_mastodon_instance(domain, webfinger_data, nodeinfo_data, http_client
                 delete_if_error_max(domain)
                 return None
             elif "json" not in content_type:
-                error_message = "Instance API reply not JSON"
+                error_message = f"Instance API reply is {content_type}"
                 vmc_output(f"{domain}: {error_message}", "orange", use_tqdm=True)
                 log_error(domain, error_message)
                 increment_domain_error(domain, "API")
@@ -1727,12 +1733,19 @@ def process_mastodon_instance(domain, webfinger_data, nodeinfo_data, http_client
                     "green",
                     use_tqdm=True,
                 )
-
+        elif response.status_code in http_codes_to_hardfail:
+                vmc_output(
+                    f"{domain}: HTTP {response.status_code} on API",
+                    "magenta",
+                    use_tqdm=True,
+                )
+                mark_failed_domain(domain)
+                delete_domain_if_known(domain)
         else:
-            error_message = "API request failed"
+            error_message = f"HTTP {response.status_code} on API"
             vmc_output(f"{domain}: {error_message}", "orange", use_tqdm=True)
             log_error(domain, error_message)
-            increment_domain_error(domain, "API")
+            increment_domain_error(domain, f"{response.status_code}")
             delete_if_error_max(domain)
 
     except httpx.RequestError as e:
