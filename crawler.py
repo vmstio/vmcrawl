@@ -1446,10 +1446,13 @@ def check_nodeinfo(domain, backend_domain, http_client):
             if "text/plain" in content_type:
                 # This is likey Wafrn
                 mark_as_non_mastodon(domain)
+                delete_domain_if_known(domain)
                 return None
             if "text/html" in content_type:
                 # Likely a web page redirect
+                vmc_output(f"{domain}: NodeInfo redirect detected", "magenta", use_tqdm=True)
                 mark_failed_domain(domain)
+                delete_domain_if_known(domain)
                 return None
             if "json" not in content_type:
                 content_type_clean = content_type.split(';')[0].strip()
