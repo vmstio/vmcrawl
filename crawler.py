@@ -1598,7 +1598,7 @@ def process_mastodon_instance(domain, webfinger_data, nodeinfo_data, http_client
     if "total" in nodeinfo_data["usage"]["users"]:
         total_users = nodeinfo_data["usage"]["users"]["total"]
     else:
-        error_to_print = f"No total user data in NodeInfo"
+        error_to_print = f"No user data in NodeInfo"
         vmc_output(f"{domain}: {error_to_print}", "yellow", use_tqdm=True)
         log_error(domain, error_to_print)
         increment_domain_error(domain, "###")
