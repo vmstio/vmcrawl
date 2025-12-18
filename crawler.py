@@ -1588,7 +1588,7 @@ def process_mastodon_instance(domain, webfinger_data, nodeinfo_data, http_client
     software_version = clean_version(nodeinfo_data["software"]["version"])
 
     if "usage" not in nodeinfo_data or "users" not in nodeinfo_data["usage"]:
-        error_to_print = f"no usage data in NodeInfo"
+        error_to_print = f"No usage data in NodeInfo"
         vmc_output(f"{domain}: {error_to_print}", "yellow", use_tqdm=True)
         log_error(domain, error_to_print)
         increment_domain_error(domain, "###")
