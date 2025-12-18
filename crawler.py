@@ -2046,8 +2046,8 @@ def print_menu() -> None:
         "Change process direction": {"1": "Standard", "2": "Reverse", "3": "Random"},
         "Retry fatal errors": {
             "6": "Other Platforms",
-            "7": "HTTP 410/418",
-            "8": "Emoji Domain",
+            "7": "Rejected Domains",
+            "8": "Failed Domains",
             "9": "Crawling Prohibited",
         },
         "Retry connection errors": {
