@@ -1588,8 +1588,8 @@ def process_mastodon_instance(domain, webfinger_data, nodeinfo_data, http_client
     software_version = clean_version(nodeinfo_data["software"]["version"])
 
     if "usage" not in nodeinfo_data or "users" not in nodeinfo_data["usage"]:
-        error_to_print = f"v{software_version} (no user count)"
-        vmc_output(f"{domain}: {error_to_print}", "light_green", use_tqdm=True)
+        error_to_print = f"no usage data in NodeInfo"
+        vmc_output(f"{domain}: {error_to_print}", "yellow", use_tqdm=True)
         log_error(domain, error_to_print)
         increment_domain_error(domain, "###")
         delete_domain_if_known(domain)
@@ -1598,8 +1598,8 @@ def process_mastodon_instance(domain, webfinger_data, nodeinfo_data, http_client
     if "total" in nodeinfo_data["usage"]["users"]:
         total_users = nodeinfo_data["usage"]["users"]["total"]
     else:
-        error_to_print = f"v{software_version} (no total user count)"
-        vmc_output(f"{domain}: {error_to_print}", "light_green", use_tqdm=True)
+        error_to_print = f"No total user data in NodeInfo"
+        vmc_output(f"{domain}: {error_to_print}", "yellow", use_tqdm=True)
         log_error(domain, error_to_print)
         increment_domain_error(domain, "###")
         delete_domain_if_known(domain)
@@ -1607,8 +1607,8 @@ def process_mastodon_instance(domain, webfinger_data, nodeinfo_data, http_client
     if "activeMonth" in nodeinfo_data["usage"]["users"]:
         active_month_users = nodeinfo_data["usage"]["users"]["activeMonth"]
     else:
-        error_to_print = f"v{software_version} (invalid MAU reported)"
-        vmc_output(f"{domain}: {error_to_print}", "light_green", use_tqdm=True)
+        error_to_print = f"No MAU data in NodeInfo"
+        vmc_output(f"{domain}: {error_to_print}", "yellow", use_tqdm=True)
         log_error(domain, error_to_print)
         increment_domain_error(domain, "###")
         delete_domain_if_known(domain)
