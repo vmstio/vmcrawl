@@ -91,7 +91,6 @@ except KeyError as e:
 color_bold = "\033[1m"
 color_reset = "\033[0m"
 color_cyan = "\033[96m"
-color_light_green = "\033[92m"
 color_green = "\033[92m"
 color_magenta = "\033[95m"
 color_orange = "\033[38;5;208m"
@@ -106,7 +105,6 @@ colors = {
     "bold": f"{color_bold}",
     "reset": f"{color_reset}",
     "cyan": f"{color_cyan}",
-    "light_green": f"{color_light_green}",
     "green": f"{color_green}",
     "magenta": f"{color_magenta}",
     "orange": f"{color_orange}",
@@ -1609,7 +1607,7 @@ def process_mastodon_instance(domain, webfinger_data, nodeinfo_data, http_client
     if "activeMonth" in nodeinfo_data["usage"]["users"]:
         active_month_users = nodeinfo_data["usage"]["users"]["activeMonth"]
     else:
-        error_to_print = f"v{software_version} (no active month user count)"
+        error_to_print = f"v{software_version} (invalid MAU reported)"
         vmc_output(f"{domain}: {error_to_print}", "light_green", use_tqdm=True)
         log_error(domain, error_to_print)
         increment_domain_error(domain, "###")
@@ -1696,23 +1694,12 @@ def process_mastodon_instance(domain, webfinger_data, nodeinfo_data, http_client
             if actual_domain == "gc2.jp":
                 source_url = "https://github.com/gc2-jp/freespeech"
 
-            # Check for invalid user counts
-            if active_month_users > max(
-                total_users + 6, total_users + (total_users * 0.25)
-            ):
-                error_to_print = f"v{software_version} (invalid MAU count)"
-                vmc_output(f"{domain}: {error_to_print}", "light_green", use_tqdm=True)
-                log_error(domain, error_to_print)
-                increment_domain_error(domain, "###")
-                delete_domain_if_known(domain)
-                return
-
             # Check for invalid software versions
             if version.parse(software_version.split("-")[0]) > version.parse(
                 version_main_branch
             ):
                 error_to_print = f'v{software_version.split("-")[0]} (version invalid)'
-                vmc_output(f"{domain}: {error_to_print}", "light_green", use_tqdm=True)
+                vmc_output(f"{domain}: {error_to_print}", "yellow", use_tqdm=True)
                 log_error(domain, error_to_print)
                 increment_domain_error(domain, "???")
                 delete_domain_if_known(domain)
