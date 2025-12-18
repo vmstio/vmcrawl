@@ -1244,7 +1244,7 @@ def check_robots_txt(domain, http_client):
                 content_type in mimetypes.types_map.values()
                 and not content_type.startswith("text/")
             ):
-                error_message = "robots.txt invalid"
+                error_message = f"robots.txt is {content_type}"
                 vmc_output(f"{domain}: {error_message}", "orange", use_tqdm=True)
                 log_error(domain, error_message)
                 increment_domain_error(domain, "TXT")
