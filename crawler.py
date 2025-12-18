@@ -11,6 +11,7 @@ try:
     import random
     import re
     import sys
+    import threading
     import time
     import toml
     import unicodedata
@@ -1064,9 +1065,16 @@ def check_and_record_domains(
 ):
     # Get max workers from environment or default to 2
     max_workers = int(os.getenv("VMCRAWL_MAX_THREADS", "2"))
+    
+    # Shutdown event for graceful interruption
+    shutdown_event = threading.Event()
 
     def process_single_domain(domain):
         """Process a single domain with all checks."""
+        # Check if shutdown was requested
+        if shutdown_event.is_set():
+            return
+            
         if should_skip_domain(
             domain,
             ignored_domains,
@@ -1086,11 +1094,16 @@ def check_and_record_domains(
 
         try:
             process_domain(domain, http_client)
+        except httpx.CloseError:
+            # Suppress errors from closed HTTP client during shutdown
+            pass
         except Exception as e:
-            handle_http_exception(domain, e)
+            if not shutdown_event.is_set():
+                handle_http_exception(domain, e)
 
     # Use ThreadPoolExecutor for concurrent processing
-    with ThreadPoolExecutor(max_workers=max_workers) as executor:
+    executor = ThreadPoolExecutor(max_workers=max_workers)
+    try:
         # Submit all tasks and wrap with tqdm for progress tracking
         futures = {
             executor.submit(process_single_domain, domain): domain
@@ -1098,19 +1111,37 @@ def check_and_record_domains(
         }
 
         # Process completed tasks with progress bar
-        for future in tqdm(
-            as_completed(futures),
-            total=len(domain_list),
-            desc="vmcrawl",
-            unit="d",
-        ):
-            try:
-                future.result()  # Get result or raise exception if any
-            except Exception as e:
-                domain = futures[future]
-                vmc_output(
-                    f"{domain}: Unexpected error in thread: {e}", "red", use_tqdm=True
-                )
+        try:
+            for future in tqdm(
+                as_completed(futures),
+                total=len(domain_list),
+                desc="vmcrawl",
+                unit="d",
+            ):
+                try:
+                    future.result()  # Get result or raise exception if any
+                except httpx.CloseError:
+                    # Suppress errors from closed HTTP client during shutdown
+                    pass
+                except Exception as e:
+                    if not shutdown_event.is_set():
+                        domain = futures[future]
+                        vmc_output(
+                            f"{domain}: Unexpected error in thread: {e}", "red", use_tqdm=True
+                        )
+        except KeyboardInterrupt:
+            shutdown_event.set()
+            print("\nProcess interrupted. Canceling pending tasks...")
+            # Cancel all pending futures
+            for future in futures:
+                future.cancel()
+            # Don't wait for running threads, just shutdown immediately
+            executor.shutdown(wait=False, cancel_futures=True)
+            return
+    finally:
+        # Normal cleanup if no interrupt
+        if not shutdown_event.is_set():
+            executor.shutdown(wait=True)
 
 
 def should_skip_domain(
