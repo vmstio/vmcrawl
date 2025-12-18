@@ -1128,19 +1128,19 @@ def should_skip_domain(
         delete_domain_if_known(domain)
         return True
     if user_choice != "7" and domain in failed_domains:
-        vmc_output(f"{domain}: HTTP Blocked", "cyan", use_tqdm=True)
+        vmc_output(f"{domain}: HTTP Blocked", "magenta", use_tqdm=True)
         delete_domain_if_known(domain)
         return True
     if user_choice != "8" and domain in nxdomain_domains:
-        vmc_output(f"{domain}: Bad Domain", "cyan", use_tqdm=True)
+        vmc_output(f"{domain}: Emoji Domain", "magenta", use_tqdm=True)
         delete_domain_if_known(domain)
         return True
     if user_choice != "9" and domain in norobots_domains:
-        vmc_output(f"{domain}: Crawling Prohibited", "cyan", use_tqdm=True)
+        vmc_output(f"{domain}: Crawling Prohibited", "magenta", use_tqdm=True)
         delete_domain_if_known(domain)
         return True
     if domain in baddata_domains:
-        vmc_output(f"{domain}: Really Bad Domain", "cyan", use_tqdm=True)
+        vmc_output(f"{domain}: Bad Domain", "magenta", use_tqdm=True)
         delete_domain_if_known(domain)
         return True
     return False
@@ -1148,12 +1148,12 @@ def should_skip_domain(
 
 def is_junk_or_bad_tld(domain, junk_domains, bad_tlds, domain_endings):
     if any(junk in domain for junk in junk_domains):
-        vmc_output(f"{domain}: Purging known junk domain", "cyan", use_tqdm=True)
+        vmc_output(f"{domain}: Purging known junk domain", "magenta", use_tqdm=True)
         delete_domain_if_known(domain)
         delete_domain_from_raw(domain)
         return True
     if any(domain.endswith(f".{tld}") for tld in bad_tlds):
-        vmc_output(f"{domain}: Purging prohibited TLD", "cyan", use_tqdm=True)
+        vmc_output(f"{domain}: Purging prohibited TLD", "magenta", use_tqdm=True)
         mark_nxdomain_domain(domain)
         delete_domain_if_known(domain)
         delete_domain_from_raw(domain)
@@ -1161,7 +1161,7 @@ def is_junk_or_bad_tld(domain, junk_domains, bad_tlds, domain_endings):
     if not any(
         domain.endswith(f".{domain_ending}") for domain_ending in domain_endings
     ):
-        vmc_output(f"{domain}: Purging unknown TLD", "cyan", use_tqdm=True)
+        vmc_output(f"{domain}: Purging unknown TLD", "magenta", use_tqdm=True)
         mark_nxdomain_domain(domain)
         delete_domain_if_known(domain)
         delete_domain_from_raw(domain)
@@ -1171,7 +1171,7 @@ def is_junk_or_bad_tld(domain, junk_domains, bad_tlds, domain_endings):
 
 def is_iftas_domain(domain, iftas_domains):
     if any(domain.endswith(f"{dni}") for dni in iftas_domains):
-        vmc_output(f"{domain}: Known IFTAS DNI domain", "cyan", use_tqdm=True)
+        vmc_output(f"{domain}: Known IFTAS DNI domain", "magenta", use_tqdm=True)
         mark_nxdomain_domain(domain)
         delete_domain_if_known(domain)
         return True
@@ -1179,11 +1179,11 @@ def is_iftas_domain(domain, iftas_domains):
 
 
 def process_domain(domain, http_client):
-    # if has_emoji_or_special_chars(domain):
-    #     vmc_output(f"{domain}: Bad Domain", "cyan", use_tqdm=True)
-    #     mark_nxdomain_domain(domain)
-    #     delete_domain_if_known(domain)
-    #     return
+    if has_emoji_or_special_chars(domain):
+        vmc_output(f"{domain}: Emoji Domain", "magenta", use_tqdm=True)
+        mark_nxdomain_domain(domain)
+        delete_domain_if_known(domain)
+        return
 
     if not check_robots_txt(domain, http_client):
         return  # Stop processing this domain
@@ -1234,7 +1234,7 @@ def check_robots_txt(domain, http_client):
                         disallow_path == "/" or disallow_path == "*"
                     ):
                         vmc_output(
-                            f"{domain}: Crawling Prohibited", "cyan", use_tqdm=True
+                            f"{domain}: Crawling Prohibited", "magenta", use_tqdm=True
                         )
                         mark_norobots_domain(domain)
                         delete_domain_if_known(domain)
@@ -1243,7 +1243,7 @@ def check_robots_txt(domain, http_client):
         elif response.status_code in http_codes_to_hardfail:
             vmc_output(
                 f"{domain}: HTTP {response.status_code} on robots.txt",
-                "yellow",
+                "magenta",
                 use_tqdm=True,
             )
             mark_failed_domain(domain)
@@ -1315,7 +1315,7 @@ def check_webfinger(domain, http_client):
         elif response.status_code in http_codes_to_hardfail:
             vmc_output(
                 f"{domain}: HTTP {response.status_code} on WebFinger",
-                "yellow",
+                "magenta",
                 use_tqdm=True,
             )
             mark_failed_domain(domain)
@@ -1389,7 +1389,7 @@ def check_hostmeta(domain, http_client):
         elif response.status_code in http_codes_to_hardfail:
             vmc_output(
                 f"{domain}: HTTP {response.status_code} on HostMeta",
-                "yellow",
+                "magenta",
                 use_tqdm=True,
             )
             mark_failed_domain(domain)
@@ -1494,7 +1494,7 @@ def check_nodeinfo(domain, backend_domain, http_client):
                     elif nodeinfo_response.status_code in http_codes_to_hardfail:
                         vmc_output(
                             f"HTTP {response.status_code} on NodeInfo",
-                            "yellow",
+                            "magenta",
                             use_tqdm=True,
                         )
                         mark_failed_domain(domain)
@@ -1519,7 +1519,7 @@ def check_nodeinfo(domain, backend_domain, http_client):
         elif response.status_code in http_codes_to_hardfail:
             vmc_output(
                 f"{domain}: HTTP {response.status_code} on NodeInfo",
-                "yellow",
+                "magenta",
                 use_tqdm=True,
             )
             mark_failed_domain(domain)
@@ -2010,7 +2010,7 @@ def print_menu() -> None:
         "Retry fatal errors": {
             "6": "Other Platforms",
             "7": "HTTP 410/418",
-            "8": "Bad Domain",
+            "8": "Emoji Domain",
             "9": "Crawling Prohibited",
         },
         "Retry connection errors": {
