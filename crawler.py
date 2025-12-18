@@ -330,7 +330,7 @@ def delete_old_patch_versions():
 
 # Common variables
 error_threshold = int(common_timeout)
-error_buffer = error_threshold + error_threshold
+error_buffer = int(os.getenv("VMCRAWL_ERROR_BUFFER", error_threshold))
 version_main_branch = get_main_version_branch()
 version_main_release = get_main_version_release()
 version_latest_release = get_highest_mastodon_version()
@@ -1929,24 +1929,23 @@ def load_from_database(user_choice):
         "42": "SELECT domain FROM mastodon_domains WHERE active_users_monthly = '0' ORDER BY active_users_monthly DESC",
         "43": "SELECT domain FROM mastodon_domains ORDER BY active_users_monthly DESC",
         "50": "SELECT domain FROM raw_domains WHERE errors > %s ORDER BY errors ASC",
-        "51": "SELECT domain FROM raw_domains WHERE errors < %s ORDER BY errors ASC",
-        "52": "SELECT domain FROM raw_domains WHERE errors >= %s AND errors <= %s ORDER BY errors ASC",
+        "51": "SELECT domain FROM raw_domains WHERE errors > %s AND errors < %s ORDER BY errors ASC",
     }
 
     if user_choice in ["2", "3"]:  # Reverse or Random
         query = query_map["1"]  # Default query
-        params = [error_threshold]
+        params = [error_buffer]
     else:
         query = query_map.get(user_choice)
 
         # Set parameters based on query type
         params = []
-        if user_choice in ["1", "51"]:
-            params = [error_threshold]
-        elif user_choice == "52":
-            params = [error_threshold, error_buffer]
-        elif user_choice == "50":
+        if user_choice in ["1"]:
             params = [error_buffer]
+        elif user_choice == "50":
+            params = [int(error_buffer*2)]
+        elif user_choice == "51":
+            params = [error_buffer, int(error_buffer*2)]
         elif user_choice == "40":
             params = {"versions": all_patched_versions}
             vmc_output("Excluding versions:", "pink")
@@ -2035,9 +2034,8 @@ def print_menu() -> None:
             "43": "All Good",
         },
         "Retry general errors": {
-            "50": f"Domains w/ >{error_buffer} Errors",
-            "51": f"Domains w/ <{error_threshold} Errors",
-            "52": f"Domains w/ {error_threshold}-{error_buffer} Errors",
+            "50": f"Domains w/ >{int(error_buffer*2)} Errors",
+            "51": f"Domains w/ {error_buffer}-{int(error_buffer*2)} Errors",
         },
     }
 
@@ -2073,7 +2071,7 @@ def main():
         "-d",
         "--buffer",
         action="store_true",
-        help="only process domains which recently reached the error threshold (same as menu item 52)",
+        help="only process domains which recently reached the error threshold (same as menu item 51)",
     )
     parser.add_argument(
         "-t",
@@ -2112,7 +2110,7 @@ def main():
                 if args.new:
                     user_choice = "0"
                 elif args.buffer:
-                    user_choice = "52"
+                    user_choice = "51"
                 elif is_running_headless():
                     user_choice = "3"  # Default to random crawl in headless mode
                 else:
