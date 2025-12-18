@@ -1275,7 +1275,7 @@ def check_robots_txt(domain, http_client):
                 "magenta",
                 use_tqdm=True,
             )
-            mark_failed_domain(domain)
+            mark_nxdomain_domain(domain)
             delete_domain_if_known(domain)
             return False
     except httpx.RequestError as e:
@@ -1347,7 +1347,7 @@ def check_webfinger(domain, http_client):
                 "magenta",
                 use_tqdm=True,
             )
-            mark_failed_domain(domain)
+            mark_nxdomain_domain(domain)
             delete_domain_if_known(domain)
             return False
         elif response.status_code in http_codes_to_softfail:
@@ -1421,7 +1421,7 @@ def check_hostmeta(domain, http_client):
                 "magenta",
                 use_tqdm=True,
             )
-            mark_failed_domain(domain)
+            mark_nxdomain_domain(domain)
             delete_domain_if_known(domain)
             return False
         elif response.status_code in http_codes_to_softfail:
@@ -1446,6 +1446,10 @@ def check_nodeinfo(domain, backend_domain, http_client):
             if "text/plain" in content_type:
                 # This is likey Wafrn
                 mark_as_non_mastodon(domain)
+                return None
+            if "text/html" in content_type:
+                # Likely a web page redirect
+                mark_failed_domain(domain)
                 return None
             if "json" not in content_type:
                 content_type_clean = content_type.split(';')[0].strip()
@@ -1532,7 +1536,7 @@ def check_nodeinfo(domain, backend_domain, http_client):
                             "magenta",
                             use_tqdm=True,
                         )
-                        mark_failed_domain(domain)
+                        mark_nxdomain_domain(domain)
                         delete_domain_if_known(domain)
                         return False
                     else:
@@ -1557,7 +1561,7 @@ def check_nodeinfo(domain, backend_domain, http_client):
                 "magenta",
                 use_tqdm=True,
             )
-            mark_failed_domain(domain)
+            mark_nxdomain_domain(domain)
             delete_domain_if_known(domain)
         else:
             error_message = f"HTTP {response.status_code} on NodeInfo"
@@ -1739,7 +1743,7 @@ def process_mastodon_instance(domain, webfinger_data, nodeinfo_data, http_client
                     "magenta",
                     use_tqdm=True,
                 )
-                mark_failed_domain(domain)
+                mark_nxdomain_domain(domain)
                 delete_domain_if_known(domain)
         else:
             error_message = f"HTTP {response.status_code} on API"
