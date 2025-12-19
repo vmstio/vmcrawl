@@ -1912,9 +1912,10 @@ def load_from_database(user_choice):
         "32": "SELECT domain FROM raw_domains WHERE reason = 'API' ORDER BY errors ASC",
         "40": "SELECT domain FROM mastodon_domains WHERE software_version != ALL(%(versions)s::text[]) ORDER BY active_users_monthly DESC",
         "41": "SELECT domain FROM mastodon_domains WHERE software_version LIKE %s ORDER BY active_users_monthly DESC",
-        "42": "SELECT domain FROM mastodon_domains WHERE active_users_monthly = '0' ORDER BY active_users_monthly DESC",
-        "43": "SELECT domain FROM mastodon_domains ORDER BY active_users_monthly DESC",
-        "44": "SELECT domain FROM raw_domains WHERE reason = '###' ORDER BY errors ASC",
+        "42": "SELECT domain FROM mastodon_domains WHERE software_version::TEXT ~ 'alpha|beta|rc' ORDER BY active_users_monthly DESC",
+        "43": "SELECT domain FROM mastodon_domains WHERE active_users_monthly = '0' ORDER BY active_users_monthly DESC",
+        "44": "SELECT domain FROM mastodon_domains ORDER BY active_users_monthly DESC",
+        "45": "SELECT domain FROM raw_domains WHERE reason = '###' ORDER BY errors ASC",
         "50": "SELECT domain FROM raw_domains WHERE errors > %s ORDER BY errors ASC",
         "51": "SELECT domain FROM raw_domains WHERE errors > %s AND errors < %s ORDER BY errors ASC",
     }
@@ -2013,9 +2014,10 @@ def get_menu_options() -> dict:
         "Retry known instances": {
             "40": "Unpatched",
             "41": "Main",
-            "42": "Inactive",
-            "43": "All Good",
-            "44": "Misreporting",
+            "42": "Development",
+            "43": "Inactive",
+            "44": "All Good",
+            "45": "Misreporting",
         },
         "Retry general errors": {
             "50": f"Domains w/ >{int(error_buffer*2)} Errors",
