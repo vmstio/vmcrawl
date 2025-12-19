@@ -697,7 +697,7 @@ def delete_domain_from_raw(domain):
         cursor.close()
 
 
-def clean_version(software_version_full):
+def clean_version(software_version_full, nightly_version_ranges):
     software_version = clean_version_suffix(software_version_full)
     software_version = clean_version_oddstring(software_version)
     software_version = clean_version_dumbstring(software_version)
@@ -707,9 +707,7 @@ def clean_version(software_version_full):
     software_version = clean_version_development(software_version)
     software_version = clean_version_wrongpatch(software_version)
     software_version = clean_version_doubledash(software_version)
-    software_version = clean_version_nightly(
-        software_version, get_nightly_version_ranges()
-    )
+    software_version = clean_version_nightly(software_version, nightly_version_ranges)
     software_version = clean_version_main_missing_prerelease(software_version)
     software_version = clean_version_release_with_prerelease(software_version)
     software_version = clean_version_strip_incorrect_prerelease(software_version)
@@ -1021,6 +1019,7 @@ def check_and_record_domains(
     http_client,
     nxdomain_domains,
     norobots_domains,
+    nightly_version_ranges,
 ):
     # Get max workers from environment or default to 2
     max_workers = int(os.getenv("VMCRAWL_MAX_THREADS", "2"))
@@ -1049,7 +1048,7 @@ def check_and_record_domains(
             return
 
         try:
-            process_domain(domain, http_client)
+            process_domain(domain, http_client, nightly_version_ranges)
         except httpx.CloseError:
             # Suppress errors from closed HTTP client during shutdown
             pass
@@ -1158,7 +1157,7 @@ def is_junk_or_bad_tld(domain, junk_domains, bad_tlds, domain_endings):
     return False
 
 
-def process_domain(domain, http_client):
+def process_domain(domain, http_client, nightly_version_ranges):
     if has_emoji_or_special_chars(domain):
         vmc_output(f"{domain}: Emoji Domain", "magenta", use_tqdm=True)
         mark_nxdomain_domain(domain)
@@ -1179,7 +1178,7 @@ def process_domain(domain, http_client):
         return
 
     if is_mastodon_instance(nodeinfo_data):
-        process_mastodon_instance(domain, webfinger_data, nodeinfo_data, http_client)
+        process_mastodon_instance(domain, webfinger_data, nodeinfo_data, http_client, nightly_version_ranges)
     else:
         mark_as_non_mastodon(domain)
 
@@ -1551,10 +1550,10 @@ def is_mastodon_instance(nodeinfo_data: dict) -> bool:
     return software_name.lower() in {"mastodon", "hometown", "kmyblue", "glitchcafe"}
 
 
-def process_mastodon_instance(domain, webfinger_data, nodeinfo_data, http_client):
+def process_mastodon_instance(domain, webfinger_data, nodeinfo_data, http_client, nightly_version_ranges):
     software_name = nodeinfo_data["software"]["name"].lower()
     software_version_full = nodeinfo_data["software"]["version"]
-    software_version = clean_version(nodeinfo_data["software"]["version"])
+    software_version = clean_version(nodeinfo_data["software"]["version"], nightly_version_ranges)
 
     if "usage" not in nodeinfo_data or "users" not in nodeinfo_data["usage"]:
         error_to_print = f"No usage data in NodeInfo"
