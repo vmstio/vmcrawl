@@ -2090,7 +2090,7 @@ def get_user_choice() -> str:
 def print_line_break():
     # Get the width of the console
     width = os.get_terminal_size().columns
-    print('-' * width)
+    print('=' * width)
 
 def main():
     parser = argparse.ArgumentParser(
