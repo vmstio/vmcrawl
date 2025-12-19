@@ -1316,14 +1316,15 @@ def check_webfinger(domain, http_client):
                 else:
                     return None
             if "localhost" in response.content.decode("utf-8"):
-                error_message = "WebFinger alias points to localhost"
-                vmc_output(f"{domain}: {error_message}", "orange", use_tqdm=True)
-                log_error(domain, error_message)
-                increment_domain_error(domain, "???")
-                delete_domain_if_known(domain)
-                return None
-            else:
-                data = response.json()
+                # WebFinger alias points to localhost
+                hostmeta_result = check_hostmeta(domain, http_client)
+                if hostmeta_result:
+                    backend_domain = hostmeta_result["backend_domain"]
+                    return {"backend_domain": backend_domain}
+                else:
+                    return None
+
+            data = response.json()
             aliases = data.get("aliases", [])
             if not aliases:
                 mark_as_non_mastodon(domain)
@@ -1711,10 +1712,10 @@ def process_mastodon_instance(domain, webfinger_data, nodeinfo_data, http_client
             if version.parse(software_version.split("-")[0]) > version.parse(
                 version_main_branch
             ):
-                error_to_print = f'v{software_version.split("-")[0]} (version invalid)'
+                error_to_print = f'Mastodon version invalid'
                 vmc_output(f"{domain}: {error_to_print}", "yellow", use_tqdm=True)
                 log_error(domain, error_to_print)
-                increment_domain_error(domain, "???")
+                increment_domain_error(domain, "###")
                 delete_domain_if_known(domain)
                 return
 
@@ -1957,15 +1958,14 @@ def load_from_database(user_choice):
         "21": "SELECT domain FROM raw_domains WHERE reason ~ '^3[0-9]{2}' ORDER BY errors ASC",
         "22": "SELECT domain FROM raw_domains WHERE reason ~ '^4[0-9]{2}' ORDER BY errors ASC",
         "23": "SELECT domain FROM raw_domains WHERE reason ~ '^5[0-9]{2}' ORDER BY errors ASC",
-        "30": "SELECT domain FROM raw_domains WHERE reason = '###' ORDER BY errors ASC",
-        "31": "SELECT domain FROM raw_domains WHERE reason = 'JSON' ORDER BY errors ASC",
-        "32": "SELECT domain FROM raw_domains WHERE reason = 'TXT' ORDER BY errors ASC",
-        "33": "SELECT domain FROM raw_domains WHERE reason = 'API' ORDER BY errors ASC",
-        "34": "SELECT domain FROM raw_domains WHERE reason = '???' ORDER BY errors ASC",
+        "30": "SELECT domain FROM raw_domains WHERE reason = 'JSON' ORDER BY errors ASC",
+        "31": "SELECT domain FROM raw_domains WHERE reason = 'TXT' ORDER BY errors ASC",
+        "32": "SELECT domain FROM raw_domains WHERE reason = 'API' ORDER BY errors ASC",
         "40": "SELECT domain FROM mastodon_domains WHERE software_version != ALL(%(versions)s::text[]) ORDER BY active_users_monthly DESC",
         "41": "SELECT domain FROM mastodon_domains WHERE software_version LIKE %s ORDER BY active_users_monthly DESC",
         "42": "SELECT domain FROM mastodon_domains WHERE active_users_monthly = '0' ORDER BY active_users_monthly DESC",
         "43": "SELECT domain FROM mastodon_domains ORDER BY active_users_monthly DESC",
+        "44": "SELECT domain FROM raw_domains WHERE reason = '###' ORDER BY errors ASC",
         "50": "SELECT domain FROM raw_domains WHERE errors > %s ORDER BY errors ASC",
         "51": "SELECT domain FROM raw_domains WHERE errors > %s AND errors < %s ORDER BY errors ASC",
     }
@@ -2054,22 +2054,21 @@ def print_menu() -> None:
             "10": "SSL",
             "11": "HTTP",
             "12": "TCP",
-            "13": "Redirects",
+            "13": "MAX",
             "14": "DNS",
         },
         "Retry HTTP errors": {"20": "2xx", "21": "3xx", "22": "4xx", "23": "5xx"},
         "Retry specific errors": {
-            "30": "###",
-            "31": "JSON",
-            "32": "TXT",
-            "33": "API",
-            "34": "???",
+            "30": "JSON",
+            "31": "TXT",
+            "32": "API",
         },
-        "Retry good data": {
+        "Retry known instances": {
             "40": "Unpatched",
             "41": "Main",
             "42": "Inactive",
             "43": "All Good",
+            "44": "Misreporting",
         },
         "Retry general errors": {
             "50": f"Domains w/ >{int(error_buffer*2)} Errors",
