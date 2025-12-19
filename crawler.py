@@ -491,7 +491,7 @@ def log_error(domain, error_to_print):
         )
         conn.commit()
     except Exception as e:
-        vmc_output(f"Failed to log error: {e}", "red")
+        vmc_output(f"{domain}: Failed to log error {e}", "red", use_tqdm=True)
         conn.rollback()
     finally:
         cursor.close()
@@ -526,7 +526,7 @@ def increment_domain_error(domain, error_reason):
         )
         conn.commit()
     except Exception as e:
-        vmc_output(f"Failed to increment domain error: {e}", "red")
+        vmc_output(f"{domain}: Failed to increment domain error {e}", "red", use_tqdm=True)
         conn.rollback()
     finally:
         cursor.close()
@@ -553,7 +553,7 @@ def delete_if_error_max(domain):
                 delete_domain_if_known(domain)
 
     except Exception as e:
-        vmc_output(f"Failed to delete maxed out domain: {e}", "red")
+        vmc_output(f"{domain}: Failed to delete maxed out domain {e}", "red", use_tqdm=True)
         conn.rollback()
     finally:
         cursor.close()
@@ -579,7 +579,7 @@ def clear_domain_error(domain):
         )
         conn.commit()
     except Exception as e:
-        vmc_output(f"{domain}: {e}", "red", use_tqdm=True)
+        vmc_output(f"{domain}: Failed to clear domain errors {e}", "red", use_tqdm=True)
         conn.rollback()
     finally:
         cursor.close()
@@ -711,7 +711,7 @@ def delete_domain_if_known(domain):
         )
         conn.commit()
     except Exception as e:
-        vmc_output(f"Failed to delete known domain: {e}", "red")
+        vmc_output(f"{domain}: Failed to delete known domain {e}", "red", use_tqdm=True)
         conn.rollback()
     finally:
         cursor.close()
@@ -728,7 +728,7 @@ def delete_domain_from_raw(domain):
         )
         conn.commit()
     except Exception as e:
-        vmc_output(f"Failed to delete known domain: {e}", "red")
+        vmc_output(f"{domain}: Failed to delete known domain {e}", "red", use_tqdm=True)
         conn.rollback()
     finally:
         cursor.close()
@@ -1113,7 +1113,7 @@ def check_and_record_domains(
             for future in tqdm(
                 as_completed(futures),
                 total=len(domain_list),
-                desc="vmcrawl",
+                desc=f"{appname}",
                 unit="d",
             ):
                 try:
@@ -1125,11 +1125,11 @@ def check_and_record_domains(
                     if not shutdown_event.is_set():
                         domain = futures[future]
                         vmc_output(
-                            f"{domain}: {e}", "red", use_tqdm=True
+                            f"{domain}: Failed to complete processing {e}", "red", use_tqdm=True
                         )
         except KeyboardInterrupt:
             shutdown_event.set()
-            vmc_output("\nvmcrawl has been manually stopped...", "maroon")
+            vmc_output(f"\n{appname} interrupted by user", "red")
             # Cancel all pending futures
             for future in futures:
                 future.cancel()
@@ -2198,7 +2198,6 @@ def main():
             nightly_version_ranges,
         )
         cleanup_old_domains()
-        vmc_output("Crawling complete!", "pink")
     except KeyboardInterrupt:
         vmc_output(f"\n{appname} interrupted by user", "red")
     finally:
@@ -2208,10 +2207,9 @@ def main():
     if is_running_headless():
         if not (args.file or args.target or args.new or args.buffer):
             try:
-                vmc_output(f"Re-executing {appname}...", "pink")
                 os.execv(sys.executable, ["python3"] + sys.argv)
             except Exception as e:
-                vmc_output(f"Failed to re-execute {appname}: {e}", "red")
+                vmc_output(f"Failed to restart {appname}: {e}", "red")
     else:
         sys.exit(0)
     pass
