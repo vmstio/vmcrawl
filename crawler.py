@@ -579,7 +579,7 @@ def clear_domain_error(domain):
         )
         conn.commit()
     except Exception as e:
-        vmc_output(f"Failed to clear domain error: {e}", "red")
+        vmc_output(f"{domain}: {e}", "red", use_tqdm=True)
         conn.rollback()
     finally:
         cursor.close()
@@ -1125,11 +1125,11 @@ def check_and_record_domains(
                     if not shutdown_event.is_set():
                         domain = futures[future]
                         vmc_output(
-                            f"{domain}: Unexpected error in thread: {e}", "red", use_tqdm=True
+                            f"{domain}: {e}", "red", use_tqdm=True
                         )
         except KeyboardInterrupt:
             shutdown_event.set()
-            print("\nProcess interrupted. Canceling pending tasks...")
+            vmc_output("\nvmcrawl has been manually stopped...", "maroon")
             # Cancel all pending futures
             for future in futures:
                 future.cancel()
@@ -1801,7 +1801,7 @@ def update_mastodon_domain(
         )
         conn.commit()
     except Exception as e:
-        vmc_output(f"Failed to update Mastodon domain data: {e}", "red", use_tqdm=True)
+        vmc_output(f"{actual_domain}: {e}", "red", use_tqdm=True)
         conn.rollback()
     finally:
         cursor.close()
