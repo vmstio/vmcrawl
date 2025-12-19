@@ -1129,7 +1129,7 @@ def check_and_record_domains(
                         )
         except KeyboardInterrupt:
             shutdown_event.set()
-            vmc_output(f"\n{appname} interrupted by user", "red")
+            vmc_output(f"\n{appname} interrupted by user", "maroon")
             # Cancel all pending futures
             for future in futures:
                 future.cancel()
@@ -2087,6 +2087,10 @@ def print_menu() -> None:
 def get_user_choice() -> str:
     return sys.stdin.readline().strip()
 
+def print_line_break():
+    # Get the width of the console
+    width = os.get_terminal_size().columns
+    print('-' * width)
 
 def main():
     parser = argparse.ArgumentParser(
@@ -2135,14 +2139,16 @@ def main():
             if domain_list_file:  # File name provided as argument
                 user_choice = 1
                 domain_list = load_from_file(domain_list_file)
-                vmc_output("Crawling domains from file…", "pink")
+                vmc_output("Crawling domains from file!", "pink")
+                print_line_break()
             elif single_domain_target:  # Single domain provided as argument
                 user_choice = 1
                 domain_list = single_domain_target.replace(" ", "").split(",")
                 vmc_output(
-                    f"Crawling domain{'s' if len(domain_list) > 1 else ''} from target…",
+                    f"Crawling domain{'s' if len(domain_list) > 1 else ''} from target!",
                     "pink",
                 )
+                print_line_break()
             else:  # Load from database by default
                 if args.new:
                     user_choice = "0"
@@ -2155,8 +2161,9 @@ def main():
                     user_choice = get_user_choice()
 
                 vmc_output(
-                    f"Crawling domains from database choice {user_choice}…", "pink"
+                    f"Crawling domains from database choice {user_choice}!", "pink"
                 )
+                print_line_break()
                 domain_list = load_from_database(user_choice)
 
             if user_choice == "2":
@@ -2199,7 +2206,7 @@ def main():
         )
         cleanup_old_domains()
     except KeyboardInterrupt:
-        vmc_output(f"\n{appname} interrupted by user", "red")
+        vmc_output(f"\n{appname} interrupted by user", "maroon")
     finally:
         conn.close()
         http_client.close()
