@@ -21,7 +21,6 @@ try:
     from datetime import datetime, timedelta, timezone
     from urllib.parse import urlparse, urlunparse
     from dotenv import load_dotenv
-    from io import StringIO
     from lxml import etree  # type: ignore
     from packaging import version
     from tqdm import tqdm
@@ -31,15 +30,6 @@ except ImportError as e:
 
 # Detect the current filename
 current_filename = os.path.basename(__file__)
-
-
-# tqdm-aware print function to prevent progress bar disruption
-def tqdm_print(text, color=None):
-    """Print text without disrupting tqdm progress bars."""
-    if color:
-        vmc_output(text, color, use_tqdm=True)
-    else:
-        tqdm.write(text)
 
 
 # Import the dotenv file
@@ -78,7 +68,6 @@ try:
     # Extract project information
     appname = project_info["project"]["name"]
     appversion = project_info["project"]["version"]
-    appdescription = project_info["project"]["description"]
 
 except FileNotFoundError:
     print(f"Error: {toml_file_path} not found.")
@@ -98,7 +87,6 @@ color_pink = "\033[38;5;198m"
 color_purple = "\033[94m"
 color_red = "\033[91m"
 color_yellow = "\033[93m"
-color_gray = "\033[90m"
 
 # Used to easily reference color constants
 colors = {
@@ -113,7 +101,6 @@ colors = {
     "red": f"{color_red}",
     "yellow": f"{color_yellow}",
     "white": f"{color_reset}",
-    "gray": f"{color_gray}",
 }
 
 # HTTP client configuration
@@ -377,34 +364,6 @@ def get_domain_endings():
     return domain_endings
 
 
-def get_iftas_dni():
-    url = "https://connect.iftas.org/wp-content/uploads/2024/04/dni.csv"
-    cache_file_path = get_cache_file_path(url)
-    max_cache_age = 86400  # 1 day in seconds
-
-    if is_cache_valid(cache_file_path, max_cache_age):
-        with open(cache_file_path, "r") as cache_file:
-            iftas_domains = [line.strip().lower() for line in cache_file.readlines()]
-    else:
-        iftas_dns_response = get_with_fallback(url, http_client)
-        if iftas_dns_response.status_code in [200]:
-
-            csv_content = StringIO(iftas_dns_response.text)
-            reader = csv.DictReader(csv_content)
-            iftas_domains = [
-                row["#domain"].strip().lower() for row in reader if "#domain" in row
-            ]
-
-            with open(cache_file_path, "w") as cache_file:
-                cache_file.write("\n".join(iftas_domains))
-        else:
-            raise Exception(
-                f"Failed to fetch IFTAS DNS. HTTP Status Code: {iftas_dns_response.status_code}"
-            )
-
-    return iftas_domains
-
-
 def is_running_headless():
     return not os.isatty(sys.stdout.fileno())
 
@@ -526,7 +485,9 @@ def increment_domain_error(domain, error_reason):
         )
         conn.commit()
     except Exception as e:
-        vmc_output(f"{domain}: Failed to increment domain error {e}", "red", use_tqdm=True)
+        vmc_output(
+            f"{domain}: Failed to increment domain error {e}", "red", use_tqdm=True
+        )
         conn.rollback()
     finally:
         cursor.close()
@@ -553,7 +514,9 @@ def delete_if_error_max(domain):
                 delete_domain_if_known(domain)
 
     except Exception as e:
-        vmc_output(f"{domain}: Failed to delete maxed out domain {e}", "red", use_tqdm=True)
+        vmc_output(
+            f"{domain}: Failed to delete maxed out domain {e}", "red", use_tqdm=True
+        )
         conn.rollback()
     finally:
         cursor.close()
@@ -1058,12 +1021,10 @@ def check_and_record_domains(
     http_client,
     nxdomain_domains,
     norobots_domains,
-    iftas_domains,
-    nightly_version_ranges,
 ):
     # Get max workers from environment or default to 2
     max_workers = int(os.getenv("VMCRAWL_MAX_THREADS", "2"))
-    
+
     # Shutdown event for graceful interruption
     shutdown_event = threading.Event()
 
@@ -1072,7 +1033,7 @@ def check_and_record_domains(
         # Check if shutdown was requested
         if shutdown_event.is_set():
             return
-            
+
         if should_skip_domain(
             domain,
             ignored_domains,
@@ -1086,9 +1047,6 @@ def check_and_record_domains(
 
         if is_junk_or_bad_tld(domain, junk_domains, bad_tlds, domain_endings):
             return
-
-        # if is_iftas_domain(domain, iftas_domains):
-        #     return
 
         try:
             process_domain(domain, http_client)
@@ -1125,7 +1083,9 @@ def check_and_record_domains(
                     if not shutdown_event.is_set():
                         domain = futures[future]
                         vmc_output(
-                            f"{domain}: Failed to complete processing {e}", "red", use_tqdm=True
+                            f"{domain}: Failed to complete processing {e}",
+                            "red",
+                            use_tqdm=True,
                         )
         except KeyboardInterrupt:
             shutdown_event.set()
@@ -1194,15 +1154,6 @@ def is_junk_or_bad_tld(domain, junk_domains, bad_tlds, domain_endings):
         mark_nxdomain_domain(domain)
         delete_domain_if_known(domain)
         delete_domain_from_raw(domain)
-        return True
-    return False
-
-
-def is_iftas_domain(domain, iftas_domains):
-    if any(domain.endswith(f"{dni}") for dni in iftas_domains):
-        vmc_output(f"{domain}: Known IFTAS DNI domain", "magenta", use_tqdm=True)
-        mark_nxdomain_domain(domain)
-        delete_domain_if_known(domain)
         return True
     return False
 
@@ -1451,12 +1402,14 @@ def check_nodeinfo(domain, backend_domain, http_client):
                 return None
             if "text/html" in content_type:
                 # Likely a web page redirect
-                vmc_output(f"{domain}: NodeInfo redirect detected", "magenta", use_tqdm=True)
+                vmc_output(
+                    f"{domain}: NodeInfo redirect detected", "magenta", use_tqdm=True
+                )
                 mark_failed_domain(domain)
                 delete_domain_if_known(domain)
                 return None
             if "json" not in content_type:
-                content_type_clean = content_type.split(';')[0].strip()
+                content_type_clean = content_type.split(";")[0].strip()
                 error_message = f"NodeInfo reply is {content_type_clean}"
                 vmc_output(f"{domain}: {error_message}", "orange", use_tqdm=True)
                 log_error(domain, error_message)
@@ -1514,7 +1467,9 @@ def check_nodeinfo(domain, backend_domain, http_client):
                             "Content-Type", ""
                         )
                         if "json" not in nodeinfo_response_content_type:
-                            content_type_clean = nodeinfo_response_content_type.split(';')[0].strip()
+                            content_type_clean = nodeinfo_response_content_type.split(
+                                ";"
+                            )[0].strip()
                             error_message = f"NodeInfo V2 reply is {content_type_clean}"
                             vmc_output(
                                 f"{domain}: {error_message}", "orange", use_tqdm=True
@@ -1712,7 +1667,7 @@ def process_mastodon_instance(domain, webfinger_data, nodeinfo_data, http_client
             if version.parse(software_version.split("-")[0]) > version.parse(
                 version_main_branch
             ):
-                error_to_print = f'Mastodon version invalid'
+                error_to_print = f"Mastodon version invalid"
                 vmc_output(f"{domain}: {error_to_print}", "yellow", use_tqdm=True)
                 log_error(domain, error_to_print)
                 increment_domain_error(domain, "###")
@@ -1742,13 +1697,13 @@ def process_mastodon_instance(domain, webfinger_data, nodeinfo_data, http_client
                     use_tqdm=True,
                 )
         elif response.status_code in http_codes_to_hardfail:
-                vmc_output(
-                    f"{domain}: HTTP {response.status_code} on API",
-                    "magenta",
-                    use_tqdm=True,
-                )
-                mark_nxdomain_domain(domain)
-                delete_domain_if_known(domain)
+            vmc_output(
+                f"{domain}: HTTP {response.status_code} on API",
+                "magenta",
+                use_tqdm=True,
+            )
+            mark_nxdomain_domain(domain)
+            delete_domain_if_known(domain)
         else:
             error_message = f"HTTP {response.status_code} on API"
             vmc_output(f"{domain}: {error_message}", "orange", use_tqdm=True)
@@ -1935,11 +1890,6 @@ def cleanup_old_domains():
         cursor.close()
 
 
-def read_domain_list(file_path):
-    with open(file_path, "r") as file:
-        return [line.strip() for line in file]
-
-
 def load_from_database(user_choice):
     # PostgreSQL uses SIMILAR TO instead of GLOB, and different timestamp functions
     query_map = {
@@ -1981,9 +1931,9 @@ def load_from_database(user_choice):
         if user_choice in ["1"]:
             params = [error_buffer]
         elif user_choice == "50":
-            params = [int(error_buffer*2)]
+            params = [int(error_buffer * 2)]
         elif user_choice == "51":
-            params = [error_buffer, int(error_buffer*2)]
+            params = [error_buffer, int(error_buffer * 2)]
         elif user_choice == "40":
             params = {"versions": all_patched_versions}
             vmc_output("Excluding versions:", "pink")
@@ -1993,9 +1943,7 @@ def load_from_database(user_choice):
             params = [f"{version_main_branch}%"]
 
     if not query:
-        vmc_output(
-            f"Choice {user_choice} is invalid, using default query", "pink"
-        )
+        vmc_output(f"Choice {user_choice} is invalid, using default query", "pink")
         query = query_map["1"]  # Default query
         params = [error_threshold]
 
@@ -2133,10 +2081,14 @@ def interactive_select_menu(menu_options: dict) -> str | None:
             ch = stdscr.getch()
             if ch in (curses.KEY_UP, ord("k")):
                 current_idx = selectable_indices.index(selected_row_idx)
-                selected_row_idx = selectable_indices[(current_idx - 1) % len(selectable_indices)]
+                selected_row_idx = selectable_indices[
+                    (current_idx - 1) % len(selectable_indices)
+                ]
             elif ch in (curses.KEY_DOWN, ord("j")):
                 current_idx = selectable_indices.index(selected_row_idx)
-                selected_row_idx = selectable_indices[(current_idx + 1) % len(selectable_indices)]
+                selected_row_idx = selectable_indices[
+                    (current_idx + 1) % len(selectable_indices)
+                ]
             elif ch in (curses.KEY_ENTER, 10, 13):
                 return rows[selected_row_idx]["key"]
             elif ch in (ord("q"), 27):
@@ -2151,10 +2103,12 @@ def interactive_select_menu(menu_options: dict) -> str | None:
 def get_user_choice() -> str:
     return sys.stdin.readline().strip()
 
+
 def print_line_break():
     # Get the width of the console
     width = os.get_terminal_size().columns
-    print('=' * width)
+    print("=" * width)
+
 
 def main():
     parser = argparse.ArgumentParser(
@@ -2250,7 +2204,6 @@ def main():
         baddata_domains = get_baddata_domains()
         nxdomain_domains = get_nxdomain_domains()
         norobots_domains = get_norobots_domains()
-        iftas_domains = get_iftas_dni()
         nightly_version_ranges = get_nightly_version_ranges()
 
         check_and_record_domains(
@@ -2265,7 +2218,6 @@ def main():
             http_client,
             nxdomain_domains,
             norobots_domains,
-            iftas_domains,
             nightly_version_ranges,
         )
         cleanup_old_domains()
