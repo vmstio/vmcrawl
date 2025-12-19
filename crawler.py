@@ -1129,7 +1129,7 @@ def check_and_record_domains(
                         )
         except KeyboardInterrupt:
             shutdown_event.set()
-            vmc_output(f"\n{appname} interrupted by user", "maroon")
+            vmc_output(f"\n{appname} interrupted by user", "pink")
             # Cancel all pending futures
             for future in futures:
                 future.cancel()
@@ -1994,7 +1994,7 @@ def load_from_database(user_choice):
 
     if not query:
         vmc_output(
-            f"Choice {user_choice} was not available, using default query", "pink"
+            f"Choice {user_choice} is invalid, using default query", "pink"
         )
         query = query_map["1"]  # Default query
         params = [error_threshold]
@@ -2040,8 +2040,8 @@ def load_from_file(file_name):
     return domain_list
 
 
-def print_menu() -> None:
-    menu_options = {
+def get_menu_options() -> dict:
+    return {
         "Process new domains": {"0": "Recently Fetched"},
         "Change process direction": {"1": "Standard", "2": "Reverse", "3": "Random"},
         "Retry fatal errors": {
@@ -2076,12 +2076,76 @@ def print_menu() -> None:
         },
     }
 
+
+def print_menu(menu_options: dict | None = None) -> None:
+    if menu_options is None:
+        menu_options = get_menu_options()
+
     for category, options in menu_options.items():
         options_str = " ".join(f"({key}) {value}" for key, value in options.items())
         vmc_output(f"{category}: ", "cyan", end="")
         vmc_output(options_str, "")  # Print options without color
     vmc_output("Enter your choice (1, 2, 3, etc):", "bold", end=" ")
     sys.stdout.flush()
+
+
+def interactive_select_menu(menu_options: dict) -> str | None:
+    """TTY-only interactive picker using arrow keys; returns selected key or None to fall back."""
+    # Skip if not in an interactive terminal
+    if is_running_headless():
+        return None
+
+    try:
+        import curses
+    except Exception:
+        return None
+
+    rows = []
+    selectable_indices = []
+    for category, options in menu_options.items():
+        rows.append({"type": "header", "label": category})
+        for key, value in options.items():
+            rows.append({"type": "option", "key": key, "label": f"({key}) {value}"})
+            selectable_indices.append(len(rows) - 1)
+
+    if not selectable_indices:
+        return None
+
+    def _menu(stdscr):
+        curses.curs_set(0)
+        stdscr.nodelay(False)
+        stdscr.keypad(True)
+        selected_row_idx = selectable_indices[0]
+
+        while True:
+            stdscr.erase()
+            stdscr.addstr(0, 0, "Use ↑/↓ or j/k, Enter to select, q to quit")
+            line = 2
+            for i, row in enumerate(rows):
+                if row["type"] == "header":
+                    stdscr.addstr(line, 0, row["label"], curses.A_BOLD)
+                else:
+                    prefix = "> " if i == selected_row_idx else "  "
+                    stdscr.addstr(line, 0, f"{prefix}{row['label']}")
+                line += 1
+            stdscr.refresh()
+
+            ch = stdscr.getch()
+            if ch in (curses.KEY_UP, ord("k")):
+                current_idx = selectable_indices.index(selected_row_idx)
+                selected_row_idx = selectable_indices[(current_idx - 1) % len(selectable_indices)]
+            elif ch in (curses.KEY_DOWN, ord("j")):
+                current_idx = selectable_indices.index(selected_row_idx)
+                selected_row_idx = selectable_indices[(current_idx + 1) % len(selectable_indices)]
+            elif ch in (curses.KEY_ENTER, 10, 13):
+                return rows[selected_row_idx]["key"]
+            elif ch in (ord("q"), 27):
+                return None
+
+    try:
+        return curses.wrapper(_menu)
+    except Exception:
+        return None
 
 
 def get_user_choice() -> str:
@@ -2130,8 +2194,6 @@ def main():
     vmc_output(f"{appname} v{appversion} ({current_filename})", "bold")
     if is_running_headless():
         vmc_output("Running in headless mode", "pink")
-    else:
-        vmc_output("Running in interactive mode", "pink")
     try:
         domain_list_file = args.file if args.file is not None else None
         single_domain_target = args.target if args.target is not None else None
@@ -2139,16 +2201,14 @@ def main():
             if domain_list_file:  # File name provided as argument
                 user_choice = 1
                 domain_list = load_from_file(domain_list_file)
-                vmc_output("Crawling domains from file!", "pink")
-                print_line_break()
+                vmc_output("Crawling domains from provided file", "cyan")
             elif single_domain_target:  # Single domain provided as argument
                 user_choice = 1
                 domain_list = single_domain_target.replace(" ", "").split(",")
                 vmc_output(
-                    f"Crawling domain{'s' if len(domain_list) > 1 else ''} from target!",
-                    "pink",
+                    f"Crawling domain{'s' if len(domain_list) > 1 else ''} from target argument",
+                    "cyan",
                 )
-                print_line_break()
             else:  # Load from database by default
                 if args.new:
                     user_choice = "0"
@@ -2157,13 +2217,17 @@ def main():
                 elif is_running_headless():
                     user_choice = "3"  # Default to random crawl in headless mode
                 else:
-                    print_menu()
-                    user_choice = get_user_choice()
+                    menu_options = get_menu_options()
+                    selection = interactive_select_menu(menu_options)
+                    if selection is None:
+                        print_menu(menu_options)
+                        user_choice = get_user_choice()
+                    else:
+                        user_choice = selection
 
                 vmc_output(
-                    f"Crawling domains from database choice {user_choice}!", "pink"
+                    f"Crawling domains from database choice {user_choice}", "cyan"
                 )
-                print_line_break()
                 domain_list = load_from_database(user_choice)
 
             if user_choice == "2":
@@ -2206,7 +2270,7 @@ def main():
         )
         cleanup_old_domains()
     except KeyboardInterrupt:
-        vmc_output(f"\n{appname} interrupted by user", "maroon")
+        vmc_output(f"\n{appname} interrupted by user", "pink")
     finally:
         conn.close()
         http_client.close()
