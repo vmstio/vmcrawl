@@ -59,48 +59,57 @@ Selecting `0` from the interactive menu will begin to process all of your fetche
 
 You can customize the crawling process with the following options:
 
+Process new domains:
+
+- `0` Recently Fetched
+
 Change process direction:
+
 - `1` Standard Alphabetical List
 - `2` Reverse Alphabetical List
-- `3` Random Order (this is the only option for headless runs)
-
-Retry general errors:
-- `4` Error Counts ≥8
-- `5` Error Counts ≤7
+- `3` Random Order (this is the default option for headless runs)
 
 Retry fatal errors:
-- `6` Not Mastodon
-- `7` Failed
-- `8` NXDOMAIN
-- `9` NoRobots
+
+- `6` Other Platforms (non-Mastodon instances)
+- `7` Rejected (HTTP 410/418 errors)
+- `8` Failed (NXDOMAIN/emoji domains)
+- `9` Crawling Prohibited (robots.txt blocks)
 
 Retry connection errors:
-- `10` SSL
-- `11` HTTP
-- `12` TIMEOUT
+
+- `10` SSL (certificate errors)
+- `11` HTTP (general HTTP errors)
+- `12` TCP (timeouts, connection issues)
+- `13` MAX (maximum redirects exceeded)
+- `14` DNS (name resolution failures)
 
 Retry HTTP errors:
-- `20` 2xx
-- `21` 3xx
-- `22` 4xx
-- `23` 5xx
+
+- `20` 2xx status codes
+- `21` 3xx status codes
+- `22` 4xx status codes
+- `23` 5xx status codes
 
 Retry specific errors:
-- `30` Invalid User Counts (###)
-- `31` JSON
-- `32` TXT
-- `33` XML
 
-Retry good data:
-- `40` Refresh Outdated Instances
-- `41` Refresh Instances Running Main
-- `42` Refresh Inactive Instances (0 Active Users)
-- `43` Refresh All Known Good Instances
+- `30` JSON parsing errors
+- `31` TXT/plain text response errors
+- `32` API errors
+
+Retry known instances:
+
+- `40` Unpatched (instances not running latest patches)
+- `41` Main (instances on development/main branch)
+- `42` Development (instances running alpha, beta, or rc versions)
+- `43` Inactive (0 active monthly users)
+- `44` All Good (all known instances)
+- `45` Misreporting (instances with invalid version data)
 
 Retry general errors:
-- `50` Domains with more than 14 Errors
-- `51` Domains with less than 7 Errors
-- `52` Domains with between 7 and 14 Errors
+
+- `50` Domains with >14 Errors
+- `51` Domains with 7-14 Errors
 
 ### Headless Crawling
 
