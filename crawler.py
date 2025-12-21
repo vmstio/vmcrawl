@@ -1399,21 +1399,15 @@ def check_nodeinfo(domain, backend_domain, http_client):
                 mark_as_non_mastodon(domain)
                 delete_domain_if_known(domain)
                 return None
-            if "text/html" in content_type:
-                # Likely a web page redirect
+            if "json" not in content_type:
+                content_type_clean = content_type.split(";")[0].strip()
+                if content_type_clean == "":
+                    content_type_clean = "type missing"
                 vmc_output(
-                    f"{domain}: NodeInfo redirect detected", "magenta", use_tqdm=True
+                    f"{domain}: NodeInfo is {content_type_clean}", "magenta", use_tqdm=True
                 )
                 mark_failed_domain(domain)
                 delete_domain_if_known(domain)
-                return None
-            if "json" not in content_type:
-                content_type_clean = content_type.split(";")[0].strip()
-                error_message = f"NodeInfo reply is {content_type_clean}"
-                vmc_output(f"{domain}: {error_message}", "orange", use_tqdm=True)
-                log_error(domain, error_message)
-                increment_domain_error(domain, "JSON")
-                delete_if_error_max(domain)
                 return None
             if not response.content:
                 error_message = "NodeInfo reply is empty"
@@ -1427,7 +1421,7 @@ def check_nodeinfo(domain, backend_domain, http_client):
                     data = response.json()
                 except json.JSONDecodeError as e:
                     error_message = f"{e}"
-                    vmc_output(f"{domain}: {error_message}", "orange", use_tqdm=True)
+                    vmc_output(f"{domain}: nodeinfo {error_message}", "orange", use_tqdm=True)
                     log_error(domain, error_message)
                     increment_domain_error(domain, "JSON")
                     delete_if_error_max(domain)
@@ -1469,13 +1463,15 @@ def check_nodeinfo(domain, backend_domain, http_client):
                             content_type_clean = nodeinfo_response_content_type.split(
                                 ";"
                             )[0].strip()
-                            error_message = f"NodeInfo V2 reply is {content_type_clean}"
+                            if content_type_clean == "":
+                                content_type_clean = "type missing"
                             vmc_output(
-                                f"{domain}: {error_message}", "orange", use_tqdm=True
+                                f"{domain}: NodeInfo V2 is {content_type_clean}",
+                                "magenta",
+                                use_tqdm=True,
                             )
-                            log_error(domain, error_message)
-                            increment_domain_error(domain, "JSON")
-                            delete_if_error_max(domain)
+                            mark_failed_domain(domain)
+                            delete_domain_if_known(domain)
                             return None
                         if not nodeinfo_response.content:
                             error_message = "NodeInfo V2 reply empty"
@@ -1487,7 +1483,20 @@ def check_nodeinfo(domain, backend_domain, http_client):
                             delete_if_error_max(domain)
                             return None
                         else:
-                            return nodeinfo_response.json()
+                            try:
+                                nodeinfo_data = nodeinfo_response.json()
+                            except json.JSONDecodeError as e:
+                                error_message = f"{e}"
+                                vmc_output(
+                                    f"{domain}: NodeInfo V2 {error_message}",
+                                    "orange",
+                                    use_tqdm=True,
+                                )
+                                log_error(domain, error_message)
+                                increment_domain_error(domain, "JSON")
+                                delete_if_error_max(domain)
+                                return None
+                            return nodeinfo_data
                     elif nodeinfo_response.status_code in http_codes_to_hardfail:
                         vmc_output(
                             f"HTTP {response.status_code} on NodeInfo",

@@ -22,7 +22,7 @@ pip install .
 
 You will then need an `.env` file in the `vmcrawl` folder with your custom values set:
 
-```
+```bash
 VMCRAWL_POSTGRES_DATA="dbname"
 VMCRAWL_POSTGRES_USER="username"
 VMCRAWL_POSTGRES_PASS="password"
