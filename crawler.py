@@ -1178,7 +1178,9 @@ def process_domain(domain, http_client, nightly_version_ranges):
         return
 
     if is_mastodon_instance(nodeinfo_data):
-        process_mastodon_instance(domain, webfinger_data, nodeinfo_data, http_client, nightly_version_ranges)
+        process_mastodon_instance(
+            domain, webfinger_data, nodeinfo_data, http_client, nightly_version_ranges
+        )
     else:
         mark_as_non_mastodon(domain)
 
@@ -1402,9 +1404,11 @@ def check_nodeinfo(domain, backend_domain, http_client):
             if "json" not in content_type:
                 content_type_clean = content_type.split(";")[0].strip()
                 if content_type_clean == "":
-                    content_type_clean = "type missing"
+                    content_type_clean = "missing type"
                 vmc_output(
-                    f"{domain}: NodeInfo is {content_type_clean}", "magenta", use_tqdm=True
+                    f"{domain}: NodeInfo is {content_type_clean}",
+                    "magenta",
+                    use_tqdm=True,
                 )
                 mark_failed_domain(domain)
                 delete_domain_if_known(domain)
@@ -1421,7 +1425,9 @@ def check_nodeinfo(domain, backend_domain, http_client):
                     data = wkni_response.json()
                 except json.JSONDecodeError as e:
                     error_message = f"{e}"
-                    vmc_output(f"{domain}: nodeinfo {error_message}", "orange", use_tqdm=True)
+                    vmc_output(
+                        f"{domain}: nodeinfo {error_message}", "orange", use_tqdm=True
+                    )
                     log_error(domain, error_message)
                     increment_domain_error(domain, "JSON")
                     delete_if_error_max(domain)
@@ -1454,70 +1460,7 @@ def check_nodeinfo(domain, backend_domain, http_client):
                             nodeinfo_20_url = next_obj["href"]
 
                 if nodeinfo_20_url and "wp-json" not in nodeinfo_20_url:
-                    nodeinfo_20_response = get_with_fallback(nodeinfo_20_url, http_client)
-                    if nodeinfo_20_response.status_code in [200]:
-                        nodeinfo_20_response_content_type = nodeinfo_20_response.headers.get(
-                            "Content-Type", ""
-                        )
-                        if "json" not in nodeinfo_20_response_content_type:
-                            content_type_clean = nodeinfo_20_response_content_type.split(
-                                ";"
-                            )[0].strip()
-                            if content_type_clean == "":
-                                content_type_clean = "type missing"
-                            vmc_output(
-                                f"{domain}: NodeInfo 2.0 is {content_type_clean}",
-                                "magenta",
-                                use_tqdm=True,
-                            )
-                            mark_failed_domain(domain)
-                            delete_domain_if_known(domain)
-                            return None
-                        if not nodeinfo_20_response.content:
-                            error_message = "NodeInfo 2.0 reply empty"
-                            vmc_output(
-                                f"{domain}: {error_message}", "orange", use_tqdm=True
-                            )
-                            log_error(domain, error_message)
-                            increment_domain_error(domain, "JSON")
-                            delete_if_error_max(domain)
-                            return None
-                        else:
-                            try:
-                                nodeinfo_20_data = nodeinfo_20_response.json()
-                            except json.JSONDecodeError as e:
-                                error_message = f"{e}"
-                                vmc_output(
-                                    f"{domain}: NodeInfo 2.0 {error_message}",
-                                    "orange",
-                                    use_tqdm=True,
-                                )
-                                log_error(domain, error_message)
-                                increment_domain_error(domain, "JSON")
-                                delete_if_error_max(domain)
-                                return None
-                            return nodeinfo_20_data
-                    elif nodeinfo_20_response.status_code in http_codes_to_hardfail:
-                        vmc_output(
-                            f"HTTP {nodeinfo_20_response.status_code} on NodeInfo",
-                            "magenta",
-                            use_tqdm=True,
-                        )
-                        mark_nxdomain_domain(domain)
-                        delete_domain_if_known(domain)
-                        return False
-                    else:
-                        error_message = (
-                            f"HTTP {nodeinfo_20_response.status_code} on NodeInfo"
-                        )
-                        vmc_output(
-                            f"{domain}: {error_message}", "yellow", use_tqdm=True
-                        )
-                        log_error(domain, f"{error_message}")
-                        increment_domain_error(
-                            domain, str(nodeinfo_20_response.status_code)
-                        )
-                        delete_if_error_max(domain)
+                    return check_nodeinfo_20(domain, nodeinfo_20_url, http_client)
                 else:
                     mark_as_non_mastodon(domain)
             else:
@@ -1543,6 +1486,69 @@ def check_nodeinfo(domain, backend_domain, http_client):
     return None
 
 
+def check_nodeinfo_20(domain, nodeinfo_20_url, http_client):
+    try:
+        """Check NodeInfo 2.0 endpoint and return nodeinfo_20_data or None."""
+        nodeinfo_20_response = get_with_fallback(nodeinfo_20_url, http_client)
+        if nodeinfo_20_response.status_code in [200]:
+            nodeinfo_20_response_content_type = nodeinfo_20_response.headers.get(
+                "Content-Type", ""
+            )
+            if "json" not in nodeinfo_20_response_content_type:
+                content_type_clean = nodeinfo_20_response_content_type.split(";")[0].strip()
+                if content_type_clean == "":
+                    content_type_clean = "missing type"
+                vmc_output(
+                    f"{domain}: NodeInfo 2.0 is {content_type_clean}",
+                    "magenta",
+                    use_tqdm=True,
+                )
+                mark_failed_domain(domain)
+                delete_domain_if_known(domain)
+                return None
+            if not nodeinfo_20_response.content:
+                error_message = "NodeInfo 2.0 reply empty"
+                vmc_output(f"{domain}: {error_message}", "orange", use_tqdm=True)
+                log_error(domain, error_message)
+                increment_domain_error(domain, "JSON")
+                delete_if_error_max(domain)
+                return None
+            else:
+                try:
+                    nodeinfo_20_data = nodeinfo_20_response.json()
+                except json.JSONDecodeError as e:
+                    error_message = f"{e}"
+                    vmc_output(
+                        f"{domain}: NodeInfo 2.0 {error_message}",
+                        "orange",
+                        use_tqdm=True,
+                    )
+                    log_error(domain, error_message)
+                    increment_domain_error(domain, "JSON")
+                    delete_if_error_max(domain)
+                    return None
+                return nodeinfo_20_data
+        elif nodeinfo_20_response.status_code in http_codes_to_hardfail:
+            vmc_output(
+                f"HTTP {nodeinfo_20_response.status_code} on NodeInfo",
+                "magenta",
+                use_tqdm=True,
+            )
+            mark_nxdomain_domain(domain)
+            delete_domain_if_known(domain)
+            return False
+        else:
+            error_message = f"HTTP {nodeinfo_20_response.status_code} on NodeInfo"
+            vmc_output(f"{domain}: {error_message}", "yellow", use_tqdm=True)
+            log_error(domain, f"{error_message}")
+            increment_domain_error(domain, str(nodeinfo_20_response.status_code))
+            delete_if_error_max(domain)
+    except httpx.RequestError as e:
+        handle_http_exception(domain, e)
+    except json.JSONDecodeError as e:
+        handle_json_exception(domain, e)
+    return None
+
 def is_mastodon_instance(nodeinfo_data: dict) -> bool:
     """Check if the given NodeInfo response indicates a Mastodon instance."""
     if not isinstance(nodeinfo_data, dict):
@@ -1559,10 +1565,14 @@ def is_mastodon_instance(nodeinfo_data: dict) -> bool:
     return software_name.lower() in {"mastodon", "hometown", "kmyblue", "glitchcafe"}
 
 
-def process_mastodon_instance(domain, webfinger_data, nodeinfo_data, http_client, nightly_version_ranges):
+def process_mastodon_instance(
+    domain, webfinger_data, nodeinfo_data, http_client, nightly_version_ranges
+):
     software_name = nodeinfo_data["software"]["name"].lower()
     software_version_full = nodeinfo_data["software"]["version"]
-    software_version = clean_version(nodeinfo_data["software"]["version"], nightly_version_ranges)
+    software_version = clean_version(
+        nodeinfo_data["software"]["version"], nightly_version_ranges
+    )
 
     if "usage" not in nodeinfo_data or "users" not in nodeinfo_data["usage"]:
         error_to_print = f"No usage data in NodeInfo"
