@@ -1391,9 +1391,9 @@ def check_hostmeta(domain, http_client):
 def check_nodeinfo(domain, backend_domain, http_client):
     url = f"https://{backend_domain}/.well-known/nodeinfo"
     try:
-        response = get_with_fallback(url, http_client)
-        if response.status_code in [200]:
-            content_type = response.headers.get("Content-Type", "")
+        wkni_response = get_with_fallback(url, http_client)
+        if wkni_response.status_code in [200]:
+            content_type = wkni_response.headers.get("Content-Type", "")
             if "text/plain" in content_type:
                 # This is likey Wafrn
                 mark_as_non_mastodon(domain)
@@ -1409,7 +1409,7 @@ def check_nodeinfo(domain, backend_domain, http_client):
                 mark_failed_domain(domain)
                 delete_domain_if_known(domain)
                 return None
-            if not response.content:
+            if not wkni_response.content:
                 error_message = "NodeInfo reply is empty"
                 vmc_output(f"{domain}: {error_message}", "orange", use_tqdm=True)
                 log_error(domain, error_message)
@@ -1418,7 +1418,7 @@ def check_nodeinfo(domain, backend_domain, http_client):
                 return None
             else:
                 try:
-                    data = response.json()
+                    data = wkni_response.json()
                 except json.JSONDecodeError as e:
                     error_message = f"{e}"
                     vmc_output(f"{domain}: nodeinfo {error_message}", "orange", use_tqdm=True)
@@ -1427,7 +1427,7 @@ def check_nodeinfo(domain, backend_domain, http_client):
                     delete_if_error_max(domain)
                     return None
             if "links" in data and len(data["links"]) > 0:
-                nodeinfo_2_url = next(
+                nodeinfo_20_url = next(
                     (
                         link["href"]
                         for link in data["links"]
@@ -1437,7 +1437,7 @@ def check_nodeinfo(domain, backend_domain, http_client):
                     ),
                     None,
                 )
-                if not nodeinfo_2_url:
+                if not nodeinfo_20_url:
                     rel_index = next(
                         (
                             i
@@ -1451,30 +1451,30 @@ def check_nodeinfo(domain, backend_domain, http_client):
                     if rel_index is not None and rel_index + 1 < len(data["links"]):
                         next_obj = data["links"][rel_index + 1]
                         if "href" in next_obj and "rel" not in next_obj:
-                            nodeinfo_2_url = next_obj["href"]
+                            nodeinfo_20_url = next_obj["href"]
 
-                if nodeinfo_2_url and "wp-json" not in nodeinfo_2_url:
-                    nodeinfo_response = get_with_fallback(nodeinfo_2_url, http_client)
-                    if nodeinfo_response.status_code in [200]:
-                        nodeinfo_response_content_type = nodeinfo_response.headers.get(
+                if nodeinfo_20_url and "wp-json" not in nodeinfo_20_url:
+                    nodeinfo_20_response = get_with_fallback(nodeinfo_20_url, http_client)
+                    if nodeinfo_20_response.status_code in [200]:
+                        nodeinfo_20_response_content_type = nodeinfo_20_response.headers.get(
                             "Content-Type", ""
                         )
-                        if "json" not in nodeinfo_response_content_type:
-                            content_type_clean = nodeinfo_response_content_type.split(
+                        if "json" not in nodeinfo_20_response_content_type:
+                            content_type_clean = nodeinfo_20_response_content_type.split(
                                 ";"
                             )[0].strip()
                             if content_type_clean == "":
                                 content_type_clean = "type missing"
                             vmc_output(
-                                f"{domain}: NodeInfo V2 is {content_type_clean}",
+                                f"{domain}: NodeInfo 2.0 is {content_type_clean}",
                                 "magenta",
                                 use_tqdm=True,
                             )
                             mark_failed_domain(domain)
                             delete_domain_if_known(domain)
                             return None
-                        if not nodeinfo_response.content:
-                            error_message = "NodeInfo V2 reply empty"
+                        if not nodeinfo_20_response.content:
+                            error_message = "NodeInfo 2.0 reply empty"
                             vmc_output(
                                 f"{domain}: {error_message}", "orange", use_tqdm=True
                             )
@@ -1484,11 +1484,11 @@ def check_nodeinfo(domain, backend_domain, http_client):
                             return None
                         else:
                             try:
-                                nodeinfo_data = nodeinfo_response.json()
+                                nodeinfo_20_data = nodeinfo_20_response.json()
                             except json.JSONDecodeError as e:
                                 error_message = f"{e}"
                                 vmc_output(
-                                    f"{domain}: NodeInfo V2 {error_message}",
+                                    f"{domain}: NodeInfo 2.0 {error_message}",
                                     "orange",
                                     use_tqdm=True,
                                 )
@@ -1496,10 +1496,10 @@ def check_nodeinfo(domain, backend_domain, http_client):
                                 increment_domain_error(domain, "JSON")
                                 delete_if_error_max(domain)
                                 return None
-                            return nodeinfo_data
-                    elif nodeinfo_response.status_code in http_codes_to_hardfail:
+                            return nodeinfo_20_data
+                    elif nodeinfo_20_response.status_code in http_codes_to_hardfail:
                         vmc_output(
-                            f"HTTP {response.status_code} on NodeInfo",
+                            f"HTTP {nodeinfo_20_response.status_code} on NodeInfo",
                             "magenta",
                             use_tqdm=True,
                         )
@@ -1508,33 +1508,33 @@ def check_nodeinfo(domain, backend_domain, http_client):
                         return False
                     else:
                         error_message = (
-                            f"HTTP {nodeinfo_response.status_code} on NodeInfo"
+                            f"HTTP {nodeinfo_20_response.status_code} on NodeInfo"
                         )
                         vmc_output(
                             f"{domain}: {error_message}", "yellow", use_tqdm=True
                         )
                         log_error(domain, f"{error_message}")
                         increment_domain_error(
-                            domain, str(nodeinfo_response.status_code)
+                            domain, str(nodeinfo_20_response.status_code)
                         )
                         delete_if_error_max(domain)
                 else:
                     mark_as_non_mastodon(domain)
             else:
                 mark_as_non_mastodon(domain)
-        elif response.status_code in http_codes_to_hardfail:
+        elif wkni_response.status_code in http_codes_to_hardfail:
             vmc_output(
-                f"{domain}: HTTP {response.status_code} on NodeInfo",
+                f"{domain}: HTTP {wkni_response.status_code} on NodeInfo",
                 "magenta",
                 use_tqdm=True,
             )
             mark_nxdomain_domain(domain)
             delete_domain_if_known(domain)
         else:
-            error_message = f"HTTP {response.status_code} on NodeInfo"
+            error_message = f"HTTP {wkni_response.status_code} on NodeInfo"
             vmc_output(f"{domain}: {error_message}", "yellow", use_tqdm=True)
             log_error(domain, f"{error_message}")
-            increment_domain_error(domain, str(response.status_code))
+            increment_domain_error(domain, str(wkni_response.status_code))
             delete_if_error_max(domain)
     except httpx.RequestError as e:
         handle_http_exception(domain, e)
