@@ -135,6 +135,7 @@ INSERT INTO
 VALUES
   ('activitypub-proxy.cf', 'ActivityPub abuse'),
   ('activitypub-troll.cf', 'ActivityPub abuse'),
+  ('chloe.cat', 'Temporary hosting platform'),
   ('cf-ipfs.com', 'Cloudflare tunnel service'),
   ('devtunnels.ms', 'Tunnel/proxy service'),
   ('elestio.app', 'Temporary hosting platform'),
