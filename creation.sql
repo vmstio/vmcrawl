@@ -143,6 +143,7 @@ VALUES
   ('gitpod.io', 'Temporary hosting platform'),
   ('ghost.io', 'Hosted blogging platform'),
   ('herokuapp.com', 'Temporary hosting platform'),
+  ('karebu.gay', 'Temporary hosting platform'),
   ('lhr.life', 'Tunnel/proxy service'),
   ('lhrtunnel.link', 'Tunnel/proxy service'),
   ('ngrok-free.app', 'ngrok tunnel service'),
