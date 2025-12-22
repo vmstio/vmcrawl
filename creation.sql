@@ -149,6 +149,7 @@ VALUES
   ('ngrok.app', 'Tunnel/proxy service'),
   ('ngrok.dev', 'Tunnel/proxy service'),
   ('ngrok.io', 'Tunnel/proxy service'),
+  ('pikapod.net', 'Temporary hosting platform'),
   ('serveo.net', 'Tunnel/proxy service'),
   ('wordpress.com', 'Hosted blogging platform');
 
