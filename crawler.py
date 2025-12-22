@@ -1088,7 +1088,7 @@ def check_and_record_domains(
                         )
         except KeyboardInterrupt:
             shutdown_event.set()
-            vmc_output(f"\n{appname} interrupted by user", "pink")
+            vmc_output(f"\n{appname} interrupted by user", "red")
             # Cancel all pending futures
             for future in futures:
                 future.cancel()
@@ -1899,7 +1899,7 @@ def cleanup_old_domains():
         deleted_domains = [row[0] for row in cursor.fetchall()]
         if deleted_domains:
             for d in deleted_domains:
-                vmc_output(f"{d}: Removed from known domains", "pink")
+                vmc_output(f"{d}: Removed from known domains", "pink", use_tqdm=True)
         conn.commit()
     except Exception as e:
         vmc_output(f"Failed to clean up old domains: {e}", "red")
@@ -2226,6 +2226,9 @@ def main():
         norobots_domains = get_norobots_domains()
         nightly_version_ranges = get_nightly_version_ranges()
 
+        # Cleanup domains older than 1 week
+        cleanup_old_domains()
+
         check_and_record_domains(
             domain_list,
             ignored_domains,
@@ -2240,9 +2243,9 @@ def main():
             norobots_domains,
             nightly_version_ranges,
         )
-        cleanup_old_domains()
+
     except KeyboardInterrupt:
-        vmc_output(f"\n{appname} interrupted by user", "pink")
+        vmc_output(f"\n{appname} interrupted by user", "red")
     finally:
         conn.close()
         http_client.close()
