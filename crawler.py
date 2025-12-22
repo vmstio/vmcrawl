@@ -2013,8 +2013,8 @@ def get_menu_options() -> dict:
         "Change process direction": {"1": "Standard", "2": "Reverse", "3": "Random"},
         "Retry fatal errors": {
             "6": "Other Platforms",
-            "7": "Rejected",
-            "8": "Failed",
+            "7": "Wrong File Type",
+            "8": "Hard Failed (410/418)",
             "9": "Crawling Prohibited",
         },
         "Retry connection errors": {
