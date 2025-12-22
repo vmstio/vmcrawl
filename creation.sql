@@ -151,7 +151,8 @@ VALUES
   ('ngrok.io', 'Tunnel/proxy service'),
   ('pikapod.net', 'Temporary hosting platform'),
   ('serveo.net', 'Tunnel/proxy service'),
-  ('wordpress.com', 'Hosted blogging platform');
+  ('wordpress.com', 'Hosted blogging platform'),
+  ('.vivaldi.net', 'Hosted blogging platform');
 
 INSERT INTO
   nightly_versions (version, start_date, end_date)
