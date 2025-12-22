@@ -133,21 +133,20 @@ VALUES
 INSERT INTO
   junk_words (keywords, comments)
 VALUES
-  ('activitypub-proxy.cf', NULL),
-  ('activitypub-troll.cf', NULL),
-  ('cf-ipfs.com', NULL),
-  ('elestio.app', NULL),
-  ('github.dev', NULL),
-  ('gitpod.io', NULL),
-  ('herokuapp.com', NULL),
-  ('lhr.life', NULL),
-  ('lhrtunnel.link', NULL),
-  ('ngrok-free.app', NULL),
-  ('ngrok.app', NULL),
-  ('ngrok.dev', NULL),
-  ('ngrok.io', NULL),
-  ('nope.rodeo', NULL),
-  ('serveo.net', NULL);
+  ('activitypub-proxy.cf', 'ActivityPub abuse'),
+  ('activitypub-troll.cf', 'ActivityPub abuse'),
+  ('cf-ipfs.com', 'Cloudflare tunnel service'),
+  ('elestio.app', 'Temporary hosting platform'),
+  ('github.dev', 'Temporary hosting platform'),
+  ('gitpod.io', 'Temporary hosting platform'),
+  ('herokuapp.com', 'Temporary hosting platform'),
+  ('lhr.life', 'Tunnel/proxy service'),
+  ('lhrtunnel.link', 'Tunnel/proxy service'),
+  ('ngrok-free.app', 'ngrok tunnel service'),
+  ('ngrok.app', 'Tunnel/proxy service'),
+  ('ngrok.dev', 'Tunnel/proxy service'),
+  ('ngrok.io', 'Tunnel/proxy service'),
+  ('serveo.net', 'Temporary tunnel service');
 
 INSERT INTO
   nightly_versions (version, start_date, end_date)
