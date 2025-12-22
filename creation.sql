@@ -140,6 +140,7 @@ VALUES
   ('elestio.app', 'Temporary hosting platform'),
   ('github.dev', 'Temporary hosting platform'),
   ('gitpod.io', 'Temporary hosting platform'),
+  ('ghost.io', 'Hosted blogging platform'),
   ('herokuapp.com', 'Temporary hosting platform'),
   ('lhr.life', 'Tunnel/proxy service'),
   ('lhrtunnel.link', 'Tunnel/proxy service'),
