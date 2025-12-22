@@ -136,6 +136,7 @@ VALUES
   ('activitypub-proxy.cf', 'ActivityPub abuse'),
   ('activitypub-troll.cf', 'ActivityPub abuse'),
   ('cf-ipfs.com', 'Cloudflare tunnel service'),
+  ('devtunnels.ms', 'Tunnel/proxy service'),
   ('elestio.app', 'Temporary hosting platform'),
   ('github.dev', 'Temporary hosting platform'),
   ('gitpod.io', 'Temporary hosting platform'),
@@ -146,7 +147,8 @@ VALUES
   ('ngrok.app', 'Tunnel/proxy service'),
   ('ngrok.dev', 'Tunnel/proxy service'),
   ('ngrok.io', 'Tunnel/proxy service'),
-  ('serveo.net', 'Tunnel/proxy service');
+  ('serveo.net', 'Tunnel/proxy service'),
+  ('wordpress.com', 'Hosted blogging platform');
 
 INSERT INTO
   nightly_versions (version, start_date, end_date)
