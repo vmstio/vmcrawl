@@ -146,7 +146,7 @@ VALUES
   ('ngrok.app', 'Tunnel/proxy service'),
   ('ngrok.dev', 'Tunnel/proxy service'),
   ('ngrok.io', 'Tunnel/proxy service'),
-  ('serveo.net', 'Temporary tunnel service');
+  ('serveo.net', 'Tunnel/proxy service');
 
 INSERT INTO
   nightly_versions (version, start_date, end_date)
