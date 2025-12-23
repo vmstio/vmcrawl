@@ -24,8 +24,8 @@ try:
     from lxml import etree  # type: ignore
     from packaging import version
     from tqdm import tqdm
-except ImportError as e:
-    print(f"Error importing module: {e}")
+except ImportError as exception:
+    print(f"Error importing module: {exception}")
     sys.exit(1)
 
 # Detect the current filename
@@ -35,8 +35,8 @@ current_filename = os.path.basename(__file__)
 # Import the dotenv file
 try:
     load_dotenv()
-except Exception as e:
-    print(f"Error loading .env file: {e}")
+except Exception as exception:
+    print(f"Error loading .env file: {exception}")
     sys.exit(1)
 
 # PostgreSQL connection parameters
@@ -52,8 +52,8 @@ conn_string = f"postgresql://{db_user}:{db_password}@{db_host}:{db_port}/{db_nam
 try:
     conn = psycopg.connect(conn_string)
     # print("Connected to PostgreSQL database successfully.")
-except psycopg.Error as e:
-    print(f"Error connecting to PostgreSQL database: {e}")
+except psycopg.Error as exception:
+    print(f"Error connecting to PostgreSQL database: {exception}")
     sys.exit(1)
 
 # Define maintained branches (adjust as needed)
@@ -73,8 +73,8 @@ except FileNotFoundError:
     print(f"Error: {toml_file_path} not found.")
 except toml.TomlDecodeError:
     print(f"Error: {toml_file_path} is not a valid TOML file.")
-except KeyError as e:
-    print(f"Error: Missing expected key in TOML file: {e}")
+except KeyError as exception:
+    print(f"Error: Missing expected key in TOML file: {exception}")
 
 # Add your color constants here
 color_bold = "\033[1m"
@@ -120,8 +120,8 @@ http_codes_to_hardfail = [451, 418, 410]
 def get_with_fallback(url, http_client):
     try:
         return http_client.get(url)
-    except httpx.RequestError as e:
-        error_str = str(e).casefold()
+    except httpx.RequestError as exception:
+        error_str = str(exception).casefold()
 
         # Check for HTTP/2 specific issues
         http2_error_indicators = ["connectionterminated"]
@@ -137,7 +137,7 @@ def get_with_fallback(url, http_client):
             return fallback_client.get(url)
         else:
             # If it's not an HTTP/2 issue, just raise the error
-            raise e
+            raise exception
 
 
 def get_cache_file_path(url: str) -> str:
@@ -174,8 +174,8 @@ def read_main_version_info(url):
                     value = lines[i + 1].strip()
                     if value.isnumeric() or re.match(r"'[^']+'", value):
                         version_info[key] = value.replace("'", "")
-    except httpx.HTTPError as e:
-        vmc_output(f"Failed to retrieve Mastodon main version: {e}", "red")
+    except httpx.HTTPError as exception:
+        vmc_output(f"Failed to retrieve Mastodon main version: {exception}", "red")
         return None
 
     return version_info
@@ -197,8 +197,8 @@ def get_highest_mastodon_version():
                     release_version
                 ) > version.parse(highest_version):
                     highest_version = release_version
-    except httpx.HTTPError as e:
-        vmc_output(f"Failed to retrieve Mastodon release version: {e}", "red")
+    except httpx.HTTPError as exception:
+        vmc_output(f"Failed to retrieve Mastodon release version: {exception}", "red")
         return None
 
     return highest_version
@@ -449,8 +449,8 @@ def log_error(domain, error_to_print):
             (domain, error_to_print),
         )
         conn.commit()
-    except Exception as e:
-        vmc_output(f"{domain}: Failed to log error {e}", "red", use_tqdm=True)
+    except Exception as exception:
+        vmc_output(f"{domain}: Failed to log error {exception}", "red", use_tqdm=True)
         conn.rollback()
     finally:
         cursor.close()
@@ -484,9 +484,9 @@ def increment_domain_error(domain, error_reason):
             (domain, None, None, new_errors, error_reason, None, None),
         )
         conn.commit()
-    except Exception as e:
+    except Exception as exception:
         vmc_output(
-            f"{domain}: Failed to increment domain error {e}", "red", use_tqdm=True
+            f"{domain}: Failed to increment domain error {exception}", "red", use_tqdm=True
         )
         conn.rollback()
     finally:
@@ -513,9 +513,9 @@ def delete_if_error_max(domain):
             ):
                 delete_domain_if_known(domain)
 
-    except Exception as e:
+    except Exception as exception:
         vmc_output(
-            f"{domain}: Failed to delete maxed out domain {e}", "red", use_tqdm=True
+            f"{domain}: Failed to delete maxed out domain {exception}", "red", use_tqdm=True
         )
         conn.rollback()
     finally:
@@ -541,8 +541,8 @@ def clear_domain_error(domain):
             (domain, None, None, None, None, None, None),
         )
         conn.commit()
-    except Exception as e:
-        vmc_output(f"{domain}: Failed to clear domain errors {e}", "red", use_tqdm=True)
+    except Exception as exception:
+        vmc_output(f"{domain}: Failed to clear domain errors {exception}", "red", use_tqdm=True)
         conn.rollback()
     finally:
         cursor.close()
@@ -567,8 +567,8 @@ def mark_ignore_domain(domain):
             (domain, None, True, None, None, None, None),
         )
         conn.commit()
-    except Exception as e:
-        vmc_output(f"Failed to mark domain ignored: {e}", "red")
+    except Exception as exception:
+        vmc_output(f"Failed to mark domain ignored: {exception}", "red")
         conn.rollback()
     finally:
         cursor.close()
@@ -593,8 +593,8 @@ def mark_failed_domain(domain):
             (domain, True, None, None, None, None, None),
         )
         conn.commit()
-    except Exception as e:
-        vmc_output(f"Failed to mark domain failed: {e}", "red")
+    except Exception as exception:
+        vmc_output(f"Failed to mark domain failed: {exception}", "red")
         conn.rollback()
     finally:
         cursor.close()
@@ -619,8 +619,8 @@ def mark_nxdomain_domain(domain):
             (domain, None, None, None, None, True, None),
         )
         conn.commit()
-    except Exception as e:
-        vmc_output(f"Failed to mark domain NXDOMAIN: {e}", "red")
+    except Exception as exception:
+        vmc_output(f"Failed to mark domain NXDOMAIN: {exception}", "red")
         conn.rollback()
     finally:
         cursor.close()
@@ -645,8 +645,8 @@ def mark_norobots_domain(domain):
             (domain, None, None, None, None, None, True),
         )
         conn.commit()
-    except Exception as e:
-        vmc_output(f"Failed to mark domain NoRobots: {e}", "red")
+    except Exception as exception:
+        vmc_output(f"Failed to mark domain NoRobots: {exception}", "red")
         conn.rollback()
     finally:
         cursor.close()
@@ -673,8 +673,8 @@ def delete_domain_if_known(domain):
             (domain,),
         )
         conn.commit()
-    except Exception as e:
-        vmc_output(f"{domain}: Failed to delete known domain {e}", "red", use_tqdm=True)
+    except Exception as exception:
+        vmc_output(f"{domain}: Failed to delete known domain {exception}", "red", use_tqdm=True)
         conn.rollback()
     finally:
         cursor.close()
@@ -690,8 +690,8 @@ def delete_domain_from_raw(domain):
             (domain,),
         )
         conn.commit()
-    except Exception as e:
-        vmc_output(f"{domain}: Failed to delete known domain {e}", "red", use_tqdm=True)
+    except Exception as exception:
+        vmc_output(f"{domain}: Failed to delete known domain {exception}", "red", use_tqdm=True)
         conn.rollback()
     finally:
         cursor.close()
@@ -905,8 +905,8 @@ def get_junk_keywords():
         junk_domains = [row[0] for row in cursor.fetchall()]
         conn.commit()
         return junk_domains
-    except Exception as e:
-        vmc_output(f"Failed to obtain junk keywords: {e}", "red")
+    except Exception as exception:
+        vmc_output(f"Failed to obtain junk keywords: {exception}", "red")
         conn.rollback()
     finally:
 
@@ -921,8 +921,8 @@ def get_bad_tld():
         bad_tlds = [row[0] for row in cursor.fetchall()]
         conn.commit()
         return bad_tlds
-    except Exception as e:
-        vmc_output(f"Failed to obtain bad TLDs: {e}", "red")
+    except Exception as exception:
+        vmc_output(f"Failed to obtain bad TLDs: {exception}", "red")
         conn.rollback()
     finally:
         cursor.close()
@@ -935,8 +935,8 @@ def get_failed_domains():
         cursor.execute("SELECT domain FROM raw_domains WHERE failed = TRUE")
         failed_domains = [row[0].strip() for row in cursor.fetchall() if row[0].strip()]
         conn.commit()
-    except Exception as e:
-        vmc_output(f"Failed to obtain failed domains: {e}", "red")
+    except Exception as exception:
+        vmc_output(f"Failed to obtain failed domains: {exception}", "red")
         conn.rollback()
     finally:
         cursor.close()
@@ -951,8 +951,8 @@ def get_ignored_domains():
             row[0].strip() for row in cursor.fetchall() if row[0].strip()
         ]
         conn.commit()
-    except Exception as e:
-        vmc_output(f"Failed to obtain ignored domains: {e}", "red")
+    except Exception as exception:
+        vmc_output(f"Failed to obtain ignored domains: {exception}", "red")
         conn.rollback()
     finally:
         cursor.close()
@@ -967,8 +967,8 @@ def get_baddata_domains():
             row[0].strip() for row in cursor.fetchall() if row[0].strip()
         ]
         conn.commit()
-    except Exception as e:
-        vmc_output(f"Failed to obtain baddata domains: {e}", "red")
+    except Exception as exception:
+        vmc_output(f"Failed to obtain baddata domains: {exception}", "red")
         conn.rollback()
     finally:
         cursor.close()
@@ -983,8 +983,8 @@ def get_nxdomain_domains():
             row[0].strip() for row in cursor.fetchall() if row[0].strip()
         ]
         conn.commit()
-    except Exception as e:
-        vmc_output(f"Failed to obtain NXDOMAIN domains: {e}", "red")
+    except Exception as exception:
+        vmc_output(f"Failed to obtain NXDOMAIN domains: {exception}", "red")
         conn.rollback()
     finally:
         cursor.close()
@@ -999,8 +999,8 @@ def get_norobots_domains():
             row[0].strip() for row in cursor.fetchall() if row[0].strip()
         ]
         conn.commit()
-    except Exception as e:
-        vmc_output(f"Failed to obtain NoRobots domains: {e}", "red")
+    except Exception as exception:
+        vmc_output(f"Failed to obtain NoRobots domains: {exception}", "red")
         conn.rollback()
     finally:
         cursor.close()
@@ -1052,9 +1052,9 @@ def check_and_record_domains(
         except httpx.CloseError:
             # Suppress errors from closed HTTP client during shutdown
             pass
-        except Exception as e:
+        except Exception as exception:
             if not shutdown_event.is_set():
-                handle_http_exception(domain, e)
+                handle_http_exception(domain, exception)
 
     # Use ThreadPoolExecutor for concurrent processing
     executor = ThreadPoolExecutor(max_workers=max_workers)
@@ -1078,11 +1078,11 @@ def check_and_record_domains(
                 except httpx.CloseError:
                     # Suppress errors from closed HTTP client during shutdown
                     pass
-                except Exception as e:
+                except Exception as exception:
                     if not shutdown_event.is_set():
                         domain = futures[future]
                         vmc_output(
-                            f"{domain}: Failed to complete processing {e}",
+                            f"{domain}: Failed to complete processing {exception}",
                             "red",
                             use_tqdm=True,
                         )
@@ -1230,8 +1230,8 @@ def check_robots_txt(domain, http_client):
             mark_nxdomain_domain(domain)
             delete_domain_if_known(domain)
             return False
-    except httpx.RequestError as e:
-        handle_http_exception(domain, e)
+    except httpx.RequestError as exception:
+        handle_http_exception(domain, exception)
         return False
     return True
 
@@ -1321,10 +1321,10 @@ def check_webfinger(domain, http_client):
             log_error(domain, error_message)
             increment_domain_error(domain, str(response.status_code))
             delete_if_error_max(domain)
-    except httpx.RequestError as e:
-        handle_http_exception(domain, e)
-    except json.JSONDecodeError as e:
-        handle_json_exception(domain, e)
+    except httpx.RequestError as exception:
+        handle_http_exception(domain, exception)
+    except json.JSONDecodeError as exception:
+        handle_json_exception(domain, exception)
     return None
 
 
@@ -1349,7 +1349,7 @@ def check_hostmeta(domain, http_client):
                 parser = etree.XMLParser(recover=True)
                 try:
                     xmldata = etree.fromstring(content, parser=parser)
-                except etree.XMLSyntaxError as e:
+                except etree.XMLSyntaxError as exception:
                     # XML syntax error while parsing HostMeta
                     return {"backend_domain": domain}
                 ns = {"xrd": "http://docs.oasis-open.org/ns/xri/xrd-1.0"}  # Namespace
@@ -1386,8 +1386,8 @@ def check_hostmeta(domain, http_client):
             log_error(domain, f"{error_message}")
             increment_domain_error(domain, str(response.status_code))
             delete_if_error_max(domain)
-    except httpx.RequestError as e:
-        handle_http_exception(domain, e)
+    except httpx.RequestError as exception:
+        handle_http_exception(domain, exception)
 
 
 def check_nodeinfo(domain, backend_domain, http_client):
@@ -1423,8 +1423,8 @@ def check_nodeinfo(domain, backend_domain, http_client):
             else:
                 try:
                     data = wkni_response.json()
-                except json.JSONDecodeError as e:
-                    error_message = f"{e}"
+                except json.JSONDecodeError as exception:
+                    error_message = f"{exception}"
                     vmc_output(
                         f"{domain}: nodeinfo {error_message}", "orange", use_tqdm=True
                     )
@@ -1479,10 +1479,10 @@ def check_nodeinfo(domain, backend_domain, http_client):
             log_error(domain, f"{error_message}")
             increment_domain_error(domain, str(wkni_response.status_code))
             delete_if_error_max(domain)
-    except httpx.RequestError as e:
-        handle_http_exception(domain, e)
-    except json.JSONDecodeError as e:
-        handle_json_exception(domain, e)
+    except httpx.RequestError as exception:
+        handle_http_exception(domain, exception)
+    except json.JSONDecodeError as exception:
+        handle_json_exception(domain, exception)
     return None
 
 
@@ -1516,8 +1516,8 @@ def check_nodeinfo_20(domain, nodeinfo_20_url, http_client):
             else:
                 try:
                     nodeinfo_20_data = nodeinfo_20_response.json()
-                except json.JSONDecodeError as e:
-                    error_message = f"{e}"
+                except json.JSONDecodeError as exception:
+                    error_message = f"{exception}"
                     vmc_output(
                         f"{domain}: NodeInfo 2.0 {error_message}",
                         "orange",
@@ -1543,10 +1543,10 @@ def check_nodeinfo_20(domain, nodeinfo_20_url, http_client):
             log_error(domain, f"{error_message}")
             increment_domain_error(domain, str(nodeinfo_20_response.status_code))
             delete_if_error_max(domain)
-    except httpx.RequestError as e:
-        handle_http_exception(domain, e)
-    except json.JSONDecodeError as e:
-        handle_json_exception(domain, e)
+    except httpx.RequestError as exception:
+        handle_http_exception(domain, exception)
+    except json.JSONDecodeError as exception:
+        handle_json_exception(domain, exception)
     return None
 
 def is_mastodon_instance(nodeinfo_data: dict) -> bool:
@@ -1729,10 +1729,10 @@ def process_mastodon_instance(
             increment_domain_error(domain, f"{response.status_code}")
             delete_if_error_max(domain)
 
-    except httpx.RequestError as e:
-        handle_http_exception(domain, e)
-    except json.JSONDecodeError as e:
-        handle_json_exception(domain, e)
+    except httpx.RequestError as exception:
+        handle_http_exception(domain, exception)
+    except json.JSONDecodeError as exception:
+        handle_json_exception(domain, exception)
 
 
 def update_mastodon_domain(
@@ -1773,8 +1773,8 @@ def update_mastodon_domain(
             ),
         )
         conn.commit()
-    except Exception as e:
-        vmc_output(f"{actual_domain}: {e}", "red", use_tqdm=True)
+    except Exception as exceptionxception:
+        vmc_output(f"{actual_domain}: {exception}", "red", use_tqdm=True)
         conn.rollback()
     finally:
         cursor.close()
@@ -1901,8 +1901,8 @@ def cleanup_old_domains():
             for d in deleted_domains:
                 vmc_output(f"{d}: Removed from known domains", "pink", use_tqdm=True)
         conn.commit()
-    except Exception as e:
-        vmc_output(f"Failed to clean up old domains: {e}", "red")
+    except Exception as exceptionxception:
+        vmc_output(f"Failed to clean up old domains: {exception}", "red")
         conn.rollback()
     finally:
         cursor.close()
@@ -1971,8 +1971,8 @@ def load_from_database(user_choice):
         cursor.execute(query, params if params else None)  # type: ignore
         domain_list = [row[0].strip() for row in cursor.fetchall() if row[0].strip()]
         conn.commit()
-    except Exception as e:
-        vmc_output(f"Failed to obtain selected domain list: {e}", "red")
+    except Exception as exceptionxception:
+        vmc_output(f"Failed to obtain selected domain list: {exception}", "red")
         conn.rollback()
         domain_list = []
     finally:
@@ -2012,10 +2012,10 @@ def get_menu_options() -> dict:
         "Process new domains": {"0": "Recently Fetched"},
         "Change process direction": {"1": "Standard", "2": "Reverse", "3": "Random"},
         "Retry fatal errors": {
-            "6": "Other Platforms",
-            "7": "Wrong File Type",
-            "8": "Hard Failed (410/418)",
-            "9": "Crawling Prohibited",
+            "6": "Other Platforms", #ignore
+            "7": "Wrong File Type", #failed
+            "8": "Hard Failed (410/418)", #nxdomain
+            "9": "Crawling Prohibited", #norobots
         },
         "Retry connection errors": {
             "10": "SSL",
@@ -2212,8 +2212,8 @@ def main():
         except FileNotFoundError:
             vmc_output(f"File not found: {domain_list_file}", "red")
             sys.exit(1)
-        except psycopg.Error as e:
-            vmc_output(f"Database error: {e}", "red")
+        except psycopg.Error as exceptionxception:
+            vmc_output(f"Database error: {exception}", "red")
             sys.exit(1)
 
         junk_domains = get_junk_keywords()
@@ -2254,8 +2254,8 @@ def main():
         if not (args.file or args.target or args.new or args.buffer):
             try:
                 os.execv(sys.executable, ["python3"] + sys.argv)
-            except Exception as e:
-                vmc_output(f"Failed to restart {appname}: {e}", "red")
+            except Exception as exceptionxception:
+                vmc_output(f"Failed to restart {appname}: {exception}", "red")
     else:
         sys.exit(0)
     pass
