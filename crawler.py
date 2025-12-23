@@ -1168,12 +1168,18 @@ def process_domain(domain, http_client, nightly_version_ranges):
         return  # Stop processing this domain
 
     webfinger_data = check_webfinger(domain, http_client)
-    if not webfinger_data:
+    if webfinger_data is False:
         return
+    if not webfinger_data:
+        hostmeta_result = check_hostmeta(domain, http_client)
+        if not hostmeta_result:
+            return
+        backend_domain = hostmeta_result["backend_domain"]
+        webfinger_data = {"backend_domain": backend_domain}
+    else:
+        backend_domain = webfinger_data["backend_domain"]
 
-    nodeinfo_data = check_nodeinfo(
-        domain, webfinger_data["backend_domain"], http_client
-    )
+    nodeinfo_data = check_nodeinfo(domain, backend_domain, http_client)
     if not nodeinfo_data:
         return
 
@@ -1246,36 +1252,16 @@ def check_webfinger(domain, http_client):
         if response.status_code in [200]:
             if "json" not in content_type:
                 # WebFinger reply is not JSON
-                hostmeta_result = check_hostmeta(domain, http_client)
-                if hostmeta_result:
-                    backend_domain = hostmeta_result["backend_domain"]
-                    return {"backend_domain": backend_domain}
-                else:
-                    return None
+                return None
             if not response.content or content_length == "0":
                 # WebFinger reply is empty
-                hostmeta_result = check_hostmeta(domain, http_client)
-                if hostmeta_result:
-                    backend_domain = hostmeta_result["backend_domain"]
-                    return {"backend_domain": backend_domain}
-                else:
-                    return None
+                return None
             if "aliases" not in response.content.decode("utf-8"):
                 # WebFinger reply is invalid
-                hostmeta_result = check_hostmeta(domain, http_client)
-                if hostmeta_result:
-                    backend_domain = hostmeta_result["backend_domain"]
-                    return {"backend_domain": backend_domain}
-                else:
-                    return None
+                return None
             if "localhost" in response.content.decode("utf-8"):
                 # WebFinger alias points to localhost
-                hostmeta_result = check_hostmeta(domain, http_client)
-                if hostmeta_result:
-                    backend_domain = hostmeta_result["backend_domain"]
-                    return {"backend_domain": backend_domain}
-                else:
-                    return None
+                return None
 
             data = response.json()
             aliases = data.get("aliases", [])
@@ -1289,12 +1275,7 @@ def check_webfinger(domain, http_client):
                 # Check for specific HTTP status codes
             else:
                 # WebFinger reply has no valid alias
-                hostmeta_result = check_hostmeta(domain, http_client)
-                if hostmeta_result:
-                    backend_domain = hostmeta_result["backend_domain"]
-                    return {"backend_domain": backend_domain}
-                else:
-                    return None
+                return None
         elif response.status_code in http_codes_to_hardfail:
             vmc_output(
                 f"{domain}: HTTP {response.status_code} on WebFinger",
@@ -1310,12 +1291,7 @@ def check_webfinger(domain, http_client):
                 return None
             else:
                 # WebFinger didn't reply
-                hostmeta_result = check_hostmeta(domain, http_client)
-                if hostmeta_result:
-                    backend_domain = hostmeta_result["backend_domain"]
-                    return {"backend_domain": backend_domain}
-                else:
-                    return None
+                return None
         else:
             error_message = f"HTTP {response.status_code} on WebFinger"
             vmc_output(f"{domain}: {error_message}", "yellow", use_tqdm=True)
