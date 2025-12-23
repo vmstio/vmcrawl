@@ -486,7 +486,9 @@ def increment_domain_error(domain, error_reason):
         conn.commit()
     except Exception as exception:
         vmc_output(
-            f"{domain}: Failed to increment domain error {exception}", "red", use_tqdm=True
+            f"{domain}: Failed to increment domain error {exception}",
+            "red",
+            use_tqdm=True,
         )
         conn.rollback()
     finally:
@@ -515,7 +517,9 @@ def delete_if_error_max(domain):
 
     except Exception as exception:
         vmc_output(
-            f"{domain}: Failed to delete maxed out domain {exception}", "red", use_tqdm=True
+            f"{domain}: Failed to delete maxed out domain {exception}",
+            "red",
+            use_tqdm=True,
         )
         conn.rollback()
     finally:
@@ -542,7 +546,9 @@ def clear_domain_error(domain):
         )
         conn.commit()
     except Exception as exception:
-        vmc_output(f"{domain}: Failed to clear domain errors {exception}", "red", use_tqdm=True)
+        vmc_output(
+            f"{domain}: Failed to clear domain errors {exception}", "red", use_tqdm=True
+        )
         conn.rollback()
     finally:
         cursor.close()
@@ -674,7 +680,9 @@ def delete_domain_if_known(domain):
         )
         conn.commit()
     except Exception as exception:
-        vmc_output(f"{domain}: Failed to delete known domain {exception}", "red", use_tqdm=True)
+        vmc_output(
+            f"{domain}: Failed to delete known domain {exception}", "red", use_tqdm=True
+        )
         conn.rollback()
     finally:
         cursor.close()
@@ -691,7 +699,9 @@ def delete_domain_from_raw(domain):
         )
         conn.commit()
     except Exception as exception:
-        vmc_output(f"{domain}: Failed to delete known domain {exception}", "red", use_tqdm=True)
+        vmc_output(
+            f"{domain}: Failed to delete known domain {exception}", "red", use_tqdm=True
+        )
         conn.rollback()
     finally:
         cursor.close()
@@ -1437,9 +1447,7 @@ def check_nodeinfo_20(domain, nodeinfo_20_url, http_client):
         """Check NodeInfo 2.0 endpoint and return nodeinfo_20_data or None."""
         response = get_with_fallback(nodeinfo_20_url, http_client)
         if response.status_code in [200]:
-            response_content_type = response.headers.get(
-                "Content-Type", ""
-            )
+            response_content_type = response.headers.get("Content-Type", "")
             if "json" not in response_content_type:
                 content_type_clean = response_content_type.split(";")[0].strip()
                 if content_type_clean == "":
@@ -1474,6 +1482,7 @@ def check_nodeinfo_20(domain, nodeinfo_20_url, http_client):
     except json.JSONDecodeError as exception:
         handle_json_exception(domain, target, exception)
     return None
+
 
 def is_mastodon_instance(nodeinfo_data: dict) -> bool:
     """Check if the given NodeInfo response indicates a Mastodon instance."""
@@ -1528,9 +1537,9 @@ def process_mastodon_instance(
         return
 
     if software_version.startswith("4"):
-        instance_api_url = f'https://{backend_domain}/api/v2/instance'
+        instance_api_url = f"https://{backend_domain}/api/v2/instance"
     else:
-        instance_api_url = f'https://{backend_domain}/api/v1/instance'
+        instance_api_url = f"https://{backend_domain}/api/v1/instance"
 
     try:
         target = "instance_api"
@@ -1712,11 +1721,13 @@ def handle_http_status_code(domain, target, code):
     increment_domain_error(domain, error_reason)
     delete_if_error_max(domain)
 
+
 def handle_http_nxdomain(domain, target, code):
     error_message = f"HTTP {code} on {target}"
     vmc_output(f"{domain}: {error_message}", "magenta", use_tqdm=True)
     mark_nxdomain_domain(domain)
     delete_domain_if_known(domain)
+
 
 def handle_tcp_exception(domain, exception):
     error_message = str(exception)
@@ -1944,10 +1955,10 @@ def get_menu_options() -> dict:
         "Process new domains": {"0": "Recently Fetched"},
         "Change process direction": {"1": "Standard", "2": "Reverse", "3": "Random"},
         "Retry fatal errors": {
-            "6": "Other Platforms", #ignore
-            "7": "Wrong File Type", #failed
-            "8": "Hard Failed (410/418)", #nxdomain
-            "9": "Crawling Prohibited", #norobots
+            "6": "Other Platforms",  # ignore
+            "7": "Wrong File Type",  # failed
+            "8": "Hard Failed (410/418)",  # nxdomain
+            "9": "Crawling Prohibited",  # norobots
         },
         "Retry connection errors": {
             "10": "SSL",
