@@ -1054,7 +1054,7 @@ def check_and_record_domains(
             pass
         except Exception as exception:
             if not shutdown_event.is_set():
-                handle_http_exception(domain, exception)
+                handle_tcp_exception(domain, exception)
 
     # Use ThreadPoolExecutor for concurrent processing
     executor = ThreadPoolExecutor(max_workers=max_workers)
@@ -1244,7 +1244,7 @@ def check_robots_txt(domain, http_client):
             delete_domain_if_known(domain)
             return False
     except httpx.RequestError as exception:
-        handle_http_exception(domain, exception)
+        handle_tcp_exception(domain, exception)
         return False
     return True
 
@@ -1306,7 +1306,7 @@ def check_webfinger(domain, http_client):
             increment_domain_error(domain, str(response.status_code))
             delete_if_error_max(domain)
     except httpx.RequestError as exception:
-        handle_http_exception(domain, exception)
+        handle_tcp_exception(domain, exception)
     except json.JSONDecodeError as exception:
         handle_json_exception(domain, target, exception)
     return None
@@ -1372,7 +1372,7 @@ def check_hostmeta(domain, http_client):
             increment_domain_error(domain, str(response.status_code))
             delete_if_error_max(domain)
     except httpx.RequestError as exception:
-        handle_http_exception(domain, exception)
+        handle_tcp_exception(domain, exception)
 
 
 def check_nodeinfo(domain, backend_domain, http_client):
@@ -1458,7 +1458,7 @@ def check_nodeinfo(domain, backend_domain, http_client):
             increment_domain_error(domain, str(wkni_response.status_code))
             delete_if_error_max(domain)
     except httpx.RequestError as exception:
-        handle_http_exception(domain, exception)
+        handle_tcp_exception(domain, exception)
     except json.JSONDecodeError as exception:
         handle_json_exception(domain, target, exception)
     return None
@@ -1513,7 +1513,7 @@ def check_nodeinfo_20(domain, nodeinfo_20_url, http_client):
             increment_domain_error(domain, str(nodeinfo_20_response.status_code))
             delete_if_error_max(domain)
     except httpx.RequestError as exception:
-        handle_http_exception(domain, exception)
+        handle_tcp_exception(domain, exception)
     except json.JSONDecodeError as exception:
         handle_json_exception(domain, target, exception)
     return None
@@ -1700,7 +1700,7 @@ def process_mastodon_instance(
             delete_if_error_max(domain)
 
     except httpx.RequestError as exception:
-        handle_http_exception(domain, exception)
+        handle_tcp_exception(domain, exception)
     except json.JSONDecodeError as exception:
         handle_json_exception(domain, target, exception)
 
@@ -1756,7 +1756,7 @@ def mark_as_non_mastodon(domain):
     delete_domain_if_known(domain)
 
 
-def handle_http_exception(domain, exception):
+def handle_tcp_exception(domain, exception):
     error_message = str(exception)
     if "_ssl.c" in error_message.casefold():
         error_reason = "SSL"
