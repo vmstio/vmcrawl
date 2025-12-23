@@ -1671,8 +1671,9 @@ def mark_as_non_mastodon(domain):
 
 
 def handle_incorrect_file_type(domain, target, content_type):
-    error_message = f"{target} is {content_type}"
-    vmc_output(f"{domain}: {error_message}", "orange", use_tqdm=True)
+    clean_content_type = re.sub(r";.*$", "", content_type).strip()
+    error_message = f"{target} is {clean_content_type}"
+    vmc_output(f"{domain}: {error_message}", "magenta", use_tqdm=True)
     mark_failed_domain(domain)
     delete_domain_if_known(domain)
 
