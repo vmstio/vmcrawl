@@ -1330,6 +1330,7 @@ def check_webfinger(domain, http_client):
 
 
 def check_hostmeta(domain, http_client):
+    target = "hostmeta"
     url = f"https://{domain}/.well-known/host-meta"
     try:
         response = get_with_fallback(url, http_client)
