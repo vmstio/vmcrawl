@@ -1674,7 +1674,7 @@ def mark_as_non_mastodon(domain):
 
 
 def handle_incorrect_file_type(domain, target, content_type):
-    if content_type == "":
+    if content_type == "" or content_type is None:
         clean_content_type = "missing Content-Type"
     clean_content_type = re.sub(r";.*$", "", content_type).strip()
     error_message = f"{target} is {clean_content_type}"
