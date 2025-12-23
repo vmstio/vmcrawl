@@ -1414,23 +1414,14 @@ def check_nodeinfo(domain, backend_domain, http_client):
                 delete_domain_if_known(domain)
                 return None
             if not wkni_response.content:
-                error_message = "NodeInfo reply is empty"
-                vmc_output(f"{domain}: {error_message}", "orange", use_tqdm=True)
-                log_error(domain, error_message)
-                increment_domain_error(domain, "JSON")
-                delete_if_error_max(domain)
+                exception = "NodeInfo reply is empty"
+                handle_json_exception(domain, exception)
                 return None
             else:
                 try:
                     data = wkni_response.json()
                 except json.JSONDecodeError as exception:
-                    error_message = f"{exception}"
-                    vmc_output(
-                        f"{domain}: nodeinfo {error_message}", "orange", use_tqdm=True
-                    )
-                    log_error(domain, error_message)
-                    increment_domain_error(domain, "JSON")
-                    delete_if_error_max(domain)
+                    handle_json_exception(domain, exception)
                     return None
             if "links" in data and len(data["links"]) > 0:
                 nodeinfo_20_url = next(
@@ -1507,25 +1498,14 @@ def check_nodeinfo_20(domain, nodeinfo_20_url, http_client):
                 delete_domain_if_known(domain)
                 return None
             if not nodeinfo_20_response.content:
-                error_message = "NodeInfo 2.0 reply empty"
-                vmc_output(f"{domain}: {error_message}", "orange", use_tqdm=True)
-                log_error(domain, error_message)
-                increment_domain_error(domain, "JSON")
-                delete_if_error_max(domain)
+                exception = "NodeInfo 2.0 reply empty"
+                handle_json_exception(domain, exception)
                 return None
             else:
                 try:
                     nodeinfo_20_data = nodeinfo_20_response.json()
                 except json.JSONDecodeError as exception:
-                    error_message = f"{exception}"
-                    vmc_output(
-                        f"{domain}: NodeInfo 2.0 {error_message}",
-                        "orange",
-                        use_tqdm=True,
-                    )
-                    log_error(domain, error_message)
-                    increment_domain_error(domain, "JSON")
-                    delete_if_error_max(domain)
+                    handle_json_exception(domain, exception)
                     return None
                 return nodeinfo_20_data
         elif nodeinfo_20_response.status_code in http_codes_to_hardfail:
