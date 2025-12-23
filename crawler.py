@@ -1199,6 +1199,7 @@ def process_domain(domain, http_client, nightly_version_ranges):
 
 
 def check_robots_txt(domain, http_client):
+    target = "robots.txt"
     url = f"https://{domain}/robots.txt"
     try:
         response = get_with_fallback(url, http_client)
@@ -1235,13 +1236,7 @@ def check_robots_txt(domain, http_client):
                         return False
         # Check for specific HTTP status codes
         elif response.status_code in http_codes_to_hardfail:
-            vmc_output(
-                f"{domain}: HTTP {response.status_code} on robots.txt",
-                "magenta",
-                use_tqdm=True,
-            )
-            mark_nxdomain_domain(domain)
-            delete_domain_if_known(domain)
+            handle_http_nxdomain(domain, target, response.status_code)
             return False
     except httpx.RequestError as exception:
         handle_tcp_exception(domain, exception)
@@ -1284,13 +1279,7 @@ def check_webfinger(domain, http_client):
                 # WebFinger reply has no valid alias
                 return None
         elif response.status_code in http_codes_to_hardfail:
-            vmc_output(
-                f"{domain}: HTTP {response.status_code} on WebFinger",
-                "magenta",
-                use_tqdm=True,
-            )
-            mark_nxdomain_domain(domain)
-            delete_domain_if_known(domain)
+            handle_http_nxdomain(domain, target, response.status_code)
             return False
         elif response.status_code in http_codes_to_softfail:
             if "json" in content_type:
@@ -1300,11 +1289,7 @@ def check_webfinger(domain, http_client):
                 # WebFinger didn't reply
                 return None
         else:
-            error_message = f"HTTP {response.status_code} on WebFinger"
-            vmc_output(f"{domain}: {error_message}", "yellow", use_tqdm=True)
-            log_error(domain, error_message)
-            increment_domain_error(domain, str(response.status_code))
-            delete_if_error_max(domain)
+            handle_http_status_code(domain, target, response.status_code)
     except httpx.RequestError as exception:
         handle_tcp_exception(domain, exception)
     except json.JSONDecodeError as exception:
@@ -1354,23 +1339,13 @@ def check_hostmeta(domain, http_client):
                     backend_domain = parsed_link.netloc
                     return {"backend_domain": backend_domain}
         elif response.status_code in http_codes_to_hardfail:
-            vmc_output(
-                f"{domain}: HTTP {response.status_code} on HostMeta",
-                "magenta",
-                use_tqdm=True,
-            )
-            mark_nxdomain_domain(domain)
-            delete_domain_if_known(domain)
+            handle_http_nxdomain(domain, target, response.status_code)
             return False
         elif response.status_code in http_codes_to_softfail:
             # HostMeta didn't reply
             return {"backend_domain": domain}
         else:
-            error_message = f"HTTP {response.status_code} on HostMeta"
-            vmc_output(f"{domain}: {error_message}", "yellow", use_tqdm=True)
-            log_error(domain, f"{error_message}")
-            increment_domain_error(domain, str(response.status_code))
-            delete_if_error_max(domain)
+            handle_http_status_code(domain, target, response.status_code)
     except httpx.RequestError as exception:
         handle_tcp_exception(domain, exception)
 
@@ -1379,9 +1354,9 @@ def check_nodeinfo(domain, backend_domain, http_client):
     target = "nodeinfo"
     url = f"https://{backend_domain}/.well-known/nodeinfo"
     try:
-        wkni_response = get_with_fallback(url, http_client)
-        if wkni_response.status_code in [200]:
-            content_type = wkni_response.headers.get("Content-Type", "")
+        response = get_with_fallback(url, http_client)
+        if response.status_code in [200]:
+            content_type = response.headers.get("Content-Type", "")
             if "text/plain" in content_type:
                 # This is likey Wafrn
                 mark_as_non_mastodon(domain)
@@ -1399,13 +1374,13 @@ def check_nodeinfo(domain, backend_domain, http_client):
                 mark_failed_domain(domain)
                 delete_domain_if_known(domain)
                 return None
-            if not wkni_response.content:
+            if not response.content:
                 exception = "reply is empty"
                 handle_json_exception(domain, target, exception)
                 return None
             else:
                 try:
-                    data = wkni_response.json()
+                    data = response.json()
                 except json.JSONDecodeError as exception:
                     handle_json_exception(domain, target, exception)
                     return None
@@ -1442,21 +1417,11 @@ def check_nodeinfo(domain, backend_domain, http_client):
                     mark_as_non_mastodon(domain)
             else:
                 mark_as_non_mastodon(domain)
-        elif wkni_response.status_code in http_codes_to_hardfail:
-            vmc_output(
-                f"{domain}: HTTP {wkni_response.status_code} on NodeInfo",
-                "magenta",
-                use_tqdm=True,
-            )
-            mark_nxdomain_domain(domain)
-            delete_domain_if_known(domain)
+        elif response.status_code in http_codes_to_hardfail:
+            handle_http_nxdomain(domain, target, response.status_code)
             return False
         else:
-            error_message = f"HTTP {wkni_response.status_code} on NodeInfo"
-            vmc_output(f"{domain}: {error_message}", "yellow", use_tqdm=True)
-            log_error(domain, f"{error_message}")
-            increment_domain_error(domain, str(wkni_response.status_code))
-            delete_if_error_max(domain)
+            handle_http_status_code(domain, target, response.status_code)
     except httpx.RequestError as exception:
         handle_tcp_exception(domain, exception)
     except json.JSONDecodeError as exception:
@@ -1468,13 +1433,13 @@ def check_nodeinfo_20(domain, nodeinfo_20_url, http_client):
     target = "nodeinfo_20"
     try:
         """Check NodeInfo 2.0 endpoint and return nodeinfo_20_data or None."""
-        nodeinfo_20_response = get_with_fallback(nodeinfo_20_url, http_client)
-        if nodeinfo_20_response.status_code in [200]:
-            nodeinfo_20_response_content_type = nodeinfo_20_response.headers.get(
+        response = get_with_fallback(nodeinfo_20_url, http_client)
+        if response.status_code in [200]:
+            response_content_type = response.headers.get(
                 "Content-Type", ""
             )
-            if "json" not in nodeinfo_20_response_content_type:
-                content_type_clean = nodeinfo_20_response_content_type.split(";")[0].strip()
+            if "json" not in response_content_type:
+                content_type_clean = response_content_type.split(";")[0].strip()
                 if content_type_clean == "":
                     content_type_clean = "missing type"
                 error_message = f"{target} is {content_type_clean}"
@@ -1486,32 +1451,22 @@ def check_nodeinfo_20(domain, nodeinfo_20_url, http_client):
                 mark_failed_domain(domain)
                 delete_domain_if_known(domain)
                 return None
-            if not nodeinfo_20_response.content:
+            if not response.content:
                 exception = "reply empty"
                 handle_json_exception(domain, target, exception)
                 return None
             else:
                 try:
-                    nodeinfo_20_data = nodeinfo_20_response.json()
+                    nodeinfo_20_data = response.json()
                 except json.JSONDecodeError as exception:
                     handle_json_exception(domain, target, exception)
                     return None
                 return nodeinfo_20_data
-        elif nodeinfo_20_response.status_code in http_codes_to_hardfail:
-            vmc_output(
-                f"HTTP {nodeinfo_20_response.status_code} on NodeInfo",
-                "magenta",
-                use_tqdm=True,
-            )
-            mark_nxdomain_domain(domain)
-            delete_domain_if_known(domain)
+        elif response.status_code in http_codes_to_hardfail:
+            handle_http_nxdomain(domain, target, response.status_code)
             return False
         else:
-            error_message = f"HTTP {nodeinfo_20_response.status_code} on NodeInfo"
-            vmc_output(f"{domain}: {error_message}", "yellow", use_tqdm=True)
-            log_error(domain, f"{error_message}")
-            increment_domain_error(domain, str(nodeinfo_20_response.status_code))
-            delete_if_error_max(domain)
+            handle_http_status_code(domain, target, response.status_code)
     except httpx.RequestError as exception:
         handle_tcp_exception(domain, exception)
     except json.JSONDecodeError as exception:
@@ -1685,19 +1640,10 @@ def process_mastodon_instance(
                     use_tqdm=True,
                 )
         elif response.status_code in http_codes_to_hardfail:
-            vmc_output(
-                f"{domain}: HTTP {response.status_code} on API",
-                "magenta",
-                use_tqdm=True,
-            )
-            mark_nxdomain_domain(domain)
-            delete_domain_if_known(domain)
+            handle_http_nxdomain(domain, target, response.status_code)
+            return None
         else:
-            error_message = f"HTTP {response.status_code} on API"
-            vmc_output(f"{domain}: {error_message}", "orange", use_tqdm=True)
-            log_error(domain, error_message)
-            increment_domain_error(domain, f"{response.status_code}")
-            delete_if_error_max(domain)
+            handle_http_status_code(domain, target, response.status_code)
 
     except httpx.RequestError as exception:
         handle_tcp_exception(domain, exception)
@@ -1755,6 +1701,20 @@ def mark_as_non_mastodon(domain):
     mark_ignore_domain(domain)
     delete_domain_if_known(domain)
 
+
+def handle_http_status_code(domain, target, code):
+    error_message = f"HTTP {code} on {target}"
+    error_reason = f"{code}"
+    vmc_output(f"{domain}: {target} {error_message}", "yellow", use_tqdm=True)
+    log_error(domain, error_message)
+    increment_domain_error(domain, error_reason)
+    delete_if_error_max(domain)
+
+def handle_http_nxdomain(domain, target, code):
+    error_message = f"HTTP {code} on {target}"
+    vmc_output(f"{domain}: {error_message}", "magenta", use_tqdm=True)
+    mark_nxdomain_domain(domain)
+    delete_domain_if_known(domain)
 
 def handle_tcp_exception(domain, exception):
     error_message = str(exception)
