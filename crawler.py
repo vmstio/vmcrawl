@@ -1675,6 +1675,8 @@ def mark_as_non_mastodon(domain):
 
 
 def handle_incorrect_file_type(domain, target, content_type):
+    if content_type == "":
+        clean_content_type = "missing Content-Type"
     clean_content_type = re.sub(r";.*$", "", content_type).strip()
     error_message = f"{target} is {clean_content_type}"
     vmc_output(f"{domain}: {error_message}", "magenta", use_tqdm=True)
