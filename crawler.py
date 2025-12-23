@@ -1172,10 +1172,12 @@ def process_domain(domain, http_client, nightly_version_ranges):
         return
     if not webfinger_data:
         hostmeta_result = check_hostmeta(domain, http_client)
-        if not hostmeta_result:
+        if hostmeta_result is False:
             return
-        backend_domain = hostmeta_result["backend_domain"]
-        webfinger_data = {"backend_domain": backend_domain}
+        if not hostmeta_result:
+            backend_domain = domain
+        else:
+            backend_domain = hostmeta_result["backend_domain"]
     else:
         backend_domain = webfinger_data["backend_domain"]
 
@@ -1192,7 +1194,7 @@ def process_domain(domain, http_client, nightly_version_ranges):
 
     if is_mastodon_instance(nodeinfo_data):
         process_mastodon_instance(
-            domain, webfinger_data, nodeinfo_data, http_client, nightly_version_ranges
+            domain, backend_domain, nodeinfo_data, http_client, nightly_version_ranges
         )
     else:
         mark_as_non_mastodon(domain)
@@ -1490,7 +1492,7 @@ def is_mastodon_instance(nodeinfo_data: dict) -> bool:
 
 
 def process_mastodon_instance(
-    domain, webfinger_data, nodeinfo_data, http_client, nightly_version_ranges
+    domain, backend_domain, nodeinfo_data, http_client, nightly_version_ranges
 ):
     software_name = nodeinfo_data["software"]["name"].lower()
     software_version_full = nodeinfo_data["software"]["version"]
@@ -1526,9 +1528,9 @@ def process_mastodon_instance(
         return
 
     if software_version.startswith("4"):
-        instance_api_url = f'https://{webfinger_data["backend_domain"]}/api/v2/instance'
+        instance_api_url = f'https://{backend_domain}/api/v2/instance'
     else:
-        instance_api_url = f'https://{webfinger_data["backend_domain"]}/api/v1/instance'
+        instance_api_url = f'https://{backend_domain}/api/v1/instance'
 
     try:
         target = "instance_api"
