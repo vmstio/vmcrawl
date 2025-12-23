@@ -1300,8 +1300,6 @@ def check_webfinger(domain, http_client):
             else:
                 # WebFinger didn't reply
                 return None
-        # else:
-        #     handle_http_status_code(domain, target, response.status_code)
     except httpx.RequestError as exception:
         handle_tcp_exception(domain, exception)
     except json.JSONDecodeError as exception:
@@ -1353,11 +1351,6 @@ def check_hostmeta(domain, http_client):
         elif response.status_code in http_codes_to_hardfail:
             handle_http_nxdomain(domain, target, response.status_code)
             return False
-        # elif response.status_code in http_codes_to_softfail:
-        #     # HostMeta didn't reply
-        #     return {"backend_domain": domain}
-        # else:
-        #     handle_http_status_code(domain, target, response.status_code)
     except httpx.RequestError as exception:
         handle_tcp_exception(domain, exception)
 
