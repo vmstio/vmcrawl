@@ -1179,7 +1179,14 @@ def process_domain(domain, http_client, nightly_version_ranges):
     else:
         backend_domain = webfinger_data["backend_domain"]
 
-    nodeinfo_data = check_nodeinfo(domain, backend_domain, http_client)
+    nodeinfo_result = check_nodeinfo(domain, backend_domain, http_client)
+    if nodeinfo_result is False:
+        return
+    if not nodeinfo_result:
+        return
+
+    nodeinfo_20_url = nodeinfo_result["nodeinfo_20_url"]
+    nodeinfo_data = check_nodeinfo_20(domain, nodeinfo_20_url, http_client)
     if not nodeinfo_data:
         return
 
@@ -1430,7 +1437,7 @@ def check_nodeinfo(domain, backend_domain, http_client):
                             nodeinfo_20_url = next_obj["href"]
 
                 if nodeinfo_20_url and "wp-json" not in nodeinfo_20_url:
-                    return check_nodeinfo_20(domain, nodeinfo_20_url, http_client)
+                    return {"nodeinfo_20_url": nodeinfo_20_url}
                 else:
                     mark_as_non_mastodon(domain)
             else:
@@ -1443,6 +1450,7 @@ def check_nodeinfo(domain, backend_domain, http_client):
             )
             mark_nxdomain_domain(domain)
             delete_domain_if_known(domain)
+            return False
         else:
             error_message = f"HTTP {wkni_response.status_code} on NodeInfo"
             vmc_output(f"{domain}: {error_message}", "yellow", use_tqdm=True)
@@ -1469,8 +1477,9 @@ def check_nodeinfo_20(domain, nodeinfo_20_url, http_client):
                 content_type_clean = nodeinfo_20_response_content_type.split(";")[0].strip()
                 if content_type_clean == "":
                     content_type_clean = "missing type"
+                error_message = f"{target} is {content_type_clean}"
                 vmc_output(
-                    f"{domain}: NodeInfo 2.0 is {content_type_clean}",
+                    f"{domain}: {error_message}",
                     "magenta",
                     use_tqdm=True,
                 )
@@ -1478,7 +1487,7 @@ def check_nodeinfo_20(domain, nodeinfo_20_url, http_client):
                 delete_domain_if_known(domain)
                 return None
             if not nodeinfo_20_response.content:
-                exception = "NodeInfo 2.0 reply empty"
+                exception = "reply empty"
                 handle_json_exception(domain, target, exception)
                 return None
             else:
