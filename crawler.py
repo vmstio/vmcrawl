@@ -1237,6 +1237,7 @@ def check_robots_txt(domain, http_client):
 
 
 def check_webfinger(domain, http_client):
+    target = "webfinger"
     url = f"https://{domain}/.well-known/webfinger?resource=acct:{domain}@{domain}"
     try:
         response = get_with_fallback(url, http_client)
@@ -1324,7 +1325,7 @@ def check_webfinger(domain, http_client):
     except httpx.RequestError as exception:
         handle_http_exception(domain, exception)
     except json.JSONDecodeError as exception:
-        handle_json_exception(domain, exception)
+        handle_json_exception(domain, target, exception)
     return None
 
 
@@ -1391,6 +1392,7 @@ def check_hostmeta(domain, http_client):
 
 
 def check_nodeinfo(domain, backend_domain, http_client):
+    target = "nodeinfo"
     url = f"https://{backend_domain}/.well-known/nodeinfo"
     try:
         wkni_response = get_with_fallback(url, http_client)
@@ -1414,14 +1416,14 @@ def check_nodeinfo(domain, backend_domain, http_client):
                 delete_domain_if_known(domain)
                 return None
             if not wkni_response.content:
-                exception = "NodeInfo reply is empty"
-                handle_json_exception(domain, exception)
+                exception = "reply is empty"
+                handle_json_exception(domain, target, exception)
                 return None
             else:
                 try:
                     data = wkni_response.json()
                 except json.JSONDecodeError as exception:
-                    handle_json_exception(domain, exception)
+                    handle_json_exception(domain, target, exception)
                     return None
             if "links" in data and len(data["links"]) > 0:
                 nodeinfo_20_url = next(
@@ -1473,11 +1475,12 @@ def check_nodeinfo(domain, backend_domain, http_client):
     except httpx.RequestError as exception:
         handle_http_exception(domain, exception)
     except json.JSONDecodeError as exception:
-        handle_json_exception(domain, exception)
+        handle_json_exception(domain, target, exception)
     return None
 
 
 def check_nodeinfo_20(domain, nodeinfo_20_url, http_client):
+    target = "nodeinfo_20"
     try:
         """Check NodeInfo 2.0 endpoint and return nodeinfo_20_data or None."""
         nodeinfo_20_response = get_with_fallback(nodeinfo_20_url, http_client)
@@ -1499,13 +1502,13 @@ def check_nodeinfo_20(domain, nodeinfo_20_url, http_client):
                 return None
             if not nodeinfo_20_response.content:
                 exception = "NodeInfo 2.0 reply empty"
-                handle_json_exception(domain, exception)
+                handle_json_exception(domain, target, exception)
                 return None
             else:
                 try:
                     nodeinfo_20_data = nodeinfo_20_response.json()
                 except json.JSONDecodeError as exception:
-                    handle_json_exception(domain, exception)
+                    handle_json_exception(domain, target, exception)
                     return None
                 return nodeinfo_20_data
         elif nodeinfo_20_response.status_code in http_codes_to_hardfail:
@@ -1526,7 +1529,7 @@ def check_nodeinfo_20(domain, nodeinfo_20_url, http_client):
     except httpx.RequestError as exception:
         handle_http_exception(domain, exception)
     except json.JSONDecodeError as exception:
-        handle_json_exception(domain, exception)
+        handle_json_exception(domain, target, exception)
     return None
 
 def is_mastodon_instance(nodeinfo_data: dict) -> bool:
@@ -1587,6 +1590,7 @@ def process_mastodon_instance(
         instance_api_url = f'https://{webfinger_data["backend_domain"]}/api/v1/instance'
 
     try:
+        target = "instance_api"
         response = get_with_fallback(instance_api_url, http_client)
         if response.status_code in [200]:
             content_type = response.headers.get("Content-Type", "")
@@ -1712,7 +1716,7 @@ def process_mastodon_instance(
     except httpx.RequestError as exception:
         handle_http_exception(domain, exception)
     except json.JSONDecodeError as exception:
-        handle_json_exception(domain, exception)
+        handle_json_exception(domain, target, exception)
 
 
 def update_mastodon_domain(
@@ -1856,10 +1860,10 @@ def handle_http_exception(domain, exception):
         delete_if_error_max(domain)
 
 
-def handle_json_exception(domain, exception):
+def handle_json_exception(domain, target, exception):
     error_message = str(exception)
     error_reason = "JSON"
-    vmc_output(f"{domain}: {error_message}", "orange", use_tqdm=True)
+    vmc_output(f"{domain}: {target} {error_message}", "orange", use_tqdm=True)
     log_error(domain, error_message)
     increment_domain_error(domain, error_reason)
     delete_if_error_max(domain)
