@@ -1509,7 +1509,9 @@ def process_mastodon_instance(
             content_type = response.headers.get("Content-Type", "")
             if not response.content:
                 error_message = "reply is empty"
-                vmc_output(f"{domain}: {target} {error_message}", "orange", use_tqdm=True)
+                vmc_output(
+                    f"{domain}: {target} {error_message}", "orange", use_tqdm=True
+                )
                 log_error(domain, f"{target} {error_message}")
                 increment_domain_error(domain, "API")
                 delete_if_error_max(domain)
@@ -1521,7 +1523,9 @@ def process_mastodon_instance(
             response_json = response.json()
             if "error" in response_json:
                 error_message = "returned an error"
-                vmc_output(f"{domain}: {target} {error_message}", "orange", use_tqdm=True)
+                vmc_output(
+                    f"{domain}: {target} {error_message}", "orange", use_tqdm=True
+                )
                 log_error(domain, f"{target} {error_message}")
                 increment_domain_error(domain, "API")
                 delete_if_error_max(domain)
