@@ -1256,7 +1256,7 @@ def check_webfinger(domain, http_client):
         if response.status_code in [200]:
             if "json" not in content_type:
                 handle_incorrect_file_type(domain, target, content_type)
-                return None
+                return False
             if not response.content or content_length == "0":
                 # WebFinger reply is empty
                 return None
@@ -1307,6 +1307,7 @@ def check_hostmeta(domain, http_client):
             if "xml" not in content_type:
                 # HostMeta reply is not XML
                 handle_incorrect_file_type(domain, target, content_type)
+                return False
             if not response.content:
                 # HostMeta reply is empty
                 return None
@@ -1356,7 +1357,6 @@ def check_nodeinfo(domain, backend_domain, http_client):
                 return None
             if "json" not in content_type:
                 handle_incorrect_file_type(domain, target, content_type)
-                return None
             if not response.content:
                 exception = "reply is empty"
                 handle_json_exception(domain, target, exception)
@@ -1421,7 +1421,6 @@ def check_nodeinfo_20(domain, nodeinfo_20_url, http_client):
             content_type = response.headers.get("Content-Type", "")
             if "json" not in content_type:
                 handle_incorrect_file_type(domain, target, content_type)
-                return None
             if not response.content:
                 exception = "reply empty"
                 handle_json_exception(domain, target, exception)
@@ -1850,6 +1849,7 @@ def load_from_database(user_choice):
         "45": "SELECT domain FROM raw_domains WHERE reason = '###' ORDER BY errors ASC",
         "50": "SELECT domain FROM raw_domains WHERE errors > %s ORDER BY errors ASC",
         "51": "SELECT domain FROM raw_domains WHERE errors > %s AND errors < %s ORDER BY errors ASC",
+        "52": "SELECT domain FROM raw_domains WHERE errors IS NOT NULL ORDER BY errors ASC",
     }
 
     if user_choice in ["2", "3"]:  # Reverse or Random
@@ -1954,6 +1954,7 @@ def get_menu_options() -> dict:
         "Retry general errors": {
             "50": f"Domains w/ >{int(error_buffer*2)} Errors",
             "51": f"Domains w/ {error_buffer}-{int(error_buffer*2)} Errors",
+            "52": f"Domains with any errors",
         },
     }
 
