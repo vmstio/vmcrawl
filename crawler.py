@@ -156,10 +156,8 @@ def is_cache_valid(cache_file_path: str, max_age_seconds: int) -> bool:
 
 
 def read_main_version_info(url):
-    """
-    Read version information from a remote Ruby file.
-    Returns a dictionary containing major, minor, patch and prerelease values.
-    """
+    # Read version information from a remote Ruby file.
+    # Returns a dictionary containing major, minor, patch and prerelease values.
     version_info = {}
     try:
         response = get_with_fallback(url, http_client)
@@ -263,9 +261,7 @@ def get_main_version_branch():
 
 
 def update_patch_versions():
-    """
-    Update the patch versions in the database.
-    """
+    # Update the patch versions in the database.
     with conn.cursor() as cur:
         n_level = -1
         cur.execute(
@@ -300,9 +296,7 @@ def update_patch_versions():
 
 
 def delete_old_patch_versions():
-    """
-    Delete rows from the patch_versions table where software_version is in all_patched_versions.
-    """
+    # Delete rows from patch_versions when software_version is in all_patched_versions.
     with conn.cursor() as cur:
         cur.execute(
             """
@@ -1038,7 +1032,7 @@ def check_and_record_domains(
     shutdown_event = threading.Event()
 
     def process_single_domain(domain):
-        """Process a single domain with all checks."""
+        # Process a single domain with all checks.
         # Check if shutdown was requested
         if shutdown_event.is_set():
             return
@@ -1222,11 +1216,7 @@ def check_robots_txt(domain, http_client):
                 content_type in mimetypes.types_map.values()
                 and not content_type.startswith("text/")
             ):
-                error_message = f"robots.txt is {content_type}"
-                vmc_output(f"{domain}: {error_message}", "orange", use_tqdm=True)
-                log_error(domain, error_message)
-                increment_domain_error(domain, "TXT")
-                delete_if_error_max(domain)
+                handle_incorrect_file_type(domain, target, content_type)
                 return False
             robots_txt = response.text
             lines = robots_txt.splitlines()
@@ -1265,7 +1255,7 @@ def check_webfinger(domain, http_client):
         content_length = response.headers.get("Content-Length", "")
         if response.status_code in [200]:
             if "json" not in content_type:
-                # WebFinger reply is not JSON
+                handle_incorrect_file_type(domain, target, content_type)
                 return None
             if not response.content or content_length == "0":
                 # WebFinger reply is empty
@@ -1316,13 +1306,10 @@ def check_hostmeta(domain, http_client):
             content_type = response.headers.get("Content-Type", "")
             if "xml" not in content_type:
                 # HostMeta reply is not XML
-                return {"backend_domain": domain}
-            if "xhtml" in content_type:
-                # HostMeta reply is an XHTML file
-                return {"backend_domain": domain}
+                handle_incorrect_file_type(domain, target, content_type)
             if not response.content:
                 # HostMeta reply is empty
-                return {"backend_domain": domain}
+                return None
             else:
                 content = response.content.strip()
                 content = content.lower()
@@ -1331,19 +1318,19 @@ def check_hostmeta(domain, http_client):
                     xmldata = etree.fromstring(content, parser=parser)
                 except etree.XMLSyntaxError as exception:
                     # XML syntax error while parsing HostMeta
-                    return {"backend_domain": domain}
+                    return None
                 ns = {"xrd": "http://docs.oasis-open.org/ns/xri/xrd-1.0"}  # Namespace
                 try:
                     link = xmldata.find(".//xrd:link[@rel='lrdd']", namespaces=ns)
                 except AttributeError:
                     # Unable to find lrdd link due to XML structure
-                    return {"backend_domain": domain}
+                    return None
                 except etree.XMLSyntaxError:
                     # XML syntax error while parsing HostMeta
-                    return {"backend_domain": domain}
+                    return None
                 if link is None:
                     # No lrdd link found in HostMeta
-                    return {"backend_domain": domain}
+                    return None
                 else:
                     parsed_link = urlparse(link.get("template"))
                     backend_domain = parsed_link.netloc
@@ -1368,16 +1355,7 @@ def check_nodeinfo(domain, backend_domain, http_client):
                 delete_domain_if_known(domain)
                 return None
             if "json" not in content_type:
-                content_type_clean = content_type.split(";")[0].strip()
-                if content_type_clean == "":
-                    content_type_clean = "missing type"
-                vmc_output(
-                    f"{domain}: NodeInfo is {content_type_clean}",
-                    "magenta",
-                    use_tqdm=True,
-                )
-                mark_failed_domain(domain)
-                delete_domain_if_known(domain)
+                handle_incorrect_file_type(domain, target, content_type)
                 return None
             if not response.content:
                 exception = "reply is empty"
@@ -1437,22 +1415,12 @@ def check_nodeinfo(domain, backend_domain, http_client):
 def check_nodeinfo_20(domain, nodeinfo_20_url, http_client):
     target = "nodeinfo_20"
     try:
-        """Check NodeInfo 2.0 endpoint and return nodeinfo_20_data or None."""
+        # Check NodeInfo 2.0 endpoint and return nodeinfo_20_data or None.
         response = get_with_fallback(nodeinfo_20_url, http_client)
         if response.status_code in [200]:
-            response_content_type = response.headers.get("Content-Type", "")
-            if "json" not in response_content_type:
-                content_type_clean = response_content_type.split(";")[0].strip()
-                if content_type_clean == "":
-                    content_type_clean = "missing type"
-                error_message = f"{target} is {content_type_clean}"
-                vmc_output(
-                    f"{domain}: {error_message}",
-                    "magenta",
-                    use_tqdm=True,
-                )
-                mark_failed_domain(domain)
-                delete_domain_if_known(domain)
+            content_type = response.headers.get("Content-Type", "")
+            if "json" not in content_type:
+                handle_incorrect_file_type(domain, target, content_type)
                 return None
             if not response.content:
                 exception = "reply empty"
@@ -1478,7 +1446,7 @@ def check_nodeinfo_20(domain, nodeinfo_20_url, http_client):
 
 
 def is_mastodon_instance(nodeinfo_data: dict) -> bool:
-    """Check if the given NodeInfo response indicates a Mastodon instance."""
+    # Check if the given NodeInfo response indicates a Mastodon instance.
     if not isinstance(nodeinfo_data, dict):
         return False
 
@@ -1540,25 +1508,21 @@ def process_mastodon_instance(
         if response.status_code in [200]:
             content_type = response.headers.get("Content-Type", "")
             if not response.content:
-                error_message = "Instance API reply is empty"
-                vmc_output(f"{domain}: {error_message}", "orange", use_tqdm=True)
-                log_error(domain, error_message)
+                error_message = "reply is empty"
+                vmc_output(f"{domain}: {target} {error_message}", "orange", use_tqdm=True)
+                log_error(domain, f"{target} {error_message}")
                 increment_domain_error(domain, "API")
                 delete_if_error_max(domain)
                 return None
             elif "json" not in content_type:
-                error_message = f"Instance API reply is {content_type}"
-                vmc_output(f"{domain}: {error_message}", "orange", use_tqdm=True)
-                log_error(domain, error_message)
-                increment_domain_error(domain, "API")
-                delete_if_error_max(domain)
+                handle_incorrect_file_type(domain, target, content_type)
                 return None
 
             response_json = response.json()
             if "error" in response_json:
-                error_message = "Instance API returned an error"
-                vmc_output(f"{domain}: {error_message}", "orange", use_tqdm=True)
-                log_error(domain, error_message)
+                error_message = "returned an error"
+                vmc_output(f"{domain}: {target} {error_message}", "orange", use_tqdm=True)
+                log_error(domain, f"{target} {error_message}")
                 increment_domain_error(domain, "API")
                 delete_if_error_max(domain)
                 return None
@@ -1706,12 +1670,18 @@ def mark_as_non_mastodon(domain):
     delete_domain_if_known(domain)
 
 
+def handle_incorrect_file_type(domain, target, content_type):
+    error_message = f"{target} is {content_type}"
+    vmc_output(f"{domain}: {error_message}", "orange", use_tqdm=True)
+    mark_failed_domain(domain)
+    delete_domain_if_known(domain)
+
+
 def handle_http_status_code(domain, target, code):
     error_message = f"HTTP {code} on {target}"
-    error_reason = f"{code}"
     vmc_output(f"{domain}: {error_message}", "yellow", use_tqdm=True)
     log_error(domain, error_message)
-    increment_domain_error(domain, error_reason)
+    increment_domain_error(domain, code)
     delete_if_error_max(domain)
 
 
@@ -1994,7 +1964,7 @@ def print_menu(menu_options: dict | None = None) -> None:
 
 
 def interactive_select_menu(menu_options: dict) -> str | None:
-    """TTY-only interactive picker using arrow keys; returns selected key or None to fall back."""
+    # TTY-only interactive picker using arrow keys; returns selected key or None to fall back.
     # Skip if not in an interactive terminal
     if is_running_headless():
         return None
