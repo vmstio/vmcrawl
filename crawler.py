@@ -1611,7 +1611,9 @@ def process_mastodon_instance(
 
             version_info = f"Mastodon v{software_version}"
             if software_version != nodeinfo_20_result["software"]["version"]:
-                version_info = f'{version_info} ({nodeinfo_20_result["software"]["version"]})'
+                version_info = (
+                    f'{version_info} ({nodeinfo_20_result["software"]["version"]})'
+                )
             vmc_output(f"{domain}: {version_info}", "green", use_tqdm=True)
         elif response.status_code in http_codes_to_authfail:
             handle_http_authfail(domain, target, response.status_code)
