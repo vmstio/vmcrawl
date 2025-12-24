@@ -1129,7 +1129,9 @@ def should_skip_domain(
         delete_domain_if_known(domain)
         return True
     if user_choice != "7" and domain in failed_domains:
-        vmc_output(f"{domain}: Authentication Required (401/403)", "cyan", use_tqdm=True)
+        vmc_output(
+            f"{domain}: Authentication Required (401/403)", "cyan", use_tqdm=True
+        )
         delete_domain_if_known(domain)
         return True
     if user_choice != "8" and domain in nxdomain_domains:
@@ -1215,7 +1217,7 @@ def process_domain(domain, http_client, nightly_version_ranges):
             nightly_version_ranges,
         )
     else:
-        mark_as_non_mastodon(domain)
+        mark_as_non_mastodon(domain, nodeinfo_20_result["software"]["name"])
 
 
 def check_robots_txt(domain, http_client):
@@ -1458,12 +1460,12 @@ def check_nodeinfo_20(domain, nodeinfo_20_url, http_client):
     return None
 
 
-def is_mastodon_instance(nodeinfo_data: dict) -> bool:
+def is_mastodon_instance(nodeinfo_20_result: dict) -> bool:
     # Check if the given NodeInfo response indicates a Mastodon instance.
-    if not isinstance(nodeinfo_data, dict):
+    if not isinstance(nodeinfo_20_result, dict):
         return False
 
-    software = nodeinfo_data.get("software")
+    software = nodeinfo_20_result.get("software")
     if software is None:
         return False
 
@@ -1475,15 +1477,15 @@ def is_mastodon_instance(nodeinfo_data: dict) -> bool:
 
 
 def process_mastodon_instance(
-    domain, backend_domain, nodeinfo_data, http_client, nightly_version_ranges
+    domain, backend_domain, nodeinfo_20_result, http_client, nightly_version_ranges
 ):
-    software_name = nodeinfo_data["software"]["name"].lower()
-    software_version_full = nodeinfo_data["software"]["version"]
+    software_name = nodeinfo_20_result["software"]["name"].lower()
+    software_version_full = nodeinfo_20_result["software"]["version"]
     software_version = clean_version(
-        nodeinfo_data["software"]["version"], nightly_version_ranges
+        nodeinfo_20_result["software"]["version"], nightly_version_ranges
     )
 
-    if "usage" not in nodeinfo_data or "users" not in nodeinfo_data["usage"]:
+    if "usage" not in nodeinfo_20_result or "users" not in nodeinfo_20_result["usage"]:
         error_to_print = f"No usage data in NodeInfo"
         vmc_output(f"{domain}: {error_to_print}", "yellow", use_tqdm=True)
         log_error(domain, error_to_print)
@@ -1491,8 +1493,8 @@ def process_mastodon_instance(
         delete_domain_if_known(domain)
         return
 
-    if "total" in nodeinfo_data["usage"]["users"]:
-        total_users = nodeinfo_data["usage"]["users"]["total"]
+    if "total" in nodeinfo_20_result["usage"]["users"]:
+        total_users = nodeinfo_20_result["usage"]["users"]["total"]
     else:
         error_to_print = f"No user data in NodeInfo"
         vmc_output(f"{domain}: {error_to_print}", "yellow", use_tqdm=True)
@@ -1500,8 +1502,8 @@ def process_mastodon_instance(
         increment_domain_error(domain, "###")
         delete_domain_if_known(domain)
         return
-    if "activeMonth" in nodeinfo_data["usage"]["users"]:
-        active_month_users = nodeinfo_data["usage"]["users"]["activeMonth"]
+    if "activeMonth" in nodeinfo_20_result["usage"]["users"]:
+        active_month_users = nodeinfo_20_result["usage"]["users"]["activeMonth"]
     else:
         error_to_print = f"No MAU data in NodeInfo"
         vmc_output(f"{domain}: {error_to_print}", "yellow", use_tqdm=True)
@@ -1554,10 +1556,6 @@ def process_mastodon_instance(
                     ).lower()
                 else:
                     contact_account = None
-                if "created_at" in instance_api_data["contact"]:
-                    admin_creation = instance_api_data["contact"]["created_at"]
-                else:
-                    admin_creation = None
                 if "source_url" in instance_api_data:
                     source_url = instance_api_data["source_url"]
                 else:
@@ -1570,10 +1568,6 @@ def process_mastodon_instance(
                     ).lower()
                 else:
                     contact_account = None
-                if "created_at" in instance_api_data:
-                    admin_creation = instance_api_data["contact_account"]["created_at"]
-                else:
-                    admin_creation = None
                 source_url = None
 
             if not is_valid_email(contact_account):
@@ -1611,16 +1605,15 @@ def process_mastodon_instance(
                 active_month_users,
                 contact_account,
                 source_url,
-                admin_creation,
             )
 
             clear_domain_error(domain)
 
-            if software_version == nodeinfo_data["software"]["version"]:
+            if software_version == nodeinfo_20_result["software"]["version"]:
                 vmc_output(f"{domain}: v{software_version}", "green", use_tqdm=True)
             else:
                 vmc_output(
-                    f'{domain}: v{software_version} ({nodeinfo_data["software"]["version"]})',
+                    f'{domain}: v{software_version} ({nodeinfo_20_result["software"]["version"]})',
                     "green",
                     use_tqdm=True,
                 )
@@ -1647,7 +1640,6 @@ def update_mastodon_domain(
     active_month_users,
     contact_account,
     source_url,
-    admin_creation,
 ):
     cursor = conn.cursor()
     try:
@@ -1677,15 +1669,17 @@ def update_mastodon_domain(
             ),
         )
         conn.commit()
-    except Exception as exceptionxception:
+    except Exception as exception:
         vmc_output(f"{actual_domain}: {exception}", "red", use_tqdm=True)
         conn.rollback()
     finally:
         cursor.close()
 
 
-def mark_as_non_mastodon(domain):
-    vmc_output(f"{domain}: Other Platform", "cyan", use_tqdm=True)
+def mark_as_non_mastodon(domain, other_platform):
+    if not other_platform:
+        other_platform = "Unknown Platform"
+    vmc_output(f"{domain}: {other_platform}", "cyan", use_tqdm=True)
     mark_ignore_domain(domain)
     delete_domain_if_known(domain)
 
