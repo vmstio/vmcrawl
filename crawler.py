@@ -1180,19 +1180,33 @@ def process_domain(domain, http_client, nightly_version_ranges):
     if not check_robots_txt(domain, http_client):
         return  # Stop processing this domain
 
-    webfinger_result = check_webfinger(domain, http_client)
-    if webfinger_result is False:
+    # webfinger_result = check_webfinger(domain, http_client)
+    # if webfinger_result is False:
+    #     return
+    # if not webfinger_result:
+    #     hostmeta_result = check_hostmeta(domain, http_client)
+    #     if hostmeta_result is False:
+    #         return
+    #     if not hostmeta_result:
+    #         backend_domain = domain
+    #     else:
+    #         backend_domain = hostmeta_result["backend_domain"]
+    # else:
+    #     backend_domain = webfinger_result["backend_domain"]
+
+    hostmeta_result = check_hostmeta(domain, http_client)
+    if hostmeta_result is False:
         return
-    if not webfinger_result:
-        hostmeta_result = check_hostmeta(domain, http_client)
-        if hostmeta_result is False:
+    if not hostmeta_result:
+        webfinger_result = check_webfinger(domain, http_client)
+        if webfinger_result is False:
             return
-        if not hostmeta_result:
+        if not webfinger_result:
             backend_domain = domain
         else:
-            backend_domain = hostmeta_result["backend_domain"]
+            backend_domain = webfinger_result["backend_domain"]
     else:
-        backend_domain = webfinger_result["backend_domain"]
+        backend_domain = hostmeta_result["backend_domain"]
 
     nodeinfo_result = check_nodeinfo(domain, backend_domain, http_client)
     if nodeinfo_result is False:
