@@ -1191,7 +1191,9 @@ def process_domain(domain, http_client, nightly_version_ranges):
     if not nodeinfo_result:
         return
 
-    nodeinfo_20_result = check_nodeinfo_20(domain, nodeinfo_result["nodeinfo_20_url"], http_client)
+    nodeinfo_20_result = check_nodeinfo_20(
+        domain, nodeinfo_result["nodeinfo_20_url"], http_client
+    )
     if nodeinfo_20_result is False:
         return
     if not nodeinfo_20_result:
@@ -1199,7 +1201,11 @@ def process_domain(domain, http_client, nightly_version_ranges):
 
     if is_mastodon_instance(nodeinfo_20_result):
         process_mastodon_instance(
-            domain, backend_domain, nodeinfo_20_result, http_client, nightly_version_ranges
+            domain,
+            backend_domain,
+            nodeinfo_20_result,
+            http_client,
+            nightly_version_ranges,
         )
     else:
         mark_as_non_mastodon(domain)
