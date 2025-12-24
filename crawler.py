@@ -325,7 +325,15 @@ def vmc_output(text: str, color: str, use_tqdm: bool = False, **kwargs) -> None:
     # tqdm output should stay on one line; lowercasing helps keep style consistent
     if use_tqdm:
         text = text.lower()
-    colored_text = f"{colors.get(color, '')}{text}{colors['reset']}"
+
+    if ":" in text:
+        before_colon, after_colon = text.split(":", 1)
+        colored_text = (
+            f"{before_colon}:{colors.get(color, '')}{after_colon}{colors['reset']}"
+        )
+    else:
+        colored_text = f"{colors.get(color, '')}{text}{colors['reset']}"
+
     if use_tqdm:
         tqdm.write(colored_text, **kwargs)
     else:
@@ -1120,19 +1128,19 @@ def should_skip_domain(
         delete_domain_if_known(domain)
         return True
     if user_choice != "7" and domain in failed_domains:
-        vmc_output(f"{domain}: HTTP Blocked", "magenta", use_tqdm=True)
+        vmc_output(f"{domain}: HTTP Blocked", "cyan", use_tqdm=True)
         delete_domain_if_known(domain)
         return True
     if user_choice != "8" and domain in nxdomain_domains:
-        vmc_output(f"{domain}: Emoji Domain", "magenta", use_tqdm=True)
+        vmc_output(f"{domain}: Emoji Domain", "cyan", use_tqdm=True)
         delete_domain_if_known(domain)
         return True
     if user_choice != "9" and domain in norobots_domains:
-        vmc_output(f"{domain}: Crawling Prohibited", "magenta", use_tqdm=True)
+        vmc_output(f"{domain}: Crawling Prohibited", "cyan", use_tqdm=True)
         delete_domain_if_known(domain)
         return True
     if domain in baddata_domains:
-        vmc_output(f"{domain}: Bad Domain", "magenta", use_tqdm=True)
+        vmc_output(f"{domain}: Bad Domain", "cyan", use_tqdm=True)
         delete_domain_if_known(domain)
         return True
     return False
@@ -1140,12 +1148,12 @@ def should_skip_domain(
 
 def is_junk_or_bad_tld(domain, junk_domains, bad_tlds, domain_endings):
     if any(junk in domain for junk in junk_domains):
-        vmc_output(f"{domain}: Purging known junk domain", "magenta", use_tqdm=True)
+        vmc_output(f"{domain}: Purging known junk domain", "cyan", use_tqdm=True)
         delete_domain_if_known(domain)
         delete_domain_from_raw(domain)
         return True
     if any(domain.endswith(f".{tld}") for tld in bad_tlds):
-        vmc_output(f"{domain}: Purging prohibited TLD", "magenta", use_tqdm=True)
+        vmc_output(f"{domain}: Purging prohibited TLD", "cyan", use_tqdm=True)
         mark_nxdomain_domain(domain)
         delete_domain_if_known(domain)
         delete_domain_from_raw(domain)
@@ -1153,7 +1161,7 @@ def is_junk_or_bad_tld(domain, junk_domains, bad_tlds, domain_endings):
     if not any(
         domain.endswith(f".{domain_ending}") for domain_ending in domain_endings
     ):
-        vmc_output(f"{domain}: Purging unknown TLD", "magenta", use_tqdm=True)
+        vmc_output(f"{domain}: Purging unknown TLD", "cyan", use_tqdm=True)
         mark_nxdomain_domain(domain)
         delete_domain_if_known(domain)
         delete_domain_from_raw(domain)
@@ -1163,7 +1171,7 @@ def is_junk_or_bad_tld(domain, junk_domains, bad_tlds, domain_endings):
 
 def process_domain(domain, http_client, nightly_version_ranges):
     if has_emoji_or_special_chars(domain):
-        vmc_output(f"{domain}: Emoji Domain", "magenta", use_tqdm=True)
+        vmc_output(f"{domain}: Emoji Domain", "cyan", use_tqdm=True)
         mark_nxdomain_domain(domain)
         delete_domain_if_known(domain)
         return
@@ -1238,7 +1246,7 @@ def check_robots_txt(domain, http_client):
                         disallow_path == "/" or disallow_path == "*"
                     ):
                         vmc_output(
-                            f"{domain}: Crawling Prohibited", "magenta", use_tqdm=True
+                            f"{domain}: Crawling Prohibited", "orange", use_tqdm=True
                         )
                         mark_norobots_domain(domain)
                         delete_domain_if_known(domain)
@@ -1512,7 +1520,7 @@ def process_mastodon_instance(
             if not response.content:
                 error_message = "reply is empty"
                 vmc_output(
-                    f"{domain}: {target} {error_message}", "orange", use_tqdm=True
+                    f"{domain}: {target} {error_message}", "yellow", use_tqdm=True
                 )
                 log_error(domain, f"{target} {error_message}")
                 increment_domain_error(domain, "API")
@@ -1526,7 +1534,7 @@ def process_mastodon_instance(
             if "error" in response_json:
                 error_message = "returned an error"
                 vmc_output(
-                    f"{domain}: {target} {error_message}", "orange", use_tqdm=True
+                    f"{domain}: {target} {error_message}", "yellow", use_tqdm=True
                 )
                 log_error(domain, f"{target} {error_message}")
                 increment_domain_error(domain, "API")
@@ -1697,7 +1705,7 @@ def handle_http_status_code(domain, target, code):
 
 def handle_http_nxdomain(domain, target, code):
     error_message = f"HTTP {code} on {target}"
-    vmc_output(f"{domain}: {error_message}", "magenta", use_tqdm=True)
+    vmc_output(f"{domain}: {error_message}", "orange", use_tqdm=True)
     mark_nxdomain_domain(domain)
     delete_domain_if_known(domain)
 
@@ -1795,7 +1803,7 @@ def handle_tcp_exception(domain, exception):
 def handle_json_exception(domain, target, exception):
     error_message = str(exception)
     error_reason = "JSON"
-    vmc_output(f"{domain}: {target} {error_message}", "orange", use_tqdm=True)
+    vmc_output(f"{domain}: {target} {error_message}", "yellow", use_tqdm=True)
     log_error(domain, error_message)
     increment_domain_error(domain, error_reason)
     delete_if_error_max(domain)
