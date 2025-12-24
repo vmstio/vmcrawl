@@ -1171,10 +1171,10 @@ def process_domain(domain, http_client, nightly_version_ranges):
     if not check_robots_txt(domain, http_client):
         return  # Stop processing this domain
 
-    webfinger_data = check_webfinger(domain, http_client)
-    if webfinger_data is False:
+    webfinger_result = check_webfinger(domain, http_client)
+    if webfinger_result is False:
         return
-    if not webfinger_data:
+    if not webfinger_result:
         hostmeta_result = check_hostmeta(domain, http_client)
         if hostmeta_result is False:
             return
@@ -1183,7 +1183,7 @@ def process_domain(domain, http_client, nightly_version_ranges):
         else:
             backend_domain = hostmeta_result["backend_domain"]
     else:
-        backend_domain = webfinger_data["backend_domain"]
+        backend_domain = webfinger_result["backend_domain"]
 
     nodeinfo_result = check_nodeinfo(domain, backend_domain, http_client)
     if nodeinfo_result is False:
@@ -1191,16 +1191,15 @@ def process_domain(domain, http_client, nightly_version_ranges):
     if not nodeinfo_result:
         return
 
-    nodeinfo_20_url = nodeinfo_result["nodeinfo_20_url"]
-    nodeinfo_20_data = check_nodeinfo_20(domain, nodeinfo_20_url, http_client)
-    if nodeinfo_20_data is False:
+    nodeinfo_20_result = check_nodeinfo_20(domain, nodeinfo_result["nodeinfo_20_url"], http_client)
+    if nodeinfo_20_result is False:
         return
-    if not nodeinfo_20_data:
+    if not nodeinfo_20_result:
         return
 
-    if is_mastodon_instance(nodeinfo_20_data):
+    if is_mastodon_instance(nodeinfo_20_result):
         process_mastodon_instance(
-            domain, backend_domain, nodeinfo_20_data, http_client, nightly_version_ranges
+            domain, backend_domain, nodeinfo_20_result, http_client, nightly_version_ranges
         )
     else:
         mark_as_non_mastodon(domain)
@@ -1416,7 +1415,7 @@ def check_nodeinfo(domain, backend_domain, http_client):
 def check_nodeinfo_20(domain, nodeinfo_20_url, http_client):
     target = "nodeinfo_20"
     try:
-        # Check NodeInfo 2.0 endpoint and return nodeinfo_20_data or None.
+        # Check NodeInfo 2.0 endpoint and return nodeinfo_20_result or None.
         response = get_with_fallback(nodeinfo_20_url, http_client)
         if response.status_code in [200]:
             content_type = response.headers.get("Content-Type", "")
@@ -1429,11 +1428,11 @@ def check_nodeinfo_20(domain, nodeinfo_20_url, http_client):
                 return False
             else:
                 try:
-                    nodeinfo_20_data = response.json()
+                    nodeinfo_20_result = response.json()
                 except json.JSONDecodeError as exception:
                     handle_json_exception(domain, target, exception)
                     return False
-                return nodeinfo_20_data
+                return nodeinfo_20_result
         elif response.status_code in http_codes_to_hardfail:
             handle_http_nxdomain(domain, target, response.status_code)
             return False
