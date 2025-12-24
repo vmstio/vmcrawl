@@ -1375,38 +1375,27 @@ def check_nodeinfo(domain, backend_domain, http_client):
                 except json.JSONDecodeError as exception:
                     handle_json_exception(domain, target, exception)
                     return False
-            if "links" in data and len(data["links"]) > 0:
-                nodeinfo_20_url = next(
-                    (
-                        link["href"]
-                        for link in data["links"]
-                        if link.get("rel")
-                        == "http://nodeinfo.diaspora.software/ns/schema/2.0"
-                        and "href" in link
-                    ),
-                    None,
-                )
-                if not nodeinfo_20_url:
-                    rel_index = next(
-                        (
-                            i
-                            for i, link in enumerate(data["links"])
-                            if link.get("rel")
-                            == "http://nodeinfo.diaspora.software/ns/schema/2.0"
-                            and "href" not in link
-                        ),
-                        None,
-                    )
-                    if rel_index is not None and rel_index + 1 < len(data["links"]):
-                        next_obj = data["links"][rel_index + 1]
-                        if "href" in next_obj and "rel" not in next_obj:
-                            nodeinfo_20_url = next_obj["href"]
-                else:
+            if data.get("links"):
+                nodeinfo_20_url = None
+                for i, link in enumerate(data["links"]):
+                    if "nodeinfo.diaspora.software/ns/schema/2." in link.get("rel", ""):
+                        if "href" in link:
+                            nodeinfo_20_url = link["href"]
+                            break
+                        elif (
+                            i + 1 < len(data["links"])
+                            and "href" in data["links"][i + 1]
+                            and "rel" not in data["links"][i + 1]
+                        ):
+                            nodeinfo_20_url = data["links"][i + 1]["href"]
+                            break
+
+                if nodeinfo_20_url:
                     return {"nodeinfo_20_url": nodeinfo_20_url}
-            else:
-                exception = "no links in reply"
-                handle_json_exception(domain, target, exception)
-                return False
+
+            exception = "no links in reply"
+            handle_json_exception(domain, target, exception)
+            return False
         elif response.status_code in http_codes_to_hardfail:
             handle_http_nxdomain(domain, target, response.status_code)
             return False
