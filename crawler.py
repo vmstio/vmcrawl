@@ -1192,16 +1192,19 @@ def process_domain(domain, http_client, nightly_version_ranges):
         return
 
     nodeinfo_20_url = nodeinfo_result["nodeinfo_20_url"]
-    nodeinfo_data = check_nodeinfo_20(domain, nodeinfo_20_url, http_client)
-    if not nodeinfo_data:
+    nodeinfo_20_data = check_nodeinfo_20(domain, nodeinfo_20_url, http_client)
+    if nodeinfo_20_data is False:
+        return
+    if not nodeinfo_20_data:
         return
 
-    if is_mastodon_instance(nodeinfo_data):
+    if is_mastodon_instance(nodeinfo_20_data):
         process_mastodon_instance(
-            domain, backend_domain, nodeinfo_data, http_client, nightly_version_ranges
+            domain, backend_domain, nodeinfo_20_data, http_client, nightly_version_ranges
         )
     else:
         mark_as_non_mastodon(domain)
+        delete_domain_if_known(domain)
 
 
 def check_robots_txt(domain, http_client):
@@ -1350,23 +1353,19 @@ def check_nodeinfo(domain, backend_domain, http_client):
         response = get_with_fallback(url, http_client)
         if response.status_code in [200]:
             content_type = response.headers.get("Content-Type", "")
-            if "text/plain" in content_type:
-                # This is likey Wafrn
-                mark_as_non_mastodon(domain)
-                delete_domain_if_known(domain)
-                return None
             if "json" not in content_type:
                 handle_incorrect_file_type(domain, target, content_type)
+                return False
             if not response.content:
                 exception = "reply is empty"
                 handle_json_exception(domain, target, exception)
-                return None
+                return False
             else:
                 try:
                     data = response.json()
                 except json.JSONDecodeError as exception:
                     handle_json_exception(domain, target, exception)
-                    return None
+                    return False
             if "links" in data and len(data["links"]) > 0:
                 nodeinfo_20_url = next(
                     (
@@ -1398,8 +1397,10 @@ def check_nodeinfo(domain, backend_domain, http_client):
                     return {"nodeinfo_20_url": nodeinfo_20_url}
                 else:
                     mark_as_non_mastodon(domain)
+                    delete_domain_if_known(domain)
             else:
                 mark_as_non_mastodon(domain)
+                delete_domain_if_known(domain)
         elif response.status_code in http_codes_to_hardfail:
             handle_http_nxdomain(domain, target, response.status_code)
             return False
@@ -1421,16 +1422,17 @@ def check_nodeinfo_20(domain, nodeinfo_20_url, http_client):
             content_type = response.headers.get("Content-Type", "")
             if "json" not in content_type:
                 handle_incorrect_file_type(domain, target, content_type)
+                return False
             if not response.content:
                 exception = "reply empty"
                 handle_json_exception(domain, target, exception)
-                return None
+                return False
             else:
                 try:
                     nodeinfo_20_data = response.json()
                 except json.JSONDecodeError as exception:
                     handle_json_exception(domain, target, exception)
-                    return None
+                    return False
                 return nodeinfo_20_data
         elif response.status_code in http_codes_to_hardfail:
             handle_http_nxdomain(domain, target, response.status_code)
@@ -1517,7 +1519,7 @@ def process_mastodon_instance(
                 return None
             elif "json" not in content_type:
                 handle_incorrect_file_type(domain, target, content_type)
-                return None
+                return False
 
             response_json = response.json()
             if "error" in response_json:
@@ -1675,7 +1677,7 @@ def mark_as_non_mastodon(domain):
 
 def handle_incorrect_file_type(domain, target, content_type):
     if content_type == "" or content_type is None:
-        clean_content_type = "missing Content-Type"
+        content_type = "missing Content-Type"
     clean_content_type = re.sub(r";.*$", "", content_type).strip()
     error_message = f"{target} is {clean_content_type}"
     vmc_output(f"{domain}: {error_message}", "magenta", use_tqdm=True)
