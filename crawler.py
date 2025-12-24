@@ -1926,9 +1926,9 @@ def get_menu_options() -> dict:
         "Process new domains": {"0": "Recently Fetched"},
         "Change process direction": {"1": "Standard", "2": "Reverse", "3": "Random"},
         "Retry fatal errors": {
-            "6": "Other Platforms",  # ignore
-            "7": "Wrong File Type",  # failed
-            "8": "Hard Failed (410/418)",  # nxdomain
+            "6": "Ignored Platform",  # ignore
+            "7": "Processing Failed",  # failed
+            "8": "NXDOMAIN (410/418)",  # nxdomain
             "9": "Crawling Prohibited",  # norobots
         },
         "Retry connection errors": {
