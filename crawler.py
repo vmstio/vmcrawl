@@ -1681,9 +1681,9 @@ def handle_incorrect_file_type(domain, target, content_type):
         content_type = "missing Content-Type"
     clean_content_type = re.sub(r";.*$", "", content_type).strip()
     error_message = f"{target} is {clean_content_type}"
-    vmc_output(f"{domain}: {error_message}", "magenta", use_tqdm=True)
-    mark_failed_domain(domain)
-    delete_domain_if_known(domain)
+    log_error(domain, error_message)
+    increment_domain_error(domain, "TYPE")
+    delete_if_error_max(domain)
 
 
 def handle_http_status_code(domain, target, code):
@@ -1844,6 +1844,7 @@ def load_from_database(user_choice):
         "30": "SELECT domain FROM raw_domains WHERE reason = 'JSON' ORDER BY errors ASC",
         "31": "SELECT domain FROM raw_domains WHERE reason = 'TXT' ORDER BY errors ASC",
         "32": "SELECT domain FROM raw_domains WHERE reason = 'API' ORDER BY errors ASC",
+        "33": "SELECT domain FROM raw_domains WHERE reason = 'TYPE' ORDER BY errors ASC",
         "40": "SELECT domain FROM mastodon_domains WHERE software_version != ALL(%(versions)s::text[]) ORDER BY active_users_monthly DESC",
         "41": "SELECT domain FROM mastodon_domains WHERE software_version LIKE %s ORDER BY active_users_monthly DESC",
         "42": "SELECT domain FROM mastodon_domains WHERE software_version::TEXT ~ 'alpha|beta|rc' ORDER BY active_users_monthly DESC",
@@ -1945,6 +1946,7 @@ def get_menu_options() -> dict:
             "30": "JSON",
             "31": "TXT",
             "32": "API",
+            "33": "TYPE",
         },
         "Retry known instances": {
             "40": "Unpatched",
