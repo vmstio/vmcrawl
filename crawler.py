@@ -1166,16 +1166,15 @@ def is_junk_or_bad_tld(domain, junk_domains, bad_tlds, domain_endings):
         delete_domain_if_known(domain)
         delete_domain_from_raw(domain)
         return True
+    if has_emoji_or_special_chars(domain):
+        vmc_output(f"{domain}: Emoji Domain", "cyan", use_tqdm=True)
+        mark_failed_domain(domain)
+        delete_domain_if_known(domain)
+        return True
     return False
 
 
 def process_domain(domain, http_client, nightly_version_ranges):
-    if has_emoji_or_special_chars(domain):
-        vmc_output(f"{domain}: Emoji Domain", "cyan", use_tqdm=True)
-        mark_nxdomain_domain(domain)
-        delete_domain_if_known(domain)
-        return
-
     if not check_robots_txt(domain, http_client):
         return  # Stop processing this domain
 
