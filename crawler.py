@@ -1203,7 +1203,6 @@ def process_domain(domain, http_client, nightly_version_ranges):
         )
     else:
         mark_as_non_mastodon(domain)
-        delete_domain_if_known(domain)
 
 
 def check_robots_txt(domain, http_client):
@@ -1273,7 +1272,7 @@ def check_webfinger(domain, http_client):
             aliases = data.get("aliases", [])
             if not aliases:
                 mark_as_non_mastodon(domain)
-                return None
+                return False
             first_alias = next((alias for alias in aliases if "https" in alias), None)
             if first_alias:
                 backend_domain = urlparse(first_alias).netloc
@@ -1288,7 +1287,7 @@ def check_webfinger(domain, http_client):
         elif response.status_code in http_codes_to_softfail:
             if "json" in content_type:
                 mark_as_non_mastodon(domain)
-                return None
+                return False
             else:
                 # WebFinger didn't reply
                 return None
@@ -1396,10 +1395,10 @@ def check_nodeinfo(domain, backend_domain, http_client):
                     return {"nodeinfo_20_url": nodeinfo_20_url}
                 else:
                     mark_as_non_mastodon(domain)
-                    delete_domain_if_known(domain)
+                    return False
             else:
                 mark_as_non_mastodon(domain)
-                delete_domain_if_known(domain)
+                return False
         elif response.status_code in http_codes_to_hardfail:
             handle_http_nxdomain(domain, target, response.status_code)
             return False
