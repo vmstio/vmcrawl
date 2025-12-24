@@ -134,27 +134,7 @@ INSERT INTO
   junk_words (keywords, comments)
 VALUES
   ('activitypub-proxy.cf', 'ActivityPub abuse'),
-  ('activitypub-troll.cf', 'ActivityPub abuse'),
-  ('chloe.cat', 'Temporary hosting platform'),
-  ('cf-ipfs.com', 'Cloudflare tunnel service'),
-  ('devtunnels.ms', 'Tunnel/proxy service'),
-  ('elestio.app', 'Temporary hosting platform'),
-  ('github.dev', 'Temporary hosting platform'),
-  ('gitpod.io', 'Temporary hosting platform'),
-  ('ghost.io', 'Hosted blogging platform'),
-  ('herokuapp.com', 'Temporary hosting platform'),
-  ('karebu.gay', 'Temporary hosting platform'),
-  ('lhr.life', 'Tunnel/proxy service'),
-  ('lhrtunnel.link', 'Tunnel/proxy service'),
-  ('ngrok-free.app', 'ngrok tunnel service'),
-  ('ngrok.app', 'Tunnel/proxy service'),
-  ('ngrok.dev', 'Tunnel/proxy service'),
-  ('ngrok.io', 'Tunnel/proxy service'),
-  ('nope.rodeo', 'Temporary hosting platform'),
-  ('pikapod.net', 'Temporary hosting platform'),
-  ('serveo.net', 'Tunnel/proxy service'),
-  ('wordpress.com', 'Hosted blogging platform'),
-  ('.vivaldi.net', 'Hosted blogging platform');
+  ('activitypub-troll.cf', 'ActivityPub abuse');
 
 INSERT INTO
   nightly_versions (version, start_date, end_date)
