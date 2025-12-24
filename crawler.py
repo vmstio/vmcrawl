@@ -1681,6 +1681,7 @@ def handle_incorrect_file_type(domain, target, content_type):
         content_type = "missing Content-Type"
     clean_content_type = re.sub(r";.*$", "", content_type).strip()
     error_message = f"{target} is {clean_content_type}"
+    vmc_output(f"{domain}: {error_message}", "yellow", use_tqdm=True)
     log_error(domain, error_message)
     increment_domain_error(domain, "TYPE")
     delete_if_error_max(domain)
