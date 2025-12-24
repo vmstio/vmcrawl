@@ -113,8 +113,9 @@ http_client = httpx.Client(
     headers=http_custom_headers,
     timeout=common_timeout,
 )
-http_codes_to_softfail = [429, 423, 422, 405, 404, 403, 402, 401, 400]
-http_codes_to_hardfail = [451, 418, 410]
+
+http_codes_to_authfail = [403, 401]  # auth
+http_codes_to_hardfail = [451, 418, 410]  # gone
 
 
 def get_with_fallback(url, http_client):
@@ -423,7 +424,7 @@ def normalize_email(email):
     return email
 
 
-def has_emoji_or_special_chars(domain):
+def has_emoji_chars(domain):
     if domain.startswith("xn--"):
         try:
             domain = domain.encode("ascii").decode("idna")
@@ -1128,11 +1129,11 @@ def should_skip_domain(
         delete_domain_if_known(domain)
         return True
     if user_choice != "7" and domain in failed_domains:
-        vmc_output(f"{domain}: HTTP Blocked", "cyan", use_tqdm=True)
+        vmc_output(f"{domain}: Authentication Required (401/403)", "cyan", use_tqdm=True)
         delete_domain_if_known(domain)
         return True
     if user_choice != "8" and domain in nxdomain_domains:
-        vmc_output(f"{domain}: Emoji Domain", "cyan", use_tqdm=True)
+        vmc_output(f"{domain}: Hard Failed (418/410)", "cyan", use_tqdm=True)
         delete_domain_if_known(domain)
         return True
     if user_choice != "9" and domain in norobots_domains:
@@ -1141,6 +1142,10 @@ def should_skip_domain(
         return True
     if domain in baddata_domains:
         vmc_output(f"{domain}: Bad Domain", "cyan", use_tqdm=True)
+        delete_domain_if_known(domain)
+        return True
+    if has_emoji_chars(domain):
+        vmc_output(f"{domain}: Emoji Domain", "cyan", use_tqdm=True)
         delete_domain_if_known(domain)
         return True
     return False
@@ -1165,11 +1170,6 @@ def is_junk_or_bad_tld(domain, junk_domains, bad_tlds, domain_endings):
         mark_nxdomain_domain(domain)
         delete_domain_if_known(domain)
         delete_domain_from_raw(domain)
-        return True
-    if has_emoji_or_special_chars(domain):
-        vmc_output(f"{domain}: Emoji Domain", "cyan", use_tqdm=True)
-        mark_failed_domain(domain)
-        delete_domain_if_known(domain)
         return True
     return False
 
@@ -1251,6 +1251,9 @@ def check_robots_txt(domain, http_client):
                         delete_domain_if_known(domain)
                         return False
         # Check for specific HTTP status codes
+        elif response.status_code in http_codes_to_authfail:
+            handle_http_authfail(domain, target, response.status_code)
+            return False
         elif response.status_code in http_codes_to_hardfail:
             handle_http_nxdomain(domain, target, response.status_code)
             return False
@@ -1295,6 +1298,9 @@ def check_webfinger(domain, http_client):
             else:
                 # WebFinger reply has no valid alias
                 return None
+        elif response.status_code in http_codes_to_authfail:
+            handle_http_authfail(domain, target, response.status_code)
+            return False
         elif response.status_code in http_codes_to_hardfail:
             handle_http_nxdomain(domain, target, response.status_code)
             return False
@@ -1346,6 +1352,9 @@ def check_hostmeta(domain, http_client):
                     parsed_link = urlparse(link.get("template"))
                     backend_domain = parsed_link.netloc
                     return {"backend_domain": backend_domain}
+        elif response.status_code in http_codes_to_authfail:
+            handle_http_authfail(domain, target, response.status_code)
+            return False
         elif response.status_code in http_codes_to_hardfail:
             handle_http_nxdomain(domain, target, response.status_code)
             return False
@@ -1396,6 +1405,9 @@ def check_nodeinfo(domain, backend_domain, http_client):
             exception = "no links in reply"
             handle_json_exception(domain, target, exception)
             return False
+        elif response.status_code in http_codes_to_authfail:
+            handle_http_authfail(domain, target, response.status_code)
+            return False
         elif response.status_code in http_codes_to_hardfail:
             handle_http_nxdomain(domain, target, response.status_code)
             return False
@@ -1429,6 +1441,9 @@ def check_nodeinfo_20(domain, nodeinfo_20_url, http_client):
                     handle_json_exception(domain, target, exception)
                     return False
                 return nodeinfo_20_result
+        elif response.status_code in http_codes_to_authfail:
+            handle_http_authfail(domain, target, response.status_code)
+            return False
         elif response.status_code in http_codes_to_hardfail:
             handle_http_nxdomain(domain, target, response.status_code)
             return False
@@ -1609,6 +1624,9 @@ def process_mastodon_instance(
                     "green",
                     use_tqdm=True,
                 )
+        elif response.status_code in http_codes_to_authfail:
+            handle_http_authfail(domain, target, response.status_code)
+            return False
         elif response.status_code in http_codes_to_hardfail:
             handle_http_nxdomain(domain, target, response.status_code)
             return None
@@ -1695,6 +1713,13 @@ def handle_http_nxdomain(domain, target, code):
     error_message = f"HTTP {code} on {target}"
     vmc_output(f"{domain}: {error_message}", "orange", use_tqdm=True)
     mark_nxdomain_domain(domain)
+    delete_domain_if_known(domain)
+
+
+def handle_http_authfail(domain, target, code):
+    error_message = f"HTTP {code} on {target}"
+    vmc_output(f"{domain}: {error_message}", "orange", use_tqdm=True)
+    mark_failed_domain(domain)
     delete_domain_if_known(domain)
 
 
