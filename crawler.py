@@ -114,8 +114,8 @@ http_client = httpx.Client(
     timeout=common_timeout,
 )
 
-http_codes_to_authfail = [403, 401]  # auth
-http_codes_to_hardfail = [451, 418, 410]  # gone
+http_codes_to_authfail = [403]  # auth
+http_codes_to_hardfail = [418, 410]  # gone
 
 
 def get_with_fallback(url, http_client):
