@@ -1289,9 +1289,6 @@ def check_webfinger(domain, http_client):
             else:
                 # WebFinger reply has no valid alias
                 return None
-        elif response.status_code in http_codes_to_authfail:
-            handle_http_authfail(domain, target, response)
-            return False
         elif response.status_code in http_codes_to_hardfail:
             handle_http_nxdomain(domain, target, response)
             return False
