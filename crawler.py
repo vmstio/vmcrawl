@@ -1253,9 +1253,9 @@ def check_robots_txt(domain, http_client):
                         delete_domain_if_known(domain)
                         return False
         # Check for specific HTTP status codes
-        # elif response.status_code in http_codes_to_authfail:
-        #     handle_http_authfail(domain, target, response.status_code)
-        #     return False
+        elif response.status_code in http_codes_to_authfail:
+            handle_http_authfail(domain, target, response)
+            return False
         elif response.status_code in http_codes_to_hardfail:
             handle_http_nxdomain(domain, target, response.status_code)
             return False
@@ -1301,7 +1301,7 @@ def check_webfinger(domain, http_client):
                 # WebFinger reply has no valid alias
                 return None
         elif response.status_code in http_codes_to_authfail:
-            handle_http_authfail(domain, target, response.status_code)
+            handle_http_authfail(domain, target, response)
             return False
         elif response.status_code in http_codes_to_hardfail:
             handle_http_nxdomain(domain, target, response.status_code)
@@ -1354,9 +1354,9 @@ def check_hostmeta(domain, http_client):
                     parsed_link = urlparse(link.get("template"))
                     backend_domain = parsed_link.netloc
                     return {"backend_domain": backend_domain}
-        # elif response.status_code in http_codes_to_authfail:
-        #     handle_http_authfail(domain, target, response.status_code)
-        #     return False
+        elif response.status_code in http_codes_to_authfail:
+            handle_http_authfail(domain, target, response)
+            return False
         elif response.status_code in http_codes_to_hardfail:
             handle_http_nxdomain(domain, target, response.status_code)
             return False
@@ -1407,9 +1407,9 @@ def check_nodeinfo(domain, backend_domain, http_client):
             exception = "no links in reply"
             handle_json_exception(domain, target, exception)
             return False
-        # elif response.status_code in http_codes_to_authfail:
-        #     handle_http_authfail(domain, target, response.status_code)
-        #     return False
+        elif response.status_code in http_codes_to_authfail:
+            handle_http_authfail(domain, target, response)
+            return False
         elif response.status_code in http_codes_to_hardfail:
             handle_http_nxdomain(domain, target, response.status_code)
             return False
@@ -1443,9 +1443,9 @@ def check_nodeinfo_20(domain, nodeinfo_20_url, http_client):
                     handle_json_exception(domain, target, exception)
                     return False
                 return nodeinfo_20_result
-        # elif response.status_code in http_codes_to_authfail:
-        #     handle_http_authfail(domain, target, response.status_code)
-        #     return False
+        elif response.status_code in http_codes_to_authfail:
+            handle_http_authfail(domain, target, response)
+            return False
         elif response.status_code in http_codes_to_hardfail:
             handle_http_nxdomain(domain, target, response.status_code)
             return False
@@ -1616,7 +1616,7 @@ def process_mastodon_instance(
                 )
             vmc_output(f"{domain}: {version_info}", "green", use_tqdm=True)
         elif response.status_code in http_codes_to_authfail:
-            handle_http_authfail(domain, target, response.status_code)
+            handle_http_authfail(domain, target, response)
             return False
         elif response.status_code in http_codes_to_hardfail:
             handle_http_nxdomain(domain, target, response.status_code)
@@ -1708,7 +1708,42 @@ def handle_http_nxdomain(domain, target, code):
     delete_domain_if_known(domain)
 
 
-def handle_http_authfail(domain, target, code):
+def handle_http_authfail(domain, target, response):
+    code = response.status_code
+    is_cloudflare = False
+
+    # Check for Cloudflare headers
+    if (
+        response.headers.get("cf-ray")
+        or response.headers.get("server", "").lower() == "cloudflare"
+    ):
+        is_cloudflare = True
+
+    # Check response content for Cloudflare indicators
+    try:
+        content = response.text.lower() if hasattr(response, "text") else ""
+        if any(
+            indicator in content
+            for indicator in [
+                "cloudflare",
+                "just a moment",
+                "checking your browser",
+                "cf-spinner",
+            ]
+        ):
+            is_cloudflare = True
+    except:
+        pass
+
+    if is_cloudflare:
+        error_message = f"HTTP {code} (Cloudflare protected) on {target}"
+        vmc_output(f"{domain}: {error_message}", "yellow", use_tqdm=True)
+        log_error(domain, f"Cloudflare interstitial on {target}")
+        increment_domain_error(domain, "CF")
+        delete_if_error_max(domain)
+        return
+
+    # Standard auth failure handling
     error_message = f"HTTP {code} on {target}"
     vmc_output(f"{domain}: {error_message}", "orange", use_tqdm=True)
     mark_failed_domain(domain)
@@ -1944,8 +1979,8 @@ def get_menu_options() -> dict:
         "Change process direction": {"1": "Standard", "2": "Reverse", "3": "Random"},
         "Retry fatal errors": {
             "6": "Ignored Platform",  # ignore
-            "7": "Processing Failed",  # failed
-            "8": "NXDOMAIN (410/418)",  # nxdomain
+            "7": "Authentication (401/403)",  # failed
+            "8": "Gone (410/418)",  # nxdomain
             "9": "Crawling Prohibited",  # norobots
         },
         "Retry connection errors": {
