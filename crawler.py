@@ -1253,9 +1253,6 @@ def check_robots_txt(domain, http_client):
                         delete_domain_if_known(domain)
                         return False
         # Check for specific HTTP status codes
-        elif response.status_code in http_codes_to_authfail:
-            handle_http_authfail(domain, target, response)
-            return False
         elif response.status_code in http_codes_to_hardfail:
             handle_http_nxdomain(domain, target, response.status_code)
             return False
@@ -1354,9 +1351,6 @@ def check_hostmeta(domain, http_client):
                     parsed_link = urlparse(link.get("template"))
                     backend_domain = parsed_link.netloc
                     return {"backend_domain": backend_domain}
-        elif response.status_code in http_codes_to_authfail:
-            handle_http_authfail(domain, target, response)
-            return False
         elif response.status_code in http_codes_to_hardfail:
             handle_http_nxdomain(domain, target, response.status_code)
             return False
@@ -1407,9 +1401,6 @@ def check_nodeinfo(domain, backend_domain, http_client):
             exception = "no links in reply"
             handle_json_exception(domain, target, exception)
             return False
-        elif response.status_code in http_codes_to_authfail:
-            handle_http_authfail(domain, target, response)
-            return False
         elif response.status_code in http_codes_to_hardfail:
             handle_http_nxdomain(domain, target, response.status_code)
             return False
@@ -1443,9 +1434,6 @@ def check_nodeinfo_20(domain, nodeinfo_20_url, http_client):
                     handle_json_exception(domain, target, exception)
                     return False
                 return nodeinfo_20_result
-        elif response.status_code in http_codes_to_authfail:
-            handle_http_authfail(domain, target, response)
-            return False
         elif response.status_code in http_codes_to_hardfail:
             handle_http_nxdomain(domain, target, response.status_code)
             return False
