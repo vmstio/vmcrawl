@@ -1803,6 +1803,7 @@ def load_from_database(user_choice):
         "43": "SELECT domain FROM mastodon_domains WHERE active_users_monthly = '0' ORDER BY active_users_monthly DESC",
         "44": "SELECT domain FROM mastodon_domains ORDER BY active_users_monthly DESC",
         "45": "SELECT domain FROM raw_domains WHERE reason = '###' ORDER BY errors ASC",
+        "46": "SELECT domain FROM mastodon_domains WHERE timestamp <= (CURRENT_TIMESTAMP - INTERVAL '3 days') AT TIME ZONE 'UTC' ORDER BY active_users_monthly DESC",
         "50": "SELECT domain FROM raw_domains WHERE errors > %s ORDER BY errors ASC",
         "51": "SELECT domain FROM raw_domains WHERE errors > %s AND errors < %s ORDER BY errors ASC",
         "52": "SELECT domain FROM raw_domains WHERE errors IS NOT NULL ORDER BY errors ASC",
@@ -1912,6 +1913,7 @@ def get_menu_options() -> dict:
             "43": "Inactive",
             "44": "All Good",
             "45": "Misreporting",
+            "46": "Stale (3+ days)",
         },
         "Retry general errors": {
             "50": f"Domains w/ >{int(error_buffer*2)} Errors",
