@@ -1853,7 +1853,7 @@ def load_from_database(user_choice):
 def load_from_file(file_name):
     cursor = conn.cursor()
     domain_list = []
-    with open(file_name, "r") as file:
+    with open(os.path.expanduser(file_name), "r") as file:
         for line in file:
             domain = line.strip()
             if domain:  # Ensure the domain is not empty
