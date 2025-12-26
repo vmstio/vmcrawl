@@ -1268,22 +1268,16 @@ def check_webfinger(domain, http_client):
             if not response.content or content_length == "0":
                 # WebFinger reply is empty
                 return None
-            if "aliases" not in response.content.decode("utf-8"):
-                # WebFinger reply is invalid
-                return None
-            if "localhost" in response.content.decode("utf-8"):
-                # WebFinger alias points to localhost
-                return None
-
             data = response.json()
             aliases = data.get("aliases", [])
             if not aliases:
-                exception = "no aliases in reply"
-                handle_json_exception(domain, target, exception)
-                return False
+                return None
             first_alias = next((alias for alias in aliases if "https" in alias), None)
             if first_alias:
                 backend_domain = urlparse(first_alias).netloc
+                # Avoid localhost backend domains
+                if "localhost" in backend_domain:
+                    return None
                 return {"backend_domain": backend_domain}
                 # Check for specific HTTP status codes
             else:
