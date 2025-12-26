@@ -1213,7 +1213,7 @@ def process_domain(domain, http_client, nightly_version_ranges):
 
 
 def check_robots_txt(domain, http_client):
-    target = "robots.txt"
+    target = "robots_txt"
     url = f"https://{domain}/robots.txt"
     try:
         response = get_with_fallback(url, http_client)
@@ -1463,8 +1463,7 @@ def process_mastodon_instance(
                     f"{domain}: {target} {error_message}", "yellow", use_tqdm=True
                 )
                 log_error(domain, f"{target} {error_message}")
-                increment_domain_error(domain, "API")
-                delete_if_error_max(domain)
+                handle_json_exception(domain, target, error_message)
                 return None
             elif "json" not in content_type:
                 handle_incorrect_file_type(domain, target, content_type)
@@ -1477,8 +1476,7 @@ def process_mastodon_instance(
                     f"{domain}: {target} {error_message}", "yellow", use_tqdm=True
                 )
                 log_error(domain, f"{target} {error_message}")
-                increment_domain_error(domain, "API")
-                delete_if_error_max(domain)
+                handle_json_exception(domain, target, error_message)
                 return None
             else:
                 instance_api_data = response_json
@@ -1623,7 +1621,7 @@ def handle_incorrect_file_type(domain, target, content_type):
     error_message = f"{target} is {clean_content_type}"
     vmc_output(f"{domain}: {error_message}", "yellow", use_tqdm=True)
     log_error(domain, error_message)
-    increment_domain_error(domain, "TYPE")
+    increment_domain_error(domain, f"TYPE+{target}")
     delete_if_error_max(domain)
 
 
@@ -1748,7 +1746,7 @@ def handle_tcp_exception(domain, exception):
 
 def handle_json_exception(domain, target, exception):
     error_message = str(exception)
-    error_reason = "JSON"
+    error_reason = f"JSON+{target}"
     vmc_output(f"{domain}: {target} {error_message}", "yellow", use_tqdm=True)
     log_error(domain, error_message)
     increment_domain_error(domain, error_reason)
@@ -1796,10 +1794,15 @@ def load_from_database(user_choice):
         "21": "SELECT domain FROM raw_domains WHERE reason ~ '^3[0-9]{2}' ORDER BY errors ASC",
         "22": "SELECT domain FROM raw_domains WHERE reason ~ '^4[0-9]{2}' ORDER BY errors ASC",
         "23": "SELECT domain FROM raw_domains WHERE reason ~ '^5[0-9]{2}' ORDER BY errors ASC",
-        "30": "SELECT domain FROM raw_domains WHERE reason = 'JSON' ORDER BY errors ASC",
-        "31": "SELECT domain FROM raw_domains WHERE reason = 'TXT' ORDER BY errors ASC",
-        "32": "SELECT domain FROM raw_domains WHERE reason = 'API' ORDER BY errors ASC",
-        "33": "SELECT domain FROM raw_domains WHERE reason = 'TYPE' ORDER BY errors ASC",
+        "30": "SELECT domain FROM raw_domains WHERE reason = 'JSON+webfinger' ORDER BY errors ASC",
+        "31": "SELECT domain FROM raw_domains WHERE reason = 'JSON+nodeinfo' ORDER BY errors ASC",
+        "32": "SELECT domain FROM raw_domains WHERE reason = 'JSON+nodeinfo_20' ORDER BY errors ASC",
+        "33": "SELECT domain FROM raw_domains WHERE reason = 'JSON+instance_api' ORDER BY errors ASC",
+        "34": "SELECT domain FROM raw_domains WHERE reason = 'TYPE+robots_txt' ORDER BY errors ASC",
+        "35": "SELECT domain FROM raw_domains WHERE reason = 'TYPE+webfinger' ORDER BY errors ASC",
+        "36": "SELECT domain FROM raw_domains WHERE reason = 'TYPE+nodeinfo' ORDER BY errors ASC",
+        "37": "SELECT domain FROM raw_domains WHERE reason = 'TYPE+nodeinfo_20' ORDER BY errors ASC",
+        "38": "SELECT domain FROM raw_domains WHERE reason = 'TYPE+instance_api' ORDER BY errors ASC",
         "40": "SELECT domain FROM mastodon_domains WHERE software_version != ALL(%(versions)s::text[]) ORDER BY active_users_monthly DESC",
         "41": "SELECT domain FROM mastodon_domains WHERE software_version LIKE %s ORDER BY active_users_monthly DESC",
         "42": "SELECT domain FROM mastodon_domains WHERE software_version::TEXT ~ 'alpha|beta|rc' ORDER BY active_users_monthly DESC",
@@ -1897,11 +1900,16 @@ def get_menu_options() -> dict:
             "14": "DNS",
         },
         "Retry HTTP errors": {"20": "2xx", "21": "3xx", "22": "4xx", "23": "5xx"},
-        "Retry specific errors": {
-            "30": "JSON",
-            "31": "TXT",
-            "32": "API",
-            "33": "TYPE",
+        "Retry target errors": {
+            "30": "WebFinger JSON",
+            "31": "NodeInfo JSON",
+            "32": "NodeInfo 2.0 JSON",
+            "33": "Instance API JSON",
+            "34": "robots.txt TYPE",
+            "35": "WebFinger TYPE",
+            "36": "NodeInfo TYPE",
+            "37": "NodeInfo 2.0 TYPE",
+            "38": "Instance API TYPE",
         },
         "Retry known instances": {
             "40": "Unpatched",
