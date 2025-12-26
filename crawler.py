@@ -1324,7 +1324,13 @@ def check_nodeinfo(domain, backend_domain, http_client):
             if data.get("links"):
                 nodeinfo_20_url = None
                 for i, link in enumerate(data["links"]):
-                    if "nodeinfo.diaspora.software/ns/schema/2." in link.get("rel", ""):
+                    rel_value = link.get("rel", "")
+                    type_value = link.get("type", "")
+                    href_value = link.get("href", "")
+                    # Check rel/type for nodeinfo schema (1.0 or 2.x), or href for nodeinfo endpoints
+                    if ("nodeinfo.diaspora.software/ns/schema/" in rel_value 
+                        or "nodeinfo.diaspora.software/ns/schema/" in type_value
+                        or "/nodeinfo/" in href_value):
                         if "href" in link:
                             nodeinfo_20_url = link["href"]
                             break
