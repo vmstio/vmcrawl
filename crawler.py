@@ -1710,38 +1710,42 @@ def handle_http_nxdomain(domain, target, code):
 
 def handle_http_authfail(domain, target, response):
     code = response.status_code
-    is_cloudflare = False
 
-    # Check for Cloudflare headers
-    if (
-        response.headers.get("cf-ray")
-        or response.headers.get("server", "").lower() == "cloudflare"
-    ):
-        is_cloudflare = True
+    # Check for CDN/DDoS protection headers
+    cf_headers = [
+        "cf-ray",
+        "server",
+        "x-served-by",
+        "x-akamai-transformed",
+        "x-amz-cf-id",
+        "x-iinfo",
+        "x-sucuri-id",
+        "x-bunny-request-id",
+    ]
 
-    # Check response content for Cloudflare indicators
-    try:
-        content = response.text.lower() if hasattr(response, "text") else ""
-        if any(
-            indicator in content
-            for indicator in [
-                "cloudflare",
-                "just a moment",
-                "checking your browser",
-                "cf-spinner",
-            ]
-        ):
-            is_cloudflare = True
-    except:
-        pass
+    server_header = response.headers.get("server", "").lower()
+    cdn_indicators = [
+        "cloudflare",
+        "fastly",
+        "akamai",
+        "imperva",
+        "incapsula",
+        "sucuri",
+        "bunnycdn",
+        "cloudfront",
+    ]
 
-    if is_cloudflare:
-        error_message = f"HTTP {code} (Cloudflare protected) on {target}"
-        vmc_output(f"{domain}: {error_message}", "yellow", use_tqdm=True)
-        log_error(domain, f"Cloudflare interstitial on {target}")
-        increment_domain_error(domain, "CF")
-        delete_if_error_max(domain)
-        return
+    # Check headers for CDN/protection service
+    if any(response.headers.get(h) for h in cf_headers):
+        if any(indicator in server_header for indicator in cdn_indicators):
+            # Handle as CDN protection, not real auth failure
+            # Log and increment error count for retry
+            error_message = f"HTTP {code} (CDN protected) on {target}"
+            vmc_output(f"{domain}: {error_message}", "yellow", use_tqdm=True)
+            log_error(domain, f"CDN interstitial on {target}")
+            increment_domain_error(domain, "CDN")
+            delete_if_error_max(domain)
+            return
 
     # Standard auth failure handling
     error_message = f"HTTP {code} on {target}"
@@ -1894,6 +1898,7 @@ def load_from_database(user_choice):
         "31": "SELECT domain FROM raw_domains WHERE reason = 'TXT' ORDER BY errors ASC",
         "32": "SELECT domain FROM raw_domains WHERE reason = 'API' ORDER BY errors ASC",
         "33": "SELECT domain FROM raw_domains WHERE reason = 'TYPE' ORDER BY errors ASC",
+        "34": "SELECT domain FROM raw_domains WHERE reason = 'CDN' ORDER BY errors ASC",
         "40": "SELECT domain FROM mastodon_domains WHERE software_version != ALL(%(versions)s::text[]) ORDER BY active_users_monthly DESC",
         "41": "SELECT domain FROM mastodon_domains WHERE software_version LIKE %s ORDER BY active_users_monthly DESC",
         "42": "SELECT domain FROM mastodon_domains WHERE software_version::TEXT ~ 'alpha|beta|rc' ORDER BY active_users_monthly DESC",
@@ -1996,6 +2001,7 @@ def get_menu_options() -> dict:
             "31": "TXT",
             "32": "API",
             "33": "TYPE",
+            "34": "CDN",
         },
         "Retry known instances": {
             "40": "Unpatched",
