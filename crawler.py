@@ -3,7 +3,6 @@
 # Import required modules
 try:
     import argparse
-    import csv
     import json
     import hashlib
     import mimetypes
@@ -21,7 +20,6 @@ try:
     from datetime import datetime, timedelta, timezone
     from urllib.parse import urlparse, urlunparse
     from dotenv import load_dotenv
-    from lxml import etree  # type: ignore
     from packaging import version
     from tqdm import tqdm
 except ImportError as exception:
@@ -1180,19 +1178,13 @@ def process_domain(domain, http_client, nightly_version_ranges):
     if not check_robots_txt(domain, http_client):
         return  # Stop processing this domain
 
-    hostmeta_result = check_hostmeta(domain, http_client)
-    if hostmeta_result is False:
+    webfinger_result = check_webfinger(domain, http_client)
+    if webfinger_result is False:
         return
-    if not hostmeta_result:
-        webfinger_result = check_webfinger(domain, http_client)
-        if webfinger_result is False:
-            return
-        if not webfinger_result:
-            backend_domain = domain
-        else:
-            backend_domain = webfinger_result["backend_domain"]
+    if not webfinger_result:
+        backend_domain = domain
     else:
-        backend_domain = hostmeta_result["backend_domain"]
+        backend_domain = webfinger_result["backend_domain"]
 
     nodeinfo_result = check_nodeinfo(domain, backend_domain, http_client)
     if nodeinfo_result is False:
@@ -1254,7 +1246,7 @@ def check_robots_txt(domain, http_client):
                         return False
         # Check for specific HTTP status codes
         elif response.status_code in http_codes_to_hardfail:
-            handle_http_nxdomain(domain, target, response.status_code)
+            handle_http_nxdomain(domain, target, response)
             return False
     except httpx.RequestError as exception:
         handle_tcp_exception(domain, exception)
@@ -1301,61 +1293,13 @@ def check_webfinger(domain, http_client):
             handle_http_authfail(domain, target, response)
             return False
         elif response.status_code in http_codes_to_hardfail:
-            handle_http_nxdomain(domain, target, response.status_code)
+            handle_http_nxdomain(domain, target, response)
             return False
     except httpx.RequestError as exception:
         handle_tcp_exception(domain, exception)
         return False
     except json.JSONDecodeError as exception:
         handle_json_exception(domain, target, exception)
-        return False
-    return None
-
-
-def check_hostmeta(domain, http_client):
-    target = "hostmeta"
-    url = f"https://{domain}/.well-known/host-meta"
-    try:
-        response = get_with_fallback(url, http_client)
-        if response.status_code in [200]:
-            content_type = response.headers.get("Content-Type", "")
-            if "xml" not in content_type:
-                # HostMeta reply is not XML
-                handle_incorrect_file_type(domain, target, content_type)
-                return False
-            if not response.content:
-                # HostMeta reply is empty
-                return None
-            else:
-                content = response.content.strip()
-                content = content.lower()
-                parser = etree.XMLParser(recover=True)
-                try:
-                    xmldata = etree.fromstring(content, parser=parser)
-                except etree.XMLSyntaxError as exception:
-                    # XML syntax error while parsing HostMeta
-                    return None
-                ns = {"xrd": "http://docs.oasis-open.org/ns/xri/xrd-1.0"}  # Namespace
-                try:
-                    link = xmldata.find(".//xrd:link[@rel='lrdd']", namespaces=ns)
-                except AttributeError:
-                    # Unable to find lrdd link due to XML structure
-                    return None
-                except etree.XMLSyntaxError:
-                    # XML syntax error while parsing HostMeta
-                    return None
-                if link is None:
-                    # No lrdd link found in HostMeta
-                    return None
-                else:
-                    parsed_link = urlparse(link.get("template"))
-                    backend_domain = parsed_link.netloc
-                    return {"backend_domain": backend_domain}
-        elif response.status_code in http_codes_to_hardfail:
-            handle_http_nxdomain(domain, target, response.status_code)
-            return False
-    except httpx.RequestError as exception:
-        handle_tcp_exception(domain, exception)
         return False
     return None
 
@@ -1402,10 +1346,10 @@ def check_nodeinfo(domain, backend_domain, http_client):
             handle_json_exception(domain, target, exception)
             return False
         elif response.status_code in http_codes_to_hardfail:
-            handle_http_nxdomain(domain, target, response.status_code)
+            handle_http_nxdomain(domain, target, response)
             return False
         else:
-            handle_http_status_code(domain, target, response.status_code)
+            handle_http_status_code(domain, target, response)
     except httpx.RequestError as exception:
         handle_tcp_exception(domain, exception)
     except json.JSONDecodeError as exception:
@@ -1435,10 +1379,10 @@ def check_nodeinfo_20(domain, nodeinfo_20_url, http_client):
                     return False
                 return nodeinfo_20_result
         elif response.status_code in http_codes_to_hardfail:
-            handle_http_nxdomain(domain, target, response.status_code)
+            handle_http_nxdomain(domain, target, response)
             return False
         else:
-            handle_http_status_code(domain, target, response.status_code)
+            handle_http_status_code(domain, target, response)
     except httpx.RequestError as exception:
         handle_tcp_exception(domain, exception)
         return False
@@ -1607,11 +1551,10 @@ def process_mastodon_instance(
             handle_http_authfail(domain, target, response)
             return False
         elif response.status_code in http_codes_to_hardfail:
-            handle_http_nxdomain(domain, target, response.status_code)
+            handle_http_nxdomain(domain, target, response)
             return None
         else:
-            handle_http_status_code(domain, target, response.status_code)
-
+            handle_http_status_code(domain, target, response)
     except httpx.RequestError as exception:
         handle_tcp_exception(domain, exception)
     except json.JSONDecodeError as exception:
@@ -1681,7 +1624,9 @@ def handle_incorrect_file_type(domain, target, content_type):
     delete_if_error_max(domain)
 
 
-def handle_http_status_code(domain, target, code):
+def handle_http_status_code(domain, target, response):
+    code = response.status_code
+
     error_message = f"HTTP {code} on {target}"
     vmc_output(f"{domain}: {error_message}", "yellow", use_tqdm=True)
     log_error(domain, error_message)
@@ -1689,7 +1634,9 @@ def handle_http_status_code(domain, target, code):
     delete_if_error_max(domain)
 
 
-def handle_http_nxdomain(domain, target, code):
+def handle_http_nxdomain(domain, target, response):
+    code = response.status_code
+
     error_message = f"HTTP {code} on {target}"
     vmc_output(f"{domain}: {error_message}", "orange", use_tqdm=True)
     mark_nxdomain_domain(domain)
@@ -1698,42 +1645,6 @@ def handle_http_nxdomain(domain, target, code):
 
 def handle_http_authfail(domain, target, response):
     code = response.status_code
-
-    # Check for CDN/DDoS protection headers
-    cf_headers = [
-        "cf-ray",
-        "server",
-        "x-served-by",
-        "x-akamai-transformed",
-        "x-amz-cf-id",
-        "x-iinfo",
-        "x-sucuri-id",
-        "x-bunny-request-id",
-    ]
-
-    server_header = response.headers.get("server", "").lower()
-    cdn_indicators = [
-        "cloudflare",
-        "fastly",
-        "akamai",
-        "imperva",
-        "incapsula",
-        "sucuri",
-        "bunnycdn",
-        "cloudfront",
-    ]
-
-    # Check headers for CDN/protection service
-    if any(response.headers.get(h) for h in cf_headers):
-        if any(indicator in server_header for indicator in cdn_indicators):
-            # Handle as CDN protection, not real auth failure
-            # Log and increment error count for retry
-            error_message = f"HTTP {code} (CDN protected) on {target}"
-            vmc_output(f"{domain}: {error_message}", "yellow", use_tqdm=True)
-            log_error(domain, f"CDN interstitial on {target}")
-            increment_domain_error(domain, "CDN")
-            delete_if_error_max(domain)
-            return
 
     # Standard auth failure handling
     error_message = f"HTTP {code} on {target}"
