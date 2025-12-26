@@ -1794,7 +1794,6 @@ def load_from_database(user_choice):
         "31": "SELECT domain FROM raw_domains WHERE reason = 'TXT' ORDER BY errors ASC",
         "32": "SELECT domain FROM raw_domains WHERE reason = 'API' ORDER BY errors ASC",
         "33": "SELECT domain FROM raw_domains WHERE reason = 'TYPE' ORDER BY errors ASC",
-        "34": "SELECT domain FROM raw_domains WHERE reason = 'CDN' ORDER BY errors ASC",
         "40": "SELECT domain FROM mastodon_domains WHERE software_version != ALL(%(versions)s::text[]) ORDER BY active_users_monthly DESC",
         "41": "SELECT domain FROM mastodon_domains WHERE software_version LIKE %s ORDER BY active_users_monthly DESC",
         "42": "SELECT domain FROM mastodon_domains WHERE software_version::TEXT ~ 'alpha|beta|rc' ORDER BY active_users_monthly DESC",
@@ -1897,7 +1896,6 @@ def get_menu_options() -> dict:
             "31": "TXT",
             "32": "API",
             "33": "TYPE",
-            "34": "CDN",
         },
         "Retry known instances": {
             "40": "Unpatched",
