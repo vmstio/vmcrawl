@@ -116,7 +116,7 @@ http_codes_to_authfail = [403, 401]  # auth
 http_codes_to_hardfail = [418, 410]  # gone
 
 
-def get_with_fallback(url, http_client):
+def get_httpx(url, http_client):
     try:
         return http_client.get(url)
     except httpx.RequestError as exception:
@@ -159,7 +159,7 @@ def read_main_version_info(url):
     # Returns a dictionary containing major, minor, patch and prerelease values.
     version_info = {}
     try:
-        response = get_with_fallback(url, http_client)
+        response = get_httpx(url, http_client)
         response.raise_for_status()
         lines = response.text.splitlines()
 
@@ -181,7 +181,7 @@ def read_main_version_info(url):
 def get_highest_mastodon_version():
     try:
         release_url = "https://api.github.com/repos/mastodon/mastodon/releases"
-        response = get_with_fallback(release_url, http_client)
+        response = get_httpx(release_url, http_client)
         if response.status_code == 200:
             releases = response.json()
             highest_version = None
@@ -207,7 +207,7 @@ def get_backport_mastodon_versions():
     # Initialize with None instead of empty string
     backport_versions = {branch: "" for branch in backport_branches}
 
-    response = get_with_fallback(url, http_client)
+    response = get_httpx(url, http_client)
     response.raise_for_status()
     releases = response.json()
 
@@ -348,7 +348,7 @@ def get_domain_endings():
         with open(cache_file_path, "r") as cache_file:
             domain_endings = [line.strip().lower() for line in cache_file.readlines()]
     else:
-        domain_endings_response = get_with_fallback(url, http_client)
+        domain_endings_response = get_httpx(url, http_client)
         if domain_endings_response.status_code in [200]:
             domain_endings = [
                 line.strip().lower()
@@ -1216,7 +1216,7 @@ def check_robots_txt(domain, http_client):
     target = "robots_txt"
     url = f"https://{domain}/robots.txt"
     try:
-        response = get_with_fallback(url, http_client)
+        response = get_httpx(url, http_client)
         # Check for valid HTTP status code
         if response.status_code in [200]:
             content_type = response.headers.get("Content-Type", "")
@@ -1258,7 +1258,7 @@ def check_webfinger(domain, http_client):
     target = "webfinger"
     url = f"https://{domain}/.well-known/webfinger?resource=acct:{domain}@{domain}"
     try:
-        response = get_with_fallback(url, http_client)
+        response = get_httpx(url, http_client)
         content_type = response.headers.get("Content-Type", "")
         content_length = response.headers.get("Content-Length", "")
         if response.status_code in [200]:
@@ -1308,7 +1308,7 @@ def check_nodeinfo(domain, backend_domain, http_client):
     target = "nodeinfo"
     url = f"https://{backend_domain}/.well-known/nodeinfo"
     try:
-        response = get_with_fallback(url, http_client)
+        response = get_httpx(url, http_client)
         if response.status_code in [200]:
             content_type = response.headers.get("Content-Type", "")
             if "json" not in content_type:
@@ -1374,7 +1374,7 @@ def check_nodeinfo_20(domain, nodeinfo_20_url, http_client):
     target = "nodeinfo_20"
     try:
         # Check NodeInfo 2.0 endpoint and return nodeinfo_20_result or None.
-        response = get_with_fallback(nodeinfo_20_url, http_client)
+        response = get_httpx(nodeinfo_20_url, http_client)
         if response.status_code in [200]:
             content_type = response.headers.get("Content-Type", "")
             if "json" not in content_type:
@@ -1469,7 +1469,7 @@ def process_mastodon_instance(
 
     try:
         target = "instance_api"
-        response = get_with_fallback(instance_api_url, http_client)
+        response = get_httpx(instance_api_url, http_client)
         if response.status_code in [200]:
             content_type = response.headers.get("Content-Type", "")
             if not response.content:
