@@ -16,6 +16,7 @@ try:
     import unicodedata
     import httpx
     import psycopg
+    import idna
     from concurrent.futures import ThreadPoolExecutor, as_completed
     from datetime import datetime, timedelta, timezone
     from urllib.parse import urlparse, urlunparse
@@ -1144,10 +1145,6 @@ def should_skip_domain(
         vmc_output(f"{domain}: Bad Domain", "cyan", use_tqdm=True)
         delete_domain_if_known(domain)
         return True
-    if has_emoji_chars(domain):
-        vmc_output(f"{domain}: Emoji Domain", "cyan", use_tqdm=True)
-        delete_domain_if_known(domain)
-        return True
     return False
 
 
@@ -1870,7 +1867,10 @@ def load_from_database(user_choice):
     cursor = conn.cursor()
     try:
         cursor.execute(query, params if params else None)  # type: ignore
-        domain_list = [row[0].strip() for row in cursor.fetchall() if row[0].strip()]
+        raw_domains = [row[0].strip() for row in cursor.fetchall() if row[0].strip()]
+        # Filter out domains with invalid characters (like emoji)
+        domain_list = [domain for domain in raw_domains if not has_emoji_chars(domain)]
+
         conn.commit()
     except Exception as exceptionxception:
         vmc_output(f"Failed to obtain selected domain list: {exception}", "red")
@@ -1888,23 +1888,25 @@ def load_from_file(file_name):
     with open(os.path.expanduser(file_name), "r") as file:
         for line in file:
             domain = line.strip()
-            if domain:  # Ensure the domain is not empty
-                domain_list.append(domain)
-                # Check if the domain already exists in the database
-                cursor.execute(
-                    "SELECT COUNT(*) FROM raw_domains WHERE domain = %s", (domain,)
-                )
-                result = cursor.fetchone()
-                exists = result is not None and result[0] > 0
+            if not domain or has_emoji_chars(domain):
+                continue
 
-                # If not, insert the new domain into the database
-                if not exists:
-                    cursor.execute(
-                        "INSERT INTO raw_domains (domain, errors) VALUES (%s, %s)",
-                        (domain, None),
-                    )
-                    cursor.close()
-                conn.commit()
+            domain_list.append(domain)
+            # Check if the domain already exists in the database
+            cursor.execute(
+                "SELECT COUNT(*) FROM raw_domains WHERE domain = %s", (domain,)
+            )
+            result = cursor.fetchone()
+            exists = result is not None and result[0] > 0
+
+            # If not, insert the new domain into the database
+            if not exists:
+                cursor.execute(
+                    "INSERT INTO raw_domains (domain, errors) VALUES (%s, %s)",
+                    (domain, None),
+                )
+            conn.commit()
+    cursor.close()
     return domain_list
 
 

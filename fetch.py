@@ -16,8 +16,9 @@ try:
         vmc_output,
         is_running_headless,
         http_client,
-        get_with_fallback,
+        get_httpx,
         get_domain_endings,
+        has_emoji_chars,
     )
 except ImportError as e:
     print(f"Error importing module: {e}")
@@ -104,7 +105,7 @@ def fetch_domain_list(conn, exclude_domains_sql):
                 ORDER BY active_users_monthly DESC
             """
         cursor.execute(query)
-        result = [row[0] for row in cursor.fetchall()]
+        result = [row[0] for row in cursor.fetchall() if not has_emoji_chars(row[0])]
 
         if args.random is True:
             random.shuffle(result)
@@ -235,12 +236,13 @@ def get_domains(api_url, domain, domain_endings):
     bad_tlds = get_bad_tld() or []
 
     try:
-        api_response = get_with_fallback(api_url, http_client)
+        api_response = get_httpx(api_url, http_client)
         data = api_response.json()
         filtered_domains = [
             item
             for item in data
             if is_valid_domain(item)
+            and not has_emoji_chars(item)
             and not any(keyword in item for keyword in keywords)
             and not any(item.endswith(f".{tld}") for tld in bad_tlds)
             and any(
