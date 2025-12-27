@@ -1476,7 +1476,7 @@ def process_mastodon_instance(
                 )
                 log_error(domain, f"{target} {error_message}")
                 handle_json_exception(domain, target, error_message)
-                return None
+                return False
             elif "json" not in content_type:
                 handle_incorrect_file_type(domain, target, content_type)
                 return False
@@ -1490,7 +1490,7 @@ def process_mastodon_instance(
                     response_json, _ = decoder.raw_decode(response.text, 0)
                 except json.JSONDecodeError as exception:
                     handle_json_exception(domain, target, exception)
-                    return None
+                    return False
 
             if "error" in response_json:
                 error_message = "returned an error"
@@ -1499,7 +1499,7 @@ def process_mastodon_instance(
                 )
                 log_error(domain, f"{target} {error_message}")
                 handle_json_exception(domain, target, error_message)
-                return None
+                return False
             else:
                 instance_api_data = response_json
 
