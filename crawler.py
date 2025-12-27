@@ -1435,32 +1435,32 @@ def process_mastodon_instance(
         nodeinfo_20_result["software"]["version"], nightly_version_ranges
     )
 
-    if "usage" not in nodeinfo_20_result or "users" not in nodeinfo_20_result["usage"]:
-        error_to_print = f"No usage data in NodeInfo"
+    # Extract users data once
+    users = nodeinfo_20_result.get("usage", {}).get("users", {})
+    if not users:
+        error_to_print = "No usage data in NodeInfo"
         vmc_output(f"{domain}: {error_to_print}", "yellow", use_tqdm=True)
         log_error(domain, error_to_print)
         increment_domain_error(domain, "###")
         delete_domain_if_known(domain)
         return
 
-    if "total" in nodeinfo_20_result["usage"]["users"]:
-        total_users = nodeinfo_20_result["usage"]["users"]["total"]
-    else:
-        error_to_print = f"No user data in NodeInfo"
-        vmc_output(f"{domain}: {error_to_print}", "yellow", use_tqdm=True)
-        log_error(domain, error_to_print)
-        increment_domain_error(domain, "###")
-        delete_domain_if_known(domain)
-        return
-    if "activeMonth" in nodeinfo_20_result["usage"]["users"]:
-        active_month_users = nodeinfo_20_result["usage"]["users"]["activeMonth"]
-    else:
-        error_to_print = f"No MAU data in NodeInfo"
-        vmc_output(f"{domain}: {error_to_print}", "yellow", use_tqdm=True)
-        log_error(domain, error_to_print)
-        increment_domain_error(domain, "###")
-        delete_domain_if_known(domain)
-        return
+    # Extract and validate required fields
+    required_fields = [
+        ("total", "No user data in NodeInfo"),
+        ("activeMonth", "No MAU data in NodeInfo"),
+    ]
+
+    for field, error_msg in required_fields:
+        if field not in users:
+            vmc_output(f"{domain}: {error_msg}", "yellow", use_tqdm=True)
+            log_error(domain, error_msg)
+            increment_domain_error(domain, "###")
+            delete_domain_if_known(domain)
+            return
+
+    total_users = users["total"]
+    active_month_users = users["activeMonth"]
 
     if software_version.startswith("4"):
         instance_api_url = f"https://{backend_domain}/api/v2/instance"
