@@ -1268,7 +1268,16 @@ def check_webfinger(domain, http_client):
             if not response.content or content_length == "0":
                 # WebFinger reply is empty
                 return None
-            data = response.json()
+            try:
+                data = response.json()
+            except json.JSONDecodeError:
+                # Try parsing first valid object if multiple exist (e.g., concatenated JSON)
+                try:
+                    decoder = json.JSONDecoder()
+                    data, _ = decoder.raw_decode(response.text, 0)
+                except json.JSONDecodeError as exception:
+                    handle_json_exception(domain, target, exception)
+                    return False
             aliases = data.get("aliases", [])
             if not aliases:
                 return None
@@ -1312,9 +1321,14 @@ def check_nodeinfo(domain, backend_domain, http_client):
             else:
                 try:
                     data = response.json()
-                except json.JSONDecodeError as exception:
-                    handle_json_exception(domain, target, exception)
-                    return False
+                except json.JSONDecodeError:
+                    # Try parsing first valid object if multiple exist (e.g., concatenated JSON)
+                    try:
+                        decoder = json.JSONDecoder()
+                        data, _ = decoder.raw_decode(response.text, 0)
+                    except json.JSONDecodeError as exception:
+                        handle_json_exception(domain, target, exception)
+                        return False
             if data.get("links"):
                 nodeinfo_20_url = None
                 for i, link in enumerate(data["links"]):
@@ -1322,9 +1336,11 @@ def check_nodeinfo(domain, backend_domain, http_client):
                     type_value = link.get("type", "")
                     href_value = link.get("href", "")
                     # Check rel/type for nodeinfo schema (1.0 or 2.x), or href for nodeinfo endpoints
-                    if ("nodeinfo.diaspora.software/ns/schema/" in rel_value 
+                    if (
+                        "nodeinfo.diaspora.software/ns/schema/" in rel_value
                         or "nodeinfo.diaspora.software/ns/schema/" in type_value
-                        or "/nodeinfo/" in href_value):
+                        or "/nodeinfo/" in href_value
+                    ):
                         if "href" in link:
                             nodeinfo_20_url = link["href"]
                             break
@@ -1371,9 +1387,14 @@ def check_nodeinfo_20(domain, nodeinfo_20_url, http_client):
             else:
                 try:
                     nodeinfo_20_result = response.json()
-                except json.JSONDecodeError as exception:
-                    handle_json_exception(domain, target, exception)
-                    return False
+                except json.JSONDecodeError:
+                    # Try parsing first valid object if multiple exist (e.g., concatenated JSON)
+                    try:
+                        decoder = json.JSONDecoder()
+                        nodeinfo_20_result, _ = decoder.raw_decode(response.text, 0)
+                    except json.JSONDecodeError as exception:
+                        handle_json_exception(domain, target, exception)
+                        return False
                 return nodeinfo_20_result
         elif response.status_code in http_codes_to_hardfail:
             handle_http_nxdomain(domain, target, response)
@@ -1463,7 +1484,17 @@ def process_mastodon_instance(
                 handle_incorrect_file_type(domain, target, content_type)
                 return False
 
-            response_json = response.json()
+            try:
+                response_json = response.json()
+            except json.JSONDecodeError:
+                # Try parsing first valid object if multiple exist (e.g., concatenated JSON)
+                try:
+                    decoder = json.JSONDecoder()
+                    response_json, _ = decoder.raw_decode(response.text, 0)
+                except json.JSONDecodeError as exception:
+                    handle_json_exception(domain, target, exception)
+                    return None
+
             if "error" in response_json:
                 error_message = "returned an error"
                 vmc_output(
