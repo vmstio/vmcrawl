@@ -1326,9 +1326,14 @@ def check_nodeinfo(domain, backend_domain, http_client):
                     except json.JSONDecodeError as exception:
                         handle_json_exception(domain, target, exception)
                         return False
-            if data.get("links"):
+            links = data.get("links")
+            if links is not None and len(links) == 0:
+                exception = "empty links array in reply"
+                handle_json_exception(domain, target, exception)
+                return False
+            if links:
                 nodeinfo_20_url = None
-                for i, link in enumerate(data["links"]):
+                for i, link in enumerate(links):
                     rel_value = link.get("rel", "")
                     type_value = link.get("type", "")
                     href_value = link.get("href", "")
@@ -1342,11 +1347,11 @@ def check_nodeinfo(domain, backend_domain, http_client):
                             nodeinfo_20_url = link["href"]
                             break
                         elif (
-                            i + 1 < len(data["links"])
-                            and "href" in data["links"][i + 1]
-                            and "rel" not in data["links"][i + 1]
+                            i + 1 < len(links)
+                            and "href" in links[i + 1]
+                            and "rel" not in links[i + 1]
                         ):
-                            nodeinfo_20_url = data["links"][i + 1]["href"]
+                            nodeinfo_20_url = links[i + 1]["href"]
                             break
 
                 if nodeinfo_20_url:
