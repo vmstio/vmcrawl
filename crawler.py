@@ -1,10 +1,9 @@
 #!/usr/bin/env python3
 
-# Import required modules
 try:
     import argparse
-    import json
     import hashlib
+    import json
     import mimetypes
     import os
     import random
@@ -12,14 +11,13 @@ try:
     import sys
     import threading
     import time
-    import toml
     import unicodedata
-    import httpx
-    import psycopg
-    import idna
     from concurrent.futures import ThreadPoolExecutor, as_completed
     from datetime import datetime, timedelta, timezone
     from urllib.parse import urlparse, urlunparse
+    import httpx
+    import psycopg
+    import toml
     from dotenv import load_dotenv
     from packaging import version
     from tqdm import tqdm
@@ -70,10 +68,13 @@ try:
 
 except FileNotFoundError:
     print(f"Error: {toml_file_path} not found.")
+    sys.exit(1)
 except toml.TomlDecodeError:
     print(f"Error: {toml_file_path} is not a valid TOML file.")
+    sys.exit(1)
 except KeyError as exception:
     print(f"Error: Missing expected key in TOML file: {exception}")
+    sys.exit(1)
 
 # Add your color constants here
 color_bold = "\033[1m"
@@ -156,8 +157,6 @@ def is_cache_valid(cache_file_path: str, max_age_seconds: int) -> bool:
 
 
 def read_main_version_info(url):
-    # Read version information from a remote Ruby file.
-    # Returns a dictionary containing major, minor, patch and prerelease values.
     version_info = {}
     try:
         response = get_httpx(url, http_client)
@@ -180,6 +179,7 @@ def read_main_version_info(url):
 
 
 def get_highest_mastodon_version():
+    highest_version = None
     try:
         release_url = "https://api.github.com/repos/mastodon/mastodon/releases"
         response = get_httpx(release_url, http_client)
@@ -394,7 +394,9 @@ def get_nightly_version_ranges():
                 (
                     end_date
                     if isinstance(end_date, datetime)
-                    else datetime.fromisoformat(str(end_date)) if end_date else None
+                    else datetime.fromisoformat(str(end_date))
+                    if end_date
+                    else None
                 ),
             )
             for version, start_date, end_date in nightly_version_ranges
@@ -921,7 +923,6 @@ def get_junk_keywords():
         vmc_output(f"Failed to obtain junk keywords: {exception}", "red")
         conn.rollback()
     finally:
-
         cursor.close()
     return []
 
@@ -942,6 +943,7 @@ def get_bad_tld():
 
 
 def get_failed_domains():
+    failed_domains = []
     cursor = conn.cursor()
     try:
         cursor.execute("SELECT domain FROM raw_domains WHERE failed = TRUE")
@@ -956,6 +958,7 @@ def get_failed_domains():
 
 
 def get_ignored_domains():
+    ignored_domains = []
     cursor = conn.cursor()
     try:
         cursor.execute("SELECT domain FROM raw_domains WHERE ignore = TRUE")
@@ -972,6 +975,7 @@ def get_ignored_domains():
 
 
 def get_baddata_domains():
+    baddata_domains = []
     cursor = conn.cursor()
     try:
         cursor.execute("SELECT domain FROM raw_domains WHERE baddata = TRUE")
@@ -988,6 +992,7 @@ def get_baddata_domains():
 
 
 def get_nxdomain_domains():
+    nxdomain_domains = []
     cursor = conn.cursor()
     try:
         cursor.execute("SELECT domain FROM raw_domains WHERE nxdomain = TRUE")
@@ -1004,6 +1009,7 @@ def get_nxdomain_domains():
 
 
 def get_norobots_domains():
+    norobots_domains = []
     cursor = conn.cursor()
     try:
         cursor.execute("SELECT domain FROM raw_domains WHERE norobots = TRUE")
@@ -1468,9 +1474,9 @@ def process_mastodon_instance(
         instance_api_url = f"https://{backend_domain}/api/v2/instance"
     else:
         instance_api_url = f"https://{backend_domain}/api/v1/instance"
-
+    
+    target = "instance_api"
     try:
-        target = "instance_api"
         response = get_httpx(instance_api_url, http_client)
         if response.status_code in [200]:
             content_type = response.headers.get("Content-Type", "")
@@ -1549,7 +1555,7 @@ def process_mastodon_instance(
             if version.parse(software_version.split("-")[0]) > version.parse(
                 version_main_branch
             ):
-                error_to_print = f"Mastodon version invalid"
+                error_to_print = "Mastodon version invalid"
                 vmc_output(f"{domain}: {error_to_print}", "yellow", use_tqdm=True)
                 log_error(domain, error_to_print)
                 increment_domain_error(domain, "###")
@@ -1572,7 +1578,7 @@ def process_mastodon_instance(
             version_info = f"Mastodon v{software_version}"
             if software_version != nodeinfo_20_result["software"]["version"]:
                 version_info = (
-                    f'{version_info} ({nodeinfo_20_result["software"]["version"]})'
+                    f"{version_info} ({nodeinfo_20_result['software']['version']})"
                 )
             vmc_output(f"{domain}: {version_info}", "green", use_tqdm=True)
         elif response.status_code in http_codes_to_authfail:
@@ -1796,7 +1802,7 @@ def cleanup_old_domains():
             for d in deleted_domains:
                 vmc_output(f"{d}: Removed from known domains", "pink", use_tqdm=True)
         conn.commit()
-    except Exception as exceptionxception:
+    except Exception as exception:
         vmc_output(f"Failed to clean up old domains: {exception}", "red")
         conn.rollback()
     finally:
@@ -1877,7 +1883,7 @@ def load_from_database(user_choice):
         domain_list = [domain for domain in raw_domains if not has_emoji_chars(domain)]
 
         conn.commit()
-    except Exception as exceptionxception:
+    except Exception as exception:
         vmc_output(f"Failed to obtain selected domain list: {exception}", "red")
         conn.rollback()
         domain_list = []
@@ -1954,9 +1960,9 @@ def get_menu_options() -> dict:
             "46": "Stale (3+ days)",
         },
         "Retry general errors": {
-            "50": f"Domains w/ >{int(error_buffer*2)} Errors",
-            "51": f"Domains w/ {error_buffer}-{int(error_buffer*2)} Errors",
-            "52": f"Domains with any errors",
+            "50": f"Domains w/ >{int(error_buffer * 2)} Errors",
+            "51": f"Domains w/ {error_buffer}-{int(error_buffer * 2)} Errors",
+            "52": "Domains with any errors",
         },
     }
 
@@ -2128,7 +2134,7 @@ def main():
         except FileNotFoundError:
             vmc_output(f"File not found: {domain_list_file}", "red")
             sys.exit(1)
-        except psycopg.Error as exceptionxception:
+        except psycopg.Error as exception:
             vmc_output(f"Database error: {exception}", "red")
             sys.exit(1)
 
@@ -2170,7 +2176,7 @@ def main():
         if not (args.file or args.target or args.new or args.buffer):
             try:
                 os.execv(sys.executable, ["python3"] + sys.argv)
-            except Exception as exceptionxception:
+            except Exception as exception:
                 vmc_output(f"Failed to restart {appname}: {exception}", "red")
     else:
         sys.exit(0)
