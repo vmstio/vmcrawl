@@ -2,6 +2,5 @@ psycopg[binary]
 httpx[http2]
 python-dotenv
 toml
-lxml
 packaging
 tqdm

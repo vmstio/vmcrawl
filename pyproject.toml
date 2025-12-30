@@ -9,7 +9,6 @@ dependencies = [
     "httpx[http2]",
     "python-dotenv",
     "toml",
-    "lxml",
     "packaging",
     "tqdm",
 ]
