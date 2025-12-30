@@ -1,6 +1,9 @@
 #!/usr/bin/env python3
 
-# Import required modules
+# =============================================================================
+# IMPORTS
+# =============================================================================
+
 try:
     import argparse
     import os
@@ -18,8 +21,16 @@ except ImportError as e:
     print(f"Error importing module: {e}")
     sys.exit(1)
 
-# Detect the current filename
+# =============================================================================
+# CONSTANTS
+# =============================================================================
+
 current_filename = os.path.basename(__file__)
+
+
+# =============================================================================
+# DATABASE FUNCTIONS - Read Operations
+# =============================================================================
 
 
 def display_current_versions():
@@ -73,13 +84,9 @@ def get_active_version():
         return None
 
 
-def validate_date(date_string):
-    """Validate date format (YYYY-MM-DD)."""
-    try:
-        datetime.strptime(date_string, "%Y-%m-%d")
-        return True
-    except ValueError:
-        return False
+# =============================================================================
+# DATABASE FUNCTIONS - Write Operations
+# =============================================================================
 
 
 def add_nightly_version(
@@ -128,7 +135,7 @@ def add_nightly_version(
                     datetime.strptime(start_date, "%Y-%m-%d") - timedelta(days=1)
                 ).strftime("%Y-%m-%d")
 
-                vmc_output("\nUpdating previous active version:", "cyan")
+                vmc_output(f"\nUpdating previous active version:", "cyan")
                 vmc_output(f"  Version: {old_version}", "cyan")
                 vmc_output(f"  Old end date: {old_end}", "cyan")
                 vmc_output(f"  New end date: {new_end_date}", "cyan")
@@ -144,9 +151,7 @@ def add_nightly_version(
                     )
                     conn.commit()
 
-                vmc_output(
-                    f"✓ Updated {old_version} end date to {new_end_date}", "green"
-                )
+                vmc_output(f"Updated {old_version} end date to {new_end_date}", "green")
 
         # Insert new version
         with conn.cursor() as cur:
@@ -159,7 +164,7 @@ def add_nightly_version(
             )
             conn.commit()
 
-        vmc_output("\n✓ Successfully added nightly version:", "green")
+        vmc_output(f"\nSuccessfully added nightly version:", "green")
         vmc_output(f"  Version: {version}", "green")
         vmc_output(f"  Start date: {start_date}", "green")
         vmc_output(f"  End date: {end_date}", "green")
@@ -195,13 +200,32 @@ def update_end_date(version, new_end_date):
 
             conn.commit()
 
-        vmc_output(f"✓ Updated {version} end date to {new_end_date}", "green")
+        vmc_output(f"Updated {version} end date to {new_end_date}", "green")
         return True
 
     except Exception as e:
         conn.rollback()
         vmc_output(f"Error updating end date: {e}", "red")
         return False
+
+
+# =============================================================================
+# VALIDATION FUNCTIONS
+# =============================================================================
+
+
+def validate_date(date_string):
+    """Validate date format (YYYY-MM-DD)."""
+    try:
+        datetime.strptime(date_string, "%Y-%m-%d")
+        return True
+    except ValueError:
+        return False
+
+
+# =============================================================================
+# INTERACTIVE FUNCTIONS
+# =============================================================================
 
 
 def interactive_add():
@@ -237,8 +261,8 @@ def interactive_add():
             datetime.strptime(start_date, "%Y-%m-%d") - timedelta(days=1)
         ).strftime("%Y-%m-%d")
 
-        vmc_output("\nThis will update the previous active version:", "yellow")
-        vmc_output(f"  {old_version}: {old_end} → {new_end}", "yellow")
+        vmc_output(f"\nThis will update the previous active version:", "yellow")
+        vmc_output(f"  {old_version}: {old_end} -> {new_end}", "yellow")
 
         confirm = input("Continue? (y/n): ").strip().lower()
         if confirm != "y":
@@ -249,8 +273,13 @@ def interactive_add():
     add_nightly_version(version, start_date, end_date)
 
 
+# =============================================================================
+# MAIN FUNCTION
+# =============================================================================
+
+
 def main():
-    """Main execution logic."""
+    """Main entry point for nightly version management."""
     parser = argparse.ArgumentParser(
         description="Manage nightly version entries in the database"
     )
@@ -328,6 +357,10 @@ def main():
     finally:
         conn.close()
 
+
+# =============================================================================
+# ENTRY POINT
+# =============================================================================
 
 if __name__ == "__main__":
     main()

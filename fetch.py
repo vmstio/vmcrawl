@@ -1,6 +1,9 @@
 #!/usr/bin/env python3
 
-# Import required modules
+# =============================================================================
+# IMPORTS
+# =============================================================================
+
 try:
     import argparse
     import ipaddress
@@ -24,8 +27,15 @@ except ImportError as e:
     print(f"Error importing module: {e}")
     sys.exit(1)
 
-# Detect the current filename
+# =============================================================================
+# CONSTANTS
+# =============================================================================
+
 current_filename = os.path.basename(__file__)
+
+# =============================================================================
+# ARGUMENT PARSING
+# =============================================================================
 
 parser = argparse.ArgumentParser(description="Fetch peer data from Mastodon instances.")
 parser.add_argument(
@@ -55,6 +65,7 @@ parser.add_argument(
 
 args = parser.parse_args()
 
+# Validate argument combinations
 if (args.limit or args.offset) and args.target:
     vmc_output("You cannot set both limit/offset and target arguments", "pink")
     sys.exit(1)
@@ -63,6 +74,7 @@ if args.offset and args.random:
     vmc_output("You cannot set both offset and random arguments", "pink")
     sys.exit(1)
 
+# Set defaults from arguments or environment
 if args.limit is not None:
     db_limit = args.limit
 else:
@@ -74,7 +86,13 @@ else:
     db_offset = int(os.getenv("VMCRAWL_FETCH_OFFSET", "0"))
 
 
+# =============================================================================
+# DATABASE FUNCTIONS
+# =============================================================================
+
+
 def fetch_exclude_domains(conn):
+    """Fetch domains to exclude from peer fetching."""
     cursor = conn.cursor()
     try:
         cursor.execute("SELECT string_agg('''' || domain || '''', ',') FROM no_peers")
@@ -89,6 +107,7 @@ def fetch_exclude_domains(conn):
 
 
 def fetch_domain_list(conn, exclude_domains_sql):
+    """Fetch list of domains to query for peers."""
     cursor = conn.cursor()
     try:
         if exclude_domains_sql:
@@ -124,34 +143,71 @@ def fetch_domain_list(conn, exclude_domains_sql):
         cursor.close()
 
 
-def is_valid_domain(domain):
-    domain_pattern = re.compile(r"^[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$", re.IGNORECASE)
-    return (
-        (domain_pattern.match(domain) or "xn--" in domain)
-        and not is_ip_address(domain)
-        and not detect_vowels(domain)
-    )
-
-
-def is_ip_address(domain):
+def get_existing_domains():
+    """Get list of domains already in raw_domains table."""
+    cursor = conn.cursor()
     try:
-        ipaddress.ip_address(domain)
-        return True
-    except ValueError:
-        return False
-
-
-def detect_vowels(domain):
-    try:
-        pattern = r"\.[aeiou]{4}"
-        matches = re.findall(pattern, domain)
-        return True if len(matches) > 0 else False
+        cursor.execute("SELECT domain FROM raw_domains")
+        existing_domains = [row[0] for row in cursor.fetchall()]
+        conn.commit()
+        return existing_domains
     except Exception as e:
-        vmc_output(f"Error detecting vowels: {e}", "orange")
-        return False
+        vmc_output(f"Failed to get list of existing domains: {e}", "orange")
+        conn.rollback()
+        return None
+    finally:
+        cursor.close()
+
+
+def get_junk_keywords():
+    """Get list of junk keywords to filter domains."""
+    cursor = conn.cursor()
+    try:
+        cursor.execute("SELECT keywords FROM junk_words")
+        keywords = [row[0] for row in cursor.fetchall()]
+        conn.commit()
+        return keywords
+    except Exception as e:
+        vmc_output(f"Failed to obtain junk domain list: {e}", "orange")
+        conn.rollback()
+        return None
+    finally:
+        cursor.close()
+
+
+def get_bad_tld():
+    """Get list of prohibited TLDs."""
+    cursor = conn.cursor()
+    try:
+        cursor.execute("SELECT tld FROM bad_tld")
+        tlds = [row[0] for row in cursor.fetchall()]
+        conn.commit()
+        return tlds
+    except Exception as e:
+        vmc_output(f"Failed to obtain bad TLD list: {e}", "orange")
+        conn.rollback()
+        return None
+    finally:
+        cursor.close()
+
+
+def add_to_no_peers(domain):
+    """Add a domain to the no_peers exclusion list."""
+    cursor = conn.cursor()
+    try:
+        cursor.execute("INSERT INTO no_peers (domain) VALUES (%s)", (domain,))
+        conn.commit()
+        vmc_output(f"{domain} added to no_peers table", "red")
+    except Exception as e:
+        vmc_output(f"Failed to add domain to no_peers list: {e}", "orange")
+        conn.rollback()
+        return None
+    finally:
+        cursor.close()
 
 
 def import_domains(domains):
+    """Import new domains into raw_domains table."""
     cursor = conn.cursor()
     try:
         if domains:
@@ -172,66 +228,48 @@ def import_domains(domains):
         cursor.close()
 
 
-def get_junk_keywords():
-    cursor = conn.cursor()
+# =============================================================================
+# VALIDATION FUNCTIONS
+# =============================================================================
+
+
+def is_valid_domain(domain):
+    """Check if a domain string is valid."""
+    domain_pattern = re.compile(r"^[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$", re.IGNORECASE)
+    return (
+        (domain_pattern.match(domain) or "xn--" in domain)
+        and not is_ip_address(domain)
+        and not detect_vowels(domain)
+    )
+
+
+def is_ip_address(domain):
+    """Check if a string is an IP address."""
     try:
-        cursor.execute("SELECT keywords FROM junk_words")
-        keywords = [row[0] for row in cursor.fetchall()]
-        conn.commit()
-        return keywords
-    except Exception as e:
-        vmc_output(f"Failed to obtain junk domain list: {e}", "orange")
-        conn.rollback()
-        return None
-    finally:
-        cursor.close()
+        ipaddress.ip_address(domain)
+        return True
+    except ValueError:
+        return False
 
 
-def get_bad_tld():
-    cursor = conn.cursor()
+def detect_vowels(domain):
+    """Detect domains with suspicious vowel patterns."""
     try:
-        cursor.execute("SELECT tld FROM bad_tld")
-        tlds = [row[0] for row in cursor.fetchall()]
-        conn.commit()
-        return tlds
+        pattern = r"\.[aeiou]{4}"
+        matches = re.findall(pattern, domain)
+        return True if len(matches) > 0 else False
     except Exception as e:
-        vmc_output(f"Failed to obtain bad TLD list: {e}", "orange")
-        conn.rollback()
-        return None
-    finally:
-        cursor.close()
+        vmc_output(f"Error detecting vowels: {e}", "orange")
+        return False
 
 
-def add_to_no_peers(domain):
-    cursor = conn.cursor()
-    try:
-        cursor.execute("INSERT INTO no_peers (domain) VALUES (%s)", (domain,))
-        conn.commit()
-        vmc_output(f"{domain} added to no_peers table", "red")
-    except Exception as e:
-        vmc_output(f"Failed to add domain to no_peers list: {e}", "orange")
-        conn.rollback()
-        return None
-    finally:
-        cursor.close()
-
-
-def get_existing_domains():
-    cursor = conn.cursor()
-    try:
-        cursor.execute("SELECT domain FROM raw_domains")
-        existing_domains = [row[0] for row in cursor.fetchall()]
-        conn.commit()
-        return existing_domains
-    except Exception as e:
-        vmc_output(f"Failed to get list of existing domains: {e}", "orange")
-        conn.rollback()
-        return None
-    finally:
-        cursor.close()
+# =============================================================================
+# DOMAIN FETCHING FUNCTIONS
+# =============================================================================
 
 
 def get_domains(api_url, domain, domain_endings):
+    """Fetch peer domains from a Mastodon instance API."""
     keywords = get_junk_keywords() or []
     bad_tlds = get_bad_tld() or []
 
@@ -253,11 +291,12 @@ def get_domains(api_url, domain, domain_endings):
         return filtered_domains
     except Exception as e:
         vmc_output(f"{e}", "orange")
-        add_to_no_peers(domain)  # Add domain to no_peers if any other error occurs
+        add_to_no_peers(domain)
     return []
 
 
 def process_domain(domain, counter, total):
+    """Process a single domain to fetch its peers."""
     vmc_output(f"Fetching peers @ {domain} ({counter}/{total})…", "bold")
 
     api_url = f"https://{domain}/api/v1/instance/peers"
@@ -273,6 +312,11 @@ def process_domain(domain, counter, total):
     print(f"Found {len(domains)} domains, {len(unique_domains)} new domains")
 
     import_domains(unique_domains)
+
+
+# =============================================================================
+# MAIN FUNCTION
+# =============================================================================
 
 
 if __name__ == "__main__":

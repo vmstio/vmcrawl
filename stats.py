@@ -1,6 +1,9 @@
 #!/usr/bin/env python3
 
-# Import required modules
+# =============================================================================
+# IMPORTS
+# =============================================================================
+
 try:
     import os
     import sys
@@ -16,11 +19,20 @@ except ImportError as e:
     print(f"Error importing module: {e}")
     sys.exit(1)
 
-# Detect the current filename
+# =============================================================================
+# CONSTANTS
+# =============================================================================
+
 current_filename = os.path.basename(__file__)
 
 
+# =============================================================================
+# STATISTICS FUNCTIONS - Raw Domain Counts
+# =============================================================================
+
+
 def get_total_raw_domains():
+    """Get total count of raw domains."""
     cursor = conn.cursor()
     value_to_return = 0
     try:
@@ -37,6 +49,7 @@ def get_total_raw_domains():
 
 
 def get_total_failed_domains():
+    """Get count of domains marked as failed."""
     cursor = conn.cursor()
     value_to_return = 0
     try:
@@ -54,23 +67,8 @@ def get_total_failed_domains():
         cursor.close()
 
 
-def get_total_mastodon_domains():
-    cursor = conn.cursor()
-    value_to_return = 0
-    try:
-        cursor.execute("SELECT COUNT(domain) AS total_domains FROM mastodon_domains;")
-        result = cursor.fetchone()
-        value_to_return = result[0] if result is not None else 0
-        conn.commit()
-        return value_to_return
-    except Exception as e:
-        print(f"Failed to obtain total Mastodon domains: {e}")
-        conn.rollback()
-    finally:
-        cursor.close()
-
-
 def get_total_ignored_domains():
+    """Get count of domains marked as ignored (non-Mastodon)."""
     cursor = conn.cursor()
     value_to_return = 0
     try:
@@ -89,6 +87,7 @@ def get_total_ignored_domains():
 
 
 def get_total_nxdomains():
+    """Get count of domains marked as NXDOMAIN."""
     cursor = conn.cursor()
     value_to_return = 0
     try:
@@ -107,6 +106,7 @@ def get_total_nxdomains():
 
 
 def get_total_norobots():
+    """Get count of domains that prohibit crawling."""
     cursor = conn.cursor()
     value_to_return = 0
     try:
@@ -125,6 +125,7 @@ def get_total_norobots():
 
 
 def get_total_baddata():
+    """Get count of domains with bad data."""
     cursor = conn.cursor()
     value_to_return = 0
     try:
@@ -143,6 +144,7 @@ def get_total_baddata():
 
 
 def get_total_error_over():
+    """Get count of domains with 8 or more errors."""
     cursor = conn.cursor()
     value_to_return = 0
     try:
@@ -161,6 +163,7 @@ def get_total_error_over():
 
 
 def get_total_error_under():
+    """Get count of domains with 7 or fewer errors."""
     cursor = conn.cursor()
     value_to_return = 0
     try:
@@ -178,41 +181,30 @@ def get_total_error_under():
         cursor.close()
 
 
-def get_total_users():
+# =============================================================================
+# STATISTICS FUNCTIONS - Mastodon Domain Counts
+# =============================================================================
+
+
+def get_total_mastodon_domains():
+    """Get total count of known Mastodon domains."""
     cursor = conn.cursor()
     value_to_return = 0
     try:
-        cursor.execute("SELECT SUM(total_users) AS total_users FROM mastodon_domains;")
+        cursor.execute("SELECT COUNT(domain) AS total_domains FROM mastodon_domains;")
         result = cursor.fetchone()
         value_to_return = result[0] if result is not None else 0
         conn.commit()
         return value_to_return
     except Exception as e:
-        print(f"Failed to obtain total users: {e}")
-        conn.rollback()
-    finally:
-        cursor.close()
-
-
-def get_total_active_users():
-    cursor = conn.cursor()
-    value_to_return = 0
-    try:
-        cursor.execute(
-            "SELECT SUM(active_users_monthly) AS total_users FROM mastodon_domains;"
-        )
-        result = cursor.fetchone()
-        value_to_return = result[0] if result is not None else 0
-        conn.commit()
-        return value_to_return
-    except Exception as e:
-        print(f"Failed to obtain active users: {e}")
+        print(f"Failed to obtain total Mastodon domains: {e}")
         conn.rollback()
     finally:
         cursor.close()
 
 
 def get_total_unique_versions():
+    """Get count of unique software versions."""
     cursor = conn.cursor()
     value_to_return = 0
     try:
@@ -230,7 +222,54 @@ def get_total_unique_versions():
         cursor.close()
 
 
+# =============================================================================
+# STATISTICS FUNCTIONS - User Counts
+# =============================================================================
+
+
+def get_total_users():
+    """Get total user count across all instances."""
+    cursor = conn.cursor()
+    value_to_return = 0
+    try:
+        cursor.execute("SELECT SUM(total_users) AS total_users FROM mastodon_domains;")
+        result = cursor.fetchone()
+        value_to_return = result[0] if result is not None else 0
+        conn.commit()
+        return value_to_return
+    except Exception as e:
+        print(f"Failed to obtain total users: {e}")
+        conn.rollback()
+    finally:
+        cursor.close()
+
+
+def get_total_active_users():
+    """Get total monthly active user count across all instances."""
+    cursor = conn.cursor()
+    value_to_return = 0
+    try:
+        cursor.execute(
+            "SELECT SUM(active_users_monthly) AS total_users FROM mastodon_domains;"
+        )
+        result = cursor.fetchone()
+        value_to_return = result[0] if result is not None else 0
+        conn.commit()
+        return value_to_return
+    except Exception as e:
+        print(f"Failed to obtain active users: {e}")
+        conn.rollback()
+    finally:
+        cursor.close()
+
+
+# =============================================================================
+# STATISTICS FUNCTIONS - Branch Instance Counts
+# =============================================================================
+
+
 def get_total_main_branch_instances():
+    """Get count of instances on main branch."""
     cursor = conn.cursor()
     value_to_return = 0
     try:
@@ -257,6 +296,7 @@ def get_total_main_branch_instances():
 
 
 def get_total_release_branch_instances():
+    """Get count of instances on current release branch."""
     cursor = conn.cursor()
     value_to_return = 0
     try:
@@ -283,6 +323,7 @@ def get_total_release_branch_instances():
 
 
 def get_total_previous_branch_instances():
+    """Get count of instances on previous release branch."""
     cursor = conn.cursor()
     value_to_return = 0
     try:
@@ -309,6 +350,7 @@ def get_total_previous_branch_instances():
 
 
 def get_total_pending_eol_branch_instances():
+    """Get count of instances on deprecated branches."""
     cursor = conn.cursor()
     value_to_return = 0
     try:
@@ -336,6 +378,7 @@ def get_total_pending_eol_branch_instances():
 
 
 def get_total_eol_branch_instances():
+    """Get count of instances on EOL branches."""
     cursor = conn.cursor()
     value_to_return = 0
     try:
@@ -361,7 +404,13 @@ def get_total_eol_branch_instances():
         cursor.close()
 
 
+# =============================================================================
+# STATISTICS FUNCTIONS - Patched Instance Counts
+# =============================================================================
+
+
 def get_total_main_patched_instances():
+    """Get count of instances on latest main version."""
     cursor = conn.cursor()
     value_to_return = 0
     try:
@@ -388,6 +437,7 @@ def get_total_main_patched_instances():
 
 
 def get_total_release_patched_instances():
+    """Get count of instances on latest release version."""
     cursor = conn.cursor()
     value_to_return = 0
     try:
@@ -414,6 +464,7 @@ def get_total_release_patched_instances():
 
 
 def get_total_previous_patched_instances():
+    """Get count of instances on latest previous branch version."""
     cursor = conn.cursor()
     value_to_return = 0
     try:
@@ -440,6 +491,7 @@ def get_total_previous_patched_instances():
 
 
 def get_total_pending_eol_patched_instances():
+    """Get count of instances on latest deprecated branch versions."""
     cursor = conn.cursor()
     value_to_return = 0
     try:
@@ -466,7 +518,13 @@ def get_total_pending_eol_patched_instances():
         cursor.close()
 
 
+# =============================================================================
+# STATISTICS FUNCTIONS - Branch User Counts (Total)
+# =============================================================================
+
+
 def get_total_main_branch_users():
+    """Get total users on main branch instances."""
     cursor = conn.cursor()
     value_to_return = 0
     try:
@@ -493,6 +551,7 @@ def get_total_main_branch_users():
 
 
 def get_total_release_branch_users():
+    """Get total users on current release branch instances."""
     cursor = conn.cursor()
     value_to_return = 0
     try:
@@ -519,6 +578,7 @@ def get_total_release_branch_users():
 
 
 def get_total_previous_branch_users():
+    """Get total users on previous release branch instances."""
     cursor = conn.cursor()
     value_to_return = 0
     try:
@@ -545,6 +605,7 @@ def get_total_previous_branch_users():
 
 
 def get_total_pending_eol_branch_users():
+    """Get total users on deprecated branch instances."""
     cursor = conn.cursor()
     value_to_return = 0
     try:
@@ -572,6 +633,7 @@ def get_total_pending_eol_branch_users():
 
 
 def get_total_eol_branch_users():
+    """Get total users on EOL branch instances."""
     cursor = conn.cursor()
     value_to_return = 0
     try:
@@ -597,7 +659,13 @@ def get_total_eol_branch_users():
         cursor.close()
 
 
+# =============================================================================
+# STATISTICS FUNCTIONS - Patched User Counts (Total)
+# =============================================================================
+
+
 def get_total_main_patched_users():
+    """Get total users on latest main version instances."""
     cursor = conn.cursor()
     value_to_return = 0
     try:
@@ -624,6 +692,7 @@ def get_total_main_patched_users():
 
 
 def get_total_release_patched_users():
+    """Get total users on latest release version instances."""
     cursor = conn.cursor()
     value_to_return = 0
     try:
@@ -650,6 +719,7 @@ def get_total_release_patched_users():
 
 
 def get_total_previous_patched_users():
+    """Get total users on latest previous branch version instances."""
     cursor = conn.cursor()
     value_to_return = 0
     try:
@@ -676,6 +746,7 @@ def get_total_previous_patched_users():
 
 
 def get_total_pending_eol_patched_users():
+    """Get total users on latest deprecated branch version instances."""
     cursor = conn.cursor()
     value_to_return = 0
     try:
@@ -702,7 +773,13 @@ def get_total_pending_eol_patched_users():
         cursor.close()
 
 
+# =============================================================================
+# STATISTICS FUNCTIONS - Branch User Counts (Active)
+# =============================================================================
+
+
 def get_active_main_branch_users():
+    """Get active users on main branch instances."""
     cursor = conn.cursor()
     value_to_return = 0
     try:
@@ -729,6 +806,7 @@ def get_active_main_branch_users():
 
 
 def get_active_release_branch_users():
+    """Get active users on current release branch instances."""
     cursor = conn.cursor()
     value_to_return = 0
     try:
@@ -755,6 +833,7 @@ def get_active_release_branch_users():
 
 
 def get_active_previous_branch_users():
+    """Get active users on previous release branch instances."""
     cursor = conn.cursor()
     value_to_return = 0
     try:
@@ -776,9 +855,12 @@ def get_active_previous_branch_users():
     except Exception as e:
         print(f"Failed to obtain active previous instances users: {e}")
         conn.rollback()
+    finally:
+        cursor.close()
 
 
 def get_active_pending_eol_branch_users():
+    """Get active users on deprecated branch instances."""
     cursor = conn.cursor()
     value_to_return = 0
     try:
@@ -806,6 +888,7 @@ def get_active_pending_eol_branch_users():
 
 
 def get_active_eol_branch_users():
+    """Get active users on EOL branch instances."""
     cursor = conn.cursor()
     value_to_return = 0
     try:
@@ -831,7 +914,13 @@ def get_active_eol_branch_users():
         cursor.close()
 
 
+# =============================================================================
+# STATISTICS FUNCTIONS - Patched User Counts (Active)
+# =============================================================================
+
+
 def get_active_main_patched_users():
+    """Get active users on latest main version instances."""
     cursor = conn.cursor()
     value_to_return = 0
     try:
@@ -858,6 +947,7 @@ def get_active_main_patched_users():
 
 
 def get_active_release_patched_users():
+    """Get active users on latest release version instances."""
     cursor = conn.cursor()
     value_to_return = 0
     try:
@@ -884,6 +974,7 @@ def get_active_release_patched_users():
 
 
 def get_active_previous_patched_users():
+    """Get active users on latest previous branch version instances."""
     cursor = conn.cursor()
     value_to_return = 0
     try:
@@ -904,9 +995,13 @@ def get_active_previous_patched_users():
         return value_to_return
     except Exception as e:
         print(f"Failed to obtain active previous patched instances users: {e}")
+        conn.rollback()
+    finally:
+        cursor.close()
 
 
 def get_active_pending_eol_patched_users():
+    """Get active users on latest deprecated branch version instances."""
     cursor = conn.cursor()
     value_to_return = 0
     try:
@@ -933,6 +1028,249 @@ def get_active_pending_eol_patched_users():
         cursor.close()
 
 
+# =============================================================================
+# STATISTICS CONFIGURATION
+# =============================================================================
+
+# Define all statistics to collect
+STATS_CONFIG = [
+    ("total_raw_domains", get_total_raw_domains, "Total raw domains"),
+    ("total_failed_domains", get_total_failed_domains, "Total failed (410) domains"),
+    ("total_mastodon_domains", get_total_mastodon_domains, "Total Mastodon domains"),
+    (
+        "total_ignored_domains",
+        get_total_ignored_domains,
+        "Total ignored (non-Masto) domains",
+    ),
+    ("total_nxdomains", get_total_nxdomains, "Total nxdomain domains"),
+    ("total_norobots", get_total_norobots, "Total robots.txt prohibited domains"),
+    ("total_baddata", get_total_baddata, "Total baddata domains"),
+    ("total_error_over", get_total_error_over, "Total error over domains"),
+    ("total_error_under", get_total_error_under, "Total error under domains"),
+    ("total_users", get_total_users, "Total users"),
+    ("total_active_users", get_total_active_users, "Total active users"),
+    ("total_unique_versions", get_total_unique_versions, "Total unique versions"),
+    (
+        "total_main_instances",
+        get_total_main_branch_instances,
+        "Total main branch instances",
+    ),
+    (
+        "total_release_instances",
+        get_total_release_branch_instances,
+        "Total release branch instances",
+    ),
+    (
+        "total_previous_instances",
+        get_total_previous_branch_instances,
+        "Total previous branch instances",
+    ),
+    (
+        "total_pending_eol_instances",
+        get_total_pending_eol_branch_instances,
+        "Total deprecated branch instances",
+    ),
+    (
+        "total_eol_instances",
+        get_total_eol_branch_instances,
+        "Total EOL branch instances",
+    ),
+    (
+        "total_main_patched_instances",
+        get_total_main_patched_instances,
+        "Total main patched instances",
+    ),
+    (
+        "total_release_patched_instances",
+        get_total_release_patched_instances,
+        "Total release patched instances",
+    ),
+    (
+        "total_previous_patched_instances",
+        get_total_previous_patched_instances,
+        "Total previous patched instances",
+    ),
+    (
+        "total_pending_eol_patched_instances",
+        get_total_pending_eol_patched_instances,
+        "Total deprecated patched instances",
+    ),
+    ("total_main_branch_users", get_total_main_branch_users, "Total main branch users"),
+    (
+        "total_release_branch_users",
+        get_total_release_branch_users,
+        "Total release branch users",
+    ),
+    (
+        "total_previous_branch_users",
+        get_total_previous_branch_users,
+        "Total previous branch users",
+    ),
+    (
+        "total_pending_eol_branch_users",
+        get_total_pending_eol_branch_users,
+        "Total deprecated branch users",
+    ),
+    ("total_eol_branch_users", get_total_eol_branch_users, "Total EOL branch users"),
+    (
+        "total_main_patched_users",
+        get_total_main_patched_users,
+        "Total main patched users",
+    ),
+    (
+        "total_release_patched_users",
+        get_total_release_patched_users,
+        "Total release patched users",
+    ),
+    (
+        "total_previous_patched_users",
+        get_total_previous_patched_users,
+        "Total previous patched users",
+    ),
+    (
+        "total_pending_eol_patched_users",
+        get_total_pending_eol_patched_users,
+        "Total deprecated patched users",
+    ),
+    (
+        "total_active_main_branch_users",
+        get_active_main_branch_users,
+        "Total active main branch users",
+    ),
+    (
+        "total_active_release_branch_users",
+        get_active_release_branch_users,
+        "Total active release branch users",
+    ),
+    (
+        "total_active_previous_branch_users",
+        get_active_previous_branch_users,
+        "Total active previous branch users",
+    ),
+    (
+        "total_active_pending_eol_branch_users",
+        get_active_pending_eol_branch_users,
+        "Total active deprecated branch users",
+    ),
+    (
+        "total_active_eol_branch_users",
+        get_active_eol_branch_users,
+        "Total active EOL branch users",
+    ),
+    (
+        "total_active_main_patched_users",
+        get_active_main_patched_users,
+        "Total active main patched users",
+    ),
+    (
+        "total_active_release_patched_users",
+        get_active_release_patched_users,
+        "Total active release patched users",
+    ),
+    (
+        "total_active_previous_patched_users",
+        get_active_previous_patched_users,
+        "Total active previous patched users",
+    ),
+    (
+        "total_active_pending_eol_patched_users",
+        get_active_pending_eol_patched_users,
+        "Total active deprecated patched users",
+    ),
+]
+
+
+# =============================================================================
+# DATABASE FUNCTIONS - Write Statistics
+# =============================================================================
+
+
+def write_statistics_to_database(stats_values):
+    """Write collected statistics to the database."""
+    cursor = conn.cursor()
+    try:
+        cursor.execute(
+            """
+        INSERT INTO statistics (
+        date, total_raw_domains, total_failed_domains, total_mastodon_domains,
+        total_ignored_domains, total_nxdomains, total_norobots, total_baddata,
+        total_error_over, total_error_under, total_users, total_active_users,
+        total_unique_versions, total_main_instances, total_release_instances,
+        total_previous_instances, total_pending_eol_instances, total_eol_instances,
+        total_main_patched_instances, total_release_patched_instances,
+        total_previous_patched_instances, total_pending_eol_patched_instances,
+        total_main_branch_users, total_release_branch_users,
+        total_previous_branch_users, total_pending_eol_branch_users,
+        total_eol_branch_users, total_main_patched_users,
+        total_release_patched_users, total_previous_patched_users,
+        total_pending_eol_patched_users, total_active_main_branch_users,
+        total_active_release_branch_users, total_active_previous_branch_users,
+        total_active_pending_eol_branch_users, total_active_eol_branch_users,
+        total_active_main_patched_users, total_active_release_patched_users,
+        total_active_previous_patched_users, total_active_pending_eol_patched_users
+        )
+        VALUES (
+        (SELECT CURRENT_DATE AT TIME ZONE 'UTC'), %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s,
+        %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s,
+        %s, %s, %s, %s, %s, %s, %s, %s
+        )
+        ON CONFLICT (date) DO UPDATE SET
+        total_raw_domains = EXCLUDED.total_raw_domains,
+        total_failed_domains = EXCLUDED.total_failed_domains,
+        total_mastodon_domains = EXCLUDED.total_mastodon_domains,
+        total_ignored_domains = EXCLUDED.total_ignored_domains,
+        total_nxdomains = EXCLUDED.total_nxdomains,
+        total_norobots = EXCLUDED.total_norobots,
+        total_baddata = EXCLUDED.total_baddata,
+        total_error_over = EXCLUDED.total_error_over,
+        total_error_under = EXCLUDED.total_error_under,
+        total_users = EXCLUDED.total_users,
+        total_active_users = EXCLUDED.total_active_users,
+        total_unique_versions = EXCLUDED.total_unique_versions,
+        total_main_instances = EXCLUDED.total_main_instances,
+        total_release_instances = EXCLUDED.total_release_instances,
+        total_previous_instances = EXCLUDED.total_previous_instances,
+        total_pending_eol_instances = EXCLUDED.total_pending_eol_instances,
+        total_eol_instances = EXCLUDED.total_eol_instances,
+        total_main_patched_instances = EXCLUDED.total_main_patched_instances,
+        total_release_patched_instances = EXCLUDED.total_release_patched_instances,
+        total_previous_patched_instances = EXCLUDED.total_previous_patched_instances,
+        total_pending_eol_patched_instances = EXCLUDED.total_pending_eol_patched_instances,
+        total_main_branch_users = EXCLUDED.total_main_branch_users,
+        total_release_branch_users = EXCLUDED.total_release_branch_users,
+        total_previous_branch_users = EXCLUDED.total_previous_branch_users,
+        total_pending_eol_branch_users = EXCLUDED.total_pending_eol_branch_users,
+        total_eol_branch_users = EXCLUDED.total_eol_branch_users,
+        total_main_patched_users = EXCLUDED.total_main_patched_users,
+        total_release_patched_users = EXCLUDED.total_release_patched_users,
+        total_previous_patched_users = EXCLUDED.total_previous_patched_users,
+        total_pending_eol_patched_users = EXCLUDED.total_pending_eol_patched_users,
+        total_active_main_branch_users = EXCLUDED.total_active_main_branch_users,
+        total_active_release_branch_users = EXCLUDED.total_active_release_branch_users,
+        total_active_previous_branch_users = EXCLUDED.total_active_previous_branch_users,
+        total_active_pending_eol_branch_users = EXCLUDED.total_active_pending_eol_branch_users,
+        total_active_eol_branch_users = EXCLUDED.total_active_eol_branch_users,
+        total_active_main_patched_users = EXCLUDED.total_active_main_patched_users,
+        total_active_release_patched_users = EXCLUDED.total_active_release_patched_users,
+        total_active_previous_patched_users = EXCLUDED.total_active_previous_patched_users,
+        total_active_pending_eol_patched_users = EXCLUDED.total_active_pending_eol_patched_users
+        """,
+            stats_values,
+        )
+        conn.commit()
+        vmc_output("Statistics inserted/updated successfully", "green")
+    except Exception as e:
+        print(f"Failed to insert/update statistics: {e}")
+        conn.rollback()
+    finally:
+        cursor.close()
+
+
+# =============================================================================
+# MAIN FUNCTION
+# =============================================================================
+
+
 if __name__ == "__main__":
     try:
         vmc_output(f"{appname} v{appversion} ({current_filename})", "bold")
@@ -941,222 +1279,16 @@ if __name__ == "__main__":
         else:
             vmc_output("Running in interactive mode", "pink")
 
-        stats = [
-            ("total_raw_domains", get_total_raw_domains, "Total raw domains"),
-            (
-                "total_failed_domains",
-                get_total_failed_domains,
-                "Total failed (410) domains",
-            ),
-            (
-                "total_mastodon_domains",
-                get_total_mastodon_domains,
-                "Total Mastodon domains",
-            ),
-            (
-                "total_ignored_domains",
-                get_total_ignored_domains,
-                "Total ignored (non-Masto) domains",
-            ),
-            ("total_nxdomains", get_total_nxdomains, "Total nxdomain domains"),
-            (
-                "total_norobots",
-                get_total_norobots,
-                "Total robots.txt prohibited domains",
-            ),
-            ("total_baddata", get_total_baddata, "Total baddata domains"),
-            ("total_error_over", get_total_error_over, "Total error over domains"),
-            ("total_error_under", get_total_error_under, "Total error under domains"),
-            ("total_users", get_total_users, "Total users"),
-            ("total_active_users", get_total_active_users, "Total active users"),
-            (
-                "total_unique_versions",
-                get_total_unique_versions,
-                "Total unique versions",
-            ),
-            (
-                "total_main_instances",
-                get_total_main_branch_instances,
-                "Total main branch instances",
-            ),
-            (
-                "total_release_instances",
-                get_total_release_branch_instances,
-                "Total release branch instances",
-            ),
-            (
-                "total_previous_instances",
-                get_total_previous_branch_instances,
-                "Total previous branch instances",
-            ),
-            (
-                "total_pending_eol_instances",
-                get_total_pending_eol_branch_instances,
-                "Total deprecated branch instances",
-            ),
-            (
-                "total_eol_instances",
-                get_total_eol_branch_instances,
-                "Total EOL branch instances",
-            ),
-            (
-                "total_main_patched_instances",
-                get_total_main_patched_instances,
-                "Total main patched instances",
-            ),
-            (
-                "total_release_patched_instances",
-                get_total_release_patched_instances,
-                "Total release patched instances",
-            ),
-            (
-                "total_previous_patched_instances",
-                get_total_previous_patched_instances,
-                "Total previous patched instances",
-            ),
-            (
-                "total_pending_eol_patched_instances",
-                get_total_pending_eol_patched_instances,
-                "Total deprecated patched instances",
-            ),
-            (
-                "total_main_branch_users",
-                get_total_main_branch_users,
-                "Total main branch users",
-            ),
-            (
-                "total_release_branch_users",
-                get_total_release_branch_users,
-                "Total release branch users",
-            ),
-            (
-                "total_previous_branch_users",
-                get_total_previous_branch_users,
-                "Total previous branch users",
-            ),
-            (
-                "total_pending_eol_branch_users",
-                get_total_pending_eol_branch_users,
-                "Total deprecated branch users",
-            ),
-            (
-                "total_eol_branch_users",
-                get_total_eol_branch_users,
-                "Total EOL branch users",
-            ),
-            (
-                "total_main_patched_users",
-                get_total_main_patched_users,
-                "Total main patched users",
-            ),
-            (
-                "total_release_patched_users",
-                get_total_release_patched_users,
-                "Total release patched users",
-            ),
-            (
-                "total_previous_patched_users",
-                get_total_previous_patched_users,
-                "Total previous patched users",
-            ),
-            (
-                "total_pending_eol_patched_users",
-                get_total_pending_eol_patched_users,
-                "Total deprecated patched users",
-            ),
-            (
-                "total_active_main_branch_users",
-                get_active_main_branch_users,
-                "Total active main branch users",
-            ),
-            (
-                "total_active_release_branch_users",
-                get_active_release_branch_users,
-                "Total active release branch users",
-            ),
-            (
-                "total_active_previous_branch_users",
-                get_active_previous_branch_users,
-                "Total active previous branch users",
-            ),
-            (
-                "total_active_pending_eol_branch_users",
-                get_active_pending_eol_branch_users,
-                "Total active deprecated branch users",
-            ),
-            (
-                "total_active_eol_branch_users",
-                get_active_eol_branch_users,
-                "Total active EOL branch users",
-            ),
-            (
-                "total_active_main_patched_users",
-                get_active_main_patched_users,
-                "Total active main patched users",
-            ),
-            (
-                "total_active_release_patched_users",
-                get_active_release_patched_users,
-                "Total active release patched users",
-            ),
-            (
-                "total_active_previous_patched_users",
-                get_active_previous_patched_users,
-                "Total active previous patched users",
-            ),
-            (
-                "total_active_pending_eol_patched_users",
-                get_active_pending_eol_patched_users,
-                "Total active deprecated patched users",
-            ),
-        ]
+        # Initialize statistics dictionary
+        stats_data = {}
 
-        # Initialize statistics variables with defaults to avoid NameError if evaluation fails
-        total_raw_domains = 0
-        total_failed_domains = 0
-        total_mastodon_domains = 0
-        total_ignored_domains = 0
-        total_nxdomains = 0
-        total_norobots = 0
-        total_baddata = 0
-        total_error_over = 0
-        total_error_under = 0
-        total_users = 0
-        total_active_users = 0
-        total_unique_versions = 0
-        total_main_instances = 0
-        total_release_instances = 0
-        total_previous_instances = 0
-        total_pending_eol_instances = 0
-        total_eol_instances = 0
-        total_main_patched_instances = 0
-        total_release_patched_instances = 0
-        total_previous_patched_instances = 0
-        total_pending_eol_patched_instances = 0
-        total_main_branch_users = 0
-        total_release_branch_users = 0
-        total_previous_branch_users = 0
-        total_pending_eol_branch_users = 0
-        total_eol_branch_users = 0
-        total_main_patched_users = 0
-        total_release_patched_users = 0
-        total_previous_patched_users = 0
-        total_pending_eol_patched_users = 0
-        total_active_main_branch_users = 0
-        total_active_release_branch_users = 0
-        total_active_previous_branch_users = 0
-        total_active_pending_eol_branch_users = 0
-        total_active_eol_branch_users = 0
-        total_active_main_patched_users = 0
-        total_active_release_patched_users = 0
-        total_active_previous_patched_users = 0
-        total_active_pending_eol_patched_users = 0
-
-        for name, fn, label in stats:
+        # Collect all statistics
+        for name, fn, label in STATS_CONFIG:
             value = fn()
-            globals()[name] = value
-            print(f"{label}: {value}")
+            stats_data[name] = value if value is not None else 0
+            print(f"{label}: {stats_data[name]}")
 
+        # Prompt for database write in interactive mode
         if not is_running_headless():
             vmc_output("Write this data to the statistics database?", "pink")
             choice = input("yes/no: ").strip().lower()
@@ -1164,124 +1296,11 @@ if __name__ == "__main__":
                 vmc_output("Exiting without writing to the database", "yellow")
                 sys.exit(0)
 
-        # Insert or update statistics in the database
-        cursor = conn.cursor()
-        try:
-            cursor.execute(
-                """
-            INSERT INTO statistics (
-            date, total_raw_domains, total_failed_domains, total_mastodon_domains,
-            total_ignored_domains, total_nxdomains, total_norobots, total_baddata,
-            total_error_over, total_error_under, total_users, total_active_users,
-            total_unique_versions, total_main_instances, total_release_instances,
-            total_previous_instances, total_pending_eol_instances, total_eol_instances,
-            total_main_patched_instances, total_release_patched_instances,
-            total_previous_patched_instances, total_pending_eol_patched_instances,
-            total_main_branch_users, total_release_branch_users,
-            total_previous_branch_users, total_pending_eol_branch_users,
-            total_eol_branch_users, total_main_patched_users,
-            total_release_patched_users, total_previous_patched_users,
-            total_pending_eol_patched_users, total_active_main_branch_users,
-            total_active_release_branch_users, total_active_previous_branch_users,
-            total_active_pending_eol_branch_users, total_active_eol_branch_users,
-            total_active_main_patched_users, total_active_release_patched_users,
-            total_active_previous_patched_users, total_active_pending_eol_patched_users
-            )
-            VALUES (
-            (SELECT CURRENT_DATE AT TIME ZONE 'UTC'), %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s,
-            %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s,
-            %s, %s, %s, %s, %s, %s, %s, %s
-            )
-            ON CONFLICT (date) DO UPDATE SET
-            total_raw_domains = EXCLUDED.total_raw_domains,
-            total_failed_domains = EXCLUDED.total_failed_domains,
-            total_mastodon_domains = EXCLUDED.total_mastodon_domains,
-            total_ignored_domains = EXCLUDED.total_ignored_domains,
-            total_nxdomains = EXCLUDED.total_nxdomains,
-            total_norobots = EXCLUDED.total_norobots,
-            total_baddata = EXCLUDED.total_baddata,
-            total_error_over = EXCLUDED.total_error_over,
-            total_error_under = EXCLUDED.total_error_under,
-            total_users = EXCLUDED.total_users,
-            total_active_users = EXCLUDED.total_active_users,
-            total_unique_versions = EXCLUDED.total_unique_versions,
-            total_main_instances = EXCLUDED.total_main_instances,
-            total_release_instances = EXCLUDED.total_release_instances,
-            total_previous_instances = EXCLUDED.total_previous_instances,
-            total_pending_eol_instances = EXCLUDED.total_pending_eol_instances,
-            total_eol_instances = EXCLUDED.total_eol_instances,
-            total_main_patched_instances = EXCLUDED.total_main_patched_instances,
-            total_release_patched_instances = EXCLUDED.total_release_patched_instances,
-            total_previous_patched_instances = EXCLUDED.total_previous_patched_instances,
-            total_pending_eol_patched_instances = EXCLUDED.total_pending_eol_patched_instances,
-            total_main_branch_users = EXCLUDED.total_main_branch_users,
-            total_release_branch_users = EXCLUDED.total_release_branch_users,
-            total_previous_branch_users = EXCLUDED.total_previous_branch_users,
-            total_pending_eol_branch_users = EXCLUDED.total_pending_eol_branch_users,
-            total_eol_branch_users = EXCLUDED.total_eol_branch_users,
-            total_main_patched_users = EXCLUDED.total_main_patched_users,
-            total_release_patched_users = EXCLUDED.total_release_patched_users,
-            total_previous_patched_users = EXCLUDED.total_previous_patched_users,
-            total_pending_eol_patched_users = EXCLUDED.total_pending_eol_patched_users,
-            total_active_main_branch_users = EXCLUDED.total_active_main_branch_users,
-            total_active_release_branch_users = EXCLUDED.total_active_release_branch_users,
-            total_active_previous_branch_users = EXCLUDED.total_active_previous_branch_users,
-            total_active_pending_eol_branch_users = EXCLUDED.total_active_pending_eol_branch_users,
-            total_active_eol_branch_users = EXCLUDED.total_active_eol_branch_users,
-            total_active_main_patched_users = EXCLUDED.total_active_main_patched_users,
-            total_active_release_patched_users = EXCLUDED.total_active_release_patched_users,
-            total_active_previous_patched_users = EXCLUDED.total_active_previous_patched_users,
-            total_active_pending_eol_patched_users = EXCLUDED.total_active_pending_eol_patched_users
-            """,
-                (
-                    total_raw_domains,
-                    total_failed_domains,
-                    total_mastodon_domains,
-                    total_ignored_domains,
-                    total_nxdomains,
-                    total_norobots,
-                    total_baddata,
-                    total_error_over,
-                    total_error_under,
-                    total_users,
-                    total_active_users,
-                    total_unique_versions,
-                    total_main_instances,
-                    total_release_instances,
-                    total_previous_instances,
-                    total_pending_eol_instances,
-                    total_eol_instances,
-                    total_main_patched_instances,
-                    total_release_patched_instances,
-                    total_previous_patched_instances,
-                    total_pending_eol_patched_instances,
-                    total_main_branch_users,
-                    total_release_branch_users,
-                    total_previous_branch_users,
-                    total_pending_eol_branch_users,
-                    total_eol_branch_users,
-                    total_main_patched_users,
-                    total_release_patched_users,
-                    total_previous_patched_users,
-                    total_pending_eol_patched_users,
-                    total_active_main_branch_users,
-                    total_active_release_branch_users,
-                    total_active_previous_branch_users,
-                    total_active_pending_eol_branch_users,
-                    total_active_eol_branch_users,
-                    total_active_main_patched_users,
-                    total_active_release_patched_users,
-                    total_active_previous_patched_users,
-                    total_active_pending_eol_patched_users,
-                ),
-            )
-            conn.commit()
-            vmc_output("Statistics inserted/updated successfully", "green")
-        except Exception as e:
-            print(f"Failed to insert/update statistics: {e}")
-            conn.rollback()
-        finally:
-            cursor.close()
+        # Prepare values tuple in correct order
+        stats_values = tuple(stats_data[name] for name, _, _ in STATS_CONFIG)
+
+        # Write to database
+        write_statistics_to_database(stats_values)
 
     except KeyboardInterrupt:
         vmc_output(f"\n{appname} interrupted by user", "bold")
