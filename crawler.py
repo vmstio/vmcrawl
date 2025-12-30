@@ -15,6 +15,7 @@ try:
     from concurrent.futures import ThreadPoolExecutor, as_completed
     from datetime import datetime, timedelta, timezone
     from urllib.parse import urlparse, urlunparse
+
     import httpx
     import psycopg
     import toml
@@ -1474,7 +1475,7 @@ def process_mastodon_instance(
         instance_api_url = f"https://{backend_domain}/api/v2/instance"
     else:
         instance_api_url = f"https://{backend_domain}/api/v1/instance"
-    
+
     target = "instance_api"
     try:
         response = get_httpx(instance_api_url, http_client)

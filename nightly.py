@@ -11,8 +11,8 @@ try:
         appname,
         appversion,
         conn,
-        vmc_output,
         is_running_headless,
+        vmc_output,
     )
 except ImportError as e:
     print(f"Error importing module: {e}")
@@ -41,9 +41,7 @@ def display_current_versions():
 
             vmc_output("\nCurrent Nightly Versions:", "cyan")
             vmc_output("-" * 70, "cyan")
-            vmc_output(
-                f"{'Version':<20} {'Start Date':<15} {'End Date':<15}", "bold"
-            )
+            vmc_output(f"{'Version':<20} {'Start Date':<15} {'End Date':<15}", "bold")
             vmc_output("-" * 70, "cyan")
 
             for version, start_date, end_date in versions:
@@ -130,7 +128,7 @@ def add_nightly_version(
                     datetime.strptime(start_date, "%Y-%m-%d") - timedelta(days=1)
                 ).strftime("%Y-%m-%d")
 
-                vmc_output(f"\nUpdating previous active version:", "cyan")
+                vmc_output("\nUpdating previous active version:", "cyan")
                 vmc_output(f"  Version: {old_version}", "cyan")
                 vmc_output(f"  Old end date: {old_end}", "cyan")
                 vmc_output(f"  New end date: {new_end_date}", "cyan")
@@ -161,7 +159,7 @@ def add_nightly_version(
             )
             conn.commit()
 
-        vmc_output(f"\n✓ Successfully added nightly version:", "green")
+        vmc_output("\n✓ Successfully added nightly version:", "green")
         vmc_output(f"  Version: {version}", "green")
         vmc_output(f"  Start date: {start_date}", "green")
         vmc_output(f"  End date: {end_date}", "green")
@@ -239,7 +237,7 @@ def interactive_add():
             datetime.strptime(start_date, "%Y-%m-%d") - timedelta(days=1)
         ).strftime("%Y-%m-%d")
 
-        vmc_output(f"\nThis will update the previous active version:", "yellow")
+        vmc_output("\nThis will update the previous active version:", "yellow")
         vmc_output(f"  {old_version}: {old_end} → {new_end}", "yellow")
 
         confirm = input("Continue? (y/n): ").strip().lower()

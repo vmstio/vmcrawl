@@ -13,12 +13,12 @@ try:
         appname,
         appversion,
         conn,
-        vmc_output,
-        is_running_headless,
-        http_client,
-        get_httpx,
         get_domain_endings,
+        get_httpx,
         has_emoji_chars,
+        http_client,
+        is_running_headless,
+        vmc_output,
     )
 except ImportError as e:
     print(f"Error importing module: {e}")
@@ -32,13 +32,13 @@ parser.add_argument(
     "-l",
     "--limit",
     type=int,
-    help=f'limit the number of domains requested from database (default: {int(os.getenv("VMCRAWL_FETCH_LIMIT", "10"))})',
+    help=f"limit the number of domains requested from database (default: {int(os.getenv('VMCRAWL_FETCH_LIMIT', '10'))})",
 )
 parser.add_argument(
     "-o",
     "--offset",
     type=int,
-    help=f'offset the top of the domains requested from database (default: {int(os.getenv("VMCRAWL_FETCH_OFFSET", "0"))})',
+    help=f"offset the top of the domains requested from database (default: {int(os.getenv('VMCRAWL_FETCH_OFFSET', '0'))})",
 )
 parser.add_argument(
     "-r",

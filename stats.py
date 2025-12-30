@@ -9,8 +9,8 @@ try:
         appname,
         appversion,
         conn,
-        vmc_output,
         is_running_headless,
+        vmc_output,
     )
 except ImportError as e:
     print(f"Error importing module: {e}")
@@ -18,6 +18,7 @@ except ImportError as e:
 
 # Detect the current filename
 current_filename = os.path.basename(__file__)
+
 
 def get_total_raw_domains():
     cursor = conn.cursor()
@@ -437,6 +438,7 @@ def get_total_previous_patched_instances():
     finally:
         cursor.close()
 
+
 def get_total_pending_eol_patched_instances():
     cursor = conn.cursor()
     value_to_return = 0
@@ -540,6 +542,8 @@ def get_total_previous_branch_users():
         conn.rollback()
     finally:
         cursor.close()
+
+
 def get_total_pending_eol_branch_users():
     cursor = conn.cursor()
     value_to_return = 0
@@ -669,6 +673,8 @@ def get_total_previous_patched_users():
         conn.rollback()
     finally:
         cursor.close()
+
+
 def get_total_pending_eol_patched_users():
     cursor = conn.cursor()
     value_to_return = 0
@@ -694,6 +700,7 @@ def get_total_pending_eol_patched_users():
         conn.rollback()
     finally:
         cursor.close()
+
 
 def get_active_main_branch_users():
     cursor = conn.cursor()
@@ -769,6 +776,8 @@ def get_active_previous_branch_users():
     except Exception as e:
         print(f"Failed to obtain active previous instances users: {e}")
         conn.rollback()
+
+
 def get_active_pending_eol_branch_users():
     cursor = conn.cursor()
     value_to_return = 0
@@ -895,6 +904,8 @@ def get_active_previous_patched_users():
         return value_to_return
     except Exception as e:
         print(f"Failed to obtain active previous patched instances users: {e}")
+
+
 def get_active_pending_eol_patched_users():
     cursor = conn.cursor()
     value_to_return = 0
@@ -932,44 +943,172 @@ if __name__ == "__main__":
 
         stats = [
             ("total_raw_domains", get_total_raw_domains, "Total raw domains"),
-            ("total_failed_domains", get_total_failed_domains, "Total failed (410) domains"),
-            ("total_mastodon_domains", get_total_mastodon_domains, "Total Mastodon domains"),
-            ("total_ignored_domains", get_total_ignored_domains, "Total ignored (non-Masto) domains"),
+            (
+                "total_failed_domains",
+                get_total_failed_domains,
+                "Total failed (410) domains",
+            ),
+            (
+                "total_mastodon_domains",
+                get_total_mastodon_domains,
+                "Total Mastodon domains",
+            ),
+            (
+                "total_ignored_domains",
+                get_total_ignored_domains,
+                "Total ignored (non-Masto) domains",
+            ),
             ("total_nxdomains", get_total_nxdomains, "Total nxdomain domains"),
-            ("total_norobots", get_total_norobots, "Total robots.txt prohibited domains"),
+            (
+                "total_norobots",
+                get_total_norobots,
+                "Total robots.txt prohibited domains",
+            ),
             ("total_baddata", get_total_baddata, "Total baddata domains"),
             ("total_error_over", get_total_error_over, "Total error over domains"),
             ("total_error_under", get_total_error_under, "Total error under domains"),
             ("total_users", get_total_users, "Total users"),
             ("total_active_users", get_total_active_users, "Total active users"),
-            ("total_unique_versions", get_total_unique_versions, "Total unique versions"),
-            ("total_main_instances", get_total_main_branch_instances, "Total main branch instances"),
-            ("total_release_instances", get_total_release_branch_instances, "Total release branch instances"),
-            ("total_previous_instances", get_total_previous_branch_instances, "Total previous branch instances"),
-            ("total_pending_eol_instances", get_total_pending_eol_branch_instances, "Total deprecated branch instances"),
-            ("total_eol_instances", get_total_eol_branch_instances, "Total EOL branch instances"),
-            ("total_main_patched_instances", get_total_main_patched_instances, "Total main patched instances"),
-            ("total_release_patched_instances", get_total_release_patched_instances, "Total release patched instances"),
-            ("total_previous_patched_instances", get_total_previous_patched_instances, "Total previous patched instances"),
-            ("total_pending_eol_patched_instances", get_total_pending_eol_patched_instances, "Total deprecated patched instances"),
-            ("total_main_branch_users", get_total_main_branch_users, "Total main branch users"),
-            ("total_release_branch_users", get_total_release_branch_users, "Total release branch users"),
-            ("total_previous_branch_users", get_total_previous_branch_users, "Total previous branch users"),
-            ("total_pending_eol_branch_users", get_total_pending_eol_branch_users, "Total deprecated branch users"),
-            ("total_eol_branch_users", get_total_eol_branch_users, "Total EOL branch users"),
-            ("total_main_patched_users", get_total_main_patched_users, "Total main patched users"),
-            ("total_release_patched_users", get_total_release_patched_users, "Total release patched users"),
-            ("total_previous_patched_users", get_total_previous_patched_users, "Total previous patched users"),
-            ("total_pending_eol_patched_users", get_total_pending_eol_patched_users, "Total deprecated patched users"),
-            ("total_active_main_branch_users", get_active_main_branch_users, "Total active main branch users"),
-            ("total_active_release_branch_users", get_active_release_branch_users, "Total active release branch users"),
-            ("total_active_previous_branch_users", get_active_previous_branch_users, "Total active previous branch users"),
-            ("total_active_pending_eol_branch_users", get_active_pending_eol_branch_users, "Total active deprecated branch users"),
-            ("total_active_eol_branch_users", get_active_eol_branch_users, "Total active EOL branch users"),
-            ("total_active_main_patched_users", get_active_main_patched_users, "Total active main patched users"),
-            ("total_active_release_patched_users", get_active_release_patched_users, "Total active release patched users"),
-            ("total_active_previous_patched_users", get_active_previous_patched_users, "Total active previous patched users"),
-            ("total_active_pending_eol_patched_users", get_active_pending_eol_patched_users, "Total active deprecated patched users"),
+            (
+                "total_unique_versions",
+                get_total_unique_versions,
+                "Total unique versions",
+            ),
+            (
+                "total_main_instances",
+                get_total_main_branch_instances,
+                "Total main branch instances",
+            ),
+            (
+                "total_release_instances",
+                get_total_release_branch_instances,
+                "Total release branch instances",
+            ),
+            (
+                "total_previous_instances",
+                get_total_previous_branch_instances,
+                "Total previous branch instances",
+            ),
+            (
+                "total_pending_eol_instances",
+                get_total_pending_eol_branch_instances,
+                "Total deprecated branch instances",
+            ),
+            (
+                "total_eol_instances",
+                get_total_eol_branch_instances,
+                "Total EOL branch instances",
+            ),
+            (
+                "total_main_patched_instances",
+                get_total_main_patched_instances,
+                "Total main patched instances",
+            ),
+            (
+                "total_release_patched_instances",
+                get_total_release_patched_instances,
+                "Total release patched instances",
+            ),
+            (
+                "total_previous_patched_instances",
+                get_total_previous_patched_instances,
+                "Total previous patched instances",
+            ),
+            (
+                "total_pending_eol_patched_instances",
+                get_total_pending_eol_patched_instances,
+                "Total deprecated patched instances",
+            ),
+            (
+                "total_main_branch_users",
+                get_total_main_branch_users,
+                "Total main branch users",
+            ),
+            (
+                "total_release_branch_users",
+                get_total_release_branch_users,
+                "Total release branch users",
+            ),
+            (
+                "total_previous_branch_users",
+                get_total_previous_branch_users,
+                "Total previous branch users",
+            ),
+            (
+                "total_pending_eol_branch_users",
+                get_total_pending_eol_branch_users,
+                "Total deprecated branch users",
+            ),
+            (
+                "total_eol_branch_users",
+                get_total_eol_branch_users,
+                "Total EOL branch users",
+            ),
+            (
+                "total_main_patched_users",
+                get_total_main_patched_users,
+                "Total main patched users",
+            ),
+            (
+                "total_release_patched_users",
+                get_total_release_patched_users,
+                "Total release patched users",
+            ),
+            (
+                "total_previous_patched_users",
+                get_total_previous_patched_users,
+                "Total previous patched users",
+            ),
+            (
+                "total_pending_eol_patched_users",
+                get_total_pending_eol_patched_users,
+                "Total deprecated patched users",
+            ),
+            (
+                "total_active_main_branch_users",
+                get_active_main_branch_users,
+                "Total active main branch users",
+            ),
+            (
+                "total_active_release_branch_users",
+                get_active_release_branch_users,
+                "Total active release branch users",
+            ),
+            (
+                "total_active_previous_branch_users",
+                get_active_previous_branch_users,
+                "Total active previous branch users",
+            ),
+            (
+                "total_active_pending_eol_branch_users",
+                get_active_pending_eol_branch_users,
+                "Total active deprecated branch users",
+            ),
+            (
+                "total_active_eol_branch_users",
+                get_active_eol_branch_users,
+                "Total active EOL branch users",
+            ),
+            (
+                "total_active_main_patched_users",
+                get_active_main_patched_users,
+                "Total active main patched users",
+            ),
+            (
+                "total_active_release_patched_users",
+                get_active_release_patched_users,
+                "Total active release patched users",
+            ),
+            (
+                "total_active_previous_patched_users",
+                get_active_previous_patched_users,
+                "Total active previous patched users",
+            ),
+            (
+                "total_active_pending_eol_patched_users",
+                get_active_pending_eol_patched_users,
+                "Total active deprecated patched users",
+            ),
         ]
 
         # Initialize statistics variables with defaults to avoid NameError if evaluation fails
