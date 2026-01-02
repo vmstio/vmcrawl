@@ -94,7 +94,7 @@ colors = {
 }
 
 # HTTP status codes for special handling
-http_codes_to_authfail = [403, 401]  # auth
+http_codes_to_authfail = [401]  # auth
 http_codes_to_hardfail = [418, 410]  # gone
 
 # Define maintained branches (adjust as needed)
