@@ -2,7 +2,7 @@
 
 ## Prerequisites
 
-- Python 3.8+
+- Python 3.13+
 - PostgreSQL database
 - System user for running the service
 
@@ -19,6 +19,7 @@ sudo useradd -r -s /bin/bash -d /opt/vmcrawl -m vmcrawl
 ```bash
 # Copy application files
 git clone https://github.com/vmstio/vmcrawl.git /opt/vmcrawl
+rm -fr /opt/vmcrawl
 chown -R vmcrawl:vmcrawl /opt/vmcrawl
 ```
 
