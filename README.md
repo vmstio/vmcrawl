@@ -129,6 +129,8 @@ systemctl status vmstats.timer
 systemctl list-timers vmstats.timer
 ```
 
+__Note: If you are deploying several collectors, you should only deploy one instance of `vmstats`.__
+
 ### Docker Installation
 
 You can also run `vmcrawl` using Docker:
