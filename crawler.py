@@ -278,25 +278,32 @@ def limit_url_depth(source_url, depth=2):
 def get_httpx(url, http_client):
     """Make HTTP GET request with HTTP/2 fallback on connection errors and size limits."""
     try:
-        response = http_client.get(url)
+        # Stream the response to check size before loading into memory
+        with http_client.stream("GET", url) as response:
+            # Check Content-Length header first if available
+            content_length = response.headers.get("Content-Length")
+            if content_length and int(content_length) > max_response_size:
+                raise ValueError(
+                    f"Response too large: {content_length} bytes (max: {max_response_size})"
+                )
 
-        # Check response size before reading content
-        content_length = response.headers.get("Content-Length")
-        if content_length and int(content_length) > max_response_size:
-            response.close()
-            raise ValueError(
-                f"Response too large: {content_length} bytes (max: {max_response_size})"
+            # Read response in chunks and check size
+            content_bytes = bytearray()
+            for chunk in response.iter_bytes():
+                content_bytes.extend(chunk)
+                if len(content_bytes) > max_response_size:
+                    raise ValueError(
+                        f"Response too large: {len(content_bytes)} bytes (max: {max_response_size})"
+                    )
+
+            # Create a regular Response object with the content we collected
+            final_response = httpx.Response(
+                status_code=response.status_code,
+                headers=response.headers,
+                content=bytes(content_bytes),
+                request=response.request,
             )
-
-        # For chunked responses, check actual content size
-        # httpx auto-reads content, but we can check if it's too large
-        if len(response.content) > max_response_size:
-            response.close()
-            raise ValueError(
-                f"Response too large: {len(response.content)} bytes (max: {max_response_size})"
-            )
-
-        return response
+            return final_response
 
     except httpx.RequestError as exception:
         error_str = str(exception).casefold()
@@ -313,21 +320,29 @@ def get_httpx(url, http_client):
                 max_redirects=10,
             )
             try:
-                response = fallback_client.get(url)
+                # Stream the fallback response too
+                with fallback_client.stream("GET", url) as response:
+                    content_length = response.headers.get("Content-Length")
+                    if content_length and int(content_length) > max_response_size:
+                        raise ValueError(
+                            f"Response too large: {content_length} bytes (max: {max_response_size})"
+                        )
 
-                # Check response size for fallback client too
-                content_length = response.headers.get("Content-Length")
-                if content_length and int(content_length) > max_response_size:
-                    response.close()
-                    raise ValueError(f"Response too large: {content_length} bytes")
+                    content_bytes = bytearray()
+                    for chunk in response.iter_bytes():
+                        content_bytes.extend(chunk)
+                        if len(content_bytes) > max_response_size:
+                            raise ValueError(
+                                f"Response too large: {len(content_bytes)} bytes (max: {max_response_size})"
+                            )
 
-                if len(response.content) > max_response_size:
-                    response.close()
-                    raise ValueError(
-                        f"Response too large: {len(response.content)} bytes"
+                    final_response = httpx.Response(
+                        status_code=response.status_code,
+                        headers=response.headers,
+                        content=bytes(content_bytes),
+                        request=response.request,
                     )
-
-                return response
+                    return final_response
             finally:
                 fallback_client.close()
         else:
