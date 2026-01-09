@@ -1,5 +1,5 @@
 [Unit]
-Description=vmstats - VMware vCenter statistics generator
+Description=vmstats
 After=network-online.target postgresql.service
 Wants=network-online.target
 Documentation=https://github.com/vmstan/vmcrawl
