@@ -13,8 +13,9 @@ It performs periodic polling of known Mastodon instances to track version inform
 
 ## Installation
 
-To install `vmcrawl`, clone the repository and install the dependencies.
-It is recommended to use a dedicated Python virtual environment within the cloned folder.
+### Quick Start (Development)
+
+For development or testing, you can quickly set up `vmcrawl` in the current directory:
 
 ```bash
 git clone https://github.com/vmstio/vmcrawl.git
@@ -22,10 +23,53 @@ cd vmcrawl
 python -m venv .venv
 source .venv/bin/activate
 pip install --upgrade pip
-pip install .
+pip install -r requirements.txt
 ```
 
-You will then need an `.env` file in the `vmcrawl` folder with your custom values set:
+### Production Installation
+
+For production deployments, follow these steps to install `vmcrawl` as a system service:
+
+#### 1. Install Application
+
+```bash
+# Clone application files
+git clone https://github.com/vmstio/vmcrawl.git /opt/vmcrawl
+```
+
+#### 2. Create System User
+
+```bash
+# Create vmcrawl user and set ownership
+useradd -r -s /bin/bash -d /opt/vmcrawl vmcrawl
+chown -R vmcrawl:vmcrawl /opt/vmcrawl
+```
+
+#### 3. Set Up Virtual Environment
+
+```bash
+# Switch to vmcrawl user
+sudo -u vmcrawl -i
+
+# Create virtual environment
+cd /opt/vmcrawl
+python3 -m venv .venv
+source .venv/bin/activate
+
+# Install dependencies
+pip install -r requirements.txt
+
+# Exit vmcrawl user
+exit
+```
+
+#### 4. Configure Environment Variables
+
+```bash
+sudo -u vmcrawl vim /opt/vmcrawl/.env
+```
+
+Add your configuration:
 
 ```bash
 VMCRAWL_POSTGRES_DATA="dbname"
@@ -37,16 +81,51 @@ VMCRAWL_POSTGRES_PORT="5432"
 
 On your PostgreSQL server, execute the contents of `creation.sql` to create the required tables.
 
+#### 5. Install Service Files
+
+```bash
+# Make the shell script executable
+chmod +x /opt/vmcrawl/vmcrawl.sh
+
+# Copy service file to systemd
+cp /opt/vmcrawl/vmcrawl.service /etc/systemd/system/
+
+# Reload systemd
+systemctl daemon-reload
+```
+
+#### 6. Enable and Start Service
+
+```bash
+# Enable service to start on boot
+systemctl enable vmcrawl.service
+
+# Start the service
+systemctl start vmcrawl.service
+
+# Check status
+systemctl status vmcrawl.service
+```
+
+### Docker Installation
+
+You can also run `vmcrawl` using Docker:
+
+```bash
+docker build -t vmcrawl .
+docker run -d --name vmcrawl --env-file .env vmcrawl
+```
+
 ## Scripts
 
 The project includes four main scripts:
 
-| Script | Purpose |
-|--------|---------|
+| Script       | Purpose                                                                    |
+| ------------ | -------------------------------------------------------------------------- |
 | `crawler.py` | Main crawling engine that processes domains and collects version/user data |
-| `fetch.py` | Fetches new domains from federated instance peer lists |
-| `stats.py` | Generates and records statistics about crawled instances |
-| `nightly.py` | Manages nightly/development version tracking in the database |
+| `fetch.py`   | Fetches new domains from federated instance peer lists                     |
+| `stats.py`   | Generates and records statistics about crawled instances                   |
+| `nightly.py` | Manages nightly/development version tracking in the database               |
 
 ## Usage
 
@@ -54,29 +133,53 @@ The project includes four main scripts:
 
 To start using `vmcrawl` you will need to populate your database with instances to crawl. You can fetch a list of fediverse instances from an existing Mastodon instance:
 
+**Native:**
 ```bash
 python fetch.py
+```
+
+**Docker:**
+```bash
+docker exec vmcrawl python fetch.py
 ```
 
 The first time this is launched it will default to polling `vmst.io` for instances to crawl.
 If you wish to override this you can target a specific instance:
 
+**Native:**
 ```bash
 python fetch.py --target example.social
 ```
 
+**Docker:**
+```bash
+docker exec vmcrawl python fetch.py --target example.social
+```
+
 Once you have established a set of known good Mastodon instances, you can use them to fetch new federated instances:
 
+**Native:**
 ```bash
 python fetch.py
+```
+
+**Docker:**
+```bash
+docker exec vmcrawl python fetch.py
 ```
 
 This will scan the top 10 instances in your database by total users.
 
 You can change the limits or offset the domain list from the top:
 
+**Native:**
 ```bash
 python fetch.py --limit 100 --offset 50
+```
+
+**Docker:**
+```bash
+docker exec vmcrawl python fetch.py --limit 100 --offset 50
 ```
 
 You can use `limit` and `offset` together, or individually, but neither option can be combined with the `target` argument.
@@ -86,8 +189,14 @@ If a server fails to fetch, it will be added to a `no_peers` table and not attem
 
 You can also select a random sampling of servers to fetch from, instead of going by user count:
 
+**Native:**
 ```bash
 python fetch.py --random
+```
+
+**Docker:**
+```bash
+docker exec vmcrawl python fetch.py --random
 ```
 
 You can combine `random` with the `limit` command, but not with `target` or `offset`.
@@ -96,8 +205,14 @@ You can combine `random` with the `limit` command, but not with `target` or `off
 
 After you have a list of instances to crawl, run the following command:
 
+**Native:**
 ```bash
 python crawler.py
+```
+
+**Docker:**
+```bash
+docker exec -it vmcrawl python crawler.py
 ```
 
 Selecting `0` from the interactive menu will begin to process all of your fetched domains.
@@ -170,28 +285,52 @@ To limit what is crawled in headless mode, use the following arguments:
 
 You can target a specific domain to fetch or crawl with the `target` option:
 
+**Native:**
 ```bash
 python crawler.py --target vmst.io
 ```
 
+**Docker:**
+```bash
+docker exec -it vmcrawl python crawler.py --target vmst.io
+```
+
 You can include multiple domains in a comma-separated list:
 
+**Native:**
 ```bash
 python crawler.py --target mas.to,infosec.exchange
 ```
 
+**Docker:**
+```bash
+docker exec -it vmcrawl python crawler.py --target mas.to,infosec.exchange
+```
+
 You can also process multiple domains using an external file, which contains each domain on a new line:
 
+**Native:**
 ```bash
 python crawler.py --file ~/domains.txt
+```
+
+**Docker:**
+```bash
+docker exec -it vmcrawl python crawler.py --file /opt/vmcrawl/domains.txt
 ```
 
 ### Statistics
 
 To generate and record statistics about your crawled instances:
 
+**Native:**
 ```bash
 python stats.py
+```
+
+**Docker:**
+```bash
+docker exec vmcrawl python stats.py
 ```
 
 This will calculate and store various metrics including total domains, user counts, version distributions, and patch status across different Mastodon branches.
@@ -200,8 +339,14 @@ This will calculate and store various metrics including total domains, user coun
 
 The `nightly.py` script manages tracking of development/nightly versions:
 
+**Native:**
 ```bash
 python nightly.py
+```
+
+**Docker:**
+```bash
+docker exec -it vmcrawl python nightly.py
 ```
 
 This displays current nightly version entries and allows you to add new versions as they are released. Nightly versions are used to identify instances running pre-release software (alpha, beta, rc versions).
@@ -216,6 +361,54 @@ Example:
 
 ```bash
 VMCRAWL_BACKPORTS="4.5,4.4,4.3,4.2"
+```
+
+## Service Management
+
+For production installations using systemd:
+
+### View Logs
+
+```bash
+# Follow logs in real-time
+journalctl -u vmcrawl.service -f
+
+# View recent logs
+journalctl -u vmcrawl.service -n 100
+
+# View logs since boot
+journalctl -u vmcrawl.service -b
+```
+
+### Control Service
+
+```bash
+# Stop service
+systemctl stop vmcrawl.service
+
+# Restart service
+systemctl restart vmcrawl.service
+
+# Disable service
+systemctl disable vmcrawl.service
+```
+
+## Troubleshooting
+
+### Service fails to start
+
+1. Check logs: `journalctl -u vmcrawl.service -n 50`
+2. Verify permissions: `ls -la /opt/vmcrawl`
+3. Test script manually: `sudo -u vmcrawl /opt/vmcrawl/vmcrawl.sh`
+
+### Permission errors
+
+```bash
+# Fix ownership
+chown -R vmcrawl:vmcrawl /opt/vmcrawl
+
+# Fix script permissions
+chmod +x /opt/vmcrawl/vmcrawl.sh
 ```
 
 ## Contributing
