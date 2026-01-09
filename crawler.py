@@ -278,41 +278,54 @@ def limit_url_depth(source_url, depth=2):
 def get_httpx(url, http_client):
     """Make HTTP GET request with HTTP/2 fallback on connection errors and size limits."""
 
-    class SizeLimitExceeded(Exception):
-        """Raised when response size exceeds the limit."""
+    def stream_with_size_limit(client, url):
+        """Stream response and enforce size limit during download."""
+        # Get the stream context manager and enter it manually
+        stream_ctx = client.stream("GET", url)
+        response = stream_ctx.__enter__()
 
-        pass
-
-    def check_response_size(response):
-        """Check if response is too large and raise error if so."""
-        # Check Content-Length header first
-        content_length = response.headers.get("Content-Length")
-        if content_length and int(content_length) > max_response_size:
-            raise SizeLimitExceeded(
-                f"Response too large: {content_length} bytes (max: {max_response_size})"
-            )
-
-        # For responses without Content-Length, check actual size
-        # Note: accessing .content loads the entire response into memory
-        # This is why we check Content-Length first when available
         try:
-            if len(response.content) > max_response_size:
-                raise SizeLimitExceeded(
-                    f"Response too large: {len(response.content)} bytes (max: {max_response_size})"
+            # Check Content-Length header first if available
+            content_length = response.headers.get("Content-Length")
+            if content_length and int(content_length) > max_response_size:
+                stream_ctx.__exit__(None, None, None)
+                raise ValueError(
+                    f"Response too large: {content_length} bytes (max: {max_response_size})"
                 )
-        except httpx.ResponseNotRead:
-            # Response not read yet, that's fine
-            pass
 
-        return response
+            # Stream the response and check size as we download
+            chunks = []
+            total_size = 0
+
+            for chunk in response.iter_bytes(chunk_size=8192):
+                chunks.append(chunk)
+                total_size += len(chunk)
+
+                if total_size > max_response_size:
+                    stream_ctx.__exit__(None, None, None)
+                    raise ValueError(
+                        f"Response too large: {total_size} bytes (max: {max_response_size})"
+                    )
+
+            # All data received within size limit - construct final response
+            # We need to manually build a Response object with our collected data
+            final_response = httpx.Response(
+                status_code=response.status_code,
+                headers=response.headers,
+                request=response.request,
+            )
+            # Directly set the content to bypass decompression
+            final_response._content = b"".join(chunks)
+
+            stream_ctx.__exit__(None, None, None)
+            return final_response
+
+        except Exception:
+            stream_ctx.__exit__(None, None, None)
+            raise
 
     try:
-        response = http_client.get(url)
-        return check_response_size(response)
-
-    except SizeLimitExceeded:
-        # Re-raise as ValueError so handle_tcp_exception catches it
-        raise ValueError(f"Response exceeds size limit of {max_response_size} bytes")
+        return stream_with_size_limit(http_client, url)
 
     except httpx.RequestError as exception:
         error_str = str(exception).casefold()
@@ -329,12 +342,7 @@ def get_httpx(url, http_client):
                 max_redirects=10,
             )
             try:
-                response = fallback_client.get(url)
-                return check_response_size(response)
-            except SizeLimitExceeded:
-                raise ValueError(
-                    f"Response exceeds size limit of {max_response_size} bytes"
-                )
+                return stream_with_size_limit(fallback_client, url)
             finally:
                 fallback_client.close()
         else:
