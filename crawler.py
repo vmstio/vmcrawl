@@ -264,7 +264,10 @@ def get_httpx(url, http_client):
                 headers=http_custom_headers,
                 timeout=common_timeout,
             )
-            return fallback_client.get(url)
+            try:
+                return fallback_client.get(url)
+            finally:
+                fallback_client.close()
         else:
             raise exception
 
@@ -1844,37 +1847,46 @@ def check_and_record_domains(
 
     executor = ThreadPoolExecutor(max_workers=max_workers)
     try:
-        futures = {
-            executor.submit(process_single_domain, domain): domain
-            for domain in domain_list
-        }
+        # Process domains in batches to avoid memory accumulation
+        batch_size = max(100, max_workers * 10)
+        total_domains = len(domain_list)
 
-        try:
-            for future in tqdm(
-                as_completed(futures),
-                total=len(domain_list),
-                desc=f"{appname}",
-                unit="d",
-            ):
+        with tqdm(total=total_domains, desc=f"{appname}", unit="d") as pbar:
+            for i in range(0, total_domains, batch_size):
+                if shutdown_event.is_set():
+                    break
+
+                batch = domain_list[i : i + batch_size]
+                futures = {
+                    executor.submit(process_single_domain, domain): domain
+                    for domain in batch
+                }
+
                 try:
-                    future.result()
-                except httpx.CloseError:
-                    pass
-                except Exception as exception:
-                    if not shutdown_event.is_set():
-                        domain = futures[future]
-                        vmc_output(
-                            f"{domain}: Failed to complete processing {exception}",
-                            "red",
-                            use_tqdm=True,
-                        )
-        except KeyboardInterrupt:
-            shutdown_event.set()
-            vmc_output(f"\n{appname} interrupted by user", "red")
-            for future in futures:
-                future.cancel()
-            executor.shutdown(wait=False, cancel_futures=True)
-            return
+                    for future in as_completed(futures):
+                        try:
+                            future.result()
+                        except httpx.CloseError:
+                            pass
+                        except Exception as exception:
+                            if not shutdown_event.is_set():
+                                domain = futures[future]
+                                vmc_output(
+                                    f"{domain}: Failed to complete processing {exception}",
+                                    "red",
+                                    use_tqdm=True,
+                                )
+                        finally:
+                            pbar.update(1)
+                            # Explicitly delete future to free memory
+                            del futures[future]
+                except KeyboardInterrupt:
+                    shutdown_event.set()
+                    vmc_output(f"\n{appname} interrupted by user", "red")
+                    for future in futures:
+                        future.cancel()
+                    executor.shutdown(wait=False, cancel_futures=True)
+                    return
     finally:
         if not shutdown_event.is_set():
             executor.shutdown(wait=True)
