@@ -1,5 +1,5 @@
 [Unit]
-Description=vmcrawl - Mastodon Instance Crawler
+Description=vmcrawl
 After=network-online.target postgresql.service
 Wants=network-online.target
 Documentation=https://github.com/vmstan/vmcrawl

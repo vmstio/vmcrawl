@@ -43,7 +43,7 @@ exit
 ### 4. Configure Environment Variables
 
 ```bash
-sudo -u vmcrawl nano /opt/vmcrawl/.env
+sudo -u vmcrawl vim /opt/vmcrawl/.env
 ```
 
 Add your configuration (database credentials, API tokens, etc.)
@@ -52,26 +52,26 @@ Add your configuration (database credentials, API tokens, etc.)
 
 ```bash
 # Make the shell script executable
-sudo chmod +x /opt/vmcrawl/vmcrawl.sh
+chmod +x /opt/vmcrawl/vmcrawl.sh
 
 # Copy service file to systemd
-sudo cp /opt/vmcrawl/vmcrawl.service /etc/systemd/system/
+cp /opt/vmcrawl/vmcrawl.service /etc/systemd/system/
 
 # Reload systemd
-sudo systemctl daemon-reload
+systemctl daemon-reload
 ```
 
 ### 6. Enable and Start Service
 
 ```bash
 # Enable service to start on boot
-sudo systemctl enable vmcrawl.service
+systemctl enable vmcrawl.service
 
 # Start the service
-sudo systemctl start vmcrawl.service
+systemctl start vmcrawl.service
 
 # Check status
-sudo systemctl status vmcrawl.service
+systemctl status vmcrawl.service
 ```
 
 ## Service Management
@@ -80,48 +80,42 @@ sudo systemctl status vmcrawl.service
 
 ```bash
 # Follow logs in real-time
-sudo journalctl -u vmcrawl.service -f
+journalctl -u vmcrawl.service -f
 
 # View recent logs
-sudo journalctl -u vmcrawl.service -n 100
+journalctl -u vmcrawl.service -n 100
 
 # View logs since boot
-sudo journalctl -u vmcrawl.service -b
+journalctl -u vmcrawl.service -b
 ```
 
 ### Control Service
 
 ```bash
 # Stop service
-sudo systemctl stop vmcrawl.service
+systemctl stop vmcrawl.service
 
 # Restart service
-sudo systemctl restart vmcrawl.service
+systemctl restart vmcrawl.service
 
 # Disable service
-sudo systemctl disable vmcrawl.service
+systemctl disable vmcrawl.service
 ```
 
 ## Troubleshooting
 
 ### Service fails to start
 
-1. Check logs: `sudo journalctl -u vmcrawl.service -n 50`
+1. Check logs: `journalctl -u vmcrawl.service -n 50`
 2. Verify permissions: `ls -la /opt/vmcrawl`
 3. Test script manually: `sudo -u vmcrawl /opt/vmcrawl/vmcrawl.sh`
-
-### Database connection issues
-
-1. Verify PostgreSQL is running: `sudo systemctl status postgresql`
-2. Check database credentials in `/opt/vmcrawl/.env`
-3. Test database connection as vmcrawl user
 
 ### Permission errors
 
 ```bash
 # Fix ownership
-sudo chown -R vmcrawl:vmcrawl /opt/vmcrawl
+chown -R vmcrawl:vmcrawl /opt/vmcrawl
 
 # Fix script permissions
-sudo chmod +x /opt/vmcrawl/vmcrawl.sh
+chmod +x /opt/vmcrawl/vmcrawl.sh
 ```
