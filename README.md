@@ -84,27 +84,38 @@ On your PostgreSQL server, execute the contents of `creation.sql` to create the 
 #### 5. Install Service Files
 
 ```bash
-# Make the shell script executable
+# Make the shell scripts executable
 chmod +x /opt/vmcrawl/vmcrawl.sh
+chmod +x /opt/vmcrawl/vmfetch.sh
 
-# Copy service file to systemd
+# Copy service files to systemd
 cp /opt/vmcrawl/vmcrawl.service /etc/systemd/system/
+cp /opt/vmcrawl/vmfetch.service /etc/systemd/system/
+cp /opt/vmcrawl/vmfetch.timer /etc/systemd/system/
 
 # Reload systemd
 systemctl daemon-reload
 ```
 
-#### 6. Enable and Start Service
+#### 6. Enable and Start Services
 
 ```bash
-# Enable service to start on boot
+# Enable crawler service to start on boot
 systemctl enable vmcrawl.service
 
-# Start the service
+# Start the crawler service
 systemctl start vmcrawl.service
 
-# Check status
+# Check crawler status
 systemctl status vmcrawl.service
+
+# Enable and start the vmfetch timer (runs hourly)
+systemctl enable vmfetch.timer
+systemctl start vmfetch.timer
+
+# Check timer status
+systemctl status vmfetch.timer
+systemctl list-timers vmfetch.timer
 ```
 
 ### Docker Installation
@@ -126,6 +137,10 @@ The project includes four main scripts:
 | `fetch.py`   | Fetches new domains from federated instance peer lists                     |
 | `stats.py`   | Generates and records statistics about crawled instances                   |
 | `nightly.py` | Manages nightly/development version tracking in the database               |
+
+### Automated Fetching
+
+The `vmfetch.timer` systemd timer automatically runs `fetch.py --random` every hour to continuously discover new instances from random servers in your database. This ensures your instance list stays up-to-date without manual intervention. The timer starts one hour after system boot and runs hourly thereafter.
 
 ## Usage
 
@@ -370,18 +385,25 @@ For production installations using systemd:
 ### View Logs
 
 ```bash
-# Follow logs in real-time
+# Follow crawler logs in real-time
 journalctl -u vmcrawl.service -f
 
-# View recent logs
+# View recent crawler logs
 journalctl -u vmcrawl.service -n 100
 
-# View logs since boot
+# View crawler logs since boot
 journalctl -u vmcrawl.service -b
+
+# Follow vmfetch logs in real-time
+journalctl -u vmfetch.service -f
+
+# View recent vmfetch logs
+journalctl -u vmfetch.service -n 100
 ```
 
-### Control Service
+### Control Services
 
+**Crawler Service:**
 ```bash
 # Stop service
 systemctl stop vmcrawl.service
@@ -391,6 +413,24 @@ systemctl restart vmcrawl.service
 
 # Disable service
 systemctl disable vmcrawl.service
+```
+
+**Fetch Timer:**
+```bash
+# Stop timer
+systemctl stop vmfetch.timer
+
+# Restart timer
+systemctl restart vmfetch.timer
+
+# Disable timer
+systemctl disable vmfetch.timer
+
+# Manually trigger a fetch
+systemctl start vmfetch.service
+
+# Check when the next fetch will run
+systemctl list-timers vmfetch.timer
 ```
 
 ## Troubleshooting

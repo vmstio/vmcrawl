@@ -2,7 +2,7 @@
 Description=vmcrawl
 After=network-online.target postgresql.service
 Wants=network-online.target
-Documentation=https://github.com/vmstan/vmcrawl
+Documentation=https://github.com/vmstio/vmcrawl
 
 [Service]
 Type=simple
