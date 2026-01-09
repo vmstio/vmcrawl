@@ -1251,17 +1251,8 @@ def handle_http_status_code(domain, target, response):
     delete_if_error_max(domain)
 
 
-def handle_http_nxdomain(domain, target, response):
-    """Handle HTTP 410/418 (gone) responses."""
-    code = response.status_code
-    error_message = f"HTTP {code} on {target}"
-    vmc_output(f"{domain}: {error_message}", "orange", use_tqdm=True)
-    mark_nxdomain_domain(domain)
-    delete_domain_if_known(domain)
-
-
-def handle_http_authfail(domain, target, response):
-    """Handle HTTP 401/403 (auth required) responses."""
+def handle_http_failed(domain, target, response):
+    """Handle HTTP 401/403 on auth endpoints and 410/418 generally."""
     code = response.status_code
     error_message = f"HTTP {code} on {target}"
     vmc_output(f"{domain}: {error_message}", "orange", use_tqdm=True)
@@ -1509,7 +1500,7 @@ def check_robots_txt(domain, http_client):
                         delete_domain_if_known(domain)
                         return False
         elif response.status_code in http_codes_to_hardfail:
-            handle_http_nxdomain(domain, target, response)
+            handle_http_failed(domain, target, response)
             return False
     except httpx.RequestError as exception:
         handle_tcp_exception(domain, exception)
@@ -1552,7 +1543,7 @@ def check_webfinger(domain, http_client):
             else:
                 return None
         elif response.status_code in http_codes_to_hardfail:
-            handle_http_nxdomain(domain, target, response)
+            handle_http_failed(domain, target, response)
             return False
     except httpx.RequestError as exception:
         handle_tcp_exception(domain, exception)
@@ -1622,7 +1613,7 @@ def check_nodeinfo(domain, backend_domain, http_client):
             handle_json_exception(domain, target, exception)
             return False
         elif response.status_code in http_codes_to_hardfail:
-            handle_http_nxdomain(domain, target, response)
+            handle_http_failed(domain, target, response)
             return False
         else:
             handle_http_status_code(domain, target, response)
@@ -1659,7 +1650,7 @@ def check_nodeinfo_20(domain, nodeinfo_20_url, http_client):
                         return False
                 return nodeinfo_20_result
         elif response.status_code in http_codes_to_hardfail:
-            handle_http_nxdomain(domain, target, response)
+            handle_http_failed(domain, target, response)
             return False
         else:
             handle_http_status_code(domain, target, response)
@@ -1846,10 +1837,10 @@ def process_mastodon_instance(
                 )
             vmc_output(f"{domain}: {version_info}", "green", use_tqdm=True)
         elif response.status_code in http_codes_to_authfail:
-            handle_http_authfail(domain, target, response)
+            handle_http_failed(domain, target, response)
             return False
         elif response.status_code in http_codes_to_hardfail:
-            handle_http_nxdomain(domain, target, response)
+            handle_http_failed(domain, target, response)
             return None
         else:
             handle_http_status_code(domain, target, response)
