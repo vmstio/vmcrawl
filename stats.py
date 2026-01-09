@@ -1284,3 +1284,4 @@ if __name__ == "__main__":
         vmc_output(f"\n{appname} interrupted by user", "bold")
     finally:
         conn.close()
+        db_pool.close()
