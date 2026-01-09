@@ -2116,10 +2116,10 @@ def get_menu_options() -> dict:
         "Process new domains": {"0": "Recently Fetched"},
         "Change process direction": {"1": "Standard", "2": "Reverse", "3": "Random"},
         "Retry fatal errors": {
-            "6": "Ignored Platform",
-            "7": "410/418 & 401/403",
+            "6": "Ignored",
+            "7": "Failed",
             "8": "NXDOMAIN",
-            "9": "Crawling Prohibited",
+            "9": "Prohibited",
         },
         "Retry connection errors": {
             "10": "SSL",
