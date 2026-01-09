@@ -1315,10 +1315,26 @@ def handle_tcp_exception(domain, exception):
         increment_domain_error(domain, error_reason)
         delete_if_error_max(domain)
     elif any(
+            msg in error_message.casefold()
+            for msg in [
+                "nodename nor servname provided",
+                "name or service not known",
+            ]
+        ):
+        error_message = (
+            re.sub(r"\s*(\[[^\]]*\]|\([^)]*\))", "", error_message)
+            .replace(":", "")
+            .replace(",", "")
+            .split(" for ", 1)[0]
+            .lstrip()
+            .rstrip(" .")
+        )
+        vmc_output(f"{domain}: {error_message}", "orange", use_tqdm=True)
+        mark_nxdomain_domain(domain)
+        delete_domain_if_known(domain)
+    elif any(
         msg in error_message.casefold()
         for msg in [
-            "nodename nor servname provided",
-            "name or service not known",
             "no address associated with hostname",
             "temporary failure in name resolution",
             "address family not supported",
