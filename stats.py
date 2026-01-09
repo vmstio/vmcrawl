@@ -12,6 +12,7 @@ try:
         appname,
         appversion,
         conn,
+        db_pool,
         is_running_headless,
         vmc_output,
     )
@@ -33,152 +34,130 @@ current_filename = os.path.basename(__file__)
 
 def get_total_raw_domains():
     """Get total count of raw domains."""
-    cursor = conn.cursor()
-    value_to_return = 0
-    try:
-        cursor.execute("SELECT COUNT(domain) AS total_domains FROM raw_domains;")
-        result = cursor.fetchone()
-        value_to_return = result[0] if result is not None else 0
-        conn.commit()
-        return value_to_return
-    except Exception as e:
-        print(f"Failed to obtain total raw domains: {e}")
-        conn.rollback()
-    finally:
-        cursor.close()
+    with db_pool.connection() as conn:
+        with conn.cursor() as cursor:
+            try:
+                cursor.execute(
+                    "SELECT COUNT(domain) AS total_domains FROM raw_domains;"
+                )
+                result = cursor.fetchone()
+                return result[0] if result is not None else 0
+            except Exception as e:
+                print(f"Failed to obtain total raw domains: {e}")
+                conn.rollback()
+                return 0
 
 
 def get_total_failed_domains():
     """Get count of domains marked as failed."""
-    cursor = conn.cursor()
-    value_to_return = 0
-    try:
-        cursor.execute(
-            "SELECT COUNT(domain) AS total_domains FROM raw_domains WHERE failed = True;"
-        )
-        result = cursor.fetchone()
-        value_to_return = result[0] if result is not None else 0
-        conn.commit()
-        return value_to_return
-    except Exception as e:
-        print(f"Failed to obtain total failed domains: {e}")
-        conn.rollback()
-    finally:
-        cursor.close()
+    with db_pool.connection() as conn:
+        with conn.cursor() as cursor:
+            try:
+                cursor.execute(
+                    "SELECT COUNT(domain) AS total_domains FROM raw_domains WHERE failed = True;"
+                )
+                result = cursor.fetchone()
+                return result[0] if result is not None else 0
+            except Exception as e:
+                print(f"Failed to obtain total failed domains: {e}")
+                conn.rollback()
+                return 0
 
 
 def get_total_ignored_domains():
     """Get count of domains marked as ignored (non-Mastodon)."""
-    cursor = conn.cursor()
-    value_to_return = 0
-    try:
-        cursor.execute(
-            "SELECT COUNT(domain) AS total_domains FROM raw_domains WHERE ignore = True;"
-        )
-        result = cursor.fetchone()
-        value_to_return = result[0] if result is not None else 0
-        conn.commit()
-        return value_to_return
-    except Exception as e:
-        print(f"Failed to obtain total non-Mastodon domains: {e}")
-        conn.rollback()
-    finally:
-        cursor.close()
+    with db_pool.connection() as conn:
+        with conn.cursor() as cursor:
+            try:
+                cursor.execute(
+                    "SELECT COUNT(domain) AS total_domains FROM raw_domains WHERE ignore = True;"
+                )
+                result = cursor.fetchone()
+                return result[0] if result is not None else 0
+            except Exception as e:
+                print(f"Failed to obtain total non-Mastodon domains: {e}")
+                conn.rollback()
+                return 0
 
 
 def get_total_nxdomains():
     """Get count of domains marked as NXDOMAIN."""
-    cursor = conn.cursor()
-    value_to_return = 0
-    try:
-        cursor.execute(
-            "SELECT COUNT(domain) AS total_domains FROM raw_domains WHERE nxdomain = True;"
-        )
-        result = cursor.fetchone()
-        value_to_return = result[0] if result is not None else 0
-        conn.commit()
-        return value_to_return
-    except Exception as e:
-        print(f"Failed to obtain total nxdomain domains: {e}")
-        conn.rollback()
-    finally:
-        cursor.close()
+    with db_pool.connection() as conn:
+        with conn.cursor() as cursor:
+            try:
+                cursor.execute(
+                    "SELECT COUNT(domain) AS total_domains FROM raw_domains WHERE nxdomain = True;"
+                )
+                result = cursor.fetchone()
+                return result[0] if result is not None else 0
+            except Exception as e:
+                print(f"Failed to obtain total nxdomain domains: {e}")
+                conn.rollback()
+                return 0
 
 
 def get_total_norobots():
     """Get count of domains that prohibit crawling."""
-    cursor = conn.cursor()
-    value_to_return = 0
-    try:
-        cursor.execute(
-            "SELECT COUNT(domain) AS total_domains FROM raw_domains WHERE norobots = True;"
-        )
-        result = cursor.fetchone()
-        value_to_return = result[0] if result is not None else 0
-        conn.commit()
-        return value_to_return
-    except Exception as e:
-        print(f"Failed to obtain total norobots domains: {e}")
-        conn.rollback()
-    finally:
-        cursor.close()
+    with db_pool.connection() as conn:
+        with conn.cursor() as cursor:
+            try:
+                cursor.execute(
+                    "SELECT COUNT(domain) AS total_domains FROM raw_domains WHERE norobots = True;"
+                )
+                result = cursor.fetchone()
+                return result[0] if result is not None else 0
+            except Exception as e:
+                print(f"Failed to obtain total norobots domains: {e}")
+                conn.rollback()
+                return 0
 
 
 def get_total_baddata():
     """Get count of domains with bad data."""
-    cursor = conn.cursor()
-    value_to_return = 0
-    try:
-        cursor.execute(
-            "SELECT COUNT(domain) AS total_domains FROM raw_domains WHERE baddata = True;"
-        )
-        result = cursor.fetchone()
-        value_to_return = result[0] if result is not None else 0
-        conn.commit()
-        return value_to_return
-    except Exception as e:
-        print(f"Failed to obtain total baddata domains: {e}")
-        conn.rollback()
-    finally:
-        cursor.close()
+    with db_pool.connection() as conn:
+        with conn.cursor() as cursor:
+            try:
+                cursor.execute(
+                    "SELECT COUNT(domain) AS total_domains FROM raw_domains WHERE baddata = True;"
+                )
+                result = cursor.fetchone()
+                return result[0] if result is not None else 0
+            except Exception as e:
+                print(f"Failed to obtain total baddata domains: {e}")
+                conn.rollback()
+                return 0
 
 
 def get_total_error_over():
     """Get count of domains with 8 or more errors."""
-    cursor = conn.cursor()
-    value_to_return = 0
-    try:
-        cursor.execute(
-            "SELECT COUNT(domain) AS total_domains FROM raw_domains WHERE errors >= 8;"
-        )
-        result = cursor.fetchone()
-        value_to_return = result[0] if result is not None else 0
-        conn.commit()
-        return value_to_return
-    except Exception as e:
-        print(f"Failed to obtain total error over domains: {e}")
-        conn.rollback()
-    finally:
-        cursor.close()
+    with db_pool.connection() as conn:
+        with conn.cursor() as cursor:
+            try:
+                cursor.execute(
+                    "SELECT COUNT(domain) AS total_domains FROM raw_domains WHERE errors >= 8;"
+                )
+                result = cursor.fetchone()
+                return result[0] if result is not None else 0
+            except Exception as e:
+                print(f"Failed to obtain total error over domains: {e}")
+                conn.rollback()
+                return 0
 
 
 def get_total_error_under():
     """Get count of domains with 7 or fewer errors."""
-    cursor = conn.cursor()
-    value_to_return = 0
-    try:
-        cursor.execute(
-            "SELECT COUNT(domain) AS total_domains FROM raw_domains WHERE errors <= 7;"
-        )
-        result = cursor.fetchone()
-        value_to_return = result[0] if result is not None else 0
-        conn.commit()
-        return value_to_return
-    except Exception as e:
-        print(f"Failed to obtain total error under domains: {e}")
-        conn.rollback()
-    finally:
-        cursor.close()
+    with db_pool.connection() as conn:
+        with conn.cursor() as cursor:
+            try:
+                cursor.execute(
+                    "SELECT COUNT(domain) AS total_domains FROM raw_domains WHERE errors <= 7;"
+                )
+                result = cursor.fetchone()
+                return result[0] if result is not None else 0
+            except Exception as e:
+                print(f"Failed to obtain total error under domains: {e}")
+                conn.rollback()
+                return 0
 
 
 # =============================================================================
@@ -1187,10 +1166,11 @@ STATS_CONFIG = [
 
 def write_statistics_to_database(stats_values):
     """Write collected statistics to the database."""
-    cursor = conn.cursor()
-    try:
-        cursor.execute(
-            """
+    with db_pool.connection() as conn:
+        with conn.cursor() as cursor:
+            try:
+                cursor.execute(
+                    """
         INSERT INTO statistics (
         date, total_raw_domains, total_failed_domains, total_mastodon_domains,
         total_ignored_domains, total_nxdomains, total_norobots, total_baddata,
@@ -1255,15 +1235,13 @@ def write_statistics_to_database(stats_values):
         total_active_previous_patched_users = EXCLUDED.total_active_previous_patched_users,
         total_active_pending_eol_patched_users = EXCLUDED.total_active_pending_eol_patched_users
         """,
-            stats_values,
-        )
-        conn.commit()
-        vmc_output("Statistics inserted/updated successfully", "green")
-    except Exception as e:
-        print(f"Failed to insert/update statistics: {e}")
-        conn.rollback()
-    finally:
-        cursor.close()
+                    stats_values,
+                )
+                conn.commit()
+                vmc_output("Statistics inserted/updated successfully", "green")
+            except Exception as e:
+                print(f"Failed to insert/update statistics: {e}")
+                conn.rollback()
 
 
 # =============================================================================

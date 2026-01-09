@@ -138,11 +138,25 @@ except psycopg.Error as exception:
 common_timeout = int(os.getenv("VMCRAWL_COMMON_TIMEOUT", "7"))
 http_custom_user_agent = f"{appname}/{appversion} (https://docs.vmst.io/{appname})"
 http_custom_headers = {"User-Agent": http_custom_user_agent}
+
+# Memory protection: limit response sizes to prevent memory bombs
+# Max response size: 10MB (should be plenty for any legitimate Mastodon API response)
+max_response_size = int(os.getenv("VMCRAWL_MAX_RESPONSE_SIZE", str(10 * 1024 * 1024)))
+
+# Create limits object for httpx
+limits = httpx.Limits(
+    max_keepalive_connections=5,
+    max_connections=10,
+    keepalive_expiry=30.0,
+)
+
 http_client = httpx.Client(
     http2=True,
     follow_redirects=True,
     headers=http_custom_headers,
     timeout=common_timeout,
+    limits=limits,
+    max_redirects=10,  # Prevent infinite redirect loops
 )
 
 # =============================================================================
@@ -262,9 +276,28 @@ def limit_url_depth(source_url, depth=2):
 
 
 def get_httpx(url, http_client):
-    """Make HTTP GET request with HTTP/2 fallback on connection errors."""
+    """Make HTTP GET request with HTTP/2 fallback on connection errors and size limits."""
     try:
-        return http_client.get(url)
+        response = http_client.get(url)
+
+        # Check response size before reading content
+        content_length = response.headers.get("Content-Length")
+        if content_length and int(content_length) > max_response_size:
+            response.close()
+            raise ValueError(
+                f"Response too large: {content_length} bytes (max: {max_response_size})"
+            )
+
+        # For chunked responses, check actual content size
+        # httpx auto-reads content, but we can check if it's too large
+        if len(response.content) > max_response_size:
+            response.close()
+            raise ValueError(
+                f"Response too large: {len(response.content)} bytes (max: {max_response_size})"
+            )
+
+        return response
+
     except httpx.RequestError as exception:
         error_str = str(exception).casefold()
 
@@ -276,9 +309,25 @@ def get_httpx(url, http_client):
                 follow_redirects=True,
                 headers=http_custom_headers,
                 timeout=common_timeout,
+                limits=limits,
+                max_redirects=10,
             )
             try:
-                return fallback_client.get(url)
+                response = fallback_client.get(url)
+
+                # Check response size for fallback client too
+                content_length = response.headers.get("Content-Length")
+                if content_length and int(content_length) > max_response_size:
+                    response.close()
+                    raise ValueError(f"Response too large: {content_length} bytes")
+
+                if len(response.content) > max_response_size:
+                    response.close()
+                    raise ValueError(
+                        f"Response too large: {len(response.content)} bytes"
+                    )
+
+                return response
             finally:
                 fallback_client.close()
         else:
@@ -286,30 +335,33 @@ def get_httpx(url, http_client):
 
 
 def get_domain_endings():
-    """Fetch and cache the list of valid TLDs from IANA."""
+    """Fetch and cache the set of valid TLDs from IANA."""
     url = "http://data.iana.org/TLD/tlds-alpha-by-domain.txt"
     cache_file_path = get_cache_file_path(url)
     max_cache_age = 86400  # 1 day in seconds
 
     if is_cache_valid(cache_file_path, max_cache_age):
         with open(cache_file_path, "r") as cache_file:
-            domain_endings = [line.strip().lower() for line in cache_file.readlines()]
+            # Use set for O(1) lookup
+            return {line.strip().lower() for line in cache_file if line.strip()}
     else:
         domain_endings_response = get_httpx(url, http_client)
         if domain_endings_response.status_code in [200]:
-            domain_endings = [
+            # Use set for O(1) lookup
+            domain_endings = {
                 line.strip().lower()
                 for line in domain_endings_response.text.splitlines()
-                if not line.startswith("#")
-            ]
+                if line.strip() and not line.startswith("#")
+            }
             with open(cache_file_path, "w") as cache_file:
-                cache_file.write("\n".join(domain_endings))
+                cache_file.write("\n".join(sorted(domain_endings)))
+            return domain_endings
         else:
             raise Exception(
                 f"Failed to fetch domain endings. HTTP Status Code: {domain_endings_response.status_code}"
             )
 
-    return domain_endings
+    return set()
 
 
 # =============================================================================
@@ -1061,13 +1113,12 @@ def get_junk_keywords():
         with conn.cursor() as cursor:
             try:
                 cursor.execute("SELECT keywords FROM junk_words")
-                junk_domains = [row[0] for row in cursor.fetchall()]
-                conn.commit()
-                return junk_domains
+                # Use set for O(1) lookup instead of O(n) list iteration
+                return {row[0] for row in cursor}
             except Exception as exception:
                 vmc_output(f"Failed to obtain junk keywords: {exception}", "red")
                 conn.rollback()
-    return []
+    return set()
 
 
 def get_bad_tld():
@@ -1076,13 +1127,12 @@ def get_bad_tld():
         with conn.cursor() as cursor:
             try:
                 cursor.execute("SELECT tld FROM bad_tld")
-                bad_tlds = [row[0] for row in cursor.fetchall()]
-                conn.commit()
-                return bad_tlds
+                # Use set for O(1) lookup
+                return {row[0] for row in cursor}
             except Exception as exception:
                 vmc_output(f"Failed to obtain bad TLDs: {exception}", "red")
                 conn.rollback()
-    return []
+    return set()
 
 
 def get_failed_domains():
@@ -1091,15 +1141,12 @@ def get_failed_domains():
         with conn.cursor() as cursor:
             try:
                 cursor.execute("SELECT domain FROM raw_domains WHERE failed = TRUE")
-                failed_domains = [
-                    row[0].strip() for row in cursor.fetchall() if row[0].strip()
-                ]
-                conn.commit()
-                return failed_domains
+                # Use set for O(1) lookup, stream results
+                return {row[0].strip() for row in cursor if row[0] and row[0].strip()}
             except Exception as exception:
                 vmc_output(f"Failed to obtain failed domains: {exception}", "red")
                 conn.rollback()
-    return []
+    return set()
 
 
 def get_ignored_domains():
@@ -1108,15 +1155,12 @@ def get_ignored_domains():
         with conn.cursor() as cursor:
             try:
                 cursor.execute("SELECT domain FROM raw_domains WHERE ignore = TRUE")
-                ignored_domains = [
-                    row[0].strip() for row in cursor.fetchall() if row[0].strip()
-                ]
-                conn.commit()
-                return ignored_domains
+                # Use set for O(1) lookup, stream results
+                return {row[0].strip() for row in cursor if row[0] and row[0].strip()}
             except Exception as exception:
                 vmc_output(f"Failed to obtain ignored domains: {exception}", "red")
                 conn.rollback()
-    return []
+    return set()
 
 
 def get_baddata_domains():
@@ -1125,15 +1169,12 @@ def get_baddata_domains():
         with conn.cursor() as cursor:
             try:
                 cursor.execute("SELECT domain FROM raw_domains WHERE baddata = TRUE")
-                baddata_domains = [
-                    row[0].strip() for row in cursor.fetchall() if row[0].strip()
-                ]
-                conn.commit()
-                return baddata_domains
+                # Use set for O(1) lookup, stream results
+                return {row[0].strip() for row in cursor if row[0] and row[0].strip()}
             except Exception as exception:
                 vmc_output(f"Failed to obtain baddata domains: {exception}", "red")
                 conn.rollback()
-    return []
+    return set()
 
 
 def get_nxdomain_domains():
@@ -1142,15 +1183,12 @@ def get_nxdomain_domains():
         with conn.cursor() as cursor:
             try:
                 cursor.execute("SELECT domain FROM raw_domains WHERE nxdomain = TRUE")
-                nxdomain_domains = [
-                    row[0].strip() for row in cursor.fetchall() if row[0].strip()
-                ]
-                conn.commit()
-                return nxdomain_domains
+                # Use set for O(1) lookup, stream results
+                return {row[0].strip() for row in cursor if row[0] and row[0].strip()}
             except Exception as exception:
                 vmc_output(f"Failed to obtain NXDOMAIN domains: {exception}", "red")
                 conn.rollback()
-    return []
+    return set()
 
 
 def get_norobots_domains():
@@ -1159,15 +1197,12 @@ def get_norobots_domains():
         with conn.cursor() as cursor:
             try:
                 cursor.execute("SELECT domain FROM raw_domains WHERE norobots = TRUE")
-                norobots_domains = [
-                    row[0].strip() for row in cursor.fetchall() if row[0].strip()
-                ]
-                conn.commit()
-                return norobots_domains
+                # Use set for O(1) lookup, stream results
+                return {row[0].strip() for row in cursor if row[0] and row[0].strip()}
             except Exception as exception:
                 vmc_output(f"Failed to obtain NoRobots domains: {exception}", "red")
                 conn.rollback()
-    return []
+    return set()
 
 
 # =============================================================================
@@ -1218,6 +1253,27 @@ def handle_http_authfail(domain, target, response):
 def handle_tcp_exception(domain, exception):
     """Handle TCP/connection exceptions with appropriate categorization."""
     error_message = str(exception)
+
+    # Handle response size violations
+    if isinstance(exception, ValueError) and "too large" in error_message.casefold():
+        error_reason = "SIZE"
+        vmc_output(
+            f"{domain}: Response too large (memory protection)", "orange", use_tqdm=True
+        )
+        log_error(domain, "Response exceeds size limit")
+        increment_domain_error(domain, error_reason)
+        delete_if_error_max(domain)
+        return
+
+    # Handle bad file descriptor (usually from cancellation/cleanup issues)
+    if "bad file descriptor" in error_message.casefold():
+        error_reason = "FD"
+        vmc_output(f"{domain}: Connection closed unexpectedly", "yellow", use_tqdm=True)
+        log_error(domain, "Bad file descriptor")
+        increment_domain_error(domain, error_reason)
+        delete_if_error_max(domain)
+        return
+
     if "_ssl.c" in error_message.casefold():
         error_reason = "SSL"
         error_message = (
@@ -1980,11 +2036,12 @@ def load_from_database(user_choice):
         with conn.cursor() as cursor:
             try:
                 cursor.execute(query, params if params else None)  # type: ignore
-                raw_domains = [
-                    row[0].strip() for row in cursor.fetchall() if row[0].strip()
-                ]
+                # Use server-side cursor for large result sets to avoid loading all into memory
+                cursor.itersize = 1000  # Fetch 1000 rows at a time
                 domain_list = [
-                    domain for domain in raw_domains if not has_emoji_chars(domain)
+                    row[0].strip()
+                    for row in cursor
+                    if row[0] and row[0].strip() and not has_emoji_chars(row[0])
                 ]
                 conn.commit()
             except Exception as exception:
