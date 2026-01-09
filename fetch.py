@@ -303,7 +303,7 @@ def get_domains(api_url, domain, domain_endings):
             and item.islower()
         ]
         return filtered_domains
-    except json.JSONDecodeError as e:
+    except json.JSONDecodeError:
         # JSON decode errors indicate HTML or non-JSON response - mark as no_peers
         vmc_output(
             f"{domain}: JSON decode error - likely HTML response (marked as no_peers)",
