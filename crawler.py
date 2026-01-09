@@ -115,15 +115,19 @@ db_port = os.getenv("VMCRAWL_POSTGRES_PORT", "5432")
 conn_string = f"postgresql://{db_user}:{db_password}@{db_host}:{db_port}/{db_name}"
 
 # Create connection pool for thread-safe database access
-# Pool size based on max threads + some overhead for main thread operations
-max_db_connections = int(os.getenv("VMCRAWL_MAX_THREADS", "2")) + 5
+# For 2 vCPU systems: Use conservative pool size based on CPU formula: (cores * 2) + 1
+# With PgBouncer: Keep small (5 connections) as PgBouncer handles connection multiplexing
+# Without PgBouncer: Still keep at 5 for 2 vCPU shared database server
+max_workers = int(os.getenv("VMCRAWL_MAX_THREADS", "2"))
+max_db_connections = 5  # Optimal for 2 vCPU: (2 * 2) + 1 = 5
 
 try:
     db_pool = ConnectionPool(
         conn_string,
-        min_size=1,
+        min_size=2,  # Keep 2 warm connections
         max_size=max_db_connections,
         timeout=30,
+        max_waiting=max_workers,  # Allow worker threads to queue briefly
     )
     # Also maintain a single connection for backwards compatibility with module-level code
     conn = psycopg.connect(conn_string)
