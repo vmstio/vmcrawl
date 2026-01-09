@@ -2117,8 +2117,8 @@ def get_menu_options() -> dict:
         "Change process direction": {"1": "Standard", "2": "Reverse", "3": "Random"},
         "Retry fatal errors": {
             "6": "Ignored Platform",
-            "7": "Authentication (401/403)",
-            "8": "Gone (410/418)",
+            "7": "Failed (410/418) or Auth (401/403)",
+            "8": "NXDOMAIN",
             "9": "Crawling Prohibited",
         },
         "Retry connection errors": {
