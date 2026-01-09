@@ -1,4 +1,5 @@
 psycopg[binary]
+psycopg-pool
 httpx[http2]
 python-dotenv
 toml

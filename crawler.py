@@ -6,6 +6,7 @@
 
 try:
     import argparse
+    import gc
     import hashlib
     import json
     import mimetypes
@@ -25,6 +26,7 @@ try:
     import toml
     from dotenv import load_dotenv
     from packaging import version
+    from psycopg_pool import ConnectionPool
     from tqdm import tqdm
 except ImportError as exception:
     print(f"Error importing module: {exception}")
@@ -112,7 +114,18 @@ db_port = os.getenv("VMCRAWL_POSTGRES_PORT", "5432")
 
 conn_string = f"postgresql://{db_user}:{db_password}@{db_host}:{db_port}/{db_name}"
 
+# Create connection pool for thread-safe database access
+# Pool size based on max threads + some overhead for main thread operations
+max_db_connections = int(os.getenv("VMCRAWL_MAX_THREADS", "2")) + 5
+
 try:
+    db_pool = ConnectionPool(
+        conn_string,
+        min_size=1,
+        max_size=max_db_connections,
+        timeout=30,
+    )
+    # Also maintain a single connection for backwards compatibility with module-level code
     conn = psycopg.connect(conn_string)
 except psycopg.Error as exception:
     print(f"Error connecting to PostgreSQL database: {exception}")
@@ -697,119 +710,124 @@ def delete_old_patch_versions():
 
 def log_error(domain, error_to_print):
     """Log an error for a domain to the error_log table."""
-    cursor = conn.cursor()
-    try:
-        cursor.execute(
-            """
-            INSERT INTO error_log (domain, error)
-            VALUES (%s, %s)
-        """,
-            (domain, error_to_print),
-        )
-        conn.commit()
-    except Exception as exception:
-        vmc_output(f"{domain}: Failed to log error {exception}", "red", use_tqdm=True)
-        conn.rollback()
-    finally:
-        cursor.close()
+    with db_pool.connection() as conn:
+        with conn.cursor() as cursor:
+            try:
+                cursor.execute(
+                    """
+                    INSERT INTO error_log (domain, error)
+                    VALUES (%s, %s)
+                """,
+                    (domain, error_to_print),
+                )
+                conn.commit()
+            except Exception as exception:
+                vmc_output(
+                    f"{domain}: Failed to log error {exception}", "red", use_tqdm=True
+                )
+                conn.rollback()
 
 
 def increment_domain_error(domain, error_reason):
     """Increment error count for a domain and record the error reason."""
-    cursor = conn.cursor()
-    try:
-        cursor.execute("SELECT errors FROM raw_domains WHERE domain = %s", (domain,))
-        result = cursor.fetchone()
-        if result:
-            current_errors = result[0] if result[0] is not None else 0
-            new_errors = current_errors + 1
-        else:
-            new_errors = 1
+    with db_pool.connection() as conn:
+        with conn.cursor() as cursor:
+            try:
+                cursor.execute(
+                    "SELECT errors FROM raw_domains WHERE domain = %s", (domain,)
+                )
+                result = cursor.fetchone()
+                if result:
+                    current_errors = result[0] if result[0] is not None else 0
+                    new_errors = current_errors + 1
+                else:
+                    new_errors = 1
 
-        cursor.execute(
-            """
-            INSERT INTO raw_domains (domain, failed, ignore, errors, reason, nxdomain, norobots)
-            VALUES (%s, %s, %s, %s, %s, %s, %s)
-            ON CONFLICT(domain) DO UPDATE SET
-            failed = excluded.failed,
-            ignore = excluded.ignore,
-            errors = excluded.errors,
-            reason = excluded.reason,
-            nxdomain = excluded.nxdomain,
-            norobots = excluded.norobots
-        """,
-            (domain, None, None, new_errors, error_reason, None, None),
-        )
-        conn.commit()
-    except Exception as exception:
-        vmc_output(
-            f"{domain}: Failed to increment domain error {exception}",
-            "red",
-            use_tqdm=True,
-        )
-        conn.rollback()
-    finally:
-        cursor.close()
+                cursor.execute(
+                    """
+                    INSERT INTO raw_domains (domain, failed, ignore, errors, reason, nxdomain, norobots)
+                    VALUES (%s, %s, %s, %s, %s, %s, %s)
+                    ON CONFLICT(domain) DO UPDATE SET
+                    failed = excluded.failed,
+                    ignore = excluded.ignore,
+                    errors = excluded.errors,
+                    reason = excluded.reason,
+                    nxdomain = excluded.nxdomain,
+                    norobots = excluded.norobots
+                """,
+                    (domain, None, None, new_errors, error_reason, None, None),
+                )
+                conn.commit()
+            except Exception as exception:
+                vmc_output(
+                    f"{domain}: Failed to increment domain error {exception}",
+                    "red",
+                    use_tqdm=True,
+                )
+                conn.rollback()
 
 
 def clear_domain_error(domain):
     """Clear all error flags for a domain."""
-    cursor = conn.cursor()
-    try:
-        cursor.execute(
-            """
-            INSERT INTO raw_domains (domain, failed, ignore, errors, reason, nxdomain, norobots)
-            VALUES (%s, %s, %s, %s, %s, %s, %s)
-            ON CONFLICT(domain) DO UPDATE SET
-            failed = excluded.failed,
-            ignore = excluded.ignore,
-            errors = excluded.errors,
-            reason = excluded.reason,
-            nxdomain = excluded.nxdomain,
-            norobots = excluded.norobots
-        """,
-            (domain, None, None, None, None, None, None),
-        )
-        conn.commit()
-    except Exception as exception:
-        vmc_output(
-            f"{domain}: Failed to clear domain errors {exception}", "red", use_tqdm=True
-        )
-        conn.rollback()
-    finally:
-        cursor.close()
+    with db_pool.connection() as conn:
+        with conn.cursor() as cursor:
+            try:
+                cursor.execute(
+                    """
+                    INSERT INTO raw_domains (domain, failed, ignore, errors, reason, nxdomain, norobots)
+                    VALUES (%s, %s, %s, %s, %s, %s, %s)
+                    ON CONFLICT(domain) DO UPDATE SET
+                    failed = excluded.failed,
+                    ignore = excluded.ignore,
+                    errors = excluded.errors,
+                    reason = excluded.reason,
+                    nxdomain = excluded.nxdomain,
+                    norobots = excluded.norobots
+                """,
+                    (domain, None, None, None, None, None, None),
+                )
+                conn.commit()
+            except Exception as exception:
+                vmc_output(
+                    f"{domain}: Failed to clear domain errors {exception}",
+                    "red",
+                    use_tqdm=True,
+                )
+                conn.rollback()
 
 
 def delete_if_error_max(domain):
     """Delete domain from known domains if error threshold is exceeded."""
-    cursor = conn.cursor()
-    try:
-        cursor.execute("SELECT errors FROM raw_domains WHERE domain = %s", (domain,))
-        result = cursor.fetchone()
-        if result and result[0] >= error_threshold:
-            cursor.execute(
-                "SELECT timestamp FROM mastodon_domains WHERE domain = %s", (domain,)
-            )
-            timestamp = cursor.fetchone()
-            if (
-                timestamp
-                and (
-                    datetime.now(timezone.utc)
-                    - timestamp[0].replace(tzinfo=timezone.utc)
-                ).days
-                >= error_threshold
-            ):
-                delete_domain_if_known(domain)
+    with db_pool.connection() as conn:
+        with conn.cursor() as cursor:
+            try:
+                cursor.execute(
+                    "SELECT errors FROM raw_domains WHERE domain = %s", (domain,)
+                )
+                result = cursor.fetchone()
+                if result and result[0] >= error_threshold:
+                    cursor.execute(
+                        "SELECT timestamp FROM mastodon_domains WHERE domain = %s",
+                        (domain,),
+                    )
+                    timestamp = cursor.fetchone()
+                    if (
+                        timestamp
+                        and (
+                            datetime.now(timezone.utc)
+                            - timestamp[0].replace(tzinfo=timezone.utc)
+                        ).days
+                        >= error_threshold
+                    ):
+                        delete_domain_if_known(domain)
 
-    except Exception as exception:
-        vmc_output(
-            f"{domain}: Failed to delete maxed out domain {exception}",
-            "red",
-            use_tqdm=True,
-        )
-        conn.rollback()
-    finally:
-        cursor.close()
+            except Exception as exception:
+                vmc_output(
+                    f"{domain}: Failed to delete maxed out domain {exception}",
+                    "red",
+                    use_tqdm=True,
+                )
+                conn.rollback()
 
 
 # =============================================================================
@@ -819,106 +837,102 @@ def delete_if_error_max(domain):
 
 def mark_ignore_domain(domain):
     """Mark a domain as ignored (non-Mastodon platform)."""
-    cursor = conn.cursor()
-    try:
-        cursor.execute(
-            """
-            INSERT INTO raw_domains (domain, failed, ignore, errors, reason, nxdomain, norobots)
-            VALUES (%s, %s, %s, %s, %s, %s, %s)
-            ON CONFLICT(domain) DO UPDATE SET
-            failed = excluded.failed,
-            ignore = excluded.ignore,
-            errors = excluded.errors,
-            reason = excluded.reason,
-            nxdomain = excluded.nxdomain,
-            norobots = excluded.norobots
-        """,
-            (domain, None, True, None, None, None, None),
-        )
-        conn.commit()
-    except Exception as exception:
-        vmc_output(f"Failed to mark domain ignored: {exception}", "red")
-        conn.rollback()
-    finally:
-        cursor.close()
+    with db_pool.connection() as conn:
+        with conn.cursor() as cursor:
+            try:
+                cursor.execute(
+                    """
+                    INSERT INTO raw_domains (domain, failed, ignore, errors, reason, nxdomain, norobots)
+                    VALUES (%s, %s, %s, %s, %s, %s, %s)
+                    ON CONFLICT(domain) DO UPDATE SET
+                    failed = excluded.failed,
+                    ignore = excluded.ignore,
+                    errors = excluded.errors,
+                    reason = excluded.reason,
+                    nxdomain = excluded.nxdomain,
+                    norobots = excluded.norobots
+                """,
+                    (domain, None, True, None, None, None, None),
+                )
+                conn.commit()
+            except Exception as exception:
+                vmc_output(f"Failed to mark domain ignored: {exception}", "red")
+                conn.rollback()
 
 
 def mark_failed_domain(domain):
     """Mark a domain as failed (authentication required)."""
-    cursor = conn.cursor()
-    try:
-        cursor.execute(
-            """
-            INSERT INTO raw_domains (domain, failed, ignore, errors, reason, nxdomain, norobots)
-            VALUES (%s, %s, %s, %s, %s, %s, %s)
-            ON CONFLICT(domain) DO UPDATE SET
-            failed = excluded.failed,
-            ignore = excluded.ignore,
-            errors = excluded.errors,
-            reason = excluded.reason,
-            nxdomain = excluded.nxdomain,
-            norobots = excluded.norobots
-        """,
-            (domain, True, None, None, None, None, None),
-        )
-        conn.commit()
-    except Exception as exception:
-        vmc_output(f"Failed to mark domain failed: {exception}", "red")
-        conn.rollback()
-    finally:
-        cursor.close()
+    with db_pool.connection() as conn:
+        with conn.cursor() as cursor:
+            try:
+                cursor.execute(
+                    """
+                    INSERT INTO raw_domains (domain, failed, ignore, errors, reason, nxdomain, norobots)
+                    VALUES (%s, %s, %s, %s, %s, %s, %s)
+                    ON CONFLICT(domain) DO UPDATE SET
+                    failed = excluded.failed,
+                    ignore = excluded.ignore,
+                    errors = excluded.errors,
+                    reason = excluded.reason,
+                    nxdomain = excluded.nxdomain,
+                    norobots = excluded.norobots
+                """,
+                    (domain, True, None, None, None, None, None),
+                )
+                conn.commit()
+            except Exception as exception:
+                vmc_output(f"Failed to mark domain failed: {exception}", "red")
+                conn.rollback()
 
 
 def mark_nxdomain_domain(domain):
     """Mark a domain as NXDOMAIN (gone/not found)."""
-    cursor = conn.cursor()
-    try:
-        cursor.execute(
-            """
-            INSERT INTO raw_domains (domain, failed, ignore, errors, reason, nxdomain, norobots)
-            VALUES (%s, %s, %s, %s, %s, %s, %s)
-            ON CONFLICT(domain) DO UPDATE SET
-            failed = excluded.failed,
-            ignore = excluded.ignore,
-            errors = excluded.errors,
-            reason = excluded.reason,
-            nxdomain = excluded.nxdomain,
-            norobots = excluded.norobots
-        """,
-            (domain, None, None, None, None, True, None),
-        )
-        conn.commit()
-    except Exception as exception:
-        vmc_output(f"Failed to mark domain NXDOMAIN: {exception}", "red")
-        conn.rollback()
-    finally:
-        cursor.close()
+    with db_pool.connection() as conn:
+        with conn.cursor() as cursor:
+            try:
+                cursor.execute(
+                    """
+                    INSERT INTO raw_domains (domain, failed, ignore, errors, reason, nxdomain, norobots)
+                    VALUES (%s, %s, %s, %s, %s, %s, %s)
+                    ON CONFLICT(domain) DO UPDATE SET
+                    failed = excluded.failed,
+                    ignore = excluded.ignore,
+                    errors = excluded.errors,
+                    reason = excluded.reason,
+                    nxdomain = excluded.nxdomain,
+                    norobots = excluded.norobots
+                """,
+                    (domain, None, None, None, None, True, None),
+                )
+                conn.commit()
+            except Exception as exception:
+                vmc_output(f"Failed to mark domain NXDOMAIN: {exception}", "red")
+                conn.rollback()
 
 
 def mark_norobots_domain(domain):
     """Mark a domain as norobots (crawling prohibited)."""
-    cursor = conn.cursor()
-    try:
-        cursor.execute(
-            """
-            INSERT INTO raw_domains (domain, failed, ignore, errors, reason, nxdomain, norobots)
-            VALUES (%s, %s, %s, %s, %s, %s, %s)
-            ON CONFLICT(domain) DO UPDATE SET
-            failed = excluded.failed,
-            ignore = excluded.ignore,
-            errors = excluded.errors,
-            reason = excluded.reason,
-            nxdomain = excluded.nxdomain,
-            norobots = excluded.norobots
-        """,
-            (domain, None, None, None, None, None, True),
-        )
-        conn.commit()
-    except Exception as exception:
-        vmc_output(f"Failed to mark domain NoRobots: {exception}", "red")
-        conn.rollback()
-    finally:
-        cursor.close()
+    with db_pool.connection() as conn:
+        with conn.cursor() as cursor:
+            try:
+                cursor.execute(
+                    """
+                    INSERT INTO raw_domains (domain, failed, ignore, errors, reason, nxdomain, norobots)
+                    VALUES (%s, %s, %s, %s, %s, %s, %s)
+                    ON CONFLICT(domain) DO UPDATE SET
+                    failed = excluded.failed,
+                    ignore = excluded.ignore,
+                    errors = excluded.errors,
+                    reason = excluded.reason,
+                    nxdomain = excluded.nxdomain,
+                    norobots = excluded.norobots
+                """,
+                    (domain, None, None, None, None, None, True),
+                )
+                conn.commit()
+            except Exception as exception:
+                vmc_output(f"Failed to mark domain NoRobots: {exception}", "red")
+                conn.rollback()
 
 
 # =============================================================================
@@ -928,42 +942,44 @@ def mark_norobots_domain(domain):
 
 def delete_domain_if_known(domain):
     """Delete a domain from the mastodon_domains table."""
-    cursor = conn.cursor()
-    try:
-        cursor.execute(
-            """
-            DELETE FROM mastodon_domains WHERE domain = %s
-            """,
-            (domain,),
-        )
-        conn.commit()
-    except Exception as exception:
-        vmc_output(
-            f"{domain}: Failed to delete known domain {exception}", "red", use_tqdm=True
-        )
-        conn.rollback()
-    finally:
-        cursor.close()
+    with db_pool.connection() as conn:
+        with conn.cursor() as cursor:
+            try:
+                cursor.execute(
+                    """
+                    DELETE FROM mastodon_domains WHERE domain = %s
+                    """,
+                    (domain,),
+                )
+                conn.commit()
+            except Exception as exception:
+                vmc_output(
+                    f"{domain}: Failed to delete known domain {exception}",
+                    "red",
+                    use_tqdm=True,
+                )
+                conn.rollback()
 
 
 def delete_domain_from_raw(domain):
     """Delete a domain from the raw_domains table."""
-    cursor = conn.cursor()
-    try:
-        cursor.execute(
-            """
-            DELETE FROM raw_domains WHERE domain = %s
-            """,
-            (domain,),
-        )
-        conn.commit()
-    except Exception as exception:
-        vmc_output(
-            f"{domain}: Failed to delete known domain {exception}", "red", use_tqdm=True
-        )
-        conn.rollback()
-    finally:
-        cursor.close()
+    with db_pool.connection() as conn:
+        with conn.cursor() as cursor:
+            try:
+                cursor.execute(
+                    """
+                    DELETE FROM raw_domains WHERE domain = %s
+                    """,
+                    (domain,),
+                )
+                conn.commit()
+            except Exception as exception:
+                vmc_output(
+                    f"{domain}: Failed to delete known domain {exception}",
+                    "red",
+                    use_tqdm=True,
+                )
+                conn.rollback()
 
 
 def update_mastodon_domain(
@@ -976,62 +992,62 @@ def update_mastodon_domain(
     source_url,
 ):
     """Insert or update a Mastodon domain in the database."""
-    cursor = conn.cursor()
-    try:
-        cursor.execute(
-            """
-            INSERT INTO mastodon_domains
-            (domain, software_version, total_users, active_users_monthly, timestamp, contact, source, full_version)
-            VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
-            ON CONFLICT(domain) DO UPDATE SET
-            software_version = excluded.software_version,
-            total_users = excluded.total_users,
-            active_users_monthly = excluded.active_users_monthly,
-            timestamp = excluded.timestamp,
-            contact = excluded.contact,
-            source = excluded.source,
-            full_version = excluded.full_version
-        """,
-            (
-                actual_domain,
-                software_version,
-                total_users,
-                active_month_users,
-                datetime.now(timezone.utc),
-                contact_account,
-                source_url,
-                software_version_full,
-            ),
-        )
-        conn.commit()
-    except Exception as exception:
-        vmc_output(f"{actual_domain}: {exception}", "red", use_tqdm=True)
-        conn.rollback()
-    finally:
-        cursor.close()
+    with db_pool.connection() as conn:
+        with conn.cursor() as cursor:
+            try:
+                cursor.execute(
+                    """
+                    INSERT INTO mastodon_domains
+                    (domain, software_version, total_users, active_users_monthly, timestamp, contact, source, full_version)
+                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
+                    ON CONFLICT(domain) DO UPDATE SET
+                    software_version = excluded.software_version,
+                    total_users = excluded.total_users,
+                    active_users_monthly = excluded.active_users_monthly,
+                    timestamp = excluded.timestamp,
+                    contact = excluded.contact,
+                    source = excluded.source,
+                    full_version = excluded.full_version
+                """,
+                    (
+                        actual_domain,
+                        software_version,
+                        total_users,
+                        active_month_users,
+                        datetime.now(timezone.utc),
+                        contact_account,
+                        source_url,
+                        software_version_full,
+                    ),
+                )
+                conn.commit()
+            except Exception as exception:
+                vmc_output(f"{actual_domain}: {exception}", "red", use_tqdm=True)
+                conn.rollback()
 
 
 def cleanup_old_domains():
     """Delete known domains older than 1 week."""
-    cursor = conn.cursor()
-    try:
-        cursor.execute(
-            """
-            DELETE FROM mastodon_domains
-            WHERE timestamp <= (CURRENT_TIMESTAMP - INTERVAL '1 week') AT TIME ZONE 'UTC'
-            RETURNING domain
-            """
-        )
-        deleted_domains = [row[0] for row in cursor.fetchall()]
-        if deleted_domains:
-            for d in deleted_domains:
-                vmc_output(f"{d}: Removed from known domains", "pink", use_tqdm=True)
-        conn.commit()
-    except Exception as exception:
-        vmc_output(f"Failed to clean up old domains: {exception}", "red")
-        conn.rollback()
-    finally:
-        cursor.close()
+    with db_pool.connection() as conn:
+        with conn.cursor() as cursor:
+            try:
+                cursor.execute(
+                    """
+                    DELETE FROM mastodon_domains
+                    WHERE timestamp <= (CURRENT_TIMESTAMP - INTERVAL '1 week') AT TIME ZONE 'UTC'
+                    RETURNING domain
+                    """
+                )
+                deleted_domains = [row[0] for row in cursor.fetchall()]
+                if deleted_domains:
+                    for d in deleted_domains:
+                        vmc_output(
+                            f"{d}: Removed from known domains", "pink", use_tqdm=True
+                        )
+                conn.commit()
+            except Exception as exception:
+                vmc_output(f"Failed to clean up old domains: {exception}", "red")
+                conn.rollback()
 
 
 # =============================================================================
@@ -1041,122 +1057,117 @@ def cleanup_old_domains():
 
 def get_junk_keywords():
     """Get list of junk keywords to filter domains."""
-    cursor = conn.cursor()
-    try:
-        cursor.execute("SELECT keywords FROM junk_words")
-        junk_domains = [row[0] for row in cursor.fetchall()]
-        conn.commit()
-        return junk_domains
-    except Exception as exception:
-        vmc_output(f"Failed to obtain junk keywords: {exception}", "red")
-        conn.rollback()
-    finally:
-        cursor.close()
+    with db_pool.connection() as conn:
+        with conn.cursor() as cursor:
+            try:
+                cursor.execute("SELECT keywords FROM junk_words")
+                junk_domains = [row[0] for row in cursor.fetchall()]
+                conn.commit()
+                return junk_domains
+            except Exception as exception:
+                vmc_output(f"Failed to obtain junk keywords: {exception}", "red")
+                conn.rollback()
     return []
 
 
 def get_bad_tld():
     """Get list of prohibited TLDs."""
-    cursor = conn.cursor()
-    try:
-        cursor.execute("SELECT tld FROM bad_tld")
-        bad_tlds = [row[0] for row in cursor.fetchall()]
-        conn.commit()
-        return bad_tlds
-    except Exception as exception:
-        vmc_output(f"Failed to obtain bad TLDs: {exception}", "red")
-        conn.rollback()
-    finally:
-        cursor.close()
+    with db_pool.connection() as conn:
+        with conn.cursor() as cursor:
+            try:
+                cursor.execute("SELECT tld FROM bad_tld")
+                bad_tlds = [row[0] for row in cursor.fetchall()]
+                conn.commit()
+                return bad_tlds
+            except Exception as exception:
+                vmc_output(f"Failed to obtain bad TLDs: {exception}", "red")
+                conn.rollback()
     return []
 
 
 def get_failed_domains():
     """Get list of domains marked as failed."""
-    failed_domains = []
-    cursor = conn.cursor()
-    try:
-        cursor.execute("SELECT domain FROM raw_domains WHERE failed = TRUE")
-        failed_domains = [row[0].strip() for row in cursor.fetchall() if row[0].strip()]
-        conn.commit()
-    except Exception as exception:
-        vmc_output(f"Failed to obtain failed domains: {exception}", "red")
-        conn.rollback()
-    finally:
-        cursor.close()
-    return failed_domains
+    with db_pool.connection() as conn:
+        with conn.cursor() as cursor:
+            try:
+                cursor.execute("SELECT domain FROM raw_domains WHERE failed = TRUE")
+                failed_domains = [
+                    row[0].strip() for row in cursor.fetchall() if row[0].strip()
+                ]
+                conn.commit()
+                return failed_domains
+            except Exception as exception:
+                vmc_output(f"Failed to obtain failed domains: {exception}", "red")
+                conn.rollback()
+    return []
 
 
 def get_ignored_domains():
     """Get list of domains marked as ignored."""
-    ignored_domains = []
-    cursor = conn.cursor()
-    try:
-        cursor.execute("SELECT domain FROM raw_domains WHERE ignore = TRUE")
-        ignored_domains = [
-            row[0].strip() for row in cursor.fetchall() if row[0].strip()
-        ]
-        conn.commit()
-    except Exception as exception:
-        vmc_output(f"Failed to obtain ignored domains: {exception}", "red")
-        conn.rollback()
-    finally:
-        cursor.close()
-    return ignored_domains
+    with db_pool.connection() as conn:
+        with conn.cursor() as cursor:
+            try:
+                cursor.execute("SELECT domain FROM raw_domains WHERE ignore = TRUE")
+                ignored_domains = [
+                    row[0].strip() for row in cursor.fetchall() if row[0].strip()
+                ]
+                conn.commit()
+                return ignored_domains
+            except Exception as exception:
+                vmc_output(f"Failed to obtain ignored domains: {exception}", "red")
+                conn.rollback()
+    return []
 
 
 def get_baddata_domains():
     """Get list of domains marked as having bad data."""
-    baddata_domains = []
-    cursor = conn.cursor()
-    try:
-        cursor.execute("SELECT domain FROM raw_domains WHERE baddata = TRUE")
-        baddata_domains = [
-            row[0].strip() for row in cursor.fetchall() if row[0].strip()
-        ]
-        conn.commit()
-    except Exception as exception:
-        vmc_output(f"Failed to obtain baddata domains: {exception}", "red")
-        conn.rollback()
-    finally:
-        cursor.close()
-    return baddata_domains
+    with db_pool.connection() as conn:
+        with conn.cursor() as cursor:
+            try:
+                cursor.execute("SELECT domain FROM raw_domains WHERE baddata = TRUE")
+                baddata_domains = [
+                    row[0].strip() for row in cursor.fetchall() if row[0].strip()
+                ]
+                conn.commit()
+                return baddata_domains
+            except Exception as exception:
+                vmc_output(f"Failed to obtain baddata domains: {exception}", "red")
+                conn.rollback()
+    return []
 
 
 def get_nxdomain_domains():
     """Get list of domains marked as NXDOMAIN."""
-    nxdomain_domains = []
-    cursor = conn.cursor()
-    try:
-        cursor.execute("SELECT domain FROM raw_domains WHERE nxdomain = TRUE")
-        nxdomain_domains = [
-            row[0].strip() for row in cursor.fetchall() if row[0].strip()
-        ]
-        conn.commit()
-    except Exception as exception:
-        vmc_output(f"Failed to obtain NXDOMAIN domains: {exception}", "red")
-        conn.rollback()
-    finally:
-        cursor.close()
-    return nxdomain_domains
+    with db_pool.connection() as conn:
+        with conn.cursor() as cursor:
+            try:
+                cursor.execute("SELECT domain FROM raw_domains WHERE nxdomain = TRUE")
+                nxdomain_domains = [
+                    row[0].strip() for row in cursor.fetchall() if row[0].strip()
+                ]
+                conn.commit()
+                return nxdomain_domains
+            except Exception as exception:
+                vmc_output(f"Failed to obtain NXDOMAIN domains: {exception}", "red")
+                conn.rollback()
+    return []
 
 
 def get_norobots_domains():
     """Get list of domains that prohibit crawling."""
-    norobots_domains = []
-    cursor = conn.cursor()
-    try:
-        cursor.execute("SELECT domain FROM raw_domains WHERE norobots = TRUE")
-        norobots_domains = [
-            row[0].strip() for row in cursor.fetchall() if row[0].strip()
-        ]
-        conn.commit()
-    except Exception as exception:
-        vmc_output(f"Failed to obtain NoRobots domains: {exception}", "red")
-        conn.rollback()
-    finally:
-        cursor.close()
-    return norobots_domains
+    with db_pool.connection() as conn:
+        with conn.cursor() as cursor:
+            try:
+                cursor.execute("SELECT domain FROM raw_domains WHERE norobots = TRUE")
+                norobots_domains = [
+                    row[0].strip() for row in cursor.fetchall() if row[0].strip()
+                ]
+                conn.commit()
+                return norobots_domains
+            except Exception as exception:
+                vmc_output(f"Failed to obtain NoRobots domains: {exception}", "red")
+                conn.rollback()
+    return []
 
 
 # =============================================================================
@@ -1887,6 +1898,9 @@ def check_and_record_domains(
                         future.cancel()
                     executor.shutdown(wait=False, cancel_futures=True)
                     return
+
+                # Force garbage collection after each batch to free memory
+                gc.collect()
     finally:
         if not shutdown_event.is_set():
             executor.shutdown(wait=True)
@@ -1962,46 +1976,49 @@ def load_from_database(user_choice):
         query = query_map["1"]
         params = [error_threshold]
 
-    cursor = conn.cursor()
-    try:
-        cursor.execute(query, params if params else None)  # type: ignore
-        raw_domains = [row[0].strip() for row in cursor.fetchall() if row[0].strip()]
-        domain_list = [domain for domain in raw_domains if not has_emoji_chars(domain)]
-        conn.commit()
-    except Exception as exception:
-        vmc_output(f"Failed to obtain selected domain list: {exception}", "red")
-        conn.rollback()
-        domain_list = []
-    finally:
-        cursor.close()
+    with db_pool.connection() as conn:
+        with conn.cursor() as cursor:
+            try:
+                cursor.execute(query, params if params else None)  # type: ignore
+                raw_domains = [
+                    row[0].strip() for row in cursor.fetchall() if row[0].strip()
+                ]
+                domain_list = [
+                    domain for domain in raw_domains if not has_emoji_chars(domain)
+                ]
+                conn.commit()
+            except Exception as exception:
+                vmc_output(f"Failed to obtain selected domain list: {exception}", "red")
+                conn.rollback()
+                domain_list = []
 
     return domain_list
 
 
 def load_from_file(file_name):
     """Load domain list from a file and add new domains to database."""
-    cursor = conn.cursor()
     domain_list = []
-    with open(os.path.expanduser(file_name), "r") as file:
-        for line in file:
-            domain = line.strip()
-            if not domain or has_emoji_chars(domain):
-                continue
+    with db_pool.connection() as conn:
+        with conn.cursor() as cursor:
+            with open(os.path.expanduser(file_name), "r") as file:
+                for line in file:
+                    domain = line.strip()
+                    if not domain or has_emoji_chars(domain):
+                        continue
 
-            domain_list.append(domain)
-            cursor.execute(
-                "SELECT COUNT(*) FROM raw_domains WHERE domain = %s", (domain,)
-            )
-            result = cursor.fetchone()
-            exists = result is not None and result[0] > 0
+                    domain_list.append(domain)
+                    cursor.execute(
+                        "SELECT COUNT(*) FROM raw_domains WHERE domain = %s", (domain,)
+                    )
+                    result = cursor.fetchone()
+                    exists = result is not None and result[0] > 0
 
-            if not exists:
-                cursor.execute(
-                    "INSERT INTO raw_domains (domain, errors) VALUES (%s, %s)",
-                    (domain, None),
-                )
-            conn.commit()
-    cursor.close()
+                    if not exists:
+                        cursor.execute(
+                            "INSERT INTO raw_domains (domain, errors) VALUES (%s, %s)",
+                            (domain, None),
+                        )
+                    conn.commit()
     return domain_list
 
 
@@ -2279,8 +2296,12 @@ def main():
     except KeyboardInterrupt:
         vmc_output(f"\n{appname} interrupted by user", "red")
     finally:
+        # Close single connection and pool
         conn.close()
+        db_pool.close()
         http_client.close()
+        # Force final garbage collection
+        gc.collect()
 
     if is_running_headless():
         if not (args.file or args.target or args.new or args.buffer):
