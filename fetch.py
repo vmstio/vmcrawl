@@ -100,7 +100,10 @@ def fetch_exclude_domains():
                 cursor.execute(
                     "SELECT string_agg('''' || domain || '''', ',') FROM no_peers"
                 )
-                exclude_domains_sql = cursor.fetchone()[0]
+                result = cursor.fetchone()
+                if result is None or result[0] is None:
+                    return ""
+                exclude_domains_sql = result[0]
                 return exclude_domains_sql if exclude_domains_sql else ""
             except Exception as e:
                 print(f"Failed to obtain excluded domain list: {e}")
@@ -113,20 +116,26 @@ def fetch_domain_list(exclude_domains_sql):
     with db_pool.connection() as conn:
         with conn.cursor() as cursor:
             try:
+                min_active = int(os.getenv("VMCRAWL_FETCH_MIN_ACTIVE", "100"))
                 if exclude_domains_sql:
-                    query = f"""
-                        SELECT domain FROM mastodon_domains
-                        WHERE active_users_monthly > {int(os.getenv("VMCRAWL_FETCH_MIN_ACTIVE", "100"))}
-                        AND domain NOT IN ({exclude_domains_sql})
-                        ORDER BY active_users_monthly DESC
-                    """
+                    # Using string concatenation for exclude_domains_sql since it's already
+                    # a properly formatted SQL list from the database
+                    query = (
+                        "SELECT domain FROM mastodon_domains "
+                        "WHERE active_users_monthly > %s "
+                        "AND domain NOT IN (" + exclude_domains_sql + ") "
+                        "ORDER BY active_users_monthly DESC"
+                    )
+                    cursor.execute(query, (min_active,))
                 else:
-                    query = f"""
+                    cursor.execute(
+                        """
                         SELECT domain FROM mastodon_domains
-                        WHERE active_users_monthly > {int(os.getenv("VMCRAWL_FETCH_MIN_ACTIVE", "100"))}
+                        WHERE active_users_monthly > %s
                         ORDER BY active_users_monthly DESC
-                    """
-                cursor.execute(query)
+                        """,
+                        (min_active,),
+                    )
                 result = [
                     row[0] for row in cursor.fetchall() if not has_emoji_chars(row[0])
                 ]

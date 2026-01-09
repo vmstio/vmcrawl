@@ -182,7 +182,6 @@ def add_nightly_version(
         return True
 
     except Exception as e:
-        conn.rollback()
         vmc_output(f"Error adding nightly version: {e}", "red")
         return False
 
