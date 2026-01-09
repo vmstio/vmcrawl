@@ -2033,11 +2033,11 @@ def load_from_database(user_choice):
         params = [error_threshold]
 
     with db_pool.connection() as conn:
-        with conn.cursor() as cursor:
+        # Use server-side cursor for large result sets to avoid loading all into memory
+        with conn.cursor(name="domain_loader") as cursor:
+            cursor.itersize = 1000  # Fetch 1000 rows at a time
             try:
                 cursor.execute(query, params if params else None)  # type: ignore
-                # Use server-side cursor for large result sets to avoid loading all into memory
-                cursor.itersize = 1000  # Fetch 1000 rows at a time
                 domain_list = [
                     row[0].strip()
                     for row in cursor
