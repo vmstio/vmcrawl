@@ -277,32 +277,42 @@ def limit_url_depth(source_url, depth=2):
 
 def get_httpx(url, http_client):
     """Make HTTP GET request with HTTP/2 fallback on connection errors and size limits."""
-    try:
-        # Stream the response to check size before loading into memory
-        with http_client.stream("GET", url) as stream_response:
-            # Check Content-Length header first if available
-            content_length = stream_response.headers.get("Content-Length")
-            if content_length and int(content_length) > max_response_size:
-                raise ValueError(
-                    f"Response too large: {content_length} bytes (max: {max_response_size})"
+
+    class SizeLimitExceeded(Exception):
+        """Raised when response size exceeds the limit."""
+
+        pass
+
+    def check_response_size(response):
+        """Check if response is too large and raise error if so."""
+        # Check Content-Length header first
+        content_length = response.headers.get("Content-Length")
+        if content_length and int(content_length) > max_response_size:
+            raise SizeLimitExceeded(
+                f"Response too large: {content_length} bytes (max: {max_response_size})"
+            )
+
+        # For responses without Content-Length, check actual size
+        # Note: accessing .content loads the entire response into memory
+        # This is why we check Content-Length first when available
+        try:
+            if len(response.content) > max_response_size:
+                raise SizeLimitExceeded(
+                    f"Response too large: {len(response.content)} bytes (max: {max_response_size})"
                 )
+        except httpx.ResponseNotRead:
+            # Response not read yet, that's fine
+            pass
 
-            # Read raw response in chunks and check size BEFORE decompression
-            # iter_raw() gives us the raw bytes before any decompression
-            raw_bytes = bytearray()
-            for chunk in stream_response.iter_raw():
-                raw_bytes.extend(chunk)
-                if len(raw_bytes) > max_response_size:
-                    raise ValueError(
-                        f"Response too large: {len(raw_bytes)} bytes (max: {max_response_size})"
-                    )
+        return response
 
-            # Now that we know the size is OK, read the full response normally
-            # This will handle decompression properly
-            stream_response.read()
+    try:
+        response = http_client.get(url)
+        return check_response_size(response)
 
-        # Return the response object (now outside the context manager but already read)
-        return stream_response
+    except SizeLimitExceeded:
+        # Re-raise as ValueError so handle_tcp_exception catches it
+        raise ValueError(f"Response exceeds size limit of {max_response_size} bytes")
 
     except httpx.RequestError as exception:
         error_str = str(exception).casefold()
@@ -319,24 +329,12 @@ def get_httpx(url, http_client):
                 max_redirects=10,
             )
             try:
-                with fallback_client.stream("GET", url) as stream_response:
-                    content_length = stream_response.headers.get("Content-Length")
-                    if content_length and int(content_length) > max_response_size:
-                        raise ValueError(
-                            f"Response too large: {content_length} bytes (max: {max_response_size})"
-                        )
-
-                    raw_bytes = bytearray()
-                    for chunk in stream_response.iter_raw():
-                        raw_bytes.extend(chunk)
-                        if len(raw_bytes) > max_response_size:
-                            raise ValueError(
-                                f"Response too large: {len(raw_bytes)} bytes (max: {max_response_size})"
-                            )
-
-                    stream_response.read()
-
-                return stream_response
+                response = fallback_client.get(url)
+                return check_response_size(response)
+            except SizeLimitExceeded:
+                raise ValueError(
+                    f"Response exceeds size limit of {max_response_size} bytes"
+                )
             finally:
                 fallback_client.close()
         else:
