@@ -215,7 +215,9 @@ def import_domains(domains):
                     args_str = ",".join(["(%s,%s)" for _ in values])
                     flattened_values = [item for sublist in values for item in sublist]
                     cursor.execute(
-                        "INSERT INTO raw_domains (domain, errors) VALUES " + args_str,
+                        "INSERT INTO raw_domains (domain, errors) VALUES "
+                        + args_str
+                        + " ON CONFLICT (domain) DO NOTHING",
                         flattened_values,
                     )
                     vmc_output(f"Imported {len(domains)} domains", "green")
@@ -356,3 +358,4 @@ if __name__ == "__main__":
         vmc_output(f"\n{appname} interrupted by user", "bold")
     finally:
         conn.close()
+        db_pool.close()
