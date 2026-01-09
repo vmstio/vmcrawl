@@ -299,8 +299,30 @@ def get_domains(api_url, domain, domain_endings):
         ]
         return filtered_domains
     except Exception as e:
-        vmc_output(f"{e}", "orange")
-        add_to_no_peers(domain)
+        error_str = str(e).lower()
+
+        # Only add to no_peers for persistent issues, not transient errors
+        # Authentication issues: 401, 403, unauthorized, forbidden
+        # Content type issues: not JSON, HTML returned, wrong content type
+        persistent_error_indicators = [
+            "401",
+            "403",
+            "unauthorized",
+            "forbidden",
+            "not authorized",
+            "html",
+            "text/html",
+            "content-type",
+            "json",
+        ]
+
+        if any(indicator in error_str for indicator in persistent_error_indicators):
+            vmc_output(f"{domain}: {e} (marked as no_peers)", "orange")
+            add_to_no_peers(domain)
+        else:
+            # Log transient errors but don't mark the domain
+            vmc_output(f"{domain}: {e} (transient error, not marked)", "yellow")
+
     return []
 
 
