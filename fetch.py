@@ -7,6 +7,7 @@
 try:
     import argparse
     import ipaddress
+    import json
     import os
     import random
     import re
@@ -205,9 +206,13 @@ def add_to_no_peers(domain):
     with db_pool.connection() as conn:
         with conn.cursor() as cursor:
             try:
-                cursor.execute("INSERT INTO no_peers (domain) VALUES (%s)", (domain,))
+                cursor.execute(
+                    "INSERT INTO no_peers (domain) VALUES (%s) ON CONFLICT (domain) DO NOTHING",
+                    (domain,),
+                )
+                if cursor.rowcount > 0:
+                    vmc_output(f"{domain} added to no_peers table", "red")
                 conn.commit()
-                vmc_output(f"{domain} added to no_peers table", "red")
             except Exception as e:
                 vmc_output(f"Failed to add domain to no_peers list: {e}", "orange")
                 conn.rollback()
@@ -298,22 +303,26 @@ def get_domains(api_url, domain, domain_endings):
             and item.islower()
         ]
         return filtered_domains
+    except json.JSONDecodeError as e:
+        # JSON decode errors indicate HTML or non-JSON response - mark as no_peers
+        vmc_output(
+            f"{domain}: JSON decode error - likely HTML response (marked as no_peers)",
+            "orange",
+        )
+        add_to_no_peers(domain)
     except Exception as e:
         error_str = str(e).lower()
 
         # Only add to no_peers for persistent issues, not transient errors
         # Authentication issues: 401, 403, unauthorized, forbidden
-        # Content type issues: not JSON, HTML returned, wrong content type
+        # 404 errors: endpoint doesn't exist
         persistent_error_indicators = [
             "401",
             "403",
+            "404",
             "unauthorized",
             "forbidden",
             "not authorized",
-            "html",
-            "text/html",
-            "content-type",
-            "json",
         ]
 
         if any(indicator in error_str for indicator in persistent_error_indicators):
