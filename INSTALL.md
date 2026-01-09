@@ -18,8 +18,8 @@ sudo useradd -r -s /bin/bash -d /opt/vmcrawl -m vmcrawl
 
 ```bash
 # Copy application files
-sudo cp -r /path/to/vmcrawl /opt/vmcrawl/
-sudo chown -R vmcrawl:vmcrawl /opt/vmcrawl
+git clone https://github.com/vmstio/vmcrawl.git /opt/vmcrawl
+chown -R vmcrawl:vmcrawl /opt/vmcrawl
 ```
 
 ### 3. Set Up Virtual Environment
@@ -30,8 +30,8 @@ sudo -u vmcrawl -i
 
 # Create virtual environment
 cd /opt/vmcrawl
-python3 -m venv venv
-source venv/bin/activate
+python3 -m venv .venv
+source .venv/bin/activate
 
 # Install dependencies
 pip install -r requirements.txt

@@ -8,7 +8,7 @@ set -e
 cd /opt/vmcrawl
 
 # Activate the virtual environment
-source venv/bin/activate
+source .venv/bin/activate
 
 # Run the crawler
 exec python3 crawler.py "$@"
