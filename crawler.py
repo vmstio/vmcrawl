@@ -71,33 +71,21 @@ except KeyError as exception:
 # =============================================================================
 
 # Terminal color codes
-color_bold = "\033[1m"
-color_reset = "\033[0m"
-color_cyan = "\033[96m"
-color_green = "\033[92m"
-color_magenta = "\033[95m"
-color_orange = "\033[38;5;208m"
-color_pink = "\033[38;5;198m"
-color_purple = "\033[94m"
-color_red = "\033[91m"
-color_yellow = "\033[93m"
-
 colors = {
-    "bold": f"{color_bold}",
-    "reset": f"{color_reset}",
-    "cyan": f"{color_cyan}",
-    "green": f"{color_green}",
-    "magenta": f"{color_magenta}",
-    "orange": f"{color_orange}",
-    "pink": f"{color_pink}",
-    "purple": f"{color_purple}",
-    "red": f"{color_red}",
-    "yellow": f"{color_yellow}",
-    "white": f"{color_reset}",
+    "bold": "\033[1m",
+    "reset": "\033[0m",
+    "cyan": "\033[96m",
+    "green": "\033[92m",
+    "magenta": "\033[95m",
+    "orange": "\033[38;5;208m",
+    "pink": "\033[38;5;198m",
+    "purple": "\033[94m",
+    "red": "\033[91m",
+    "yellow": "\033[93m",
+    "white": "\033[0m",
 }
 
 # HTTP status codes for special handling
-http_codes_to_authfail = [401]  # auth
 http_codes_to_hardfail = [418, 410]  # gone
 
 # Define maintained branches (adjust as needed)
@@ -107,13 +95,7 @@ backport_branches = os.getenv("VMCRAWL_BACKPORTS", "4.5").split(",")
 # DATABASE CONNECTION
 # =============================================================================
 
-db_name = os.getenv("VMCRAWL_POSTGRES_DATA")
-db_user = os.getenv("VMCRAWL_POSTGRES_USER")
-db_password = os.getenv("VMCRAWL_POSTGRES_PASS")
-db_host = os.getenv("VMCRAWL_POSTGRES_HOST", "localhost")
-db_port = os.getenv("VMCRAWL_POSTGRES_PORT", "5432")
-
-conn_string = f"postgresql://{db_user}:{db_password}@{db_host}:{db_port}/{db_name}"
+conn_string = f"postgresql://{os.getenv('VMCRAWL_POSTGRES_USER')}:{os.getenv('VMCRAWL_POSTGRES_PASS')}@{os.getenv('VMCRAWL_POSTGRES_HOST', 'localhost')}:{os.getenv('VMCRAWL_POSTGRES_PORT', '5432')}/{os.getenv('VMCRAWL_POSTGRES_DATA')}"
 
 # Create connection pool for thread-safe database access
 # Scale connection pool size with number of worker threads
@@ -206,12 +188,6 @@ def is_running_headless():
     return not os.isatty(sys.stdout.fileno())
 
 
-def print_line_break():
-    """Print a line of equals signs matching console width."""
-    width = os.get_terminal_size().columns
-    print("=" * width)
-
-
 # =============================================================================
 # UTILITY FUNCTIONS - Caching
 # =============================================================================
@@ -236,6 +212,29 @@ def is_cache_valid(cache_file_path: str, max_age_seconds: int) -> bool:
 # =============================================================================
 # UTILITY FUNCTIONS - Validation
 # =============================================================================
+
+
+def parse_json_with_fallback(response, domain, target):
+    """Parse JSON from response with fallback decoder for malformed JSON.
+
+    Args:
+        response: httpx Response object
+        domain: Domain being processed (for error reporting)
+        target: Target endpoint name (for error reporting)
+
+    Returns:
+        Parsed JSON data or False on error
+    """
+    try:
+        return response.json()
+    except json.JSONDecodeError:
+        try:
+            decoder = json.JSONDecoder()
+            data, _ = decoder.raw_decode(response.text, 0)
+            return data
+        except json.JSONDecodeError as exception:
+            handle_json_exception(domain, target, exception)
+            return False
 
 
 def has_emoji_chars(domain):
@@ -888,8 +887,26 @@ def delete_if_error_max(domain):
 # =============================================================================
 
 
-def mark_ignore_domain(domain):
-    """Mark a domain as ignored (non-Mastodon platform)."""
+def mark_domain_status(domain, status_type):
+    """Mark a domain with a specific status flag.
+
+    Args:
+        domain: The domain to mark
+        status_type: One of 'ignore', 'failed', 'nxdomain', 'norobots'
+    """
+    status_map = {
+        "ignore": (None, True, None, None, None, None, "ignored"),
+        "failed": (True, None, None, None, None, None, "failed"),
+        "nxdomain": (None, None, None, None, True, None, "NXDOMAIN"),
+        "norobots": (None, None, None, None, None, True, "NoRobots"),
+    }
+
+    if status_type not in status_map:
+        vmc_output(f"Invalid status type: {status_type}", "red")
+        return
+
+    failed, ignore, errors, reason, nxdomain, norobots, label = status_map[status_type]
+
     with db_pool.connection() as conn:
         with conn.cursor() as cursor:
             try:
@@ -905,87 +922,33 @@ def mark_ignore_domain(domain):
                     nxdomain = excluded.nxdomain,
                     norobots = excluded.norobots
                 """,
-                    (domain, None, True, None, None, None, None),
+                    (domain, failed, ignore, errors, reason, nxdomain, norobots),
                 )
                 conn.commit()
             except Exception as exception:
-                vmc_output(f"Failed to mark domain ignored: {exception}", "red")
+                vmc_output(f"Failed to mark domain {label}: {exception}", "red")
                 conn.rollback()
+
+
+# Convenience wrapper functions for backwards compatibility
+def mark_ignore_domain(domain):
+    """Mark a domain as ignored (non-Mastodon platform)."""
+    mark_domain_status(domain, "ignore")
 
 
 def mark_failed_domain(domain):
     """Mark a domain as failed (authentication required)."""
-    with db_pool.connection() as conn:
-        with conn.cursor() as cursor:
-            try:
-                cursor.execute(
-                    """
-                    INSERT INTO raw_domains (domain, failed, ignore, errors, reason, nxdomain, norobots)
-                    VALUES (%s, %s, %s, %s, %s, %s, %s)
-                    ON CONFLICT(domain) DO UPDATE SET
-                    failed = excluded.failed,
-                    ignore = excluded.ignore,
-                    errors = excluded.errors,
-                    reason = excluded.reason,
-                    nxdomain = excluded.nxdomain,
-                    norobots = excluded.norobots
-                """,
-                    (domain, True, None, None, None, None, None),
-                )
-                conn.commit()
-            except Exception as exception:
-                vmc_output(f"Failed to mark domain failed: {exception}", "red")
-                conn.rollback()
+    mark_domain_status(domain, "failed")
 
 
 def mark_nxdomain_domain(domain):
     """Mark a domain as NXDOMAIN (gone/not found)."""
-    with db_pool.connection() as conn:
-        with conn.cursor() as cursor:
-            try:
-                cursor.execute(
-                    """
-                    INSERT INTO raw_domains (domain, failed, ignore, errors, reason, nxdomain, norobots)
-                    VALUES (%s, %s, %s, %s, %s, %s, %s)
-                    ON CONFLICT(domain) DO UPDATE SET
-                    failed = excluded.failed,
-                    ignore = excluded.ignore,
-                    errors = excluded.errors,
-                    reason = excluded.reason,
-                    nxdomain = excluded.nxdomain,
-                    norobots = excluded.norobots
-                """,
-                    (domain, None, None, None, None, True, None),
-                )
-                conn.commit()
-            except Exception as exception:
-                vmc_output(f"Failed to mark domain NXDOMAIN: {exception}", "red")
-                conn.rollback()
+    mark_domain_status(domain, "nxdomain")
 
 
 def mark_norobots_domain(domain):
     """Mark a domain as norobots (crawling prohibited)."""
-    with db_pool.connection() as conn:
-        with conn.cursor() as cursor:
-            try:
-                cursor.execute(
-                    """
-                    INSERT INTO raw_domains (domain, failed, ignore, errors, reason, nxdomain, norobots)
-                    VALUES (%s, %s, %s, %s, %s, %s, %s)
-                    ON CONFLICT(domain) DO UPDATE SET
-                    failed = excluded.failed,
-                    ignore = excluded.ignore,
-                    errors = excluded.errors,
-                    reason = excluded.reason,
-                    nxdomain = excluded.nxdomain,
-                    norobots = excluded.norobots
-                """,
-                    (domain, None, None, None, None, None, True),
-                )
-                conn.commit()
-            except Exception as exception:
-                vmc_output(f"Failed to mark domain NoRobots: {exception}", "red")
-                conn.rollback()
+    mark_domain_status(domain, "norobots")
 
 
 # =============================================================================
@@ -1175,74 +1138,59 @@ def get_bad_tld():
     return set()
 
 
-def get_failed_domains():
-    """Get list of domains marked as failed."""
+def get_domains_by_status(status_column):
+    """Get list of domains filtered by status column.
+
+    Args:
+        status_column: One of 'failed', 'ignore', 'baddata', 'nxdomain', 'norobots'
+
+    Returns:
+        Set of domain strings
+    """
+    valid_columns = ["failed", "ignore", "baddata", "nxdomain", "norobots"]
+    if status_column not in valid_columns:
+        vmc_output(f"Invalid status column: {status_column}", "red")
+        return set()
+
     with db_pool.connection() as conn:
         with conn.cursor() as cursor:
             try:
-                cursor.execute("SELECT domain FROM raw_domains WHERE failed = TRUE")
+                query = f"SELECT domain FROM raw_domains WHERE {status_column} = TRUE"
+                cursor.execute(query)
                 # Use set for O(1) lookup, stream results
                 return {row[0].strip() for row in cursor if row[0] and row[0].strip()}
             except Exception as exception:
-                vmc_output(f"Failed to obtain failed domains: {exception}", "red")
+                vmc_output(
+                    f"Failed to obtain {status_column} domains: {exception}", "red"
+                )
                 conn.rollback()
     return set()
+
+
+# Convenience wrapper functions for backwards compatibility
+def get_failed_domains():
+    """Get list of domains marked as failed."""
+    return get_domains_by_status("failed")
 
 
 def get_ignored_domains():
     """Get list of domains marked as ignored."""
-    with db_pool.connection() as conn:
-        with conn.cursor() as cursor:
-            try:
-                cursor.execute("SELECT domain FROM raw_domains WHERE ignore = TRUE")
-                # Use set for O(1) lookup, stream results
-                return {row[0].strip() for row in cursor if row[0] and row[0].strip()}
-            except Exception as exception:
-                vmc_output(f"Failed to obtain ignored domains: {exception}", "red")
-                conn.rollback()
-    return set()
+    return get_domains_by_status("ignore")
 
 
 def get_baddata_domains():
     """Get list of domains marked as having bad data."""
-    with db_pool.connection() as conn:
-        with conn.cursor() as cursor:
-            try:
-                cursor.execute("SELECT domain FROM raw_domains WHERE baddata = TRUE")
-                # Use set for O(1) lookup, stream results
-                return {row[0].strip() for row in cursor if row[0] and row[0].strip()}
-            except Exception as exception:
-                vmc_output(f"Failed to obtain baddata domains: {exception}", "red")
-                conn.rollback()
-    return set()
+    return get_domains_by_status("baddata")
 
 
 def get_nxdomain_domains():
     """Get list of domains marked as NXDOMAIN."""
-    with db_pool.connection() as conn:
-        with conn.cursor() as cursor:
-            try:
-                cursor.execute("SELECT domain FROM raw_domains WHERE nxdomain = TRUE")
-                # Use set for O(1) lookup, stream results
-                return {row[0].strip() for row in cursor if row[0] and row[0].strip()}
-            except Exception as exception:
-                vmc_output(f"Failed to obtain NXDOMAIN domains: {exception}", "red")
-                conn.rollback()
-    return set()
+    return get_domains_by_status("nxdomain")
 
 
 def get_norobots_domains():
     """Get list of domains that prohibit crawling."""
-    with db_pool.connection() as conn:
-        with conn.cursor() as cursor:
-            try:
-                cursor.execute("SELECT domain FROM raw_domains WHERE norobots = TRUE")
-                # Use set for O(1) lookup, stream results
-                return {row[0].strip() for row in cursor if row[0] and row[0].strip()}
-            except Exception as exception:
-                vmc_output(f"Failed to obtain NoRobots domains: {exception}", "red")
-                conn.rollback()
-    return set()
+    return get_domains_by_status("norobots")
 
 
 # =============================================================================
@@ -1541,15 +1489,9 @@ def check_webfinger(domain, http_client):
                 return False
             if not response.content or content_length == "0":
                 return None
-            try:
-                data = response.json()
-            except json.JSONDecodeError:
-                try:
-                    decoder = json.JSONDecoder()
-                    data, _ = decoder.raw_decode(response.text, 0)
-                except json.JSONDecodeError as exception:
-                    handle_json_exception(domain, target, exception)
-                    return False
+            data = parse_json_with_fallback(response, domain, target)
+            if data is False:
+                return False
             aliases = data.get("aliases", [])
             if not aliases:
                 return None
@@ -1589,15 +1531,9 @@ def check_nodeinfo(domain, backend_domain, http_client):
                 handle_json_exception(domain, target, exception)
                 return False
             else:
-                try:
-                    data = response.json()
-                except json.JSONDecodeError:
-                    try:
-                        decoder = json.JSONDecoder()
-                        data, _ = decoder.raw_decode(response.text, 0)
-                    except json.JSONDecodeError as exception:
-                        handle_json_exception(domain, target, exception)
-                        return False
+                data = parse_json_with_fallback(response, domain, target)
+                if data is False:
+                    return False
             links = data.get("links")
             if links is not None and len(links) == 0:
                 exception = "empty links array in reply"
@@ -1658,15 +1594,9 @@ def check_nodeinfo_20(domain, nodeinfo_20_url, http_client, from_cache=False):
                 handle_json_exception(domain, target, exception)
                 return False
             else:
-                try:
-                    nodeinfo_20_result = response.json()
-                except json.JSONDecodeError:
-                    try:
-                        decoder = json.JSONDecoder()
-                        nodeinfo_20_result, _ = decoder.raw_decode(response.text, 0)
-                    except json.JSONDecodeError as exception:
-                        handle_json_exception(domain, target, exception)
-                        return False
+                nodeinfo_20_result = parse_json_with_fallback(response, domain, target)
+                if nodeinfo_20_result is False:
+                    return False
                 return nodeinfo_20_result
         elif response.status_code in http_codes_to_hardfail:
             handle_http_failed(domain, target, response)
