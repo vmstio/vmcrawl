@@ -1306,12 +1306,12 @@ def handle_tcp_exception(domain, exception):
         increment_domain_error(domain, error_reason)
         delete_if_error_max(domain)
     elif any(
-            msg in error_message.casefold()
-            for msg in [
-                "nodename nor servname provided",
-                "name or service not known",
-            ]
-        ):
+        msg in error_message.casefold()
+        for msg in [
+            "nodename nor servname provided",
+            "name or service not known",
+        ]
+    ):
         error_message = (
             re.sub(r"\s*(\[[^\]]*\]|\([^)]*\))", "", error_message)
             .replace(":", "")
@@ -1912,6 +1912,22 @@ def check_and_record_domains(
     max_workers = int(os.getenv("VMCRAWL_MAX_THREADS", "2"))
     shutdown_event = threading.Event()
 
+    # Thread-local storage for HTTP clients to avoid contention
+    thread_local = threading.local()
+
+    def get_thread_http_client():
+        """Get or create a thread-local HTTP client."""
+        if not hasattr(thread_local, "http_client"):
+            thread_local.http_client = httpx.Client(
+                http2=True,
+                follow_redirects=True,
+                headers=http_custom_headers,
+                timeout=common_timeout,
+                limits=limits,
+                max_redirects=10,
+            )
+        return thread_local.http_client
+
     def process_single_domain(domain):
         if shutdown_event.is_set():
             return
@@ -1931,7 +1947,9 @@ def check_and_record_domains(
             return
 
         try:
-            process_domain(domain, http_client, nightly_version_ranges)
+            # Use thread-local HTTP client instead of shared one
+            client = get_thread_http_client()
+            process_domain(domain, client, nightly_version_ranges)
         except httpx.CloseError:
             pass
         except Exception as exception:
@@ -1940,52 +1958,49 @@ def check_and_record_domains(
 
     executor = ThreadPoolExecutor(max_workers=max_workers)
     try:
-        # Process domains in batches to avoid memory accumulation
-        batch_size = max(100, max_workers * 10)
-        total_domains = len(domain_list)
+        # Submit all domains at once for maximum parallelism
+        # The thread pool will manage concurrency automatically
+        futures = {
+            executor.submit(process_single_domain, domain): domain
+            for domain in domain_list
+        }
 
-        with tqdm(total=total_domains, desc=f"{appname}", unit="d") as pbar:
-            for i in range(0, total_domains, batch_size):
-                if shutdown_event.is_set():
-                    break
-
-                batch = domain_list[i : i + batch_size]
-                futures = {
-                    executor.submit(process_single_domain, domain): domain
-                    for domain in batch
-                }
-
+        try:
+            for future in tqdm(
+                as_completed(futures),
+                total=len(domain_list),
+                desc=f"{appname}",
+                unit="d",
+            ):
                 try:
-                    for future in as_completed(futures):
-                        try:
-                            future.result()
-                        except httpx.CloseError:
-                            pass
-                        except Exception as exception:
-                            if not shutdown_event.is_set():
-                                domain = futures[future]
-                                vmc_output(
-                                    f"{domain}: Failed to complete processing {exception}",
-                                    "red",
-                                    use_tqdm=True,
-                                )
-                        finally:
-                            pbar.update(1)
-                            # Explicitly delete future to free memory
-                            del futures[future]
-                except KeyboardInterrupt:
-                    shutdown_event.set()
-                    vmc_output(f"\n{appname} interrupted by user", "red")
-                    for future in futures:
-                        future.cancel()
-                    executor.shutdown(wait=False, cancel_futures=True)
-                    return
-
-                # Force garbage collection after each batch to free memory
-                gc.collect()
+                    future.result()
+                except httpx.CloseError:
+                    pass
+                except Exception as exception:
+                    if not shutdown_event.is_set():
+                        domain = futures[future]
+                        vmc_output(
+                            f"{domain}: Failed to complete processing {exception}",
+                            "red",
+                            use_tqdm=True,
+                        )
+        except KeyboardInterrupt:
+            shutdown_event.set()
+            vmc_output(f"\n{appname} interrupted by user", "red")
+            for future in futures:
+                future.cancel()
+            executor.shutdown(wait=False, cancel_futures=True)
+            return
     finally:
         if not shutdown_event.is_set():
             executor.shutdown(wait=True)
+
+        # Clean up thread-local HTTP clients
+        if hasattr(thread_local, "http_client"):
+            try:
+                thread_local.http_client.close()
+            except Exception:
+                pass
 
 
 # =============================================================================
