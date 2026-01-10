@@ -6,6 +6,7 @@
 
 try:
     import argparse
+    import atexit
     import gc
     import hashlib
     import json
@@ -131,6 +132,19 @@ try:
     )
     # Also maintain a single connection for backwards compatibility with module-level code
     conn = psycopg.connect(conn_string)
+
+    # Register cleanup handler to prevent threading errors on early exit
+    def cleanup_db_connections():
+        try:
+            conn.close()
+        except Exception:
+            pass
+        try:
+            db_pool.close(timeout=5)
+        except Exception:
+            pass
+
+    atexit.register(cleanup_db_connections)
 except psycopg.Error as exception:
     print(f"Error connecting to PostgreSQL database: {exception}")
     sys.exit(1)
@@ -1732,7 +1746,6 @@ def process_mastodon_instance(
     total_users = users["total"]
     active_month_users = users["activeMonth"]
 
-
     if version.parse(software_version.split("-")[0]) > version.parse(
         version_main_branch
     ):
@@ -2326,9 +2339,18 @@ def main():
         vmc_output(f"\n{appname} interrupted by user", "red")
     finally:
         # Close single connection and pool
-        conn.close()
-        db_pool.close()
-        http_client.close()
+        try:
+            conn.close()
+        except Exception:
+            pass
+        try:
+            db_pool.close(timeout=5)
+        except Exception:
+            pass
+        try:
+            http_client.close()
+        except Exception:
+            pass
         # Force final garbage collection
         gc.collect()
 
