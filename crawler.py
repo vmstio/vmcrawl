@@ -1051,6 +1051,11 @@ def update_mastodon_domain(
     active_month_users,
 ):
     """Insert or update a Mastodon domain in the database."""
+    # Validate that domain is not empty
+    if not actual_domain or not actual_domain.strip():
+        vmc_output("Attempted to insert empty domain, skipping", "red", use_tqdm=True)
+        return
+
     with db_pool.connection() as conn:
         with conn.cursor() as cursor:
             try:
@@ -1067,7 +1072,7 @@ def update_mastodon_domain(
                     full_version = excluded.full_version
                 """,
                     (
-                        actual_domain,
+                        actual_domain.strip(),
                         software_version,
                         total_users,
                         active_month_users,
