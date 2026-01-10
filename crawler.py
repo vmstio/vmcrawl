@@ -4,8 +4,6 @@
 # IMPORTS
 # =============================================================================
 
-from pydoc import source_synopsis
-
 try:
     import argparse
     import gc
@@ -21,7 +19,7 @@ try:
     import unicodedata
     from concurrent.futures import ThreadPoolExecutor, as_completed
     from datetime import datetime, timedelta, timezone
-    from urllib.parse import urlparse, urlunparse
+    from urllib.parse import urlparse
 
     import httpx
     import psycopg
@@ -226,29 +224,6 @@ def is_cache_valid(cache_file_path: str, max_age_seconds: int) -> bool:
 # =============================================================================
 
 
-def is_valid_email(email):
-    """Validate email format using regex."""
-    pattern = r"^[\w\.-]+(?:\+[\w\.-]+)?@[\w\.-]+\.\w+$"
-    return re.match(pattern, email) is not None
-
-
-def normalize_email(email):
-    """Normalize obfuscated email addresses (e.g., 'user [at] domain [dot] com')."""
-    email = re.sub(
-        r"(\[at\]|\(at\)|\{at\}| at | @ |\[@\]| \[at\] | \(at\) | \{at\} )",
-        "@",
-        email,
-        flags=re.IGNORECASE,
-    )
-    email = re.sub(
-        r"(\[dot\]|\(dot\)|\{dot\}| dot | \[dot\] | \(dot\) | \{dot\} )",
-        ".",
-        email,
-        flags=re.IGNORECASE,
-    )
-    return email
-
-
 def has_emoji_chars(domain):
     """Check if a domain contains emoji or invalid characters."""
     if domain.startswith("xn--"):
@@ -265,15 +240,6 @@ def has_emoji_chars(domain):
     except Exception:
         return True
     return False
-
-
-def limit_url_depth(source_url, depth=2):
-    """Limit URL path depth to specified number of segments."""
-    parsed_url = urlparse(source_url)
-    path_parts = parsed_url.path.split("/")
-    limited_path = "/" + "/".join([part for part in path_parts if part][:depth])
-    new_url = urlunparse(parsed_url._replace(path=limited_path))
-    return new_url
 
 
 # =============================================================================
@@ -1106,8 +1072,6 @@ def update_mastodon_domain(
     software_version_full,
     total_users,
     active_month_users,
-    contact_account,
-    source_url,
 ):
     """Insert or update a Mastodon domain in the database."""
     with db_pool.connection() as conn:
@@ -1116,15 +1080,13 @@ def update_mastodon_domain(
                 cursor.execute(
                     """
                     INSERT INTO mastodon_domains
-                    (domain, software_version, total_users, active_users_monthly, timestamp, contact, source, full_version)
-                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
+                    (domain, software_version, total_users, active_users_monthly, timestamp, full_version)
+                    VALUES (%s, %s, %s, %s, %s, %s)
                     ON CONFLICT(domain) DO UPDATE SET
                     software_version = excluded.software_version,
                     total_users = excluded.total_users,
                     active_users_monthly = excluded.active_users_monthly,
                     timestamp = excluded.timestamp,
-                    contact = excluded.contact,
-                    source = excluded.source,
                     full_version = excluded.full_version
                 """,
                     (
@@ -1133,8 +1095,6 @@ def update_mastodon_domain(
                         total_users,
                         active_month_users,
                         datetime.now(timezone.utc),
-                        contact_account,
-                        source_url,
                         software_version_full,
                     ),
                 )
@@ -1742,7 +1702,6 @@ def process_mastodon_instance(
     domain, backend_domain, nodeinfo_20_result, http_client, nightly_version_ranges
 ):
     """Process a confirmed Mastodon instance and update the database."""
-    software_name = nodeinfo_20_result["software"]["name"].lower()
     software_version_full = nodeinfo_20_result["software"]["version"]
     software_version = clean_version(
         nodeinfo_20_result["software"]["version"], nightly_version_ranges
@@ -1773,8 +1732,6 @@ def process_mastodon_instance(
     total_users = users["total"]
     active_month_users = users["activeMonth"]
 
-    contact_account = None
-    source_url = None
 
     if version.parse(software_version.split("-")[0]) > version.parse(
         version_main_branch
@@ -1792,8 +1749,6 @@ def process_mastodon_instance(
         software_version_full,
         total_users,
         active_month_users,
-        contact_account,
-        source_url,
     )
 
     clear_domain_error(domain)
