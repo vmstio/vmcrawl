@@ -1268,7 +1268,7 @@ def handle_tcp_exception(domain, exception):
     if isinstance(exception, ValueError) and "too large" in error_message.casefold():
         error_reason = "SIZE"
         vmc_output(
-            f"{domain}: Response too large (memory protection)", "orange", use_tqdm=True
+            f"{domain}: Response too large", "yellow", use_tqdm=True
         )
         log_error(domain, "Response exceeds size limit")
         increment_domain_error(domain, error_reason)
@@ -2022,6 +2022,8 @@ def load_from_database(user_choice):
         "12": "SELECT domain FROM raw_domains WHERE reason = 'TCP' ORDER BY errors ASC",
         "13": "SELECT domain FROM raw_domains WHERE reason = 'MAX' ORDER BY errors ASC",
         "14": "SELECT domain FROM raw_domains WHERE reason = 'DNS' ORDER BY errors ASC",
+        "15": "SELECT domain FROM raw_domains WHERE reason = 'SIZE' ORDER BY errors ASC",
+        "16": "SELECT domain FROM raw_domains WHERE reason = 'FD' ORDER BY errors ASC",
         "20": "SELECT domain FROM raw_domains WHERE reason ~ '^2[0-9]{2}' ORDER BY errors ASC",
         "21": "SELECT domain FROM raw_domains WHERE reason ~ '^3[0-9]{2}' ORDER BY errors ASC",
         "22": "SELECT domain FROM raw_domains WHERE reason ~ '^4[0-9]{2}' ORDER BY errors ASC",
@@ -2135,6 +2137,8 @@ def get_menu_options() -> dict:
             "12": "TCP",
             "13": "MAX",
             "14": "DNS",
+            "15": "SIZE",
+            "16": "FD",
         },
         "Retry HTTP errors": {"20": "2xx", "21": "3xx", "22": "4xx", "23": "5xx"},
         "Retry target errors": {
