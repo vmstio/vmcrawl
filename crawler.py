@@ -20,6 +20,7 @@ try:
     import unicodedata
     from concurrent.futures import ThreadPoolExecutor, as_completed
     from datetime import datetime, timedelta, timezone
+    from typing import Any
     from urllib.parse import urlparse
 
     import httpx
@@ -42,7 +43,7 @@ current_filename = os.path.basename(__file__)
 
 # Load environment variables from .env file
 try:
-    load_dotenv()
+    _ = load_dotenv()
 except Exception as exception:
     print(f"Error loading .env file: {exception}")
     sys.exit(1)
@@ -54,8 +55,8 @@ except Exception as exception:
 toml_file_path = os.path.join(os.path.dirname(__file__), "pyproject.toml")
 try:
     project_info = toml.load(toml_file_path)
-    appname = project_info["project"]["name"]
-    appversion = project_info["project"]["version"]
+    appname: str = project_info["project"]["name"]
+    appversion: str = project_info["project"]["version"]
 except FileNotFoundError:
     print(f"Error: {toml_file_path} not found.")
     sys.exit(1)
@@ -126,7 +127,7 @@ try:
         except Exception:
             pass
 
-    atexit.register(cleanup_db_connections)
+    _ = atexit.register(cleanup_db_connections)
 except psycopg.Error as exception:
     print(f"Error connecting to PostgreSQL database: {exception}")
     sys.exit(1)
@@ -164,7 +165,7 @@ http_client = httpx.Client(
 # =============================================================================
 
 
-def vmc_output(text: str, color: str, use_tqdm: bool = False, **kwargs) -> None:
+def vmc_output(text: str, color: str, use_tqdm: bool = False, **kwargs: Any) -> None:
     """Print colored output, optionally using tqdm.write for progress bar compatibility."""
     if use_tqdm:
         text = text.lower()
@@ -214,7 +215,9 @@ def is_cache_valid(cache_file_path: str, max_age_seconds: int) -> bool:
 # =============================================================================
 
 
-def parse_json_with_fallback(response, domain, target):
+def parse_json_with_fallback(
+    response: httpx.Response, domain: str, target: str
+) -> Any | bool:
     """Parse JSON from response with fallback decoder for malformed JSON.
 
     Args:
@@ -237,7 +240,7 @@ def parse_json_with_fallback(response, domain, target):
             return False
 
 
-def has_emoji_chars(domain):
+def has_emoji_chars(domain: str) -> bool:
     """Check if a domain contains emoji or invalid characters."""
     if domain.startswith("xn--"):
         try:
@@ -260,10 +263,10 @@ def has_emoji_chars(domain):
 # =============================================================================
 
 
-def get_httpx(url, http_client):
+def get_httpx(url: str, http_client: httpx.Client) -> httpx.Response:
     """Make HTTP GET request with HTTP/2 fallback on connection errors and size limits."""
 
-    def stream_with_size_limit(client, url):
+    def stream_with_size_limit(client: httpx.Client, url: str) -> httpx.Response:
         """Stream response and enforce size limit during download."""
         # Get the stream context manager and enter it manually
         stream_ctx = client.stream("GET", url)
@@ -273,7 +276,7 @@ def get_httpx(url, http_client):
             # Check Content-Length header first if available
             content_length = response.headers.get("Content-Length")
             if content_length and int(content_length) > max_response_size:
-                stream_ctx.__exit__(None, None, None)
+                _ = stream_ctx.__exit__(None, None, None)
                 raise ValueError(
                     f"Response too large: {content_length} bytes (max: {max_response_size})"
                 )
@@ -287,7 +290,7 @@ def get_httpx(url, http_client):
                 total_size += len(chunk)
 
                 if total_size > max_response_size:
-                    stream_ctx.__exit__(None, None, None)
+                    _ = stream_ctx.__exit__(None, None, None)
                     raise ValueError(
                         f"Response too large: {total_size} bytes (max: {max_response_size})"
                     )
@@ -302,11 +305,11 @@ def get_httpx(url, http_client):
             # Directly set the content to bypass decompression
             final_response._content = b"".join(chunks)
 
-            stream_ctx.__exit__(None, None, None)
+            _ = stream_ctx.__exit__(None, None, None)
             return final_response
 
         except Exception:
-            stream_ctx.__exit__(None, None, None)
+            _ = stream_ctx.__exit__(None, None, None)
             raise
 
     try:
@@ -334,7 +337,7 @@ def get_httpx(url, http_client):
             raise exception
 
 
-def get_domain_endings():
+def get_domain_endings() -> set[str]:
     """Fetch and cache the set of valid TLDs from IANA."""
     url = "http://data.iana.org/TLD/tlds-alpha-by-domain.txt"
     cache_file_path = get_cache_file_path(url)
@@ -344,24 +347,22 @@ def get_domain_endings():
         with open(cache_file_path, "r") as cache_file:
             # Use set for O(1) lookup
             return {line.strip().lower() for line in cache_file if line.strip()}
-    else:
-        domain_endings_response = get_httpx(url, http_client)
-        if domain_endings_response.status_code in [200]:
-            # Use set for O(1) lookup
-            domain_endings = {
-                line.strip().lower()
-                for line in domain_endings_response.text.splitlines()
-                if line.strip() and not line.startswith("#")
-            }
-            with open(cache_file_path, "w") as cache_file:
-                cache_file.write("\n".join(sorted(domain_endings)))
-            return domain_endings
-        else:
-            raise Exception(
-                f"Failed to fetch domain endings. HTTP Status Code: {domain_endings_response.status_code}"
-            )
 
-    return set()
+    domain_endings_response = get_httpx(url, http_client)
+    if domain_endings_response.status_code in [200]:
+        # Use set for O(1) lookup
+        domain_endings = {
+            line.strip().lower()
+            for line in domain_endings_response.text.splitlines()
+            if line.strip() and not line.startswith("#")
+        }
+        with open(cache_file_path, "w") as cache_file:
+            _ = cache_file.write("\n".join(sorted(domain_endings)))
+        return domain_endings
+
+    raise Exception(
+        f"Failed to fetch domain endings. HTTP Status Code: {domain_endings_response.status_code}"
+    )
 
 
 # =============================================================================
@@ -369,12 +370,12 @@ def get_domain_endings():
 # =============================================================================
 
 
-def read_main_version_info(url):
+def read_main_version_info(url: str) -> dict[str, str] | None:
     """Parse Mastodon version.rb file to extract version information."""
-    version_info = {}
+    version_info: dict[str, str] = {}
     try:
         response = get_httpx(url, http_client)
-        response.raise_for_status()
+        _ = response.raise_for_status()
         lines = response.text.splitlines()
 
         for i, line in enumerate(lines):
@@ -392,9 +393,9 @@ def read_main_version_info(url):
     return version_info
 
 
-def get_highest_mastodon_version():
+def get_highest_mastodon_version() -> str | None:
     """Get the highest stable Mastodon release version from GitHub."""
-    highest_version = None
+    highest_version: str | None = None
     try:
         release_url = "https://api.github.com/repos/mastodon/mastodon/releases"
         response = get_httpx(release_url, http_client)
@@ -423,7 +424,7 @@ def get_backport_mastodon_versions():
     backport_versions = {branch: "" for branch in backport_branches}
 
     response = get_httpx(url, http_client)
-    response.raise_for_status()
+    _ = response.raise_for_status()
     releases = response.json()
 
     for release in releases:
@@ -475,10 +476,10 @@ def get_main_version_branch():
     return obtained_main_branch
 
 
-def get_nightly_version_ranges():
+def get_nightly_version_ranges() -> list[tuple[str, datetime, datetime | None]]:
     """Get nightly version ranges from the database."""
     with conn.cursor() as cur:
-        cur.execute(
+        _ = cur.execute(
             """
             SELECT version, start_date, end_date
             FROM nightly_versions
@@ -512,7 +513,10 @@ def get_nightly_version_ranges():
 # =============================================================================
 
 
-def clean_version(software_version_full, nightly_version_ranges):
+def clean_version(
+    software_version_full: str,
+    nightly_version_ranges: list[tuple[str, datetime, datetime | None]],
+) -> str:
     """Apply all version cleaning transformations."""
     software_version = clean_version_suffix(software_version_full)
     software_version = clean_version_oddstring(software_version)
@@ -530,7 +534,7 @@ def clean_version(software_version_full, nightly_version_ranges):
     return software_version
 
 
-def clean_version_suffix(software_version_full):
+def clean_version_suffix(software_version_full: str) -> str:
     """Remove unwanted or invalid suffixes from version string."""
     software_version = (
         software_version_full.split("+")[0]
@@ -545,7 +549,7 @@ def clean_version_suffix(software_version_full):
     return software_version
 
 
-def clean_version_suffix_more(software_version):
+def clean_version_suffix_more(software_version: str) -> str:
     """Remove additional suffixes unless they are valid prerelease identifiers."""
     if (
         "alpha" not in software_version
@@ -559,7 +563,7 @@ def clean_version_suffix_more(software_version):
     return software_version
 
 
-def clean_version_dumbstring(software_version):
+def clean_version_dumbstring(software_version: str) -> str:
     """Remove known unwanted strings from versions."""
     unwanted_strings = ["-pre", "-theconnector", "-theatlsocial"]
     for unwanted_string in unwanted_strings:
@@ -567,14 +571,14 @@ def clean_version_dumbstring(software_version):
     return software_version
 
 
-def clean_version_oddstring(software_version):
+def clean_version_oddstring(software_version: str) -> str:
     """Replace known typos in version strings."""
     if "mastau" in software_version:
         software_version = software_version.replace("mastau", "alpha")
     return software_version
 
 
-def clean_version_date(software_version):
+def clean_version_date(software_version: str) -> str:
     """Convert date-based suffixes to nightly format."""
     match = re.search(r"-(\d{2})(\d{2})(\d{2})$", software_version)
     if match:
@@ -584,7 +588,7 @@ def clean_version_date(software_version):
     return software_version
 
 
-def clean_version_development(software_version):
+def clean_version_development(software_version: str) -> str:
     """Normalize development version formats (rc, beta)."""
     patterns = {r"rc(\d+)": r"-rc.\1", r"beta(\d+)": r"-beta.\1"}
     for pattern, replacement in patterns.items():
@@ -592,7 +596,7 @@ def clean_version_development(software_version):
     return software_version
 
 
-def clean_version_hometown(software_version):
+def clean_version_hometown(software_version: str) -> str:
     """Map Hometown version numbers to corresponding Mastodon versions."""
     if software_version == "1.0.6":
         software_version = "3.5.3"
@@ -603,7 +607,7 @@ def clean_version_hometown(software_version):
     return software_version
 
 
-def clean_version_doubledash(software_version):
+def clean_version_doubledash(software_version: str) -> str:
     """Fix double dashes and trailing dashes in version strings."""
     if "--" in software_version:
         software_version = software_version.replace("--", "-")
@@ -612,7 +616,7 @@ def clean_version_doubledash(software_version):
     return software_version
 
 
-def clean_version_wrongpatch(software_version):
+def clean_version_wrongpatch(software_version: str) -> str:
     """Correct patch versions that exceed the latest release."""
     match = re.match(r"^(\d+)\.(\d+)\.(\d+)(-.+)?$", software_version)
 
@@ -648,7 +652,10 @@ def clean_version_wrongpatch(software_version):
         return software_version
 
 
-def clean_version_nightly(software_version, nightly_version_ranges):
+def clean_version_nightly(
+    software_version: str,
+    nightly_version_ranges: list[tuple[str, datetime, datetime | None]],
+) -> str:
     """Map nightly versions to their corresponding release versions."""
     software_version = re.sub(r"-nightly-\d{8}", "", software_version)
 
@@ -673,14 +680,14 @@ def clean_version_nightly(software_version, nightly_version_ranges):
     return software_version
 
 
-def clean_version_main_missing_prerelease(software_version):
+def clean_version_main_missing_prerelease(software_version: str) -> str:
     """Add missing prerelease suffix to main branch versions."""
     if software_version.startswith(version_main_branch) and "-" not in software_version:
         software_version = f"{software_version}-alpha.1"
     return software_version
 
 
-def clean_version_release_with_prerelease(software_version):
+def clean_version_release_with_prerelease(software_version: str) -> str:
     """Strip prerelease suffix from stable release versions."""
     if (
         version_latest_release
@@ -692,7 +699,7 @@ def clean_version_release_with_prerelease(software_version):
     return software_version
 
 
-def clean_version_strip_incorrect_prerelease(software_version):
+def clean_version_strip_incorrect_prerelease(software_version: str) -> str:
     """Remove prerelease suffix from non-zero patch versions."""
     match = re.match(r"^(\d+)\.(\d+)\.(\d+)(-.+)?$", software_version)
     if match:
@@ -760,12 +767,12 @@ def delete_old_patch_versions():
 # =============================================================================
 
 
-def log_error(domain, error_to_print):
+def log_error(domain: str, error_to_print: str) -> None:
     """Log an error for a domain to the error_log table."""
     with db_pool.connection() as conn:
         with conn.cursor() as cursor:
             try:
-                cursor.execute(
+                _ = cursor.execute(
                     """
                     INSERT INTO error_log (domain, error)
                     VALUES (%s, %s)
@@ -780,7 +787,7 @@ def log_error(domain, error_to_print):
                 conn.rollback()
 
 
-def increment_domain_error(domain, error_reason):
+def increment_domain_error(domain: str, error_reason: str) -> None:
     """Increment error count for a domain and record the error reason."""
     with db_pool.connection() as conn:
         with conn.cursor() as cursor:
@@ -795,7 +802,7 @@ def increment_domain_error(domain, error_reason):
                 else:
                     new_errors = 1
 
-                cursor.execute(
+                _ = cursor.execute(
                     """
                     INSERT INTO raw_domains (domain, failed, ignore, errors, reason, nxdomain, norobots)
                     VALUES (%s, %s, %s, %s, %s, %s, %s)
@@ -819,12 +826,12 @@ def increment_domain_error(domain, error_reason):
                 conn.rollback()
 
 
-def clear_domain_error(domain):
+def clear_domain_error(domain: str) -> None:
     """Clear all error flags for a domain."""
     with db_pool.connection() as conn:
         with conn.cursor() as cursor:
             try:
-                cursor.execute(
+                _ = cursor.execute(
                     """
                     INSERT INTO raw_domains (domain, failed, ignore, errors, reason, nxdomain, norobots)
                     VALUES (%s, %s, %s, %s, %s, %s, %s)
@@ -848,7 +855,7 @@ def clear_domain_error(domain):
                 conn.rollback()
 
 
-def delete_if_error_max(domain):
+def delete_if_error_max(domain: str) -> None:
     """Delete domain from known domains if error threshold is exceeded."""
     with db_pool.connection() as conn:
         with conn.cursor() as cursor:
@@ -887,7 +894,7 @@ def delete_if_error_max(domain):
 # =============================================================================
 
 
-def mark_domain_status(domain, status_type):
+def mark_domain_status(domain: str, status_type: str) -> None:
     """Mark a domain with a specific status flag.
 
     Args:
@@ -910,7 +917,7 @@ def mark_domain_status(domain, status_type):
     with db_pool.connection() as conn:
         with conn.cursor() as cursor:
             try:
-                cursor.execute(
+                _ = cursor.execute(
                     """
                     INSERT INTO raw_domains (domain, failed, ignore, errors, reason, nxdomain, norobots)
                     VALUES (%s, %s, %s, %s, %s, %s, %s)
@@ -931,22 +938,22 @@ def mark_domain_status(domain, status_type):
 
 
 # Convenience wrapper functions for backwards compatibility
-def mark_ignore_domain(domain):
+def mark_ignore_domain(domain: str) -> None:
     """Mark a domain as ignored (non-Mastodon platform)."""
     mark_domain_status(domain, "ignore")
 
 
-def mark_failed_domain(domain):
+def mark_failed_domain(domain: str) -> None:
     """Mark a domain as failed (authentication required)."""
     mark_domain_status(domain, "failed")
 
 
-def mark_nxdomain_domain(domain):
+def mark_nxdomain_domain(domain: str) -> None:
     """Mark a domain as NXDOMAIN (gone/not found)."""
     mark_domain_status(domain, "nxdomain")
 
 
-def mark_norobots_domain(domain):
+def mark_norobots_domain(domain: str) -> None:
     """Mark a domain as norobots (crawling prohibited)."""
     mark_domain_status(domain, "norobots")
 
@@ -956,12 +963,12 @@ def mark_norobots_domain(domain):
 # =============================================================================
 
 
-def delete_domain_if_known(domain):
+def delete_domain_if_known(domain: str) -> None:
     """Delete a domain from the mastodon_domains table."""
     with db_pool.connection() as conn:
         with conn.cursor() as cursor:
             try:
-                cursor.execute(
+                _ = cursor.execute(
                     """
                     DELETE FROM mastodon_domains WHERE domain = %s
                     """,
@@ -977,12 +984,12 @@ def delete_domain_if_known(domain):
                 conn.rollback()
 
 
-def delete_domain_from_raw(domain):
+def delete_domain_from_raw(domain: str) -> None:
     """Delete a domain from the raw_domains table."""
     with db_pool.connection() as conn:
         with conn.cursor() as cursor:
             try:
-                cursor.execute(
+                _ = cursor.execute(
                     """
                     DELETE FROM raw_domains WHERE domain = %s
                     """,
@@ -1024,7 +1031,7 @@ def save_nodeinfo_url(domain, nodeinfo_20_url):
     with db_pool.connection() as conn:
         with conn.cursor() as cursor:
             try:
-                cursor.execute(
+                _ = cursor.execute(
                     """
                     INSERT INTO raw_domains (domain, nodeinfo)
                     VALUES (%s, %s)
@@ -1059,7 +1066,7 @@ def update_mastodon_domain(
     with db_pool.connection() as conn:
         with conn.cursor() as cursor:
             try:
-                cursor.execute(
+                _ = cursor.execute(
                     """
                     INSERT INTO mastodon_domains
                     (domain, software_version, total_users, active_users_monthly, timestamp, full_version)
@@ -1161,7 +1168,7 @@ def get_domains_by_status(status_column):
         with conn.cursor() as cursor:
             try:
                 query = f"SELECT domain FROM raw_domains WHERE {status_column} = TRUE"
-                cursor.execute(query)
+                _ = cursor.execute(query)  # pyright: ignore[reportCallIssue,reportArgumentType]
                 # Use set for O(1) lookup, stream results
                 return {row[0].strip() for row in cursor if row[0] and row[0].strip()}
             except Exception as exception:
@@ -1497,6 +1504,8 @@ def check_webfinger(domain, http_client):
             data = parse_json_with_fallback(response, domain, target)
             if data is False:
                 return False
+            if not isinstance(data, dict):
+                return None
             aliases = data.get("aliases", [])
             if not aliases:
                 return None
@@ -1539,6 +1548,8 @@ def check_nodeinfo(domain, backend_domain, http_client):
                 data = parse_json_with_fallback(response, domain, target)
                 if data is False:
                     return False
+            if not isinstance(data, dict):
+                return None
             links = data.get("links")
             if links is not None and len(links) == 0:
                 exception = "empty links array in reply"
@@ -1622,7 +1633,7 @@ def check_nodeinfo_20(domain, nodeinfo_20_url, http_client, from_cache=False):
 # =============================================================================
 
 
-def is_mastodon_instance(nodeinfo_20_result: dict) -> bool:
+def is_mastodon_instance(nodeinfo_20_result: dict[str, Any]) -> bool:
     """Check if the NodeInfo response indicates a Mastodon-compatible instance."""
     if not isinstance(nodeinfo_20_result, dict):
         return False
@@ -1962,7 +1973,7 @@ def load_from_database(user_choice):
         with conn.cursor(name="domain_loader") as cursor:
             cursor.itersize = 1000  # Fetch 1000 rows at a time
             try:
-                cursor.execute(query, params if params else None)  # type: ignore
+                _ = cursor.execute(query, params if params else None)  # pyright: ignore[reportCallIssue,reportArgumentType]
                 domain_list = [
                     row[0].strip()
                     for row in cursor
@@ -2009,7 +2020,7 @@ def load_from_file(file_name):
 # =============================================================================
 
 
-def get_menu_options() -> dict:
+def get_menu_options() -> dict[str, dict[str, str]]:
     """Return the menu options dictionary."""
     return {
         "Process new domains": {"0": "Uncrawled"},
@@ -2051,7 +2062,7 @@ def get_menu_options() -> dict:
     }
 
 
-def print_menu(menu_options: dict | None = None) -> None:
+def print_menu(menu_options: dict[str, dict[str, str]] | None = None) -> None:
     """Print the text-based menu to stdout."""
     if menu_options is None:
         menu_options = get_menu_options()
@@ -2064,7 +2075,7 @@ def print_menu(menu_options: dict | None = None) -> None:
     sys.stdout.flush()
 
 
-def interactive_select_menu(menu_options: dict) -> str | None:
+def interactive_select_menu(menu_options: dict[str, dict[str, str]]) -> str | None:
     """Interactive menu picker using arrow keys (TTY only)."""
     if is_running_headless():
         return None
