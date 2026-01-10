@@ -2019,7 +2019,7 @@ def load_from_database(user_choice):
         "9": "SELECT domain FROM raw_domains WHERE norobots = TRUE ORDER BY domain",
         "10": "SELECT domain FROM raw_domains WHERE reason = 'SSL' ORDER BY errors ASC",
         "11": "SELECT domain FROM raw_domains WHERE reason = 'HTTP' ORDER BY errors ASC",
-        "12": "SELECT domain FROM raw_domains WHERE reason IN ('TIMEOUT', 'TIME', 'TCP') ORDER BY errors ASC",
+        "12": "SELECT domain FROM raw_domains WHERE reason = 'TCP' ORDER BY errors ASC",
         "13": "SELECT domain FROM raw_domains WHERE reason = 'MAX' ORDER BY errors ASC",
         "14": "SELECT domain FROM raw_domains WHERE reason = 'DNS' ORDER BY errors ASC",
         "20": "SELECT domain FROM raw_domains WHERE reason ~ '^2[0-9]{2}' ORDER BY errors ASC",
