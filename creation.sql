@@ -53,7 +53,8 @@ CREATE TABLE
     reason TEXT DEFAULT NULL,
     nxdomain BOOLEAN DEFAULT NULL,
     norobots BOOLEAN DEFAULT NULL,
-    baddata BOOLEAN DEFAULT NULL
+    baddata BOOLEAN DEFAULT NULL,
+    nodeinfo TEXT DEFAULT NULL
   );
 
 CREATE TABLE statistics (
