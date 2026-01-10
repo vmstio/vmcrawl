@@ -3,7 +3,7 @@ ARG PYTHON_VERSION=3.13
 
 FROM python:${PYTHON_VERSION}-${DEBIAN_VERSION}
 
-RUN apt update && apt dist-upgrade -y
+RUN apt-get update && apt-get upgrade -y
 
 # Clone repository and set up application
 RUN git clone https://github.com/vmstio/vmcrawl.git /opt/vmcrawl
