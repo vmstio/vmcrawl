@@ -115,11 +115,11 @@ db_port = os.getenv("VMCRAWL_POSTGRES_PORT", "5432")
 conn_string = f"postgresql://{db_user}:{db_password}@{db_host}:{db_port}/{db_name}"
 
 # Create connection pool for thread-safe database access
-# For 2 vCPU systems: Use conservative pool size based on CPU formula: (cores * 2) + 1
-# With PgBouncer: Keep small (5 connections) as PgBouncer handles connection multiplexing
-# Without PgBouncer: Still keep at 5 for 2 vCPU shared database server
+# Scale connection pool size with number of worker threads
+# With PgBouncer: Connection multiplexing allows more application connections
+# Without PgBouncer: May need to adjust based on database server capacity
 max_workers = int(os.getenv("VMCRAWL_MAX_THREADS", "2"))
-max_db_connections = 5  # Optimal for 2 vCPU: (2 * 2) + 1 = 5
+max_db_connections = max_workers  # One connection per worker thread
 
 try:
     db_pool = ConnectionPool(
@@ -1267,9 +1267,7 @@ def handle_tcp_exception(domain, exception):
     # Handle response size violations
     if isinstance(exception, ValueError) and "too large" in error_message.casefold():
         error_reason = "SIZE"
-        vmc_output(
-            f"{domain}: Response too large", "yellow", use_tqdm=True
-        )
+        vmc_output(f"{domain}: Response too large", "yellow", use_tqdm=True)
         log_error(domain, "Response exceeds size limit")
         increment_domain_error(domain, error_reason)
         delete_if_error_max(domain)
