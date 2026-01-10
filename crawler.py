@@ -2024,6 +2024,7 @@ def load_from_database(user_choice):
         "14": "SELECT domain FROM raw_domains WHERE reason = 'DNS' ORDER BY errors ASC",
         "15": "SELECT domain FROM raw_domains WHERE reason = 'SIZE' ORDER BY errors ASC",
         "16": "SELECT domain FROM raw_domains WHERE reason = 'FD' ORDER BY errors ASC",
+        "17": "SELECT domain FROM raw_domains WHERE reason = '###' ORDER BY errors ASC",
         "20": "SELECT domain FROM raw_domains WHERE reason ~ '^2[0-9]{2}' ORDER BY errors ASC",
         "21": "SELECT domain FROM raw_domains WHERE reason ~ '^3[0-9]{2}' ORDER BY errors ASC",
         "22": "SELECT domain FROM raw_domains WHERE reason ~ '^4[0-9]{2}' ORDER BY errors ASC",
@@ -2034,9 +2035,8 @@ def load_from_database(user_choice):
         "41": "SELECT domain FROM mastodon_domains WHERE software_version LIKE %s ORDER BY active_users_monthly DESC",
         "42": "SELECT domain FROM mastodon_domains WHERE software_version::TEXT ~ 'alpha|beta|rc' ORDER BY active_users_monthly DESC",
         "43": "SELECT domain FROM mastodon_domains WHERE active_users_monthly = '0' ORDER BY active_users_monthly DESC",
-        "44": "SELECT domain FROM mastodon_domains ORDER BY active_users_monthly DESC",
-        "45": "SELECT domain FROM raw_domains WHERE reason = '###' ORDER BY errors ASC",
-        "46": "SELECT domain FROM mastodon_domains WHERE timestamp <= (CURRENT_TIMESTAMP - INTERVAL '3 days') AT TIME ZONE 'UTC' ORDER BY active_users_monthly DESC",
+        "44": "SELECT domain FROM mastodon_domains WHERE timestamp <= (CURRENT_TIMESTAMP - INTERVAL '3 days') AT TIME ZONE 'UTC' ORDER BY active_users_monthly DESC",
+        "45": "SELECT domain FROM mastodon_domains ORDER BY active_users_monthly DESC",
         "50": "SELECT domain FROM raw_domains WHERE errors > %s ORDER BY errors ASC",
         "51": "SELECT domain FROM raw_domains WHERE errors > %s AND errors < %s ORDER BY errors ASC",
         "52": "SELECT domain FROM raw_domains WHERE errors IS NOT NULL ORDER BY errors ASC",
@@ -2123,7 +2123,7 @@ def load_from_file(file_name):
 def get_menu_options() -> dict:
     """Return the menu options dictionary."""
     return {
-        "Process new domains": {"0": "Recently Fetched"},
+        "Process new domains": {"0": "Uncrawled"},
         "Change process direction": {"1": "Standard", "2": "Reverse", "3": "Random"},
         "Retry fatal errors": {
             "6": "Ignored",
@@ -2139,6 +2139,7 @@ def get_menu_options() -> dict:
             "14": "DNS",
             "15": "SIZE",
             "16": "FD",
+            "17": "###",
         },
         "Retry HTTP errors": {"20": "2xx", "21": "3xx", "22": "4xx", "23": "5xx"},
         "Retry target errors": {
@@ -2146,18 +2147,17 @@ def get_menu_options() -> dict:
             "31": "TYPE",
         },
         "Retry known instances": {
-            "40": "Unpatched",
-            "41": "Main",
-            "42": "Development",
-            "43": "Inactive",
-            "44": "All Good",
-            "45": "Misreporting",
-            "46": "Stale (3+ days)",
+            "40": "Old",
+            "41": f"{version_main_branch}",
+            "42": "Dev",
+            "43": "Dead",
+            "44": "Stale",
+            "45": "All",
         },
         "Retry general errors": {
-            "50": f"Domains w/ >{int(error_buffer * 2)} Errors",
-            "51": f"Domains w/ {error_buffer}-{int(error_buffer * 2)} Errors",
-            "52": "Domains with any errors",
+            "50": f">{int(error_buffer * 2)}",
+            "51": f"{error_buffer}-{int(error_buffer * 2)}",
+            "52": "1+",
         },
     }
 
