@@ -4,6 +4,8 @@
 # IMPORTS
 # =============================================================================
 
+from pydoc import source_synopsis
+
 try:
     import argparse
     import gc
@@ -1053,6 +1055,51 @@ def delete_domain_from_raw(domain):
                 conn.rollback()
 
 
+def get_cached_nodeinfo_url(domain):
+    """Retrieve cached nodeinfo_20_url from database if available."""
+    with db_pool.connection() as conn:
+        with conn.cursor() as cursor:
+            try:
+                cursor.execute(
+                    "SELECT nodeinfo FROM raw_domains WHERE domain = %s", (domain,)
+                )
+                result = cursor.fetchone()
+                if result and result[0]:
+                    return result[0]
+                return None
+            except Exception as exception:
+                vmc_output(
+                    f"{domain}: Failed to retrieve cached nodeinfo URL {exception}",
+                    "red",
+                    use_tqdm=True,
+                )
+                return None
+
+
+def save_nodeinfo_url(domain, nodeinfo_20_url):
+    """Save nodeinfo_20_url to database for future use."""
+    with db_pool.connection() as conn:
+        with conn.cursor() as cursor:
+            try:
+                cursor.execute(
+                    """
+                    INSERT INTO raw_domains (domain, nodeinfo)
+                    VALUES (%s, %s)
+                    ON CONFLICT(domain) DO UPDATE SET
+                    nodeinfo = excluded.nodeinfo
+                    """,
+                    (domain, nodeinfo_20_url),
+                )
+                conn.commit()
+            except Exception as exception:
+                vmc_output(
+                    f"{domain}: Failed to save nodeinfo URL {exception}",
+                    "red",
+                    use_tqdm=True,
+                )
+                conn.rollback()
+
+
 def update_mastodon_domain(
     actual_domain,
     software_version,
@@ -1622,9 +1669,9 @@ def check_nodeinfo(domain, backend_domain, http_client):
     return None
 
 
-def check_nodeinfo_20(domain, nodeinfo_20_url, http_client):
+def check_nodeinfo_20(domain, nodeinfo_20_url, http_client, from_cache=False):
     """Fetch and parse NodeInfo 2.0 data."""
-    target = "nodeinfo_20"
+    target = "nodeinfo_20" if not from_cache else "nodeinfo_20 (cached)"
     try:
         response = get_httpx(nodeinfo_20_url, http_client)
         if response.status_code in [200]:
@@ -1726,126 +1773,35 @@ def process_mastodon_instance(
     total_users = users["total"]
     active_month_users = users["activeMonth"]
 
-    if software_version.startswith("4"):
-        instance_api_url = f"https://{backend_domain}/api/v2/instance"
-    else:
-        instance_api_url = f"https://{backend_domain}/api/v1/instance"
+    contact_account = None
+    source_url = None
 
-    target = "instance_api"
-    try:
-        response = get_httpx(instance_api_url, http_client)
-        if response.status_code in [200]:
-            content_type = response.headers.get("Content-Type", "")
-            if not response.content:
-                error_message = "reply is empty"
-                vmc_output(
-                    f"{domain}: {target} {error_message}", "yellow", use_tqdm=True
-                )
-                log_error(domain, f"{target} {error_message}")
-                handle_json_exception(domain, target, error_message)
-                return False
-            elif "json" not in content_type:
-                handle_incorrect_file_type(domain, target, content_type)
-                return False
+    if version.parse(software_version.split("-")[0]) > version.parse(
+        version_main_branch
+    ):
+        error_to_print = "Mastodon version invalid"
+        vmc_output(f"{domain}: {error_to_print}", "yellow", use_tqdm=True)
+        log_error(domain, error_to_print)
+        increment_domain_error(domain, "###")
+        delete_domain_if_known(domain)
+        return
 
-            try:
-                response_json = response.json()
-            except json.JSONDecodeError:
-                try:
-                    decoder = json.JSONDecoder()
-                    response_json, _ = decoder.raw_decode(response.text, 0)
-                except json.JSONDecodeError as exception:
-                    handle_json_exception(domain, target, exception)
-                    return False
+    update_mastodon_domain(
+        domain,
+        software_version,
+        software_version_full,
+        total_users,
+        active_month_users,
+        contact_account,
+        source_url,
+    )
 
-            if "error" in response_json:
-                error_message = "returned an error"
-                vmc_output(
-                    f"{domain}: {target} {error_message}", "yellow", use_tqdm=True
-                )
-                log_error(domain, f"{target} {error_message}")
-                handle_json_exception(domain, target, error_message)
-                return False
-            else:
-                instance_api_data = response_json
+    clear_domain_error(domain)
 
-            if software_version.startswith("4"):
-                actual_domain = instance_api_data["domain"].lower()
-                if "email" in instance_api_data["contact"]:
-                    contact_account = normalize_email(
-                        instance_api_data["contact"]["email"]
-                    ).lower()
-                else:
-                    contact_account = None
-                if "source_url" in instance_api_data:
-                    source_url = instance_api_data["source_url"]
-                else:
-                    source_url = None
-            else:
-                actual_domain = instance_api_data["uri"].lower()
-                if "email" in instance_api_data:
-                    contact_account = normalize_email(
-                        instance_api_data["email"]
-                    ).lower()
-                else:
-                    contact_account = None
-                source_url = None
-
-            if not is_valid_email(contact_account):
-                contact_account = None
-
-            if source_url:
-                source_url = limit_url_depth(source_url)
-
-            if source_url == "/source.tar.gz":
-                source_url = f"https://{actual_domain}{source_url}"
-
-            if software_name == "hometown":
-                source_url = "https://github.com/hometown-fork/hometown"
-
-            if actual_domain == "gc2.jp":
-                source_url = "https://github.com/gc2-jp/freespeech"
-
-            if version.parse(software_version.split("-")[0]) > version.parse(
-                version_main_branch
-            ):
-                error_to_print = "Mastodon version invalid"
-                vmc_output(f"{domain}: {error_to_print}", "yellow", use_tqdm=True)
-                log_error(domain, error_to_print)
-                increment_domain_error(domain, "###")
-                delete_domain_if_known(domain)
-                return
-
-            update_mastodon_domain(
-                actual_domain,
-                software_version,
-                software_version_full,
-                total_users,
-                active_month_users,
-                contact_account,
-                source_url,
-            )
-
-            clear_domain_error(domain)
-
-            version_info = f"Mastodon v{software_version}"
-            if software_version != nodeinfo_20_result["software"]["version"]:
-                version_info = (
-                    f"{version_info} ({nodeinfo_20_result['software']['version']})"
-                )
-            vmc_output(f"{domain}: {version_info}", "green", use_tqdm=True)
-        elif response.status_code in http_codes_to_authfail:
-            handle_http_failed(domain, target, response)
-            return False
-        elif response.status_code in http_codes_to_hardfail:
-            handle_http_failed(domain, target, response)
-            return None
-        else:
-            handle_http_status_code(domain, target, response)
-    except httpx.RequestError as exception:
-        handle_tcp_exception(domain, exception)
-    except json.JSONDecodeError as exception:
-        handle_json_exception(domain, target, exception)
+    version_info = f"Mastodon v{software_version}"
+    if software_version != nodeinfo_20_result["software"]["version"]:
+        version_info = f"{version_info} ({nodeinfo_20_result['software']['version']})"
+    vmc_output(f"{domain}: {version_info}", "green", use_tqdm=True)
 
 
 def process_domain(domain, http_client, nightly_version_ranges):
@@ -1853,6 +1809,35 @@ def process_domain(domain, http_client, nightly_version_ranges):
     if not check_robots_txt(domain, http_client):
         return
 
+    # Check if we have a cached nodeinfo_20_url to skip discovery process
+    cached_nodeinfo_url = get_cached_nodeinfo_url(domain)
+    if cached_nodeinfo_url:
+        # Use cached URL directly, skip webfinger and nodeinfo discovery
+        nodeinfo_20_result = check_nodeinfo_20(
+            domain, cached_nodeinfo_url, http_client, from_cache=True
+        )
+
+        # If cached URL fails, clear cache and fall through to full discovery
+        if nodeinfo_20_result is False or not nodeinfo_20_result:
+            save_nodeinfo_url(domain, None)  # Clear invalid cached URL
+            # Fall through to full discovery process below
+        else:
+            # Cached URL worked, process the result
+            backend_domain = domain
+
+            if is_mastodon_instance(nodeinfo_20_result):
+                process_mastodon_instance(
+                    domain,
+                    backend_domain,
+                    nodeinfo_20_result,
+                    http_client,
+                    nightly_version_ranges,
+                )
+            else:
+                mark_as_non_mastodon(domain, nodeinfo_20_result["software"]["name"])
+            return
+
+    # No cached URL, perform full discovery process
     webfinger_result = check_webfinger(domain, http_client)
     if webfinger_result is False:
         return
@@ -1867,9 +1852,12 @@ def process_domain(domain, http_client, nightly_version_ranges):
     if not nodeinfo_result:
         return
 
-    nodeinfo_20_result = check_nodeinfo_20(
-        domain, nodeinfo_result["nodeinfo_20_url"], http_client
-    )
+    nodeinfo_20_url = nodeinfo_result["nodeinfo_20_url"]
+
+    # Save the discovered nodeinfo_20_url for future use
+    save_nodeinfo_url(domain, nodeinfo_20_url)
+
+    nodeinfo_20_result = check_nodeinfo_20(domain, nodeinfo_20_url, http_client)
     if nodeinfo_20_result is False:
         return
     if not nodeinfo_20_result:
