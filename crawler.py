@@ -1791,12 +1791,11 @@ def process_domain(domain, http_client, nightly_version_ranges):
 
     # No cached URL, perform full discovery process
     webfinger_result = check_webfinger(domain, http_client)
-    if webfinger_result is False:
-        return
     if not webfinger_result:
-        backend_domain = domain
-    else:
-        backend_domain = webfinger_result["backend_domain"]
+        # Webfinger lookup failed - don't attempt nodeinfo fallback
+        return
+
+    backend_domain = webfinger_result["backend_domain"]
 
     nodeinfo_result = check_nodeinfo(domain, backend_domain, http_client)
     if nodeinfo_result is False:
