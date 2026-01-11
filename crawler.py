@@ -814,19 +814,34 @@ def log_error(domain: str, error_to_print: str) -> None:
 
 
 def increment_domain_error(domain: str, error_reason: str) -> None:
-    """Increment error count for a domain and record the error reason."""
+    """Increment error count for a domain and record the error reason.
+
+    Only increments error count for DNS errors. For other error types,
+    the count is set to null while still recording the error reason.
+    """
     with db_pool.connection() as conn:
         with conn.cursor() as cursor:
             try:
-                cursor.execute(
-                    "SELECT errors FROM raw_domains WHERE domain = %s", (domain,)
-                )
-                result = cursor.fetchone()
-                if result:
-                    current_errors = result[0] if result[0] is not None else 0
-                    new_errors = current_errors + 1
+                # Only increment count for DNS errors
+                if error_reason == "DNS":
+                    cursor.execute(
+                        "SELECT errors FROM raw_domains WHERE domain = %s", (domain,)
+                    )
+                    result = cursor.fetchone()
+                    if result:
+                        current_errors = result[0] if result[0] is not None else 0
+                        new_errors = current_errors + 1
+                    else:
+                        new_errors = 1
+
+                    # If DNS errors reach threshold, mark as NXDOMAIN
+                    if new_errors >= common_timeout:
+                        mark_domain_status(domain, "nxdomain")
+                        delete_domain_if_known(domain)
+                        return
                 else:
-                    new_errors = 1
+                    # For non-DNS errors, set count to null
+                    new_errors = None
 
                 _ = cursor.execute(
                     """
@@ -875,40 +890,6 @@ def clear_domain_error(domain: str) -> None:
             except Exception as exception:
                 vmc_output(
                     f"{domain}: Failed to clear domain errors {exception}",
-                    "red",
-                    use_tqdm=True,
-                )
-                conn.rollback()
-
-
-def delete_if_error_max(domain: str) -> None:
-    """Delete domain from known domains if error threshold is exceeded."""
-    with db_pool.connection() as conn:
-        with conn.cursor() as cursor:
-            try:
-                cursor.execute(
-                    "SELECT errors FROM raw_domains WHERE domain = %s", (domain,)
-                )
-                result = cursor.fetchone()
-                if result and result[0] >= error_threshold:
-                    cursor.execute(
-                        "SELECT timestamp FROM mastodon_domains WHERE domain = %s",
-                        (domain,),
-                    )
-                    timestamp = cursor.fetchone()
-                    if (
-                        timestamp
-                        and (
-                            datetime.now(timezone.utc)
-                            - timestamp[0].replace(tzinfo=timezone.utc)
-                        ).days
-                        >= error_threshold
-                    ):
-                        delete_domain_if_known(domain)
-
-            except Exception as exception:
-                vmc_output(
-                    f"{domain}: Failed to delete maxed out domain {exception}",
                     "red",
                     use_tqdm=True,
                 )
@@ -1245,7 +1226,6 @@ def handle_incorrect_file_type(domain, target, content_type):
     vmc_output(f"{domain}: {error_message}", "yellow", use_tqdm=True)
     log_error(domain, error_message)
     increment_domain_error(domain, f"TYPE+{target}")
-    delete_if_error_max(domain)
 
 
 def handle_http_status_code(domain, target, response):
@@ -1255,7 +1235,6 @@ def handle_http_status_code(domain, target, response):
     vmc_output(f"{domain}: {error_message}", "yellow", use_tqdm=True)
     log_error(domain, error_message)
     increment_domain_error(domain, code)
-    delete_if_error_max(domain)
 
 
 def handle_http_failed(domain, target, response):
@@ -1277,7 +1256,6 @@ def handle_tcp_exception(domain, exception):
         vmc_output(f"{domain}: Response too large", "yellow", use_tqdm=True)
         log_error(domain, "Response exceeds size limit")
         increment_domain_error(domain, error_reason)
-        delete_if_error_max(domain)
         return
 
     # Handle bad file descriptor (usually from cancellation/cleanup issues)
@@ -1286,7 +1264,6 @@ def handle_tcp_exception(domain, exception):
         vmc_output(f"{domain}: Connection closed unexpectedly", "yellow", use_tqdm=True)
         log_error(domain, "Bad file descriptor")
         increment_domain_error(domain, error_reason)
-        delete_if_error_max(domain)
         return
 
     if "_ssl.c" in error_message.casefold():
@@ -1302,14 +1279,12 @@ def handle_tcp_exception(domain, exception):
         vmc_output(f"{domain}: {error_message}", "yellow", use_tqdm=True)
         log_error(domain, error_message)
         increment_domain_error(domain, error_reason)
-        delete_if_error_max(domain)
     elif "maximum allowed redirects" in error_message.casefold():
         error_reason = "MAX"
         error_message = error_message.strip(".")
         vmc_output(f"{domain}: {error_message}", "yellow", use_tqdm=True)
         log_error(domain, error_message)
         increment_domain_error(domain, error_reason)
-        delete_if_error_max(domain)
     elif any(
         msg in error_message.casefold()
         for msg in [
@@ -1332,7 +1307,6 @@ def handle_tcp_exception(domain, exception):
         vmc_output(f"{domain}: {error_message}", "yellow", use_tqdm=True)
         log_error(domain, error_message)
         increment_domain_error(domain, error_reason)
-        delete_if_error_max(domain)
     elif any(
         msg in error_message.casefold()
         for msg in [
@@ -1360,7 +1334,6 @@ def handle_tcp_exception(domain, exception):
         vmc_output(f"{domain}: {error_message}", "yellow", use_tqdm=True)
         log_error(domain, error_message)
         increment_domain_error(domain, error_reason)
-        delete_if_error_max(domain)
     else:
         error_reason = "HTTP"
         error_message = (
@@ -1374,7 +1347,6 @@ def handle_tcp_exception(domain, exception):
         vmc_output(f"{domain}: {error_message}", "yellow", use_tqdm=True)
         log_error(domain, error_message)
         increment_domain_error(domain, error_reason)
-        delete_if_error_max(domain)
 
 
 def handle_json_exception(domain, target, exception):
@@ -1384,7 +1356,6 @@ def handle_json_exception(domain, target, exception):
     vmc_output(f"{domain}: {target} {error_message}", "yellow", use_tqdm=True)
     log_error(domain, error_message)
     increment_domain_error(domain, error_reason)
-    delete_if_error_max(domain)
 
 
 # =============================================================================
@@ -1958,7 +1929,8 @@ def load_from_database(user_choice):
     """Load domain list from database based on user menu selection."""
     query_map = {
         "0": "SELECT domain FROM raw_domains WHERE errors = 0 ORDER BY LENGTH(DOMAIN) ASC",
-        "1": "SELECT domain FROM raw_domains WHERE (failed IS NULL OR failed = FALSE) AND (ignore IS NULL OR ignore = FALSE) AND (nxdomain IS NULL OR nxdomain = FALSE) AND (norobots IS NULL OR norobots = FALSE) AND (baddata IS NULL OR baddata = FALSE) AND (errors <= %s OR errors IS NULL) ORDER BY domain ASC",
+        "1": "SELECT domain FROM raw_domains WHERE (failed IS NULL OR failed = FALSE) AND (ignore IS NULL OR ignore = FALSE) AND (nxdomain IS NULL OR nxdomain = FALSE) AND (norobots IS NULL OR norobots = FALSE) AND (baddata IS NULL OR baddata = FALSE) ORDER BY domain ASC",
+        "5": "SELECT domain FROM raw_domains WHERE errors IS NOT NULL ORDER BY errors ASC",
         "6": "SELECT domain FROM raw_domains WHERE ignore = TRUE ORDER BY domain",
         "7": "SELECT domain FROM raw_domains WHERE failed = TRUE ORDER BY domain",
         "8": "SELECT domain FROM raw_domains WHERE nxdomain = TRUE ORDER BY domain",
@@ -1983,25 +1955,15 @@ def load_from_database(user_choice):
         "43": "SELECT domain FROM mastodon_domains WHERE active_users_monthly = '0' ORDER BY active_users_monthly DESC",
         "44": "SELECT domain FROM mastodon_domains WHERE timestamp <= (CURRENT_TIMESTAMP - INTERVAL '3 days') AT TIME ZONE 'UTC' ORDER BY active_users_monthly DESC",
         "45": "SELECT domain FROM mastodon_domains ORDER BY active_users_monthly DESC",
-        "50": "SELECT domain FROM raw_domains WHERE errors > %s ORDER BY errors ASC",
-        "51": "SELECT domain FROM raw_domains WHERE errors > %s AND errors < %s ORDER BY errors ASC",
-        "52": "SELECT domain FROM raw_domains WHERE errors IS NOT NULL ORDER BY errors ASC",
     }
 
     if user_choice in ["2", "3"]:
         query = query_map["1"]
-        params = [error_buffer]
     else:
         query = query_map.get(user_choice)
 
         params = []
-        if user_choice in ["1"]:
-            params = [error_buffer]
-        elif user_choice == "50":
-            params = [int(error_buffer * 2)]
-        elif user_choice == "51":
-            params = [error_buffer, int(error_buffer * 2)]
-        elif user_choice == "40":
+        if user_choice == "40":
             params = {"versions": all_patched_versions}
             vmc_output("Excluding versions:", "pink")
             for version in params["versions"]:
@@ -2012,14 +1974,13 @@ def load_from_database(user_choice):
     if not query:
         vmc_output(f"Choice {user_choice} is invalid, using default query", "pink")
         query = query_map["1"]
-        params = [error_threshold]
 
     with db_pool.connection() as conn:
         # Use server-side cursor for large result sets to avoid loading all into memory
         with conn.cursor(name="domain_loader") as cursor:
             cursor.itersize = 1000  # Fetch 1000 rows at a time
             try:
-                _ = cursor.execute(query, params if params else None)  # pyright: ignore[reportCallIssue,reportArgumentType]
+                _ = cursor.execute(query)  # pyright: ignore[reportCallIssue,reportArgumentType]
                 domain_list = [
                     row[0].strip()
                     for row in cursor
@@ -2071,6 +2032,9 @@ def get_menu_options() -> dict[str, dict[str, str]]:
     return {
         "Process new domains": {"0": "Uncrawled"},
         "Change process direction": {"1": "Standard", "2": "Reverse", "3": "Random"},
+        "Retry any (non-fatal) errors": {
+            "5": "Any",
+        },
         "Retry fatal errors": {
             "6": "Ignored",
             "7": "Failed",
@@ -2099,11 +2063,6 @@ def get_menu_options() -> dict[str, dict[str, str]]:
             "43": "Dead",
             "44": "Stale",
             "45": "All",
-        },
-        "Retry general errors": {
-            "50": f">{int(error_buffer * 2)}",
-            "51": f"{error_buffer}-{int(error_buffer * 2)}",
-            "52": "1+",
         },
     }
 
@@ -2191,10 +2150,6 @@ def get_user_choice() -> str:
 # =============================================================================
 # MODULE-LEVEL INITIALIZATION
 # =============================================================================
-
-# Error handling configuration
-error_threshold = int(common_timeout)
-error_buffer = int(os.getenv("VMCRAWL_ERROR_BUFFER", error_threshold))
 
 # Version information (fetched at module load)
 version_main_branch = get_main_version_branch()
