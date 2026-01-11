@@ -22,11 +22,7 @@ CREATE TABLE
     total_users INTEGER DEFAULT NULL,
     active_users_monthly INTEGER DEFAULT NULL,
     timestamp TIMESTAMP DEFAULT NULL,
-    cve_patch BOOLEAN DEFAULT NULL,
-    contact TEXT DEFAULT NULL,
-    source TEXT DEFAULT NULL,
     full_version TEXT DEFAULT NULL,
-    registration_date TIMESTAMP DEFAULT NULL
   );
 
 CREATE TABLE
