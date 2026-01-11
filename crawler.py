@@ -4,9 +4,6 @@
 # IMPORTS
 # =============================================================================
 
-from _typeshed import ExcInfo
-
-
 try:
     import argparse
     import atexit
@@ -1981,8 +1978,7 @@ def load_from_database(user_choice):
         "23": "SELECT domain FROM raw_domains WHERE reason ~ '^5[0-9]{2}' ORDER BY errors ASC",
         "30": "SELECT domain FROM raw_domains WHERE reason LIKE '%JSON%' ORDER BY errors ASC",
         "31": "SELECT domain FROM raw_domains WHERE reason LIKE '%TYPE%' ORDER BY errors ASC",
-        "32": "SELECT domain FROM raw_domains WHERE reason LIKE '%WF%' ORDER BY errors ASC",
-        "33": "SELECT domain FROM raw_domains WHERE reason LIKE '%###%' ORDER BY errors ASC",
+        "32": "SELECT domain FROM raw_domains WHERE reason LIKE '%###%' ORDER BY errors ASC",
         "40": "SELECT domain FROM mastodon_domains WHERE software_version != ALL(%(versions)s::text[]) ORDER BY active_users_monthly DESC",
         "41": "SELECT domain FROM mastodon_domains WHERE software_version LIKE %s ORDER BY active_users_monthly DESC",
         "42": "SELECT domain FROM mastodon_domains WHERE software_version::TEXT ~ 'alpha|beta|rc' ORDER BY active_users_monthly DESC",
@@ -2096,8 +2092,7 @@ def get_menu_options() -> dict[str, dict[str, str]]:
         "Retry target errors": {
             "30": "JSON",
             "31": "TYPE",
-            "32": "WF",
-            "33": "###",
+            "32": "###",
         },
         "Retry known instances": {
             "40": "Old",
