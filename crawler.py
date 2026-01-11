@@ -90,7 +90,7 @@ colors = {
 http_codes_to_hardfail = [418, 410]  # gone
 
 # Define maintained branches (adjust as needed)
-backport_branches = os.getenv("VMCRAWL_BACKPORTS", "4.5").split(",")
+backport_branches = ["4.5", "4.4", "4.3"]
 
 # =============================================================================
 # DATABASE CONNECTION
