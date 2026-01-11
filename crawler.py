@@ -1697,16 +1697,6 @@ def process_mastodon_instance(
     domain, backend_domain, nodeinfo_20_result, http_client, nightly_version_ranges
 ):
     """Process a confirmed Mastodon instance and update the database."""
-    # Validate that backend_domain is either the same as domain or a subdomain
-    if not is_same_or_subdomain(backend_domain, domain):
-        error_to_print = (
-            f"Backend domain {backend_domain} is not a subdomain of {domain}"
-        )
-        vmc_output(f"{domain}: {error_to_print}", "yellow", use_tqdm=True)
-        log_error(domain, error_to_print)
-        increment_domain_error(domain, "###")
-        delete_domain_if_known(domain)
-        return
 
     software_version_full = nodeinfo_20_result["software"]["version"]
     software_version = clean_version(
@@ -1784,7 +1774,7 @@ def process_domain(domain, http_client, nightly_version_ranges):
             # Fall through to full discovery process below
         else:
             # Cached URL worked, process the result
-            backend_domain = domain
+            backend_domain = urlparse(cached_nodeinfo_url).netloc
 
             if is_mastodon_instance(nodeinfo_20_result):
                 process_mastodon_instance(
@@ -1804,6 +1794,17 @@ def process_domain(domain, http_client, nightly_version_ranges):
         return
 
     backend_domain = webfinger_result["backend_domain"]
+
+    # Validate that backend_domain is either the same as domain or a subdomain
+    if not is_same_or_subdomain(backend_domain, domain):
+        error_to_print = (
+            f"Backend domain {backend_domain} is not a subdomain of {domain}"
+        )
+        vmc_output(f"{domain}: {error_to_print}", "yellow", use_tqdm=True)
+        log_error(domain, error_to_print)
+        increment_domain_error(domain, "###")
+        delete_domain_if_known(domain)
+        return
 
     nodeinfo_result = check_nodeinfo(domain, backend_domain, http_client)
     if nodeinfo_result is False:
