@@ -87,14 +87,11 @@ On your PostgreSQL server, execute the contents of `creation.sql` to create the 
 # Make the shell scripts executable
 chmod +x /opt/vmcrawl/vmcrawl.sh
 chmod +x /opt/vmcrawl/vmfetch.sh
-chmod +x /opt/vmcrawl/vmstats.sh
 
 # Copy service files to systemd
 cp /opt/vmcrawl/vmcrawl.service /etc/systemd/system/
 cp /opt/vmcrawl/vmfetch.service /etc/systemd/system/
 cp /opt/vmcrawl/vmfetch.timer /etc/systemd/system/
-cp /opt/vmcrawl/vmstats.service /etc/systemd/system/
-cp /opt/vmcrawl/vmstats.timer /etc/systemd/system/
 
 # Reload systemd
 systemctl daemon-reload
@@ -119,17 +116,7 @@ systemctl start vmfetch.timer
 # Check vmfetch timer status
 systemctl status vmfetch.timer
 systemctl list-timers vmfetch.timer
-
-# Enable and start the vmstats timer (runs daily at midnight)
-systemctl enable vmstats.timer
-systemctl start vmstats.timer
-
-# Check vmstats timer status
-systemctl status vmstats.timer
-systemctl list-timers vmstats.timer
 ```
-
-__Note: If you are deploying several collectors, you should only deploy one instance of `vmstats`.__
 
 ### Docker Installation
 
@@ -142,13 +129,12 @@ docker run -d --name vmcrawl --env-file .env vmcrawl
 
 ## Scripts
 
-The project includes four main scripts:
+The project includes three main scripts:
 
 | Script       | Purpose                                                                    |
 | ------------ | -------------------------------------------------------------------------- |
-| `crawler.py` | Main crawling engine that processes domains and collects version/user data |
+| `crawler.py` | Main crawling engine that processes domains, collects version/user data, and generates statistics |
 | `fetch.py`   | Fetches new domains from federated instance peer lists                     |
-| `stats.py`   | Generates and records statistics about crawled instances                   |
 | `nightly.py` | Manages nightly/development version tracking in the database               |
 
 ### Automated Tasks
@@ -157,9 +143,9 @@ The project includes four main scripts:
 
 The `vmfetch.timer` systemd timer automatically runs `fetch.py --random` every hour to continuously discover new instances from random servers in your database. This ensures your instance list stays up-to-date without manual intervention. The timer starts one hour after system boot and runs hourly thereafter.
 
-**Automated Statistics:**
+**Statistics Generation:**
 
-The `vmstats.timer` systemd timer automatically runs `stats.py` daily at midnight to generate and record statistics about your crawled instances. If the system is offline at midnight, the timer will run shortly after boot to ensure statistics remain current.
+Statistics are automatically generated and recorded by the main crawler (`crawler.py`) during its crawling operations. Historical statistics tracking is integrated into the crawling workflow, eliminating the need for a separate statistics service.
 
 ## Usage
 
@@ -353,22 +339,6 @@ python crawler.py --file ~/domains.txt
 docker exec -it vmcrawl python crawler.py --file /opt/vmcrawl/domains.txt
 ```
 
-### Statistics
-
-To generate and record statistics about your crawled instances:
-
-**Native:**
-```bash
-python stats.py
-```
-
-**Docker:**
-```bash
-docker exec vmcrawl python stats.py
-```
-
-This will calculate and store various metrics including total domains, user counts, version distributions, and patch status across different Mastodon branches.
-
 ### Nightly Version Management
 
 The `nightly.py` script manages tracking of development/nightly versions:
@@ -418,12 +388,6 @@ journalctl -u vmfetch.service -f
 
 # View recent vmfetch logs
 journalctl -u vmfetch.service -n 100
-
-# Follow vmstats logs in real-time
-journalctl -u vmstats.service -f
-
-# View recent vmstats logs
-journalctl -u vmstats.service -n 100
 ```
 
 ### Control Services
@@ -456,24 +420,6 @@ systemctl start vmfetch.service
 
 # Check when the next fetch will run
 systemctl list-timers vmfetch.timer
-```
-
-**Stats Timer:**
-```bash
-# Stop timer
-systemctl stop vmstats.timer
-
-# Restart timer
-systemctl restart vmstats.timer
-
-# Disable timer
-systemctl disable vmstats.timer
-
-# Manually trigger stats generation
-systemctl start vmstats.service
-
-# Check when the next stats run will occur
-systemctl list-timers vmstats.timer
 ```
 
 ## Troubleshooting
