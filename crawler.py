@@ -1101,14 +1101,14 @@ def update_mastodon_domain(
 
 
 def cleanup_old_domains():
-    """Delete known domains older than 1 week."""
+    """Delete known domains older than 1 day."""
     with db_pool.connection() as conn:
         with conn.cursor() as cursor:
             try:
                 cursor.execute(
                     """
                     DELETE FROM mastodon_domains
-                    WHERE timestamp <= (CURRENT_TIMESTAMP - INTERVAL '1 week') AT TIME ZONE 'UTC'
+                    WHERE timestamp <= (CURRENT_TIMESTAMP - INTERVAL '1 day') AT TIME ZONE 'UTC'
                     RETURNING domain
                     """
                 )
@@ -1990,8 +1990,6 @@ def load_from_database(user_choice):
         "12": "SELECT domain FROM raw_domains WHERE reason = 'TCP' ORDER BY errors ASC",
         "13": "SELECT domain FROM raw_domains WHERE reason = 'MAX' ORDER BY errors ASC",
         "14": "SELECT domain FROM raw_domains WHERE reason = 'DNS' ORDER BY errors ASC",
-        "15": "SELECT domain FROM raw_domains WHERE reason = 'SIZE' ORDER BY errors ASC",
-        "16": "SELECT domain FROM raw_domains WHERE reason = 'FD' ORDER BY errors ASC",
         "20": "SELECT domain FROM raw_domains WHERE reason ~ '^2[0-9]{2}' ORDER BY errors ASC",
         "21": "SELECT domain FROM raw_domains WHERE reason ~ '^3[0-9]{2}' ORDER BY errors ASC",
         "22": "SELECT domain FROM raw_domains WHERE reason ~ '^4[0-9]{2}' ORDER BY errors ASC",
@@ -1999,12 +1997,11 @@ def load_from_database(user_choice):
         "30": "SELECT domain FROM raw_domains WHERE reason LIKE '%JSON%' ORDER BY errors ASC",
         "31": "SELECT domain FROM raw_domains WHERE reason LIKE '%TYPE%' ORDER BY errors ASC",
         "32": "SELECT domain FROM raw_domains WHERE reason LIKE '%###%' ORDER BY errors ASC",
+        "33": "SELECT domain FROM raw_domains WHERE reason = 'SIZE' ORDER BY errors ASC",
+        "34": "SELECT domain FROM raw_domains WHERE reason = 'FD' ORDER BY errors ASC",
         "40": "SELECT domain FROM mastodon_domains WHERE software_version != ALL(%(versions)s::text[]) ORDER BY active_users_monthly DESC",
         "41": "SELECT domain FROM mastodon_domains WHERE software_version LIKE %s ORDER BY active_users_monthly DESC",
-        "42": "SELECT domain FROM mastodon_domains WHERE software_version::TEXT ~ 'alpha|beta|rc' ORDER BY active_users_monthly DESC",
-        "43": "SELECT domain FROM mastodon_domains WHERE active_users_monthly = '0' ORDER BY active_users_monthly DESC",
-        "44": "SELECT domain FROM mastodon_domains WHERE timestamp <= (CURRENT_TIMESTAMP - INTERVAL '3 days') AT TIME ZONE 'UTC' ORDER BY active_users_monthly DESC",
-        "45": "SELECT domain FROM mastodon_domains ORDER BY active_users_monthly DESC",
+        "42": "SELECT domain FROM mastodon_domains ORDER BY active_users_monthly DESC",
     }
 
     if user_choice in ["2", "3"]:
@@ -2097,22 +2094,19 @@ def get_menu_options() -> dict[str, dict[str, str]]:
             "12": "TCP",
             "13": "MAX",
             "14": "DNS",
-            "15": "SIZE",
-            "16": "FD",
         },
         "Retry HTTP errors": {"20": "2xx", "21": "3xx", "22": "4xx", "23": "5xx"},
         "Retry target errors": {
             "30": "JSON",
             "31": "TYPE",
             "32": "###",
+            "33": "SIZE",
+            "34": "FD",
         },
         "Retry known instances": {
-            "40": "Old",
-            "41": f"{version_main_branch}",
-            "42": "Dev",
-            "43": "Dead",
-            "44": "Stale",
-            "45": "All",
+            "40": "Unpatched",
+            "41": f"{version_main_branch}/main",
+            "42": "All",
         },
     }
 
