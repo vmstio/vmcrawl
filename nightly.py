@@ -251,7 +251,7 @@ def interactive_add():
         return
 
     # Get start date
-    default_start_date = datetime.now().strftime("%Y-%m-%d")
+    default_start_date = (datetime.now() + timedelta(days=1)).strftime("%Y-%m-%d")
     start_date_input = input(
         f"Enter start date (YYYY-MM-DD) [default: {default_start_date}]: "
     ).strip()
