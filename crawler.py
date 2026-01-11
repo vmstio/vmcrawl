@@ -4,6 +4,9 @@
 # IMPORTS
 # =============================================================================
 
+from shutil import SameFileError
+
+
 try:
     import argparse
     import atexit
@@ -1740,7 +1743,7 @@ def process_mastodon_instance(
 
     total_users = users["total"]
     active_month_users = users["activeMonth"]
-    
+
     if active_month_users == 0:
         vmc_output(f"{db_domain}: MAU reported as 0", "yellow", use_tqdm=True)
         log_error(domain, "MAU reported as 0")
@@ -1975,6 +1978,742 @@ def check_and_record_domains(
                 thread_local.http_client.close()
             except Exception:
                 pass
+
+
+# =============================================================================
+# STATISTICS FUNCTIONS - Mastodon Domain Counts
+# =============================================================================
+
+
+def get_mastodon_domains():
+    """Get total count of known Mastodon domains."""
+    cursor = conn.cursor()
+    value_to_return = 0
+    try:
+        cursor.execute("SELECT COUNT(domain) AS domains FROM mastodon_domains;")
+        result = cursor.fetchone()
+        value_to_return = result[0] if result is not None else 0
+        conn.commit()
+        return value_to_return
+    except Exception as e:
+        print(f"Failed to obtain total Mastodon domains: {e}")
+        conn.rollback()
+    finally:
+        cursor.close()
+
+
+def get_unique_versions():
+    """Get count of unique software versions."""
+    cursor = conn.cursor()
+    value_to_return = 0
+    try:
+        cursor.execute(
+            "SELECT COUNT(DISTINCT software_version) AS unique_software_versions FROM mastodon_domains;"
+        )
+        result = cursor.fetchone()
+        value_to_return = result[0] if result is not None else 0
+        conn.commit()
+        return value_to_return
+    except Exception as e:
+        print(f"Failed to obtain unique versions: {e}")
+        conn.rollback()
+    finally:
+        cursor.close()
+
+
+# =============================================================================
+# STATISTICS FUNCTIONS - User Counts
+# =============================================================================
+
+
+def get_mau():
+    """Get total monthly active user count across all instances."""
+    cursor = conn.cursor()
+    value_to_return = 0
+    try:
+        cursor.execute("SELECT SUM(active_users_monthly) AS mau FROM mastodon_domains;")
+        result = cursor.fetchone()
+        value_to_return = result[0] if result is not None else 0
+        conn.commit()
+        return value_to_return
+    except Exception as e:
+        print(f"Failed to obtain active users: {e}")
+        conn.rollback()
+    finally:
+        cursor.close()
+
+
+# =============================================================================
+# STATISTICS FUNCTIONS - Branch Instance Counts
+# =============================================================================
+
+
+def get_main_branch_instances():
+    """Get count of instances on main branch."""
+    cursor = conn.cursor()
+    value_to_return = 0
+    try:
+        cursor.execute(
+            """
+            SELECT COUNT(DISTINCT domain) as "Main Total"
+            FROM mastodon_domains
+            WHERE software_version LIKE (
+                SELECT branch || '.%'
+                FROM patch_versions
+                WHERE n_level = -1
+            );
+        """
+        )
+        result = cursor.fetchone()
+        value_to_return = result[0] if result is not None else 0
+        conn.commit()
+        return value_to_return
+    except Exception as e:
+        print(f"Failed to obtain total main instances: {e}")
+        conn.rollback()
+    finally:
+        cursor.close()
+
+
+def get_latest_branch_instances():
+    """Get count of instances on latest branch."""
+    cursor = conn.cursor()
+    value_to_return = 0
+    try:
+        cursor.execute(
+            """
+            SELECT COUNT(DISTINCT domain) as "Latest Total"
+            FROM mastodon_domains
+            WHERE software_version LIKE (
+                SELECT branch || '.%'
+                FROM patch_versions
+                WHERE n_level = 0
+            );
+        """
+        )
+        result = cursor.fetchone()
+        value_to_return = result[0] if result is not None else 0
+        conn.commit()
+        return value_to_return
+    except Exception as e:
+        print(f"Failed to obtain total latest instances: {e}")
+        conn.rollback()
+    finally:
+        cursor.close()
+
+
+def get_previous_branch_instances():
+    """Get count of instances on previous release branch."""
+    cursor = conn.cursor()
+    value_to_return = 0
+    try:
+        cursor.execute(
+            """
+            SELECT COUNT(DISTINCT domain) as "Latest Total"
+            FROM mastodon_domains
+            WHERE software_version LIKE (
+                SELECT branch || '.%'
+                FROM patch_versions
+                WHERE n_level = 1
+            );
+        """
+        )
+        result = cursor.fetchone()
+        value_to_return = result[0] if result is not None else 0
+        conn.commit()
+        return value_to_return
+    except Exception as e:
+        print(f"Failed to obtain total previous instances: {e}")
+        conn.rollback()
+    finally:
+        cursor.close()
+
+
+def get_deprecated_branch_instances():
+    """Get count of instances on deprecated branches."""
+    cursor = conn.cursor()
+    value_to_return = 0
+    try:
+        cursor.execute(
+            """
+            SELECT COUNT(DISTINCT domain) as "Latest Total"
+            FROM mastodon_domains
+            WHERE EXISTS (
+                SELECT 1
+                FROM patch_versions
+                WHERE n_level >= 2
+                  AND mastodon_domains.software_version LIKE patch_versions.branch || '.%'
+            );
+        """
+        )
+        result = cursor.fetchone()
+        value_to_return = result[0] if result is not None else 0
+        conn.commit()
+        return value_to_return
+    except Exception as e:
+        print(f"Failed to obtain total deprecated instances: {e}")
+        conn.rollback()
+    finally:
+        cursor.close()
+
+
+def get_eol_branch_instances():
+    """Get count of instances on EOL branches."""
+    cursor = conn.cursor()
+    value_to_return = 0
+    try:
+        cursor.execute(
+            """
+            SELECT COUNT(DISTINCT mastodon_domains.domain) as "Latest Total"
+            FROM mastodon_domains
+            WHERE EXISTS (
+                SELECT 1
+                FROM eol_versions
+                WHERE mastodon_domains.software_version LIKE eol_versions.software_version || '%'
+            );
+        """
+        )
+        result = cursor.fetchone()
+        value_to_return = result[0] if result is not None else 0
+        conn.commit()
+        return value_to_return
+    except Exception as e:
+        print(f"Failed to obtain total EOL instances: {e}")
+        conn.rollback()
+    finally:
+        cursor.close()
+
+
+# =============================================================================
+# STATISTICS FUNCTIONS - Patched Instance Counts
+# =============================================================================
+
+
+def get_main_patched_instances():
+    """Get count of instances on latest main version."""
+    cursor = conn.cursor()
+    value_to_return = 0
+    try:
+        cursor.execute(
+            """
+            SELECT COUNT(DISTINCT domain) as "Main Patched"
+            FROM mastodon_domains
+            WHERE software_version LIKE (
+                SELECT software_version
+                FROM patch_versions
+                WHERE main = True
+            ) || '%';
+        """
+        )
+        result = cursor.fetchone()
+        value_to_return = result[0] if result is not None else 0
+        conn.commit()
+        return value_to_return
+    except Exception as e:
+        print(f"Failed to obtain main patched instances: {e}")
+        conn.rollback()
+    finally:
+        cursor.close()
+
+
+def get_latest_patched_instances():
+    """Get count of instances on latest release version."""
+    cursor = conn.cursor()
+    value_to_return = 0
+    try:
+        cursor.execute(
+            """
+            SELECT COUNT(DISTINCT domain) as "Latest Patched"
+            FROM mastodon_domains
+            WHERE software_version LIKE (
+                SELECT software_version
+                FROM patch_versions
+                WHERE n_level = 0
+            ) || '%';
+        """
+        )
+        result = cursor.fetchone()
+        value_to_return = result[0] if result is not None else 0
+        conn.commit()
+        return value_to_return
+    except Exception as e:
+        print(f"Failed to obtain release patched instances: {e}")
+        conn.rollback()
+    finally:
+        cursor.close()
+
+
+def get_previous_patched_instances():
+    """Get count of instances on latest previous branch version."""
+    cursor = conn.cursor()
+    value_to_return = 0
+    try:
+        cursor.execute(
+            """
+            SELECT COUNT(DISTINCT domain) as "Previous Patched"
+            FROM mastodon_domains
+            WHERE software_version LIKE (
+                SELECT software_version
+                FROM patch_versions
+                WHERE n_level = 1
+            ) || '%';
+        """
+        )
+        result = cursor.fetchone()
+        value_to_return = result[0] if result is not None else 0
+        conn.commit()
+        return value_to_return
+    except Exception as e:
+        print(f"Failed to obtain previous patched instances: {e}")
+        conn.rollback()
+    finally:
+        cursor.close()
+
+
+def get_deprecated_patched_instances():
+    """Get count of instances on latest deprecated branch versions."""
+    cursor = conn.cursor()
+    value_to_return = 0
+    try:
+        cursor.execute(
+            """
+            SELECT COUNT(DISTINCT domain) as "Deprecated Patched"
+            FROM mastodon_domains
+            WHERE EXISTS (
+                SELECT 1
+                FROM patch_versions
+                WHERE n_level >= 2
+                  AND mastodon_domains.software_version LIKE patch_versions.software_version || '%'
+            );
+        """
+        )
+        result = cursor.fetchone()
+        value_to_return = result[0] if result is not None else 0
+        conn.commit()
+        return value_to_return
+    except Exception as e:
+        print(f"Failed to obtain deprecated patched instances: {e}")
+        conn.rollback()
+    finally:
+        cursor.close()
+
+
+# =============================================================================
+# STATISTICS FUNCTIONS - Branch User Counts (Active)
+# =============================================================================
+
+
+def get_main_branch_mau():
+    """Get active users on main branch instances."""
+    cursor = conn.cursor()
+    value_to_return = 0
+    try:
+        cursor.execute(
+            """
+            SELECT SUM(active_users_monthly) as "Main Total"
+            FROM mastodon_domains
+            WHERE software_version LIKE (
+                SELECT branch || '.%'
+                FROM patch_versions
+                WHERE n_level = -1
+            );
+        """
+        )
+        result = cursor.fetchone()
+        value_to_return = result[0] if result is not None else 0
+        conn.commit()
+        return value_to_return
+    except Exception as e:
+        print(f"Failed to obtain active main instances users: {e}")
+        conn.rollback()
+    finally:
+        cursor.close()
+
+
+def get_latest_branch_mau():
+    """Get active users on latest branch instances."""
+    cursor = conn.cursor()
+    value_to_return = 0
+    try:
+        cursor.execute(
+            """
+            SELECT SUM(active_users_monthly) as "Latest Total"
+            FROM mastodon_domains
+            WHERE software_version LIKE (
+                SELECT branch || '.%'
+                FROM patch_versions
+                WHERE n_level = 0
+            );
+        """
+        )
+        result = cursor.fetchone()
+        value_to_return = result[0] if result is not None else 0
+        conn.commit()
+        return value_to_return
+    except Exception as e:
+        print(f"Failed to obtain active latest instances users: {e}")
+        conn.rollback()
+    finally:
+        cursor.close()
+
+
+def get_previous_branch_mau():
+    """Get active users on previous release branch instances."""
+    cursor = conn.cursor()
+    value_to_return = 0
+    try:
+        cursor.execute(
+            """
+            SELECT SUM(active_users_monthly) as "Latest Total"
+            FROM mastodon_domains
+            WHERE software_version LIKE (
+                SELECT branch || '.%'
+                FROM patch_versions
+                WHERE n_level = 1
+            );
+        """
+        )
+        result = cursor.fetchone()
+        value_to_return = result[0] if result is not None else 0
+        conn.commit()
+        return value_to_return
+    except Exception as e:
+        print(f"Failed to obtain active previous instances users: {e}")
+        conn.rollback()
+    finally:
+        cursor.close()
+
+
+def get_deprecated_branch_mau():
+    """Get active users on deprecated branch instances."""
+    cursor = conn.cursor()
+    value_to_return = 0
+    try:
+        cursor.execute(
+            """
+            SELECT SUM(active_users_monthly) as "Latest Total"
+            FROM mastodon_domains
+            WHERE EXISTS (
+                SELECT 1
+                FROM patch_versions
+                WHERE n_level >= 2
+                  AND mastodon_domains.software_version LIKE patch_versions.branch || '.%'
+            );
+        """
+        )
+        result = cursor.fetchone()
+        value_to_return = result[0] if result is not None else 0
+        conn.commit()
+        return value_to_return
+    except Exception as e:
+        print(f"Failed to obtain active deprecated instances users: {e}")
+        conn.rollback()
+    finally:
+        cursor.close()
+
+
+def get_eol_branch_mau():
+    """Get active users on EOL branch instances."""
+    cursor = conn.cursor()
+    value_to_return = 0
+    try:
+        cursor.execute(
+            """
+            SELECT SUM(mastodon_domains.active_users_monthly) as "Latest Total"
+            FROM mastodon_domains
+            WHERE EXISTS (
+                SELECT 1
+                FROM eol_versions
+                WHERE mastodon_domains.software_version LIKE eol_versions.software_version || '%'
+            );
+        """
+        )
+        result = cursor.fetchone()
+        value_to_return = result[0] if result is not None else 0
+        conn.commit()
+        return value_to_return
+    except Exception as e:
+        print(f"Failed to obtain active EOL instances users: {e}")
+        conn.rollback()
+    finally:
+        cursor.close()
+
+
+# =============================================================================
+# STATISTICS FUNCTIONS - Patched User Counts (Active)
+# =============================================================================
+
+
+def get_main_patched_mau():
+    """Get active users on latest main version instances."""
+    cursor = conn.cursor()
+    value_to_return = 0
+    try:
+        cursor.execute(
+            """
+            SELECT SUM(active_users_monthly) as "Main Patched"
+            FROM mastodon_domains
+            WHERE software_version LIKE (
+                SELECT software_version
+                FROM patch_versions
+                WHERE main = True
+            ) || '%';
+        """
+        )
+        result = cursor.fetchone()
+        value_to_return = result[0] if result is not None else 0
+        conn.commit()
+        return value_to_return
+    except Exception as e:
+        print(f"Failed to obtain active main patched instances users: {e}")
+        conn.rollback()
+    finally:
+        cursor.close()
+
+
+def get_latest_patched_mau():
+    """Get active users on latest release version instances."""
+    cursor = conn.cursor()
+    value_to_return = 0
+    try:
+        cursor.execute(
+            """
+            SELECT SUM(active_users_monthly) as "Latest Patched"
+            FROM mastodon_domains
+            WHERE software_version LIKE (
+                SELECT software_version
+                FROM patch_versions
+                WHERE n_level = 0
+            ) || '%';
+        """
+        )
+        result = cursor.fetchone()
+        value_to_return = result[0] if result is not None else 0
+        conn.commit()
+        return value_to_return
+    except Exception as e:
+        print(f"Failed to obtain active release patched instances users: {e}")
+        conn.rollback()
+    finally:
+        cursor.close()
+
+
+def get_previous_patched_mau():
+    """Get active users on latest previous branch version instances."""
+    cursor = conn.cursor()
+    value_to_return = 0
+    try:
+        cursor.execute(
+            """
+            SELECT SUM(active_users_monthly) as "Previous Patched"
+            FROM mastodon_domains
+            WHERE software_version LIKE (
+                SELECT software_version
+                FROM patch_versions
+                WHERE n_level = 1
+            ) || '%';
+        """
+        )
+        result = cursor.fetchone()
+        value_to_return = result[0] if result is not None else 0
+        conn.commit()
+        return value_to_return
+    except Exception as e:
+        print(f"Failed to obtain active previous patched instances users: {e}")
+        conn.rollback()
+    finally:
+        cursor.close()
+
+
+def get_deprecated_patched_mau():
+    """Get active users on latest deprecated branch version instances."""
+    cursor = conn.cursor()
+    value_to_return = 0
+    try:
+        cursor.execute(
+            """
+            SELECT SUM(active_users_monthly) as "Deprecated Patched"
+            FROM mastodon_domains
+            WHERE EXISTS (
+                SELECT 1
+                FROM patch_versions
+                WHERE n_level >= 2
+                  AND mastodon_domains.software_version LIKE patch_versions.software_version || '%'
+            );
+        """
+        )
+        result = cursor.fetchone()
+        value_to_return = result[0] if result is not None else 0
+        conn.commit()
+        return value_to_return
+    except Exception as e:
+        print(f"Failed to obtain active deprecated patched instances users: {e}")
+        conn.rollback()
+    finally:
+        cursor.close()
+
+
+# =============================================================================
+# STATISTICS CONFIGURATION
+# =============================================================================
+
+# Define all statistics to collect
+STATS_CONFIG = [
+    ("mau", get_mau, "Total active users"),
+    ("unique_versions", get_unique_versions, "Total unique versions"),
+    (
+        "main_instances",
+        get_main_branch_instances,
+        "Total main branch instances",
+    ),
+    (
+        "latest_instances",
+        get_latest_branch_instances,
+        "Total release branch instances",
+    ),
+    (
+        "previous_instances",
+        get_previous_branch_instances,
+        "Total previous branch instances",
+    ),
+    (
+        "deprecated_instances",
+        get_deprecated_branch_instances,
+        "Total deprecated branch instances",
+    ),
+    (
+        "eol_instances",
+        get_eol_branch_instances,
+        "Total EOL branch instances",
+    ),
+    (
+        "main_patched_instances",
+        get_main_patched_instances,
+        "Total main patched instances",
+    ),
+    (
+        "latest_patched_instances",
+        get_latest_patched_instances,
+        "Total release patched instances",
+    ),
+    (
+        "previous_patched_instances",
+        get_previous_patched_instances,
+        "Total previous patched instances",
+    ),
+    (
+        "deprecated_patched_instances",
+        get_deprecated_patched_instances,
+        "Total deprecated patched instances",
+    ),
+    ("main_branch_mau", get_main_branch_mau, "Total main branch users"),
+    (
+        "latest_branch_mau",
+        get_latest_branch_mau,
+        "Total release branch users",
+    ),
+    (
+        "previous_branch_mau",
+        get_previous_branch_mau,
+        "Total previous branch users",
+    ),
+    (
+        "deprecated_branch_mau",
+        get_deprecated_branch_mau,
+        "Total deprecated branch users",
+    ),
+    ("eol_branch_mau", get_eol_branch_mau, "Total EOL branch users"),
+    (
+        "main_patched_mau",
+        get_main_patched_mau,
+        "Total main patched users",
+    ),
+    (
+        "latest_patched_mau",
+        get_latest_patched_mau,
+        "Total release patched users",
+    ),
+    (
+        "previous_patched_mau",
+        get_previous_patched_mau,
+        "Total previous patched users",
+    ),
+    (
+        "deprecated_patched_mau",
+        get_deprecated_patched_mau,
+        "Total deprecated patched users",
+    ),
+]
+
+
+# =============================================================================
+# STATISTICS DATABASE FUNCTIONS - Write Statistics
+# =============================================================================
+
+def save_statistics():
+    # Initialize statistics dictionary
+    stats_data = {}
+
+    # Collect all statistics
+    for name, fn, label in STATS_CONFIG:
+        value = fn()
+        stats_data[name] = value if value is not None else 0
+
+    # Prepare values tuple in correct order
+    stats_values = tuple(stats_data[name] for name, _, _ in STATS_CONFIG)
+
+    # Write to database
+    write_statistics_to_database(stats_values)
+
+def write_statistics_to_database(stats_values):
+    """Write collected statistics to the database."""
+    with db_pool.connection() as conn:
+        with conn.cursor() as cursor:
+            try:
+                cursor.execute(
+                    """
+        INSERT INTO statistics (
+        date, mau, unique_versions, main_instances, latest_instances,
+        previous_instances, deprecated_instances, eol_instances,
+        main_patched_instances, latest_patched_instances,
+        previous_patched_instances, deprecated_patched_instances,
+        main_branch_mau, latest_branch_mau, previous_branch_mau,
+        deprecated_branch_mau, eol_branch_mau,
+        main_patched_mau, latest_patched_mau,
+        previous_patched_mau, deprecated_patched_mau
+        )
+        VALUES (
+        (SELECT CURRENT_DATE AT TIME ZONE 'UTC'), %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s,
+        %s, %s, %s, %s, %s, %s
+        )
+        ON CONFLICT (date) DO UPDATE SET
+        mau = EXCLUDED.mau,
+        unique_versions = EXCLUDED.unique_versions,
+        main_instances = EXCLUDED.main_instances,
+        latest_instances = EXCLUDED.latest_instances,
+        previous_instances = EXCLUDED.previous_instances,
+        deprecated_instances = EXCLUDED.deprecated_instances,
+        eol_instances = EXCLUDED.eol_instances,
+        main_patched_instances = EXCLUDED.main_patched_instances,
+        latest_patched_instances = EXCLUDED.latest_patched_instances,
+        previous_patched_instances = EXCLUDED.previous_patched_instances,
+        deprecated_patched_instances = EXCLUDED.deprecated_patched_instances,
+        main_branch_mau = EXCLUDED.main_branch_mau,
+        latest_branch_mau = EXCLUDED.latest_branch_mau,
+        previous_branch_mau = EXCLUDED.previous_branch_mau,
+        deprecated_branch_mau = EXCLUDED.deprecated_branch_mau,
+        eol_branch_mau = EXCLUDED.eol_branch_mau,
+        main_patched_mau = EXCLUDED.main_patched_mau,
+        latest_patched_mau = EXCLUDED.latest_patched_mau,
+        previous_patched_mau = EXCLUDED.previous_patched_mau,
+        deprecated_patched_mau = EXCLUDED.deprecated_patched_mau
+        """,
+                    stats_values,
+                )
+                conn.commit()
+            except Exception as e:
+                print(f"Failed to insert/update statistics: {e}")
+                conn.rollback()
 
 
 # =============================================================================
@@ -2332,6 +3071,8 @@ def main():
             norobots_domains,
             nightly_version_ranges,
         )
+        
+        save_statistics()
 
     except KeyboardInterrupt:
         vmc_output(f"\n{appname} interrupted by user", "red")
