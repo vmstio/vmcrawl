@@ -1792,13 +1792,11 @@ def process_domain(domain, http_client, nightly_version_ranges):
     # No cached URL, perform full discovery process
     webfinger_result = check_webfinger(domain, http_client)
     if not webfinger_result:
-        # Webfinger lookup failed - don't attempt nodeinfo fallback
-        if webfinger_result is None:
-            vmc_output(
-                f"{domain}: No backend domain found via webfinger",
-                "yellow",
-                use_tqdm=True,
-            )
+        error_message = "No backend domain found via webfinger"
+        vmc_output(f"{domain}: {error_message}", "yellow", use_tqdm=True)
+        log_error(domain, error_message)
+        increment_domain_error(domain, "WF")
+        delete_if_error_max(domain)
         return
 
     backend_domain = webfinger_result["backend_domain"]
@@ -1967,13 +1965,14 @@ def load_from_database(user_choice):
         "14": "SELECT domain FROM raw_domains WHERE reason = 'DNS' ORDER BY errors ASC",
         "15": "SELECT domain FROM raw_domains WHERE reason = 'SIZE' ORDER BY errors ASC",
         "16": "SELECT domain FROM raw_domains WHERE reason = 'FD' ORDER BY errors ASC",
-        "17": "SELECT domain FROM raw_domains WHERE reason = '###' ORDER BY errors ASC",
         "20": "SELECT domain FROM raw_domains WHERE reason ~ '^2[0-9]{2}' ORDER BY errors ASC",
         "21": "SELECT domain FROM raw_domains WHERE reason ~ '^3[0-9]{2}' ORDER BY errors ASC",
         "22": "SELECT domain FROM raw_domains WHERE reason ~ '^4[0-9]{2}' ORDER BY errors ASC",
         "23": "SELECT domain FROM raw_domains WHERE reason ~ '^5[0-9]{2}' ORDER BY errors ASC",
         "30": "SELECT domain FROM raw_domains WHERE reason LIKE '%JSON%' ORDER BY errors ASC",
         "31": "SELECT domain FROM raw_domains WHERE reason LIKE '%TYPE%' ORDER BY errors ASC",
+        "32": "SELECT domain FROM raw_domains WHERE reason LIKE '%WF%' ORDER BY errors ASC",
+        "33": "SELECT domain FROM raw_domains WHERE reason LIKE '%###%' ORDER BY errors ASC",
         "40": "SELECT domain FROM mastodon_domains WHERE software_version != ALL(%(versions)s::text[]) ORDER BY active_users_monthly DESC",
         "41": "SELECT domain FROM mastodon_domains WHERE software_version LIKE %s ORDER BY active_users_monthly DESC",
         "42": "SELECT domain FROM mastodon_domains WHERE software_version::TEXT ~ 'alpha|beta|rc' ORDER BY active_users_monthly DESC",
@@ -2082,12 +2081,13 @@ def get_menu_options() -> dict[str, dict[str, str]]:
             "14": "DNS",
             "15": "SIZE",
             "16": "FD",
-            "17": "###",
         },
         "Retry HTTP errors": {"20": "2xx", "21": "3xx", "22": "4xx", "23": "5xx"},
         "Retry target errors": {
             "30": "JSON",
             "31": "TYPE",
+            "32": "WF",
+            "33": "###",
         },
         "Retry known instances": {
             "40": "Old",
