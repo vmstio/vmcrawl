@@ -4,6 +4,9 @@
 # IMPORTS
 # =============================================================================
 
+from _typeshed import ExcInfo
+
+
 try:
     import argparse
     import atexit
@@ -1403,15 +1406,6 @@ def handle_json_exception(domain, target, exception):
     delete_if_error_max(domain)
 
 
-def handle_webfinger_soft_failure(domain, target, error_message, error_code):
-    """Handle webfinger soft failures (empty content, no aliases, etc.)."""
-    error_reason = f"{error_code}+{target}"
-    vmc_output(f"{domain}: {error_message}", "yellow", use_tqdm=True)
-    log_error(domain, error_message)
-    increment_domain_error(domain, error_reason)
-    delete_if_error_max(domain)
-
-
 # =============================================================================
 # DOMAIN PROCESSING - Validation and Filtering
 # =============================================================================
@@ -1535,37 +1529,32 @@ def check_webfinger(domain, http_client):
                 handle_incorrect_file_type(domain, target, content_type)
                 return False
             if not response.content or content_length == "0":
-                handle_webfinger_soft_failure(
-                    domain, target, f"{target} returned empty content", "JSON"
-                )
+                exception = "returned empty content"
+                handle_json_exception(domain, target, exception)
                 return False
             data = parse_json_with_fallback(response, domain, target)
             if data is False:
                 return False
             if not isinstance(data, dict):
-                handle_webfinger_soft_failure(
-                    domain, target, f"{target} returned non-dict JSON", "JSON"
-                )
+                exception = "returned non-dict JSON"
+                handle_json_exception(domain, target, exception)
                 return False
             aliases = data.get("aliases", [])
             if not aliases:
-                handle_webfinger_soft_failure(
-                    domain, target, f"{target} has no aliases", "JSON"
-                )
+                exception = "has no aliases"
+                handle_json_exception(domain, target, exception)
                 return False
             first_alias = next((alias for alias in aliases if "https" in alias), None)
             if first_alias:
                 backend_domain = urlparse(first_alias).netloc
                 if "localhost" in backend_domain:
-                    handle_webfinger_soft_failure(
-                        domain, target, f"{target} points to localhost", "JSON"
-                    )
+                    exception = "points to localhost"
+                    handle_json_exception(domain, target, exception)
                     return False
                 return {"backend_domain": backend_domain}
             else:
-                handle_webfinger_soft_failure(
-                    domain, target, f"{target} has no https alias", "JSON"
-                )
+                exception = "has no https alias"
+                handle_json_exception(domain, target, exception)
                 return False
         elif response.status_code in http_codes_to_hardfail:
             handle_http_failed(domain, target, response)
