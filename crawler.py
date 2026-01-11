@@ -1403,6 +1403,15 @@ def handle_json_exception(domain, target, exception):
     delete_if_error_max(domain)
 
 
+def handle_webfinger_soft_failure(domain, target, error_message, error_code):
+    """Handle webfinger soft failures (empty content, no aliases, etc.)."""
+    error_reason = f"{error_code}+{target}"
+    vmc_output(f"{domain}: {error_message}", "yellow", use_tqdm=True)
+    log_error(domain, error_message)
+    increment_domain_error(domain, error_reason)
+    delete_if_error_max(domain)
+
+
 # =============================================================================
 # DOMAIN PROCESSING - Validation and Filtering
 # =============================================================================
@@ -1526,25 +1535,43 @@ def check_webfinger(domain, http_client):
                 handle_incorrect_file_type(domain, target, content_type)
                 return False
             if not response.content or content_length == "0":
-                return None
+                handle_webfinger_soft_failure(
+                    domain, target, f"{target} returned empty content", "JSON"
+                )
+                return False
             data = parse_json_with_fallback(response, domain, target)
             if data is False:
                 return False
             if not isinstance(data, dict):
-                return None
+                handle_webfinger_soft_failure(
+                    domain, target, f"{target} returned non-dict JSON", "JSON"
+                )
+                return False
             aliases = data.get("aliases", [])
             if not aliases:
-                return None
+                handle_webfinger_soft_failure(
+                    domain, target, f"{target} has no aliases", "JSON"
+                )
+                return False
             first_alias = next((alias for alias in aliases if "https" in alias), None)
             if first_alias:
                 backend_domain = urlparse(first_alias).netloc
                 if "localhost" in backend_domain:
-                    return None
+                    handle_webfinger_soft_failure(
+                        domain, target, f"{target} points to localhost", "JSON"
+                    )
+                    return False
                 return {"backend_domain": backend_domain}
             else:
-                return None
+                handle_webfinger_soft_failure(
+                    domain, target, f"{target} has no https alias", "JSON"
+                )
+                return False
         elif response.status_code in http_codes_to_hardfail:
             handle_http_failed(domain, target, response)
+            return False
+        else:
+            handle_http_status_code(domain, target, response)
             return False
     except httpx.RequestError as exception:
         handle_tcp_exception(domain, exception)
@@ -1552,7 +1579,6 @@ def check_webfinger(domain, http_client):
     except json.JSONDecodeError as exception:
         handle_json_exception(domain, target, exception)
         return False
-    return None
 
 
 def check_nodeinfo(domain, backend_domain, http_client):
@@ -1792,11 +1818,6 @@ def process_domain(domain, http_client, nightly_version_ranges):
     # No cached URL, perform full discovery process
     webfinger_result = check_webfinger(domain, http_client)
     if not webfinger_result:
-        error_message = "No backend domain found via webfinger"
-        vmc_output(f"{domain}: {error_message}", "yellow", use_tqdm=True)
-        log_error(domain, error_message)
-        increment_domain_error(domain, "WF")
-        delete_if_error_max(domain)
         return
 
     backend_domain = webfinger_result["backend_domain"]
