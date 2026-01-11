@@ -1664,10 +1664,52 @@ def mark_as_non_mastodon(domain, other_platform):
     delete_domain_if_known(domain)
 
 
+def get_instance_uri(backend_domain: str, http_client: httpx.Client) -> str | None:
+    """Fetch the instance API and extract the 'uri' field."""
+    instance_api_url = f"https://{backend_domain}/api/v1/instance"
+    target = "instance_api"
+
+    try:
+        response = get_httpx(instance_api_url, http_client)
+        if response.status_code == 200:
+            content_type = response.headers.get("Content-Type", "")
+            if "json" not in content_type:
+                return None
+            if not response.content:
+                return None
+
+            instance_data = parse_json_with_fallback(response, backend_domain, target)
+            if instance_data is False or not instance_data:
+                return None
+
+            if isinstance(instance_data, dict):
+                uri = instance_data.get("uri")
+                return uri
+            return None
+        else:
+            return None
+    except httpx.RequestError:
+        return None
+    except json.JSONDecodeError:
+        return None
+
+
 def process_mastodon_instance(
-    domain, backend_domain, nodeinfo_20_result, http_client, nightly_version_ranges
+    domain,
+    nodeinfo_20_result,
+    nightly_version_ranges,
+    actual_domain=None,
 ):
-    """Process a confirmed Mastodon instance and update the database."""
+    """Process a confirmed Mastodon instance and update the database.
+
+    Args:
+        domain: The original domain being crawled (used for error tracking)
+        nodeinfo_20_result: NodeInfo 2.0 data
+        nightly_version_ranges: Version ranges for nightly builds
+        actual_domain: The canonical domain from instance API (used for database updates)
+    """
+    # Use actual_domain for database operations if provided, otherwise fall back to domain
+    db_domain = actual_domain if actual_domain else domain
 
     software_version_full = nodeinfo_20_result["software"]["version"]
     software_version = clean_version(
@@ -1677,7 +1719,7 @@ def process_mastodon_instance(
     users = nodeinfo_20_result.get("usage", {}).get("users", {})
     if not users:
         error_to_print = "No usage data in NodeInfo"
-        vmc_output(f"{domain}: {error_to_print}", "yellow", use_tqdm=True)
+        vmc_output(f"{db_domain}: {error_to_print}", "yellow", use_tqdm=True)
         log_error(domain, error_to_print)
         increment_domain_error(domain, "###")
         delete_domain_if_known(domain)
@@ -1690,7 +1732,7 @@ def process_mastodon_instance(
 
     for field, error_msg in required_fields:
         if field not in users:
-            vmc_output(f"{domain}: {error_msg}", "yellow", use_tqdm=True)
+            vmc_output(f"{db_domain}: {error_msg}", "yellow", use_tqdm=True)
             log_error(domain, error_msg)
             increment_domain_error(domain, "###")
             delete_domain_if_known(domain)
@@ -1703,15 +1745,15 @@ def process_mastodon_instance(
         version_main_branch
     ):
         error_to_print = "Mastodon version invalid"
-        vmc_output(f"{domain}: {error_to_print}", "yellow", use_tqdm=True)
+        vmc_output(f"{db_domain}: {error_to_print}", "yellow", use_tqdm=True)
         log_error(domain, error_to_print)
         increment_domain_error(domain, "###")
         delete_domain_if_known(domain)
         return
 
-    # Use the original domain when updating the database
+    # Use db_domain (actual_domain if available) for database updates
     update_mastodon_domain(
-        domain,
+        db_domain,
         software_version,
         software_version_full,
         total_users,
@@ -1723,7 +1765,11 @@ def process_mastodon_instance(
     version_info = f"Mastodon v{software_version}"
     if software_version != nodeinfo_20_result["software"]["version"]:
         version_info = f"{version_info} ({nodeinfo_20_result['software']['version']})"
-    vmc_output(f"{domain}: {version_info}", "green", use_tqdm=True)
+    vmc_output(f"{db_domain}: {version_info}", "green", use_tqdm=True)
+
+    # If actual_domain is different from domain, delete the old domain entry
+    if actual_domain and actual_domain != domain:
+        delete_domain_if_known(domain)
 
 
 def process_domain(domain, http_client, nightly_version_ranges):
@@ -1748,12 +1794,14 @@ def process_domain(domain, http_client, nightly_version_ranges):
             backend_domain = urlparse(cached_nodeinfo_url).netloc
 
             if is_mastodon_instance(nodeinfo_20_result):
+                # Get the actual domain from the instance API
+                instance_uri = get_instance_uri(backend_domain, http_client)
+
                 process_mastodon_instance(
                     domain,
-                    backend_domain,
                     nodeinfo_20_result,
-                    http_client,
                     nightly_version_ranges,
+                    actual_domain=instance_uri,
                 )
             else:
                 mark_as_non_mastodon(domain, nodeinfo_20_result["software"]["name"])
@@ -1795,12 +1843,14 @@ def process_domain(domain, http_client, nightly_version_ranges):
         return
 
     if is_mastodon_instance(nodeinfo_20_result):
+        # Get the actual domain from the instance API
+        instance_uri = get_instance_uri(backend_domain, http_client)
+
         process_mastodon_instance(
             domain,
-            backend_domain,
             nodeinfo_20_result,
-            http_client,
             nightly_version_ranges,
+            actual_domain=instance_uri,
         )
     else:
         mark_as_non_mastodon(domain, nodeinfo_20_result["software"]["name"])
