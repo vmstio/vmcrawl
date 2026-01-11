@@ -1793,6 +1793,12 @@ def process_domain(domain, http_client, nightly_version_ranges):
     webfinger_result = check_webfinger(domain, http_client)
     if not webfinger_result:
         # Webfinger lookup failed - don't attempt nodeinfo fallback
+        if webfinger_result is None:
+            vmc_output(
+                f"{domain}: No backend domain found via webfinger",
+                "yellow",
+                use_tqdm=True,
+            )
         return
 
     backend_domain = webfinger_result["backend_domain"]
