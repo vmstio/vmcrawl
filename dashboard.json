@@ -2306,6 +2306,18 @@
                 "value": 100
               }
             ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Version"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 100
+              }
+            ]
           }
         ]
       },
@@ -2330,7 +2342,7 @@
           "editorMode": "code",
           "format": "table",
           "rawQuery": true,
-          "rawSql": "SELECT \n    domain AS \"Domain\",\n    active_users_monthly AS \"MAU\",\n    software_version AS \"Software Version\"\nFROM mastodon_domains \nWHERE software_version NOT IN (\n    SELECT software_version \n    FROM patch_versions\n)\nAND NOT EXISTS (\n    SELECT 1\n    FROM eol_versions\n    WHERE mastodon_domains.software_version LIKE eol_versions.software_version || '%'\n)\nORDER BY active_users_monthly DESC\nLIMIT 10;\n",
+          "rawSql": "SELECT \n    domain AS \"Domain\",\n    software_version AS \"Version\",\n    active_users_monthly AS \"MAU\"\nFROM mastodon_domains \nWHERE software_version NOT IN (\n    SELECT software_version \n    FROM patch_versions\n)\nAND NOT EXISTS (\n    SELECT 1\n    FROM eol_versions\n    WHERE mastodon_domains.software_version LIKE eol_versions.software_version || '%'\n)\nORDER BY active_users_monthly DESC\nLIMIT 10;\n",
           "refId": "A",
           "sql": {
             "columns": [
@@ -2402,6 +2414,18 @@
                 "value": 100
               }
             ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Version"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 100
+              }
+            ]
           }
         ]
       },
@@ -2426,7 +2450,7 @@
           "editorMode": "code",
           "format": "table",
           "rawQuery": true,
-          "rawSql": "SELECT \n    domain AS \"Domain\",\n    active_users_monthly AS \"MAU\",\n    software_version AS \"Software Version\"\nFROM mastodon_domains \nWHERE software_version NOT IN (\n    SELECT software_version \n    FROM patch_versions\n)\nAND EXISTS (\n    SELECT 1\n    FROM eol_versions\n    WHERE mastodon_domains.software_version LIKE eol_versions.software_version || '%'\n)\nORDER BY active_users_monthly DESC\nLIMIT 10;\n",
+          "rawSql": "SELECT \n    domain AS \"Domain\",\n    software_version AS \"Version\",\n    active_users_monthly AS \"MAU\"\nFROM mastodon_domains \nWHERE software_version NOT IN (\n    SELECT software_version \n    FROM patch_versions\n)\nAND EXISTS (\n    SELECT 1\n    FROM eol_versions\n    WHERE mastodon_domains.software_version LIKE eol_versions.software_version || '%'\n)\nORDER BY active_users_monthly DESC\nLIMIT 10;\n",
           "refId": "A",
           "sql": {
             "columns": [
@@ -2692,7 +2716,32 @@
           },
           "unit": "locale"
         },
-        "overrides": []
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Monthly Active Users"
+            },
+            "properties": [
+              {
+                "id": "custom.align",
+                "value": "auto"
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Last Crawled"
+            },
+            "properties": [
+              {
+                "id": "custom.align",
+                "value": "right"
+              }
+            ]
+          }
+        ]
       },
       "gridPos": {
         "h": 28,
@@ -2717,7 +2766,7 @@
           "editorMode": "code",
           "format": "table",
           "rawQuery": true,
-          "rawSql": "SELECT \n    domain AS \"Domain\",\n    software_version AS \"Software Version\",\n    full_version as \"Raw Version\",\n    active_users_monthly as \"MAU\",\n    timestamp as \"Last Crawled\"\nFROM mastodon_domains\nORDER BY timestamp DESC;\n",
+          "rawSql": "SELECT \n    domain AS \"Domain\",\n    software_version AS \"Version\",\n    full_version as \"Raw Version\",\n    active_users_monthly as \"Monthly Active Users\",\n    timestamp as \"Last Crawled\"\nFROM mastodon_domains\nORDER BY timestamp DESC;\n",
           "refId": "A",
           "sql": {
             "columns": [
@@ -2763,7 +2812,7 @@
   "timezone": "browser",
   "title": "vmcrawl",
   "uid": "aedqo0q7klrswa",
-  "version": 8,
+  "version": 10,
   "weekStart": "",
   "id": null
 }
