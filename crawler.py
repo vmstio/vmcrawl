@@ -1478,7 +1478,7 @@ def check_robots_txt(domain, http_client):
     url = f"https://{domain}/robots.txt"
     try:
         response = get_httpx(url, http_client)
-        if response.status_code in [200]:
+        if response.status_code == 200:
             content_type = response.headers.get("Content-Type", "")
             if (
                 content_type in mimetypes.types_map.values()
@@ -1521,38 +1521,51 @@ def check_webfinger(domain, http_client):
         response = get_httpx(url, http_client)
         content_type = response.headers.get("Content-Type", "")
         content_length = response.headers.get("Content-Length", "")
-        if response.status_code in [200]:
+
+        if response.status_code == 200:
+            # Validate content type
             if "json" not in content_type:
                 handle_incorrect_file_type(domain, target, content_type)
                 return False
+
+            # Validate content exists
             if not response.content or content_length == "0":
                 exception = "returned empty content"
                 handle_json_exception(domain, target, exception)
                 return False
+
+            # Parse and validate JSON structure
             data = parse_json_with_fallback(response, domain, target)
-            if data is False:
-                return False
-            if not isinstance(data, dict):
+            if not data or not isinstance(data, dict):
+                if data is False:
+                    return False
                 exception = "returned non-dict JSON"
                 handle_json_exception(domain, target, exception)
                 return False
+
+            # Validate aliases exist
             aliases = data.get("aliases", [])
             if not aliases:
                 exception = "has no aliases"
                 handle_json_exception(domain, target, exception)
                 return False
+
+            # Find first HTTPS alias
             first_alias = next((alias for alias in aliases if "https" in alias), None)
-            if first_alias:
-                backend_domain = urlparse(first_alias).netloc
-                if "localhost" in backend_domain:
-                    exception = "points to localhost"
-                    handle_json_exception(domain, target, exception)
-                    return False
-                return {"backend_domain": backend_domain}
-            else:
+            if not first_alias:
                 exception = "has no https alias"
                 handle_json_exception(domain, target, exception)
                 return False
+
+            # Extract and validate backend domain
+            backend_domain = urlparse(first_alias).netloc
+            if "localhost" in backend_domain:
+                exception = "points to localhost"
+                handle_json_exception(domain, target, exception)
+                return False
+
+            return {"backend_domain": backend_domain}
+
         elif response.status_code in http_codes_to_hardfail:
             handle_http_failed(domain, target, response)
             return False
@@ -1573,7 +1586,7 @@ def check_nodeinfo(domain, backend_domain, http_client):
     url = f"https://{backend_domain}/.well-known/nodeinfo"
     try:
         response = get_httpx(url, http_client)
-        if response.status_code in [200]:
+        if response.status_code == 200:
             content_type = response.headers.get("Content-Type", "")
             if "json" not in content_type:
                 handle_incorrect_file_type(domain, target, content_type)
@@ -1638,7 +1651,7 @@ def check_nodeinfo_20(domain, nodeinfo_20_url, http_client, from_cache=False):
     target = "nodeinfo_20" if not from_cache else "nodeinfo_20 (cached)"
     try:
         response = get_httpx(nodeinfo_20_url, http_client)
-        if response.status_code in [200]:
+        if response.status_code == 200:
             content_type = response.headers.get("Content-Type", "")
             if "json" not in content_type:
                 handle_incorrect_file_type(domain, target, content_type)
