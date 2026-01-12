@@ -10,6 +10,7 @@ It performs periodic polling of known Mastodon instances to track version inform
 
 - Python 3.13 or higher
 - PostgreSQL database
+- [UV](https://docs.astral.sh/uv/)
 
 ## Installation
 
