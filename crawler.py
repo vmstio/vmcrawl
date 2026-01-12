@@ -153,11 +153,11 @@ limits = httpx.Limits(
 
 http_client = httpx.Client(
     http2=True,
-    follow_redirects=False,
+    follow_redirects=True,
     headers=http_custom_headers,
     timeout=common_timeout,
     limits=limits,
-    max_redirects=10,  # Prevent infinite redirect loops
+    max_redirects=common_timeout,
 )
 
 # =============================================================================
@@ -324,10 +324,11 @@ def get_httpx(url: str, http_client: httpx.Client) -> httpx.Response:
         if any(indicator in error_str for indicator in http2_error_indicators):
             fallback_client = httpx.Client(
                 http2=False,
-                follow_redirects=False,
+                follow_redirects=True,
                 headers=http_custom_headers,
                 timeout=common_timeout,
                 limits=limits,
+                max_redirects=common_timeout,
             )
             try:
                 return stream_with_size_limit(fallback_client, url)
@@ -1854,10 +1855,11 @@ def check_and_record_domains(
         if not hasattr(thread_local, "http_client"):
             thread_local.http_client = httpx.Client(
                 http2=True,
-                follow_redirects=False,
+                follow_redirects=True,
                 headers=http_custom_headers,
                 timeout=common_timeout,
                 limits=limits,
+                max_redirects=common_timeout,
             )
         return thread_local.http_client
 
