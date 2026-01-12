@@ -258,31 +258,6 @@ def has_emoji_chars(domain: str) -> bool:
     return False
 
 
-def is_same_or_subdomain(actual_domain: str, original_domain: str) -> bool:
-    """Check if actual_domain is the same as original_domain or a subdomain of it.
-
-    Args:
-        actual_domain: The domain from nodeinfo/backend
-        original_domain: The original domain being crawled
-
-    Returns:
-        True if actual_domain matches or is a subdomain of original_domain
-    """
-    # Normalize to lowercase for comparison
-    actual = actual_domain.lower().strip()
-    original = original_domain.lower().strip()
-
-    # Check if they're exactly the same
-    if actual == original:
-        return True
-
-    # Check if actual_domain is a subdomain of original_domain
-    # It should end with ".original_domain"
-    if actual.endswith(f".{original}"):
-        return True
-
-    return False
-
 
 # =============================================================================
 # HTTP FUNCTIONS
@@ -1816,17 +1791,6 @@ def process_domain(domain, http_client, nightly_version_ranges):
         return
 
     backend_domain = webfinger_result["backend_domain"]
-
-    # Validate that backend_domain is either the same as domain or a subdomain
-    if not is_same_or_subdomain(backend_domain, domain):
-        error_to_print = (
-            f"Backend domain {backend_domain} is not a subdomain of {domain}"
-        )
-        vmc_output(f"{domain}: {error_to_print}", "yellow", use_tqdm=True)
-        log_error(domain, error_to_print)
-        increment_domain_error(domain, "BACK")
-        delete_domain_if_known(domain)
-        return
 
     nodeinfo_result = check_nodeinfo(domain, backend_domain, http_client)
     if nodeinfo_result is False:
