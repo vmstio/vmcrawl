@@ -33,7 +33,7 @@
       "type": "grafana",
       "id": "grafana",
       "name": "Grafana",
-      "version": "12.4.0-20765167345"
+      "version": "12.4.0-20781422371"
     },
     {
       "type": "datasource",
@@ -144,7 +144,7 @@
         "textMode": "auto",
         "wideLayout": true
       },
-      "pluginVersion": "12.4.0-20765167345",
+      "pluginVersion": "12.4.0-20781422371",
       "targets": [
         {
           "datasource": {
@@ -226,7 +226,7 @@
         "textMode": "auto",
         "wideLayout": true
       },
-      "pluginVersion": "12.4.0-20765167345",
+      "pluginVersion": "12.4.0-20781422371",
       "targets": [
         {
           "datasource": {
@@ -308,7 +308,7 @@
         "textMode": "auto",
         "wideLayout": true
       },
-      "pluginVersion": "12.4.0-20765167345",
+      "pluginVersion": "12.4.0-20781422371",
       "targets": [
         {
           "datasource": {
@@ -339,7 +339,7 @@
           }
         }
       ],
-      "title": "All Versions",
+      "title": "Versions Deployed",
       "type": "stat"
     },
     {
@@ -390,7 +390,7 @@
         "textMode": "auto",
         "wideLayout": true
       },
-      "pluginVersion": "12.4.0-20765167345",
+      "pluginVersion": "12.4.0-20781422371",
       "targets": [
         {
           "datasource": {
@@ -494,7 +494,7 @@
         "showThresholdMarkers": false,
         "sizing": "auto"
       },
-      "pluginVersion": "12.4.0-20765167345",
+      "pluginVersion": "12.4.0-20781422371",
       "targets": [
         {
           "datasource": {
@@ -632,7 +632,7 @@
         "showThresholdMarkers": false,
         "sizing": "auto"
       },
-      "pluginVersion": "12.4.0-20765167345",
+      "pluginVersion": "12.4.0-20781422371",
       "targets": [
         {
           "datasource": {
@@ -765,7 +765,7 @@
         "showThresholdMarkers": false,
         "sizing": "auto"
       },
-      "pluginVersion": "12.4.0-20765167345",
+      "pluginVersion": "12.4.0-20781422371",
       "targets": [
         {
           "datasource": {
@@ -898,7 +898,7 @@
         "showThresholdMarkers": false,
         "sizing": "auto"
       },
-      "pluginVersion": "12.4.0-20765167345",
+      "pluginVersion": "12.4.0-20781422371",
       "targets": [
         {
           "datasource": {
@@ -1031,7 +1031,7 @@
         "showThresholdMarkers": false,
         "sizing": "auto"
       },
-      "pluginVersion": "12.4.0-20765167345",
+      "pluginVersion": "12.4.0-20781422371",
       "targets": [
         {
           "datasource": {
@@ -1169,7 +1169,7 @@
         "showThresholdMarkers": false,
         "sizing": "auto"
       },
-      "pluginVersion": "12.4.0-20765167345",
+      "pluginVersion": "12.4.0-20781422371",
       "targets": [
         {
           "datasource": {
@@ -1307,7 +1307,7 @@
         "showThresholdMarkers": false,
         "sizing": "auto"
       },
-      "pluginVersion": "12.4.0-20765167345",
+      "pluginVersion": "12.4.0-20781422371",
       "targets": [
         {
           "datasource": {
@@ -1445,7 +1445,7 @@
         "showThresholdMarkers": false,
         "sizing": "auto"
       },
-      "pluginVersion": "12.4.0-20765167345",
+      "pluginVersion": "12.4.0-20781422371",
       "targets": [
         {
           "datasource": {
@@ -1651,7 +1651,7 @@
           "sort": "none"
         }
       },
-      "pluginVersion": "12.4.0-20765167345",
+      "pluginVersion": "12.4.0-20781422371",
       "targets": [
         {
           "datasource": {
@@ -1772,7 +1772,7 @@
           "sort": "none"
         }
       },
-      "pluginVersion": "12.4.0-20765167345",
+      "pluginVersion": "12.4.0-20781422371",
       "targets": [
         {
           "datasource": {
@@ -2683,7 +2683,7 @@
             "cellOptions": {
               "type": "auto"
             },
-            "filterable": true,
+            "filterable": false,
             "footer": {
               "reducers": []
             },
@@ -2941,7 +2941,7 @@
   "timezone": "browser",
   "title": "vmcrawl",
   "uid": "aedqo0q7klrswa",
-  "version": 16,
+  "version": 19,
   "weekStart": "",
   "id": null
 }
