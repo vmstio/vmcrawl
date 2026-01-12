@@ -153,7 +153,7 @@ limits = httpx.Limits(
 
 http_client = httpx.Client(
     http2=True,
-    follow_redirects=True,
+    follow_redirects=False,
     headers=http_custom_headers,
     timeout=common_timeout,
     limits=limits,
@@ -349,11 +349,10 @@ def get_httpx(url: str, http_client: httpx.Client) -> httpx.Response:
         if any(indicator in error_str for indicator in http2_error_indicators):
             fallback_client = httpx.Client(
                 http2=False,
-                follow_redirects=True,
+                follow_redirects=False,
                 headers=http_custom_headers,
                 timeout=common_timeout,
                 limits=limits,
-                max_redirects=10,
             )
             try:
                 return stream_with_size_limit(fallback_client, url)
@@ -1279,12 +1278,6 @@ def handle_tcp_exception(domain, exception):
         vmc_output(f"{domain}: {error_message}", "yellow", use_tqdm=True)
         log_error(domain, error_message)
         increment_domain_error(domain, error_reason)
-    elif "maximum allowed redirects" in error_message.casefold():
-        error_reason = "MAX"
-        error_message = error_message.strip(".")
-        vmc_output(f"{domain}: {error_message}", "yellow", use_tqdm=True)
-        log_error(domain, error_message)
-        increment_domain_error(domain, error_reason)
     elif any(
         msg in error_message.casefold()
         for msg in [
@@ -1831,7 +1824,7 @@ def process_domain(domain, http_client, nightly_version_ranges):
         )
         vmc_output(f"{domain}: {error_to_print}", "yellow", use_tqdm=True)
         log_error(domain, error_to_print)
-        increment_domain_error(domain, "###")
+        increment_domain_error(domain, "BACKEND")
         delete_domain_if_known(domain)
         return
 
@@ -1897,11 +1890,10 @@ def check_and_record_domains(
         if not hasattr(thread_local, "http_client"):
             thread_local.http_client = httpx.Client(
                 http2=True,
-                follow_redirects=True,
+                follow_redirects=False,
                 headers=http_custom_headers,
                 timeout=common_timeout,
                 limits=limits,
-                max_redirects=10,
             )
         return thread_local.http_client
 
@@ -2736,8 +2728,7 @@ def load_from_database(user_choice):
         "10": "SELECT domain FROM raw_domains WHERE reason = 'SSL' ORDER BY errors ASC",
         "11": "SELECT domain FROM raw_domains WHERE reason = 'HTTP' ORDER BY errors ASC",
         "12": "SELECT domain FROM raw_domains WHERE reason = 'TCP' ORDER BY errors ASC",
-        "13": "SELECT domain FROM raw_domains WHERE reason = 'MAX' ORDER BY errors ASC",
-        "14": "SELECT domain FROM raw_domains WHERE reason = 'DNS' ORDER BY errors ASC",
+        "13": "SELECT domain FROM raw_domains WHERE reason = 'DNS' ORDER BY errors ASC",
         "20": "SELECT domain FROM raw_domains WHERE reason ~ '^2[0-9]{2}' ORDER BY errors ASC",
         "21": "SELECT domain FROM raw_domains WHERE reason ~ '^3[0-9]{2}' ORDER BY errors ASC",
         "22": "SELECT domain FROM raw_domains WHERE reason ~ '^4[0-9]{2}' ORDER BY errors ASC",
@@ -2844,8 +2835,7 @@ def get_menu_options() -> dict[str, dict[str, str]]:
             "10": "SSL",
             "11": "HTTP",
             "12": "TCP",
-            "13": "MAX",
-            "14": "DNS",
+            "13": "DNS",
         },
         "Retry HTTP errors": {"20": "2xx", "21": "3xx", "22": "4xx", "23": "5xx"},
         "Retry target errors": {
