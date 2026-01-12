@@ -33,7 +33,7 @@
       "type": "grafana",
       "id": "grafana",
       "name": "Grafana",
-      "version": "12.4.0-20728917751"
+      "version": "12.4.0-20765167345"
     },
     {
       "type": "datasource",
@@ -144,7 +144,7 @@
         "textMode": "auto",
         "wideLayout": true
       },
-      "pluginVersion": "12.4.0-20728917751",
+      "pluginVersion": "12.4.0-20765167345",
       "targets": [
         {
           "datasource": {
@@ -226,7 +226,7 @@
         "textMode": "auto",
         "wideLayout": true
       },
-      "pluginVersion": "12.4.0-20728917751",
+      "pluginVersion": "12.4.0-20765167345",
       "targets": [
         {
           "datasource": {
@@ -308,7 +308,7 @@
         "textMode": "auto",
         "wideLayout": true
       },
-      "pluginVersion": "12.4.0-20728917751",
+      "pluginVersion": "12.4.0-20765167345",
       "targets": [
         {
           "datasource": {
@@ -390,7 +390,7 @@
         "textMode": "auto",
         "wideLayout": true
       },
-      "pluginVersion": "12.4.0-20728917751",
+      "pluginVersion": "12.4.0-20765167345",
       "targets": [
         {
           "datasource": {
@@ -494,7 +494,7 @@
         "showThresholdMarkers": false,
         "sizing": "auto"
       },
-      "pluginVersion": "12.4.0-20728917751",
+      "pluginVersion": "12.4.0-20765167345",
       "targets": [
         {
           "datasource": {
@@ -632,7 +632,7 @@
         "showThresholdMarkers": false,
         "sizing": "auto"
       },
-      "pluginVersion": "12.4.0-20728917751",
+      "pluginVersion": "12.4.0-20765167345",
       "targets": [
         {
           "datasource": {
@@ -765,7 +765,7 @@
         "showThresholdMarkers": false,
         "sizing": "auto"
       },
-      "pluginVersion": "12.4.0-20728917751",
+      "pluginVersion": "12.4.0-20765167345",
       "targets": [
         {
           "datasource": {
@@ -898,7 +898,7 @@
         "showThresholdMarkers": false,
         "sizing": "auto"
       },
-      "pluginVersion": "12.4.0-20728917751",
+      "pluginVersion": "12.4.0-20765167345",
       "targets": [
         {
           "datasource": {
@@ -1031,7 +1031,7 @@
         "showThresholdMarkers": false,
         "sizing": "auto"
       },
-      "pluginVersion": "12.4.0-20728917751",
+      "pluginVersion": "12.4.0-20765167345",
       "targets": [
         {
           "datasource": {
@@ -1169,7 +1169,7 @@
         "showThresholdMarkers": false,
         "sizing": "auto"
       },
-      "pluginVersion": "12.4.0-20728917751",
+      "pluginVersion": "12.4.0-20765167345",
       "targets": [
         {
           "datasource": {
@@ -1307,7 +1307,7 @@
         "showThresholdMarkers": false,
         "sizing": "auto"
       },
-      "pluginVersion": "12.4.0-20728917751",
+      "pluginVersion": "12.4.0-20765167345",
       "targets": [
         {
           "datasource": {
@@ -1445,7 +1445,7 @@
         "showThresholdMarkers": false,
         "sizing": "auto"
       },
-      "pluginVersion": "12.4.0-20728917751",
+      "pluginVersion": "12.4.0-20765167345",
       "targets": [
         {
           "datasource": {
@@ -1651,7 +1651,7 @@
           "sort": "none"
         }
       },
-      "pluginVersion": "12.4.0-20728917751",
+      "pluginVersion": "12.4.0-20765167345",
       "targets": [
         {
           "datasource": {
@@ -1772,7 +1772,7 @@
           "sort": "none"
         }
       },
-      "pluginVersion": "12.4.0-20728917751",
+      "pluginVersion": "12.4.0-20765167345",
       "targets": [
         {
           "datasource": {
@@ -1878,7 +1878,7 @@
           "sort": "none"
         }
       },
-      "pluginVersion": "12.4.0-20728917751",
+      "pluginVersion": "12.4.0-20765167345",
       "targets": [
         {
           "datasource": {
@@ -1984,7 +1984,7 @@
           "sort": "none"
         }
       },
-      "pluginVersion": "12.4.0-20728917751",
+      "pluginVersion": "12.4.0-20765167345",
       "targets": [
         {
           "datasource": {
@@ -2025,6 +2025,198 @@
         "w": 24,
         "x": 0,
         "y": 57
+      },
+      "id": 65,
+      "panels": [],
+      "title": "Branch Adoption",
+      "type": "row"
+    },
+    {
+      "datasource": {
+        "type": "grafana-postgresql-datasource",
+        "uid": "${DS_GRAFANA-POSTGRESQL-DATASOURCE-1}"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "mappings": [],
+          "min": 0,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "purple",
+                "value": 0
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 7,
+        "w": 24,
+        "x": 0,
+        "y": 58
+      },
+      "id": 70,
+      "options": {
+        "displayMode": "gradient",
+        "legend": {
+          "calcs": [],
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": false
+        },
+        "maxVizHeight": 300,
+        "minVizHeight": 16,
+        "minVizWidth": 8,
+        "namePlacement": "auto",
+        "orientation": "auto",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "showUnfilled": true,
+        "sizing": "auto",
+        "valueMode": "color"
+      },
+      "pluginVersion": "12.4.0-20765167345",
+      "targets": [
+        {
+          "datasource": {
+            "type": "grafana-postgresql-datasource",
+            "uid": "${DS_GRAFANA-POSTGRESQL-DATASOURCE-1}"
+          },
+          "editorMode": "code",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "SELECT \n    COUNT(CASE WHEN \n        software_version LIKE '5.0%' OR\n        software_version LIKE '4.9%' OR\n        software_version LIKE '4.8%' OR\n        software_version LIKE '4.7%' OR\n        software_version LIKE '4.6%' OR\n        software_version LIKE '4.5%'\n    THEN 1 END) * 100.0 / COUNT(*) AS \"4.5+\",\n\n    COUNT(CASE WHEN \n        software_version LIKE '5.0%' OR\n        software_version LIKE '4.9%' OR\n        software_version LIKE '4.8%' OR\n        software_version LIKE '4.7%' OR\n        software_version LIKE '4.6%' OR\n        software_version LIKE '4.5%' OR \n        software_version LIKE '4.4%' \n    THEN 1 END) * 100.0 / COUNT(*) AS \"4.4+\",\n\n    COUNT(CASE WHEN \n        software_version LIKE '5.0%' OR\n        software_version LIKE '4.9%' OR\n        software_version LIKE '4.8%' OR\n        software_version LIKE '4.7%' OR\n        software_version LIKE '4.6%' OR\n        software_version LIKE '4.5%' OR \n        software_version LIKE '4.4%' OR \n        software_version LIKE '4.3%'\n    THEN 1 END) * 100.0 / COUNT(*) AS \"4.3+\",\n\n    COUNT(CASE WHEN \n        software_version LIKE '4.6%' OR\n        software_version LIKE '4.5%' OR \n        software_version LIKE '4.4%' OR \n        software_version LIKE '4.3%' OR\n        software_version LIKE '4.2%'\n    THEN 1 END) * 100.0 / COUNT(*) AS \"4.2+\",\n\n    COUNT(CASE WHEN \n        software_version LIKE '5.0%' OR\n        software_version LIKE '4.9%' OR\n        software_version LIKE '4.8%' OR\n        software_version LIKE '4.7%' OR\n        software_version LIKE '4.6%' OR\n        software_version LIKE '4.5%' OR \n        software_version LIKE '4.4%' OR \n        software_version LIKE '4.3%' OR\n        software_version LIKE '4.2%' OR\n        software_version LIKE '4.1%'\n    THEN 1 END) * 100.0 / COUNT(*) AS \"4.1+\"\n\nFROM \n    mastodon_domains\nWHERE \n    software_version IS NOT NULL;\n",
+          "refId": "A",
+          "sql": {
+            "columns": [
+              {
+                "parameters": [],
+                "type": "function"
+              }
+            ],
+            "groupBy": [
+              {
+                "property": {
+                  "type": "string"
+                },
+                "type": "groupBy"
+              }
+            ],
+            "limit": 50
+          }
+        }
+      ],
+      "title": "Percent of Instances",
+      "type": "bargauge"
+    },
+    {
+      "datasource": {
+        "type": "grafana-postgresql-datasource",
+        "uid": "${DS_GRAFANA-POSTGRESQL-DATASOURCE-1}"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "fieldMinMax": false,
+          "mappings": [],
+          "min": 0,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "purple",
+                "value": 0
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 7,
+        "w": 24,
+        "x": 0,
+        "y": 65
+      },
+      "id": 71,
+      "options": {
+        "displayMode": "gradient",
+        "legend": {
+          "calcs": [],
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": false
+        },
+        "maxVizHeight": 300,
+        "minVizHeight": 16,
+        "minVizWidth": 8,
+        "namePlacement": "auto",
+        "orientation": "auto",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "showUnfilled": true,
+        "sizing": "auto",
+        "valueMode": "color"
+      },
+      "pluginVersion": "12.4.0-20765167345",
+      "targets": [
+        {
+          "datasource": {
+            "type": "grafana-postgresql-datasource",
+            "uid": "${DS_GRAFANA-POSTGRESQL-DATASOURCE-1}"
+          },
+          "editorMode": "code",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "SELECT \n    SUM(CASE WHEN \n        software_version LIKE '5.0%' OR\n        software_version LIKE '4.9%' OR\n        software_version LIKE '4.8%' OR\n        software_version LIKE '4.7%' OR\n        software_version LIKE '4.6%' OR\n        software_version LIKE '4.5%' \n    THEN active_users_monthly ELSE 0 END) * 100.0 / \n        SUM(active_users_monthly) AS \"4.5+\",\n\n    SUM(CASE WHEN \n        software_version LIKE '4.6%' OR \n        software_version LIKE '4.5%' OR \n        software_version LIKE '4.4%' \n    THEN active_users_monthly ELSE 0 END) * 100.0 / \n        SUM(active_users_monthly) AS \"4.4+\",\n\n    SUM(CASE WHEN\n        software_version LIKE '5.0%' OR\n        software_version LIKE '4.9%' OR\n        software_version LIKE '4.8%' OR\n        software_version LIKE '4.7%' OR\n        software_version LIKE '4.6%' OR\n        software_version LIKE '4.5%' OR \n        software_version LIKE '4.4%' OR \n        software_version LIKE '4.3%'\n    THEN active_users_monthly ELSE 0 END) * 100.0 / \n        SUM(active_users_monthly) AS \"4.3+\",\n\n    SUM(CASE WHEN \n        software_version LIKE '5.0%' OR\n        software_version LIKE '4.9%' OR\n        software_version LIKE '4.8%' OR\n        software_version LIKE '4.7%' OR\n        software_version LIKE '4.6%' OR\n        software_version LIKE '4.5%' OR \n        software_version LIKE '4.4%' OR \n        software_version LIKE '4.3%' OR\n        software_version LIKE '4.2%'\n    THEN active_users_monthly ELSE 0 END) * 100.0 / \n        SUM(active_users_monthly) AS \"4.2+\",\n\n    SUM(CASE WHEN \n        software_version LIKE '5.0%' OR\n        software_version LIKE '4.9%' OR\n        software_version LIKE '4.8%' OR\n        software_version LIKE '4.7%' OR\n        software_version LIKE '4.6%' OR\n        software_version LIKE '4.5%' OR \n        software_version LIKE '4.4%' OR \n        software_version LIKE '4.3%' OR\n        software_version LIKE '4.2%' OR\n        software_version LIKE '4.1%'\n    THEN active_users_monthly ELSE 0 END) * 100.0 / \n        SUM(active_users_monthly) AS \"4.1+\"\nFROM \n    mastodon_domains\nWHERE \n    software_version IS NOT NULL\n    AND active_users_monthly IS NOT NULL;\n",
+          "refId": "A",
+          "sql": {
+            "columns": [
+              {
+                "parameters": [],
+                "type": "function"
+              }
+            ],
+            "groupBy": [
+              {
+                "property": {
+                  "type": "string"
+                },
+                "type": "groupBy"
+              }
+            ],
+            "limit": 50
+          }
+        }
+      ],
+      "title": "Percent of MAUs",
+      "type": "bargauge"
+    },
+    {
+      "collapsed": false,
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 72
       },
       "id": 17,
       "panels": [],
@@ -2083,9 +2275,9 @@
       },
       "gridPos": {
         "h": 12,
-        "w": 6,
+        "w": 12,
         "x": 0,
-        "y": 58
+        "y": 73
       },
       "id": 12,
       "options": {
@@ -2110,7 +2302,7 @@
         "xTickLabelRotation": 0,
         "xTickLabelSpacing": 0
       },
-      "pluginVersion": "12.4.0-20728917751",
+      "pluginVersion": "12.4.0-20765167345",
       "targets": [
         {
           "datasource": {
@@ -2196,9 +2388,9 @@
       },
       "gridPos": {
         "h": 12,
-        "w": 6,
-        "x": 6,
-        "y": 58
+        "w": 12,
+        "x": 12,
+        "y": 73
       },
       "id": 48,
       "options": {
@@ -2223,7 +2415,7 @@
         "xTickLabelRotation": 0,
         "xTickLabelSpacing": 0
       },
-      "pluginVersion": "12.4.0-20728917751",
+      "pluginVersion": "12.4.0-20765167345",
       "targets": [
         {
           "datasource": {
@@ -2303,7 +2495,7 @@
             "properties": [
               {
                 "id": "custom.width",
-                "value": 100
+                "value": 120
               }
             ]
           },
@@ -2315,24 +2507,25 @@
             "properties": [
               {
                 "id": "custom.width",
-                "value": 100
+                "value": 120
               }
             ]
           }
         ]
       },
       "gridPos": {
-        "h": 12,
-        "w": 6,
-        "x": 12,
-        "y": 58
+        "h": 13,
+        "w": 12,
+        "x": 0,
+        "y": 85
       },
       "id": 13,
       "options": {
         "cellHeight": "sm",
+        "enablePagination": true,
         "showHeader": true
       },
-      "pluginVersion": "12.4.0-20728917751",
+      "pluginVersion": "12.4.0-20765167345",
       "targets": [
         {
           "datasource": {
@@ -2342,7 +2535,7 @@
           "editorMode": "code",
           "format": "table",
           "rawQuery": true,
-          "rawSql": "SELECT \n    domain AS \"Domain\",\n    software_version AS \"Version\",\n    active_users_monthly AS \"MAU\"\nFROM mastodon_domains \nWHERE software_version NOT IN (\n    SELECT software_version \n    FROM patch_versions\n)\nAND NOT EXISTS (\n    SELECT 1\n    FROM eol_versions\n    WHERE mastodon_domains.software_version LIKE eol_versions.software_version || '%'\n)\nORDER BY active_users_monthly DESC\nLIMIT 10;\n",
+          "rawSql": "SELECT \n    domain AS \"Domain\",\n    software_version AS \"Version\",\n    active_users_monthly AS \"MAU\"\nFROM mastodon_domains \nWHERE software_version NOT IN (\n    SELECT software_version \n    FROM patch_versions\n)\nAND NOT EXISTS (\n    SELECT 1\n    FROM eol_versions\n    WHERE mastodon_domains.software_version LIKE eol_versions.software_version || '%'\n)\nORDER BY active_users_monthly DESC\nLIMIT 100;\n",
           "refId": "A",
           "sql": {
             "columns": [
@@ -2411,7 +2604,7 @@
             "properties": [
               {
                 "id": "custom.width",
-                "value": 100
+                "value": 120
               }
             ]
           },
@@ -2423,24 +2616,25 @@
             "properties": [
               {
                 "id": "custom.width",
-                "value": 100
+                "value": 120
               }
             ]
           }
         ]
       },
       "gridPos": {
-        "h": 12,
-        "w": 6,
-        "x": 18,
-        "y": 58
+        "h": 13,
+        "w": 12,
+        "x": 12,
+        "y": 85
       },
       "id": 47,
       "options": {
         "cellHeight": "sm",
+        "enablePagination": true,
         "showHeader": true
       },
-      "pluginVersion": "12.4.0-20728917751",
+      "pluginVersion": "12.4.0-20765167345",
       "targets": [
         {
           "datasource": {
@@ -2450,7 +2644,7 @@
           "editorMode": "code",
           "format": "table",
           "rawQuery": true,
-          "rawSql": "SELECT \n    domain AS \"Domain\",\n    software_version AS \"Version\",\n    active_users_monthly AS \"MAU\"\nFROM mastodon_domains \nWHERE software_version NOT IN (\n    SELECT software_version \n    FROM patch_versions\n)\nAND EXISTS (\n    SELECT 1\n    FROM eol_versions\n    WHERE mastodon_domains.software_version LIKE eol_versions.software_version || '%'\n)\nORDER BY active_users_monthly DESC\nLIMIT 10;\n",
+          "rawSql": "SELECT \n    domain AS \"Domain\",\n    software_version AS \"Version\",\n    active_users_monthly AS \"MAU\"\nFROM mastodon_domains \nWHERE software_version NOT IN (\n    SELECT software_version \n    FROM patch_versions\n)\nAND EXISTS (\n    SELECT 1\n    FROM eol_versions\n    WHERE mastodon_domains.software_version LIKE eol_versions.software_version || '%'\n)\nORDER BY active_users_monthly DESC\nLIMIT 100;\n",
           "refId": "A",
           "sql": {
             "columns": [
@@ -2475,19 +2669,6 @@
       "type": "table"
     },
     {
-      "collapsed": false,
-      "gridPos": {
-        "h": 1,
-        "w": 24,
-        "x": 0,
-        "y": 70
-      },
-      "id": 65,
-      "panels": [],
-      "title": "Branch Adoption",
-      "type": "row"
-    },
-    {
       "datasource": {
         "type": "grafana-postgresql-datasource",
         "uid": "${DS_GRAFANA-POSTGRESQL-DATASOURCE-1}"
@@ -2497,52 +2678,79 @@
           "color": {
             "mode": "thresholds"
           },
+          "custom": {
+            "align": "auto",
+            "cellOptions": {
+              "type": "auto"
+            },
+            "filterable": true,
+            "footer": {
+              "reducers": []
+            },
+            "inspect": false
+          },
           "mappings": [],
-          "min": 0,
           "thresholds": {
             "mode": "absolute",
             "steps": [
               {
-                "color": "purple",
+                "color": "green",
                 "value": 0
+              },
+              {
+                "color": "red",
+                "value": 80
+              }
+            ]
+          },
+          "unit": "locale"
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Monthly Active Users"
+            },
+            "properties": [
+              {
+                "id": "custom.align",
+                "value": "auto"
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Last Crawled"
+            },
+            "properties": [
+              {
+                "id": "custom.align",
+                "value": "right"
               }
             ]
           }
-        },
-        "overrides": []
+        ]
       },
       "gridPos": {
-        "h": 7,
+        "h": 12,
         "w": 24,
         "x": 0,
-        "y": 71
+        "y": 98
       },
-      "id": 70,
+      "id": 10,
       "options": {
-        "displayMode": "gradient",
-        "legend": {
-          "calcs": [],
-          "displayMode": "list",
-          "placement": "bottom",
-          "showLegend": false
-        },
-        "maxVizHeight": 300,
-        "minVizHeight": 16,
-        "minVizWidth": 8,
-        "namePlacement": "auto",
-        "orientation": "auto",
-        "reduceOptions": {
-          "calcs": [
-            "lastNotNull"
-          ],
-          "fields": "",
-          "values": false
-        },
-        "showUnfilled": true,
-        "sizing": "auto",
-        "valueMode": "color"
+        "cellHeight": "sm",
+        "enablePagination": false,
+        "showHeader": true,
+        "sortBy": [
+          {
+            "desc": true,
+            "displayName": "Monthly Active Users"
+          }
+        ]
       },
-      "pluginVersion": "12.4.0-20728917751",
+      "pluginVersion": "12.4.0-20765167345",
       "targets": [
         {
           "datasource": {
@@ -2552,12 +2760,17 @@
           "editorMode": "code",
           "format": "table",
           "rawQuery": true,
-          "rawSql": "SELECT \n    COUNT(CASE WHEN software_version LIKE '4.6%' THEN 1 END) * 100.0 / COUNT(*) AS \"4.6\",\n    \n    COUNT(CASE WHEN \n        software_version LIKE '4.6%' OR\n        software_version LIKE '4.5%'\n    THEN 1 END) * 100.0 / COUNT(*) AS \"4.5+\",\n\n    COUNT(CASE WHEN \n        software_version LIKE '4.6%' OR\n        software_version LIKE '4.5%' OR \n        software_version LIKE '4.4%' \n    THEN 1 END) * 100.0 / COUNT(*) AS \"4.4+\",\n\n    COUNT(CASE WHEN \n        software_version LIKE '4.6%' OR\n        software_version LIKE '4.5%' OR \n        software_version LIKE '4.4%' OR \n        software_version LIKE '4.3%'\n    THEN 1 END) * 100.0 / COUNT(*) AS \"4.3+\",\n\n    COUNT(CASE WHEN \n        software_version LIKE '4.6%' OR\n        software_version LIKE '4.5%' OR \n        software_version LIKE '4.4%' OR \n        software_version LIKE '4.3%' OR\n        software_version LIKE '4.2%'\n    THEN 1 END) * 100.0 / COUNT(*) AS \"4.2+\",\n\n    COUNT(CASE WHEN \n        software_version LIKE '4.6%' OR\n        software_version LIKE '4.5%' OR \n        software_version LIKE '4.4%' OR \n        software_version LIKE '4.3%' OR\n        software_version LIKE '4.2%' OR\n        software_version LIKE '4.1%'\n    THEN 1 END) * 100.0 / COUNT(*) AS \"4.1+\"\n\nFROM \n    mastodon_domains\nWHERE \n    software_version IS NOT NULL;\n",
+          "rawSql": "SELECT \n    domain AS \"Domain\",\n    software_version AS \"Version\",\n    full_version as \"Raw Version\",\n    active_users_monthly as \"Monthly Active Users\",\n    timestamp as \"Last Crawled\"\nFROM mastodon_domains\nORDER BY timestamp DESC\nLIMIT 10;\n",
           "refId": "A",
           "sql": {
             "columns": [
               {
-                "parameters": [],
+                "parameters": [
+                  {
+                    "name": "*",
+                    "type": "functionParameter"
+                  }
+                ],
                 "type": "function"
               }
             ],
@@ -2570,101 +2783,12 @@
               }
             ],
             "limit": 50
-          }
+          },
+          "table": "mastodon_domains"
         }
       ],
-      "title": "Percent of Instances",
-      "type": "bargauge"
-    },
-    {
-      "datasource": {
-        "type": "grafana-postgresql-datasource",
-        "uid": "${DS_GRAFANA-POSTGRESQL-DATASOURCE-1}"
-      },
-      "fieldConfig": {
-        "defaults": {
-          "color": {
-            "mode": "thresholds"
-          },
-          "fieldMinMax": false,
-          "mappings": [],
-          "min": 0,
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "color": "purple",
-                "value": 0
-              }
-            ]
-          }
-        },
-        "overrides": []
-      },
-      "gridPos": {
-        "h": 7,
-        "w": 24,
-        "x": 0,
-        "y": 78
-      },
-      "id": 71,
-      "options": {
-        "displayMode": "gradient",
-        "legend": {
-          "calcs": [],
-          "displayMode": "list",
-          "placement": "bottom",
-          "showLegend": false
-        },
-        "maxVizHeight": 300,
-        "minVizHeight": 16,
-        "minVizWidth": 8,
-        "namePlacement": "auto",
-        "orientation": "auto",
-        "reduceOptions": {
-          "calcs": [
-            "lastNotNull"
-          ],
-          "fields": "",
-          "values": false
-        },
-        "showUnfilled": true,
-        "sizing": "auto",
-        "valueMode": "color"
-      },
-      "pluginVersion": "12.4.0-20728917751",
-      "targets": [
-        {
-          "datasource": {
-            "type": "grafana-postgresql-datasource",
-            "uid": "${DS_GRAFANA-POSTGRESQL-DATASOURCE-1}"
-          },
-          "editorMode": "code",
-          "format": "table",
-          "rawQuery": true,
-          "rawSql": "SELECT \n    SUM(CASE WHEN software_version LIKE '4.6%' THEN active_users_monthly ELSE 0 END) * 100.0 / \n        SUM(active_users_monthly) AS \"4.6\",\n\n    SUM(CASE WHEN \n        software_version LIKE '4.6%' OR \n        software_version LIKE '4.5%' \n    THEN active_users_monthly ELSE 0 END) * 100.0 / \n        SUM(active_users_monthly) AS \"4.5+\",\n\n    SUM(CASE WHEN \n        software_version LIKE '4.6%' OR \n        software_version LIKE '4.5%' OR \n        software_version LIKE '4.4%' \n    THEN active_users_monthly ELSE 0 END) * 100.0 / \n        SUM(active_users_monthly) AS \"4.4+\",\n\n    SUM(CASE WHEN\n        software_version LIKE '4.6%' OR \n        software_version LIKE '4.5%' OR \n        software_version LIKE '4.4%' OR \n        software_version LIKE '4.3%'\n    THEN active_users_monthly ELSE 0 END) * 100.0 / \n        SUM(active_users_monthly) AS \"4.3+\",\n\n    SUM(CASE WHEN \n        software_version LIKE '4.6%' OR \n        software_version LIKE '4.5%' OR \n        software_version LIKE '4.4%' OR \n        software_version LIKE '4.3%' OR\n        software_version LIKE '4.2%'\n    THEN active_users_monthly ELSE 0 END) * 100.0 / \n        SUM(active_users_monthly) AS \"4.2+\",\n\n    SUM(CASE WHEN \n        software_version LIKE '4.6%' OR \n        software_version LIKE '4.5%' OR \n        software_version LIKE '4.4%' OR \n        software_version LIKE '4.3%' OR\n        software_version LIKE '4.2%' OR\n        software_version LIKE '4.1%'\n    THEN active_users_monthly ELSE 0 END) * 100.0 / \n        SUM(active_users_monthly) AS \"4.1+\"\nFROM \n    mastodon_domains\nWHERE \n    software_version IS NOT NULL\n    AND active_users_monthly IS NOT NULL;\n",
-          "refId": "A",
-          "sql": {
-            "columns": [
-              {
-                "parameters": [],
-                "type": "function"
-              }
-            ],
-            "groupBy": [
-              {
-                "property": {
-                  "type": "string"
-                },
-                "type": "groupBy"
-              }
-            ],
-            "limit": 50
-          }
-        }
-      ],
-      "title": "Percent of MAUs",
-      "type": "bargauge"
+      "title": "Last 10 Crawled",
+      "type": "table"
     },
     {
       "collapsed": false,
@@ -2672,11 +2796,11 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 85
+        "y": 110
       },
       "id": 9,
       "panels": [],
-      "title": "Table Data",
+      "title": "All Data",
       "type": "row"
     },
     {
@@ -2747,16 +2871,21 @@
         "h": 28,
         "w": 24,
         "x": 0,
-        "y": 86
+        "y": 111
       },
-      "id": 10,
+      "id": 76,
       "options": {
         "cellHeight": "sm",
         "enablePagination": true,
         "showHeader": true,
-        "sortBy": []
+        "sortBy": [
+          {
+            "desc": true,
+            "displayName": "Monthly Active Users"
+          }
+        ]
       },
-      "pluginVersion": "12.4.0-20728917751",
+      "pluginVersion": "12.4.0-20765167345",
       "targets": [
         {
           "datasource": {
@@ -2766,7 +2895,7 @@
           "editorMode": "code",
           "format": "table",
           "rawQuery": true,
-          "rawSql": "SELECT \n    domain AS \"Domain\",\n    software_version AS \"Version\",\n    full_version as \"Raw Version\",\n    active_users_monthly as \"Monthly Active Users\",\n    timestamp as \"Last Crawled\"\nFROM mastodon_domains\nORDER BY timestamp DESC;\n",
+          "rawSql": "SELECT \n    domain AS \"Domain\",\n    software_version AS \"Version\",\n    full_version as \"Raw Version\",\n    active_users_monthly as \"Monthly Active Users\",\n    timestamp as \"Last Crawled\"\nFROM mastodon_domains\nORDER BY active_users_monthly DESC;\n",
           "refId": "A",
           "sql": {
             "columns": [
@@ -2812,7 +2941,7 @@
   "timezone": "browser",
   "title": "vmcrawl",
   "uid": "aedqo0q7klrswa",
-  "version": 10,
+  "version": 16,
   "weekStart": "",
   "id": null
 }
