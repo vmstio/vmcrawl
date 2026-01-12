@@ -1,6 +1,6 @@
 #!/bin/bash
 # vmfetch startup script
-# This script activates the virtual environment and runs fetch.py
+# This script uses uv to run fetch.py
 
 set -e
 
@@ -16,8 +16,5 @@ else
     cd "$SCRIPT_DIR"
 fi
 
-# Activate the virtual environment
-source .venv/bin/activate
-
-# Run the fetcher
-exec python3 fetch.py "$@"
+# Run the fetcher using uv
+exec uv run fetch.py "$@"

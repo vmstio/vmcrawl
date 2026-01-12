@@ -1,6 +1,6 @@
 #!/bin/bash
 # vmcrawl startup script
-# This script activates the virtual environment and runs crawler.py
+# This script uses uv to run crawler.py
 
 set -e
 
@@ -16,8 +16,5 @@ else
     cd "$SCRIPT_DIR"
 fi
 
-# Activate the virtual environment
-source .venv/bin/activate
-
-# Run the crawler
-exec python3 crawler.py "$@"
+# Run the crawler using uv
+exec uv run crawler.py "$@"

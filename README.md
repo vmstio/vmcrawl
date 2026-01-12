@@ -20,10 +20,8 @@ For development or testing, you can quickly set up `vmcrawl` in the current dire
 ```bash
 git clone https://github.com/vmstio/vmcrawl.git
 cd vmcrawl
-python -m venv .venv
+uv sync
 source .venv/bin/activate
-pip install --upgrade pip
-pip install -r requirements.txt
 ```
 
 ### Production Installation
@@ -51,13 +49,9 @@ chown -R vmcrawl:vmcrawl /opt/vmcrawl
 # Switch to vmcrawl user
 sudo -u vmcrawl -i
 
-# Create virtual environment
+# Create virtual environment and install dependencies
 cd /opt/vmcrawl
-python3 -m venv .venv
-source .venv/bin/activate
-
-# Install dependencies
-pip install -r requirements.txt
+uv sync
 
 # Exit vmcrawl user
 exit

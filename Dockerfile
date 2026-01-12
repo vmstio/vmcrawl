@@ -5,6 +5,9 @@ FROM python:${PYTHON_VERSION}-${DEBIAN_VERSION}
 
 RUN apt-get update && apt-get upgrade -y
 
+# Install uv
+COPY --from=ghcr.io/astral-sh/uv:latest /uv /usr/local/bin/uv
+
 # Clone repository and set up application
 RUN git clone https://github.com/vmstio/vmcrawl.git /opt/vmcrawl
 
@@ -17,10 +20,7 @@ USER vmcrawl
 WORKDIR /opt/vmcrawl
 
 # Set up virtual environment and install dependencies
-RUN python3 -m venv .venv \
-    && . .venv/bin/activate \
-    && pip install --upgrade pip \
-    && pip install -r requirements.txt
+RUN uv sync
 
 # Make the startup script executable
 RUN chmod +x /opt/vmcrawl/vmcrawl.sh
