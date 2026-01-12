@@ -2650,6 +2650,7 @@ STATS_CONFIG = [
 # STATISTICS DATABASE FUNCTIONS - Write Statistics
 # =============================================================================
 
+
 def save_statistics():
     # Initialize statistics dictionary
     stats_data = {}
@@ -2664,6 +2665,7 @@ def save_statistics():
 
     # Write to database
     write_statistics_to_database(stats_values)
+
 
 def write_statistics_to_database(stats_values):
     """Write collected statistics to the database."""
@@ -2750,12 +2752,13 @@ def load_from_database(user_choice):
         "42": "SELECT domain FROM mastodon_domains ORDER BY active_users_monthly DESC",
     }
 
+    params = None
+
     if user_choice in ["2", "3"]:
         query = query_map["1"]
     else:
         query = query_map.get(user_choice)
 
-        params = []
         if user_choice == "40":
             params = {"versions": all_patched_versions}
             vmc_output("Excluding versions:", "pink")
@@ -2773,7 +2776,10 @@ def load_from_database(user_choice):
         with conn.cursor(name="domain_loader") as cursor:
             cursor.itersize = 1000  # Fetch 1000 rows at a time
             try:
-                _ = cursor.execute(query)  # pyright: ignore[reportCallIssue,reportArgumentType]
+                if params:
+                    _ = cursor.execute(query, params)  # pyright: ignore[reportCallIssue,reportArgumentType]
+                else:
+                    _ = cursor.execute(query)  # pyright: ignore[reportCallIssue,reportArgumentType]
                 domain_list = [
                     row[0].strip()
                     for row in cursor
@@ -3071,7 +3077,7 @@ def main():
             norobots_domains,
             nightly_version_ranges,
         )
-        
+
         save_statistics()
 
     except KeyboardInterrupt:
