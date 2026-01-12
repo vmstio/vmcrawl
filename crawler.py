@@ -6,6 +6,7 @@
 
 try:
     import argparse
+    import asyncio
     import atexit
     import gc
     import hashlib
@@ -160,6 +161,11 @@ http_client = httpx.Client(
     max_redirects=common_timeout,
 )
 
+# Track domains that require HTTP/1.1 fallback to avoid retrying HTTP/2
+# Thread-safe set for tracking domains with HTTP/2 issues
+http2_broken_domains = set()
+http2_broken_domains_lock = threading.Lock()
+
 # =============================================================================
 # UTILITY FUNCTIONS - Output and Environment
 # =============================================================================
@@ -258,7 +264,6 @@ def has_emoji_chars(domain: str) -> bool:
     return False
 
 
-
 # =============================================================================
 # HTTP FUNCTIONS
 # =============================================================================
@@ -266,6 +271,12 @@ def has_emoji_chars(domain: str) -> bool:
 
 def get_httpx(url: str, http_client: httpx.Client) -> httpx.Response:
     """Make HTTP GET request with HTTP/2 fallback on connection errors and size limits."""
+
+    # Extract domain from URL for HTTP/2 tracking
+    try:
+        domain = urlparse(url).netloc
+    except Exception:
+        domain = None
 
     def stream_with_size_limit(client: httpx.Client, url: str) -> httpx.Response:
         """Stream response and enforce size limit during download."""
@@ -313,6 +324,19 @@ def get_httpx(url: str, http_client: httpx.Client) -> httpx.Response:
             _ = stream_ctx.__exit__(None, None, None)
             raise
 
+    # Check if this domain is known to have HTTP/2 issues
+    if domain and domain in http2_broken_domains:
+        # Use HTTP/1.1 directly for known problematic domains
+        with httpx.Client(
+            http2=False,
+            follow_redirects=True,
+            headers=http_custom_headers,
+            timeout=common_timeout,
+            limits=limits,
+            max_redirects=common_timeout,
+        ) as fallback_client:
+            return stream_with_size_limit(fallback_client, url)
+
     try:
         return stream_with_size_limit(http_client, url)
 
@@ -322,18 +346,114 @@ def get_httpx(url: str, http_client: httpx.Client) -> httpx.Response:
         http2_error_indicators = ["connectionterminated"]
 
         if any(indicator in error_str for indicator in http2_error_indicators):
-            fallback_client = httpx.Client(
+            # Mark this domain as having HTTP/2 issues for future requests
+            if domain:
+                with http2_broken_domains_lock:
+                    http2_broken_domains.add(domain)
+
+            with httpx.Client(
                 http2=False,
                 follow_redirects=True,
                 headers=http_custom_headers,
                 timeout=common_timeout,
                 limits=limits,
                 max_redirects=common_timeout,
-            )
-            try:
+            ) as fallback_client:
                 return stream_with_size_limit(fallback_client, url)
-            finally:
-                fallback_client.close()
+        else:
+            raise exception
+
+
+async def get_httpx_async(url: str, http_client: httpx.AsyncClient) -> httpx.Response:
+    """Async version: Make HTTP GET request with HTTP/2 fallback and size limits."""
+
+    # Extract domain from URL for HTTP/2 tracking
+    try:
+        domain = urlparse(url).netloc
+    except Exception:
+        domain = None
+
+    async def stream_with_size_limit_async(
+        client: httpx.AsyncClient, url: str
+    ) -> httpx.Response:
+        """Async stream response and enforce size limit during download."""
+        stream_ctx = client.stream("GET", url)
+        response = await stream_ctx.__aenter__()
+
+        try:
+            # Check Content-Length header first if available
+            content_length = response.headers.get("Content-Length")
+            if content_length and int(content_length) > max_response_size:
+                await stream_ctx.__aexit__(None, None, None)
+                raise ValueError(
+                    f"Response too large: {content_length} bytes (max: {max_response_size})"
+                )
+
+            # Stream the response and check size as we download
+            chunks = []
+            total_size = 0
+
+            async for chunk in response.aiter_bytes(chunk_size=8192):
+                chunks.append(chunk)
+                total_size += len(chunk)
+
+                if total_size > max_response_size:
+                    await stream_ctx.__aexit__(None, None, None)
+                    raise ValueError(
+                        f"Response too large: {total_size} bytes (max: {max_response_size})"
+                    )
+
+            # All data received within size limit - construct final response
+            final_response = httpx.Response(
+                status_code=response.status_code,
+                headers=response.headers,
+                request=response.request,
+            )
+            final_response._content = b"".join(chunks)
+
+            await stream_ctx.__aexit__(None, None, None)
+            return final_response
+
+        except Exception:
+            await stream_ctx.__aexit__(None, None, None)
+            raise
+
+    # Check if this domain is known to have HTTP/2 issues
+    if domain and domain in http2_broken_domains:
+        # Use HTTP/1.1 directly for known problematic domains
+        async with httpx.AsyncClient(
+            http2=False,
+            follow_redirects=True,
+            headers=http_custom_headers,
+            timeout=common_timeout,
+            limits=limits,
+            max_redirects=common_timeout,
+        ) as fallback_client:
+            return await stream_with_size_limit_async(fallback_client, url)
+
+    try:
+        return await stream_with_size_limit_async(http_client, url)
+
+    except httpx.RequestError as exception:
+        error_str = str(exception).casefold()
+
+        http2_error_indicators = ["connectionterminated"]
+
+        if any(indicator in error_str for indicator in http2_error_indicators):
+            # Mark this domain as having HTTP/2 issues for future requests
+            if domain:
+                with http2_broken_domains_lock:
+                    http2_broken_domains.add(domain)
+
+            async with httpx.AsyncClient(
+                http2=False,
+                follow_redirects=True,
+                headers=http_custom_headers,
+                timeout=common_timeout,
+                limits=limits,
+                max_redirects=common_timeout,
+            ) as fallback_client:
+                return await stream_with_size_limit_async(fallback_client, url)
         else:
             raise exception
 
@@ -1824,6 +1944,310 @@ def process_domain(domain, http_client, nightly_version_ranges):
         mark_as_non_mastodon(domain, nodeinfo_20_result["software"]["name"])
 
 
+async def process_domain_async(domain, nightly_version_ranges):
+    """Async version: Process domain with HTTP/2 multiplexing for concurrent requests.
+
+    This version leverages HTTP/2 multiplexing to send multiple requests concurrently
+    over a single connection, significantly improving performance.
+    """
+    async with httpx.AsyncClient(
+        http2=True,
+        follow_redirects=True,
+        headers=http_custom_headers,
+        timeout=common_timeout,
+        limits=limits,
+        max_redirects=common_timeout,
+    ) as client:
+        # Check robots.txt first (must complete before proceeding)
+        try:
+            robots_url = f"https://{domain}/robots.txt"
+            response = await get_httpx_async(robots_url, client)
+
+            if response.status_code == 200:
+                content_type = response.headers.get("Content-Type", "")
+                if (
+                    content_type in mimetypes.types_map.values()
+                    and not content_type.startswith("text/")
+                ):
+                    handle_incorrect_file_type(domain, "robots_txt", content_type)
+                    return
+
+                robots_txt = response.text
+                lines = robots_txt.splitlines()
+                user_agent = None
+                for line in lines:
+                    line = line.strip().lower()
+                    if line.startswith("user-agent:"):
+                        user_agent = line.split(":", 1)[1].strip()
+                    elif line.startswith("disallow:"):
+                        disallow_path = line.split(":", 1)[1].strip()
+                        if user_agent in ["*", appname.lower()] and (
+                            disallow_path == "/" or disallow_path == "*"
+                        ):
+                            vmc_output(
+                                f"{domain}: Crawling Prohibited",
+                                "orange",
+                                use_tqdm=True,
+                            )
+                            mark_norobots_domain(domain)
+                            delete_domain_if_known(domain)
+                            return
+            elif response.status_code in http_codes_to_hardfail:
+                handle_http_failed(domain, "robots_txt", response)
+                return
+            else:
+                handle_http_status_code(domain, "robots_txt", response)
+                return
+        except httpx.RequestError as exception:
+            handle_tcp_exception(domain, exception)
+            return
+
+        # Check if we have cached nodeinfo URL
+        cached_nodeinfo_url = get_cached_nodeinfo_url(domain)
+
+        if cached_nodeinfo_url:
+            # Use cached URL - can fetch nodeinfo and instance API concurrently
+            backend_domain = urlparse(cached_nodeinfo_url).netloc
+
+            try:
+                # Fetch both concurrently (HTTP/2 multiplexing!)
+                nodeinfo_task = get_httpx_async(cached_nodeinfo_url, client)
+                instance_task = get_httpx_async(
+                    f"https://{backend_domain}/api/v1/instance", client
+                )
+
+                nodeinfo_resp, instance_resp = await asyncio.gather(
+                    nodeinfo_task, instance_task, return_exceptions=True
+                )
+
+                # Process nodeinfo response
+                if isinstance(nodeinfo_resp, Exception):
+                    save_nodeinfo_url(domain, None)
+                    # Fall through to full discovery
+                else:
+                    if nodeinfo_resp.status_code == 200:
+                        content_type = nodeinfo_resp.headers.get("Content-Type", "")
+                        if "json" in content_type and nodeinfo_resp.content:
+                            nodeinfo_20_result = parse_json_with_fallback(
+                                nodeinfo_resp, domain, "nodeinfo_20 (cached)"
+                            )
+
+                            if nodeinfo_20_result and is_mastodon_instance(
+                                nodeinfo_20_result
+                            ):
+                                # Get instance URI from instance API response
+                                instance_uri = None
+                                if (
+                                    not isinstance(instance_resp, Exception)
+                                    and instance_resp.status_code == 200
+                                ):
+                                    instance_data = parse_json_with_fallback(
+                                        instance_resp, backend_domain, "instance_api"
+                                    )
+                                    if instance_data and isinstance(
+                                        instance_data, dict
+                                    ):
+                                        instance_uri = instance_data.get("uri")
+
+                                process_mastodon_instance(
+                                    domain,
+                                    nodeinfo_20_result,
+                                    nightly_version_ranges,
+                                    actual_domain=instance_uri,
+                                )
+                                return
+                            elif nodeinfo_20_result:
+                                mark_as_non_mastodon(
+                                    domain, nodeinfo_20_result["software"]["name"]
+                                )
+                                return
+
+                    # Cached URL failed, clear and fall through
+                    save_nodeinfo_url(domain, None)
+
+            except Exception:
+                # Error with cached path, fall through to full discovery
+                save_nodeinfo_url(domain, None)
+
+        # Full discovery process - fetch webfinger
+        try:
+            webfinger_url = f"https://{domain}/.well-known/webfinger?resource=acct:{domain}@{domain}"
+            webfinger_resp = await get_httpx_async(webfinger_url, client)
+
+            if webfinger_resp.status_code != 200:
+                if webfinger_resp.status_code in http_codes_to_hardfail:
+                    handle_http_failed(domain, "webfinger", webfinger_resp)
+                else:
+                    handle_http_status_code(domain, "webfinger", webfinger_resp)
+                return
+
+            content_type = webfinger_resp.headers.get("Content-Type", "")
+            if "json" not in content_type:
+                handle_incorrect_file_type(domain, "webfinger", content_type)
+                return
+
+            if (
+                not webfinger_resp.content
+                or webfinger_resp.headers.get("Content-Length") == "0"
+            ):
+                handle_json_exception(domain, "webfinger", "returned empty content")
+                return
+
+            webfinger_data = parse_json_with_fallback(
+                webfinger_resp, domain, "webfinger"
+            )
+            if not webfinger_data or not isinstance(webfinger_data, dict):
+                return
+
+            aliases = webfinger_data.get("aliases", [])
+            if not aliases:
+                handle_json_exception(domain, "webfinger", "has no aliases")
+                return
+
+            first_alias = next((alias for alias in aliases if "https" in alias), None)
+            if not first_alias:
+                handle_json_exception(domain, "webfinger", "has no https alias")
+                return
+
+            backend_domain = urlparse(first_alias).netloc
+            if "localhost" in backend_domain:
+                handle_json_exception(domain, "webfinger", "points to localhost")
+                return
+
+        except httpx.RequestError as exception:
+            handle_tcp_exception(domain, exception)
+            return
+        except json.JSONDecodeError as exception:
+            handle_json_exception(domain, "webfinger", exception)
+            return
+
+        # Now fetch nodeinfo, nodeinfo_20, and instance API concurrently (HTTP/2 multiplexing!)
+        try:
+            nodeinfo_url = f"https://{backend_domain}/.well-known/nodeinfo"
+            instance_url = f"https://{backend_domain}/api/v1/instance"
+
+            # Start with nodeinfo discovery
+            nodeinfo_resp = await get_httpx_async(nodeinfo_url, client)
+
+            if nodeinfo_resp.status_code != 200:
+                if nodeinfo_resp.status_code in http_codes_to_hardfail:
+                    handle_http_failed(domain, "nodeinfo", nodeinfo_resp)
+                else:
+                    handle_http_status_code(domain, "nodeinfo", nodeinfo_resp)
+                return
+
+            content_type = nodeinfo_resp.headers.get("Content-Type", "")
+            if "json" not in content_type:
+                handle_incorrect_file_type(domain, "nodeinfo", content_type)
+                return
+
+            if not nodeinfo_resp.content:
+                handle_json_exception(domain, "nodeinfo", "reply is empty")
+                return
+
+            nodeinfo_data = parse_json_with_fallback(nodeinfo_resp, domain, "nodeinfo")
+            if not nodeinfo_data or not isinstance(nodeinfo_data, dict):
+                return
+
+            links = nodeinfo_data.get("links")
+            if not links or len(links) == 0:
+                handle_json_exception(domain, "nodeinfo", "no links in reply")
+                return
+
+            # Find nodeinfo 2.0 URL
+            nodeinfo_20_url = None
+            for i, link in enumerate(links):
+                rel_value = link.get("rel", "")
+                type_value = link.get("type", "")
+                href_value = link.get("href", "")
+                if (
+                    "nodeinfo.diaspora.software/ns/schema/" in rel_value
+                    or "nodeinfo.diaspora.software/ns/schema/" in type_value
+                    or "/nodeinfo/" in href_value
+                ):
+                    if "href" in link:
+                        nodeinfo_20_url = link["href"]
+                        break
+                    elif (
+                        i + 1 < len(links)
+                        and "href" in links[i + 1]
+                        and "rel" not in links[i + 1]
+                    ):
+                        nodeinfo_20_url = links[i + 1]["href"]
+                        break
+
+            if not nodeinfo_20_url:
+                handle_json_exception(domain, "nodeinfo", "no nodeinfo 2.0 link found")
+                return
+
+            # Cache the nodeinfo URL
+            save_nodeinfo_url(domain, nodeinfo_20_url)
+
+            # Fetch nodeinfo_20 and instance API concurrently (HTTP/2 multiplexing!)
+            nodeinfo_20_task = get_httpx_async(nodeinfo_20_url, client)
+            instance_task = get_httpx_async(instance_url, client)
+
+            nodeinfo_20_resp, instance_resp = await asyncio.gather(
+                nodeinfo_20_task, instance_task, return_exceptions=True
+            )
+
+            # Process nodeinfo_20 response
+            if isinstance(nodeinfo_20_resp, Exception):
+                handle_tcp_exception(domain, nodeinfo_20_resp)
+                return
+
+            if nodeinfo_20_resp.status_code != 200:
+                if nodeinfo_20_resp.status_code in http_codes_to_hardfail:
+                    handle_http_failed(domain, "nodeinfo_20", nodeinfo_20_resp)
+                else:
+                    handle_http_status_code(domain, "nodeinfo_20", nodeinfo_20_resp)
+                return
+
+            content_type = nodeinfo_20_resp.headers.get("Content-Type", "")
+            if "json" not in content_type:
+                handle_incorrect_file_type(domain, "nodeinfo_20", content_type)
+                return
+
+            if not nodeinfo_20_resp.content:
+                handle_json_exception(domain, "nodeinfo_20", "reply empty")
+                return
+
+            nodeinfo_20_result = parse_json_with_fallback(
+                nodeinfo_20_resp, domain, "nodeinfo_20"
+            )
+            if not nodeinfo_20_result:
+                return
+
+            if is_mastodon_instance(nodeinfo_20_result):
+                # Get instance URI from instance API response
+                instance_uri = None
+                if (
+                    not isinstance(instance_resp, Exception)
+                    and instance_resp.status_code == 200
+                ):
+                    instance_data = parse_json_with_fallback(
+                        instance_resp, backend_domain, "instance_api"
+                    )
+                    if instance_data and isinstance(instance_data, dict):
+                        instance_uri = instance_data.get("uri")
+
+                process_mastodon_instance(
+                    domain,
+                    nodeinfo_20_result,
+                    nightly_version_ranges,
+                    actual_domain=instance_uri,
+                )
+            else:
+                mark_as_non_mastodon(domain, nodeinfo_20_result["software"]["name"])
+
+        except httpx.RequestError as exception:
+            handle_tcp_exception(domain, exception)
+            return
+        except json.JSONDecodeError as exception:
+            handle_json_exception(domain, "nodeinfo_20", exception)
+            return
+
+
 # =============================================================================
 # DOMAIN PROCESSING - Batch Processing
 # =============================================================================
@@ -1843,25 +2267,13 @@ def check_and_record_domains(
     norobots_domains,
     nightly_version_ranges,
 ):
-    """Process a list of domains concurrently with progress tracking."""
+    """Process a list of domains concurrently with progress tracking.
+
+    Uses threading for cross-domain parallelism and async/await for
+    HTTP/2 multiplexing within each domain's request pipeline.
+    """
     max_workers = int(os.getenv("VMCRAWL_MAX_THREADS", "2"))
     shutdown_event = threading.Event()
-
-    # Thread-local storage for HTTP clients to avoid contention
-    thread_local = threading.local()
-
-    def get_thread_http_client():
-        """Get or create a thread-local HTTP client."""
-        if not hasattr(thread_local, "http_client"):
-            thread_local.http_client = httpx.Client(
-                http2=True,
-                follow_redirects=True,
-                headers=http_custom_headers,
-                timeout=common_timeout,
-                limits=limits,
-                max_redirects=common_timeout,
-            )
-        return thread_local.http_client
 
     def process_single_domain(domain):
         if shutdown_event.is_set():
@@ -1882,9 +2294,9 @@ def check_and_record_domains(
             return
 
         try:
-            # Use thread-local HTTP client instead of shared one
-            client = get_thread_http_client()
-            process_domain(domain, client, nightly_version_ranges)
+            # Use async version for HTTP/2 multiplexing benefits
+            # asyncio.run() creates a new event loop for each domain (thread-safe)
+            asyncio.run(process_domain_async(domain, nightly_version_ranges))
         except httpx.CloseError:
             pass
         except Exception as exception:
@@ -1929,13 +2341,6 @@ def check_and_record_domains(
     finally:
         if not shutdown_event.is_set():
             executor.shutdown(wait=True)
-
-        # Clean up thread-local HTTP clients
-        if hasattr(thread_local, "http_client"):
-            try:
-                thread_local.http_client.close()
-            except Exception:
-                pass
 
 
 # =============================================================================
