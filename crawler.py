@@ -384,7 +384,7 @@ async def get_httpx_async(url: str, http_client: httpx.AsyncClient) -> httpx.Res
             # Check Content-Length header first if available
             content_length = response.headers.get("Content-Length")
             if content_length and int(content_length) > max_response_size:
-                await stream_ctx.__aexit__(None, None, None)
+                _ = await stream_ctx.__aexit__(None, None, None)
                 raise ValueError(
                     f"Response too large: {content_length} bytes (max: {max_response_size})"
                 )
@@ -398,7 +398,7 @@ async def get_httpx_async(url: str, http_client: httpx.AsyncClient) -> httpx.Res
                 total_size += len(chunk)
 
                 if total_size > max_response_size:
-                    await stream_ctx.__aexit__(None, None, None)
+                    _ = await stream_ctx.__aexit__(None, None, None)
                     raise ValueError(
                         f"Response too large: {total_size} bytes (max: {max_response_size})"
                     )
@@ -411,11 +411,11 @@ async def get_httpx_async(url: str, http_client: httpx.AsyncClient) -> httpx.Res
             )
             final_response._content = b"".join(chunks)
 
-            await stream_ctx.__aexit__(None, None, None)
+            _ = await stream_ctx.__aexit__(None, None, None)
             return final_response
 
         except Exception:
-            await stream_ctx.__aexit__(None, None, None)
+            _ = await stream_ctx.__aexit__(None, None, None)
             raise
 
     # Check if this domain is known to have HTTP/2 issues
@@ -2024,7 +2024,7 @@ async def process_domain_async(domain, nightly_version_ranges):
                 if isinstance(nodeinfo_resp, Exception):
                     save_nodeinfo_url(domain, None)
                     # Fall through to full discovery
-                else:
+                elif isinstance(nodeinfo_resp, httpx.Response):
                     if nodeinfo_resp.status_code == 200:
                         content_type = nodeinfo_resp.headers.get("Content-Type", "")
                         if "json" in content_type and nodeinfo_resp.content:
@@ -2032,13 +2032,15 @@ async def process_domain_async(domain, nightly_version_ranges):
                                 nodeinfo_resp, domain, "nodeinfo_20 (cached)"
                             )
 
-                            if nodeinfo_20_result and is_mastodon_instance(
+                            if (
                                 nodeinfo_20_result
+                                and isinstance(nodeinfo_20_result, dict)
+                                and is_mastodon_instance(nodeinfo_20_result)
                             ):
                                 # Get instance URI from instance API response
                                 instance_uri = None
                                 if (
-                                    not isinstance(instance_resp, Exception)
+                                    isinstance(instance_resp, httpx.Response)
                                     and instance_resp.status_code == 200
                                 ):
                                     instance_data = parse_json_with_fallback(
@@ -2056,14 +2058,19 @@ async def process_domain_async(domain, nightly_version_ranges):
                                     actual_domain=instance_uri,
                                 )
                                 return
-                            elif nodeinfo_20_result:
+                            elif nodeinfo_20_result and isinstance(
+                                nodeinfo_20_result, dict
+                            ):
                                 mark_as_non_mastodon(
                                     domain, nodeinfo_20_result["software"]["name"]
                                 )
                                 return
 
-                    # Cached URL failed, clear and fall through
-                    save_nodeinfo_url(domain, None)
+                        # Cached URL failed, clear and fall through
+                        save_nodeinfo_url(domain, None)
+                    else:
+                        # Cached URL failed, clear and fall through
+                        save_nodeinfo_url(domain, None)
 
             except Exception:
                 # Error with cached path, fall through to full discovery
@@ -2196,6 +2203,9 @@ async def process_domain_async(domain, nightly_version_ranges):
                 handle_tcp_exception(domain, nodeinfo_20_resp)
                 return
 
+            if not isinstance(nodeinfo_20_resp, httpx.Response):
+                return
+
             if nodeinfo_20_resp.status_code != 200:
                 if nodeinfo_20_resp.status_code in http_codes_to_hardfail:
                     handle_http_failed(domain, "nodeinfo_20", nodeinfo_20_resp)
@@ -2215,14 +2225,14 @@ async def process_domain_async(domain, nightly_version_ranges):
             nodeinfo_20_result = parse_json_with_fallback(
                 nodeinfo_20_resp, domain, "nodeinfo_20"
             )
-            if not nodeinfo_20_result:
+            if not nodeinfo_20_result or not isinstance(nodeinfo_20_result, dict):
                 return
 
             if is_mastodon_instance(nodeinfo_20_result):
                 # Get instance URI from instance API response
                 instance_uri = None
                 if (
-                    not isinstance(instance_resp, Exception)
+                    isinstance(instance_resp, httpx.Response)
                     and instance_resp.status_code == 200
                 ):
                     instance_data = parse_json_with_fallback(
@@ -2238,7 +2248,10 @@ async def process_domain_async(domain, nightly_version_ranges):
                     actual_domain=instance_uri,
                 )
             else:
-                mark_as_non_mastodon(domain, nodeinfo_20_result["software"]["name"])
+                mark_as_non_mastodon(
+                    domain,
+                    nodeinfo_20_result.get("software", {}).get("name", "Unknown"),
+                )
 
         except httpx.RequestError as exception:
             handle_tcp_exception(domain, exception)
