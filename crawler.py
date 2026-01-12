@@ -1717,7 +1717,7 @@ def process_mastodon_instance(
         error_to_print = "No usage data in NodeInfo"
         vmc_output(f"{db_domain}: {error_to_print}", "yellow", use_tqdm=True)
         log_error(domain, error_to_print)
-        increment_domain_error(domain, "###")
+        increment_domain_error(domain, "MAU")
         delete_domain_if_known(domain)
         return
 
@@ -1730,7 +1730,7 @@ def process_mastodon_instance(
         if field not in users:
             vmc_output(f"{db_domain}: {error_msg}", "yellow", use_tqdm=True)
             log_error(domain, error_msg)
-            increment_domain_error(domain, "###")
+            increment_domain_error(domain, "MAU")
             delete_domain_if_known(domain)
             return
 
@@ -1740,7 +1740,7 @@ def process_mastodon_instance(
     if active_month_users == 0:
         vmc_output(f"{db_domain}: MAU reported as 0", "yellow", use_tqdm=True)
         log_error(domain, "MAU reported as 0")
-        increment_domain_error(domain, "###")
+        increment_domain_error(domain, "MAU")
         delete_domain_if_known(domain)
         return
 
@@ -1750,7 +1750,7 @@ def process_mastodon_instance(
         error_to_print = "Mastodon version invalid"
         vmc_output(f"{db_domain}: {error_to_print}", "yellow", use_tqdm=True)
         log_error(domain, error_to_print)
-        increment_domain_error(domain, "###")
+        increment_domain_error(domain, "MAU")
         delete_domain_if_known(domain)
         return
 
@@ -1824,7 +1824,7 @@ def process_domain(domain, http_client, nightly_version_ranges):
         )
         vmc_output(f"{domain}: {error_to_print}", "yellow", use_tqdm=True)
         log_error(domain, error_to_print)
-        increment_domain_error(domain, "BACKEND")
+        increment_domain_error(domain, "BACK")
         delete_domain_if_known(domain)
         return
 
@@ -2734,10 +2734,11 @@ def load_from_database(user_choice):
         "22": "SELECT domain FROM raw_domains WHERE reason ~ '^4[0-9]{2}' ORDER BY errors ASC",
         "23": "SELECT domain FROM raw_domains WHERE reason ~ '^5[0-9]{2}' ORDER BY errors ASC",
         "30": "SELECT domain FROM raw_domains WHERE reason LIKE '%JSON%' ORDER BY errors ASC",
-        "31": "SELECT domain FROM raw_domains WHERE reason LIKE '%TYPE%' ORDER BY errors ASC",
-        "32": "SELECT domain FROM raw_domains WHERE reason LIKE '%###%' ORDER BY errors ASC",
-        "33": "SELECT domain FROM raw_domains WHERE reason = 'SIZE' ORDER BY errors ASC",
-        "34": "SELECT domain FROM raw_domains WHERE reason = 'FD' ORDER BY errors ASC",
+        "31": "SELECT domain FROM raw_domains WHERE reason LIKE '%MAU%' ORDER BY errors ASC",
+        "32": "SELECT domain FROM raw_domains WHERE reason LIKE '%BACK%' ORDER BY errors ASC",
+        "33": "SELECT domain FROM raw_domains WHERE reason LIKE '%FD%' ORDER BY errors ASC",
+        "34": "SELECT domain FROM raw_domains WHERE reason LIKE '%SIZE%' ORDER BY errors ASC",
+        "35": "SELECT domain FROM raw_domains WHERE reason LIKE '%TYPE%' ORDER BY errors ASC",
         "40": "SELECT domain FROM mastodon_domains WHERE software_version != ALL(%(versions)s::text[]) ORDER BY active_users_monthly DESC",
         "41": "SELECT domain FROM mastodon_domains WHERE software_version LIKE %s ORDER BY active_users_monthly DESC",
         "42": "SELECT domain FROM mastodon_domains ORDER BY active_users_monthly DESC",
@@ -2840,10 +2841,11 @@ def get_menu_options() -> dict[str, dict[str, str]]:
         "Retry HTTP errors": {"20": "2xx", "21": "3xx", "22": "4xx", "23": "5xx"},
         "Retry target errors": {
             "30": "JSON",
-            "31": "TYPE",
-            "32": "###",
-            "33": "SIZE",
-            "34": "FD",
+            "31": "MAU",
+            "32": "Backend",
+            "33": "File Descriptor",
+            "34": "File Size",
+            "35": "File Type",
         },
         "Retry known instances": {
             "40": "Unpatched",
