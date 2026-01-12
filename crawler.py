@@ -1443,7 +1443,6 @@ def check_robots_txt(domain, http_client):
                 and not content_type.startswith("text/")
             ):
                 handle_incorrect_file_type(domain, target, content_type)
-                delete_domain_if_known(domain)
                 return False
             robots_txt = response.text
             lines = robots_txt.splitlines()
@@ -1468,7 +1467,6 @@ def check_robots_txt(domain, http_client):
             return False
         else:
             handle_http_status_code(domain, target, response)
-            delete_domain_if_known(domain)
             return False
     except httpx.RequestError as exception:
         handle_tcp_exception(domain, exception)
