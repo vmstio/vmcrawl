@@ -21,7 +21,7 @@ For development or testing, you can quickly set up `vmcrawl` in the current dire
 git clone https://github.com/vmstio/vmcrawl.git
 cd vmcrawl
 uv sync
-source .venv/bin/activate
+./vmcrawl.sh
 ```
 
 ### Production Installation
@@ -47,6 +47,13 @@ chown -R vmcrawl:vmcrawl /opt/vmcrawl
 
 ```bash
 # Switch to vmcrawl user
+sudo -u vmcrawl -i
+
+# Install uv package manager
+curl -LsSf https://astral.sh/uv/install.sh | sh
+
+# Exit and log back in to refresh the PATH
+exit
 sudo -u vmcrawl -i
 
 # Create virtual environment and install dependencies
@@ -149,12 +156,12 @@ To start using `vmcrawl` you will need to populate your database with instances 
 
 **Native:**
 ```bash
-python fetch.py
+./vmfetch.sh
 ```
 
 **Docker:**
 ```bash
-docker exec vmcrawl python fetch.py
+docker exec vmcrawl ./vmfetch.sh
 ```
 
 The first time this is launched it will default to polling `vmst.io` for instances to crawl.
@@ -162,24 +169,24 @@ If you wish to override this you can target a specific instance:
 
 **Native:**
 ```bash
-python fetch.py --target example.social
+./vmfetch.sh --target example.social
 ```
 
 **Docker:**
 ```bash
-docker exec vmcrawl python fetch.py --target example.social
+docker exec vmcrawl ./vmfetch.sh --target example.social
 ```
 
 Once you have established a set of known good Mastodon instances, you can use them to fetch new federated instances:
 
 **Native:**
 ```bash
-python fetch.py
+./vmfetch.sh
 ```
 
 **Docker:**
 ```bash
-docker exec vmcrawl python fetch.py
+docker exec vmcrawl ./vmfetch.sh
 ```
 
 This will scan the top 10 instances in your database by total users.
@@ -188,12 +195,12 @@ You can change the limits or offset the domain list from the top:
 
 **Native:**
 ```bash
-python fetch.py --limit 100 --offset 50
+./vmfetch.sh --limit 100 --offset 50
 ```
 
 **Docker:**
 ```bash
-docker exec vmcrawl python fetch.py --limit 100 --offset 50
+docker exec vmcrawl ./vmfetch.sh --limit 100 --offset 50
 ```
 
 You can use `limit` and `offset` together, or individually, but neither option can be combined with the `target` argument.
@@ -205,12 +212,12 @@ You can also select a random sampling of servers to fetch from, instead of going
 
 **Native:**
 ```bash
-python fetch.py --random
+./vmfetch.sh --random
 ```
 
 **Docker:**
 ```bash
-docker exec vmcrawl python fetch.py --random
+docker exec vmcrawl ./vmfetch.sh --random
 ```
 
 You can combine `random` with the `limit` command, but not with `target` or `offset`.
@@ -221,12 +228,12 @@ After you have a list of instances to crawl, run the following command:
 
 **Native:**
 ```bash
-python crawler.py
+./vmcrawl.sh
 ```
 
 **Docker:**
 ```bash
-docker exec -it vmcrawl python crawler.py
+docker exec -it vmcrawl ./vmcrawl.sh
 ```
 
 Selecting `0` from the interactive menu will begin to process all of your fetched domains.
@@ -301,36 +308,36 @@ You can target a specific domain to fetch or crawl with the `target` option:
 
 **Native:**
 ```bash
-python crawler.py --target vmst.io
+./vmcrawl.sh --target vmst.io
 ```
 
 **Docker:**
 ```bash
-docker exec -it vmcrawl python crawler.py --target vmst.io
+docker exec -it vmcrawl ./vmcrawl.sh --target vmst.io
 ```
 
 You can include multiple domains in a comma-separated list:
 
 **Native:**
 ```bash
-python crawler.py --target mas.to,infosec.exchange
+./vmcrawl.sh --target mas.to,infosec.exchange
 ```
 
 **Docker:**
 ```bash
-docker exec -it vmcrawl python crawler.py --target mas.to,infosec.exchange
+docker exec -it vmcrawl ./vmcrawl.sh --target mas.to,infosec.exchange
 ```
 
 You can also process multiple domains using an external file, which contains each domain on a new line:
 
 **Native:**
 ```bash
-python crawler.py --file ~/domains.txt
+./vmcrawl.sh --file ~/domains.txt
 ```
 
 **Docker:**
 ```bash
-docker exec -it vmcrawl python crawler.py --file /opt/vmcrawl/domains.txt
+docker exec -it vmcrawl ./vmcrawl.sh --file /opt/vmcrawl/domains.txt
 ```
 
 ### Nightly Version Management
@@ -339,12 +346,12 @@ The `nightly.py` script manages tracking of development/nightly versions:
 
 **Native:**
 ```bash
-python nightly.py
+uv run nightly.py
 ```
 
 **Docker:**
 ```bash
-docker exec -it vmcrawl python nightly.py
+docker exec -it vmcrawl uv run nightly.py
 ```
 
 This displays current nightly version entries and allows you to add new versions as they are released. Nightly versions are used to identify instances running pre-release software (alpha, beta, rc versions).
