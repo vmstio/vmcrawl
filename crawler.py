@@ -1363,7 +1363,7 @@ def handle_tcp_exception(domain, exception):
 
     if "_ssl.c" in error_message.casefold():
         error_reason = "SSL"
-        error_message = (
+        cleaned_message = (
             re.sub(r"\s*(\[[^\]]*\]|\([^)]*\))", "", error_message)
             .replace(":", "")
             .replace(",", "")
@@ -1371,8 +1371,11 @@ def handle_tcp_exception(domain, exception):
             .lstrip()
             .rstrip(" .")
         )
-        vmc_output(f"{domain}: {error_message}", "yellow", use_tqdm=True)
-        log_error(domain, error_message)
+        # Fallback to original if cleaning resulted in empty string
+        if not cleaned_message:
+            cleaned_message = "SSL connection error"
+        vmc_output(f"{domain}: {cleaned_message}", "yellow", use_tqdm=True)
+        log_error(domain, cleaned_message)
         increment_domain_error(domain, error_reason)
     elif any(
         msg in error_message.casefold()
@@ -1385,7 +1388,7 @@ def handle_tcp_exception(domain, exception):
         ]
     ):
         error_reason = "DNS"
-        error_message = (
+        cleaned_message = (
             re.sub(r"\s*(\[[^\]]*\]|\([^)]*\))", "", error_message)
             .replace(":", "")
             .replace(",", "")
@@ -1393,8 +1396,11 @@ def handle_tcp_exception(domain, exception):
             .lstrip()
             .rstrip(" .")
         )
-        vmc_output(f"{domain}: {error_message}", "yellow", use_tqdm=True)
-        log_error(domain, error_message)
+        # Fallback to original if cleaning resulted in empty string
+        if not cleaned_message:
+            cleaned_message = "DNS resolution failed"
+        vmc_output(f"{domain}: {cleaned_message}", "yellow", use_tqdm=True)
+        log_error(domain, cleaned_message)
         increment_domain_error(domain, error_reason)
     elif any(
         msg in error_message.casefold()
@@ -1411,21 +1417,25 @@ def handle_tcp_exception(domain, exception):
     ):
         error_reason = "TCP"
         if "streamreset" in error_message.casefold():
-            error_message = "HTTP/2 stream was abruptly terminated"
-        error_message = (
-            re.sub(r"\s*(\[[^\]]*\]|\([^)]*\))", "", error_message)
-            .replace(":", "")
-            .replace(",", "")
-            .split(" for ", 1)[0]
-            .lstrip()
-            .rstrip(" .")
-        )
-        vmc_output(f"{domain}: {error_message}", "yellow", use_tqdm=True)
-        log_error(domain, error_message)
+            cleaned_message = "HTTP/2 stream was abruptly terminated"
+        else:
+            cleaned_message = (
+                re.sub(r"\s*(\[[^\]]*\]|\([^)]*\))", "", error_message)
+                .replace(":", "")
+                .replace(",", "")
+                .split(" for ", 1)[0]
+                .lstrip()
+                .rstrip(" .")
+            )
+        # Fallback to original if cleaning resulted in empty string
+        if not cleaned_message:
+            cleaned_message = "TCP connection error"
+        vmc_output(f"{domain}: {cleaned_message}", "yellow", use_tqdm=True)
+        log_error(domain, cleaned_message)
         increment_domain_error(domain, error_reason)
     else:
         error_reason = "HTTP"
-        error_message = (
+        cleaned_message = (
             re.sub(r"\s*(\[[^\]]*\]|\([^)]*\))", "", error_message)
             .replace(":", "")
             .replace(",", "")
@@ -1433,8 +1443,11 @@ def handle_tcp_exception(domain, exception):
             .lstrip()
             .rstrip(" .")
         )
-        vmc_output(f"{domain}: {error_message}", "yellow", use_tqdm=True)
-        log_error(domain, error_message)
+        # Fallback to original if cleaning resulted in empty string
+        if not cleaned_message:
+            cleaned_message = str(exception)[:100] or "HTTP request error"
+        vmc_output(f"{domain}: {cleaned_message}", "yellow", use_tqdm=True)
+        log_error(domain, cleaned_message)
         increment_domain_error(domain, error_reason)
 
 
