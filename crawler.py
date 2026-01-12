@@ -838,7 +838,7 @@ def increment_domain_error(domain: str, error_reason: str) -> None:
                         new_errors = 1
 
                     # If DNS errors reach threshold, mark as NXDOMAIN
-                    if new_errors >= common_timeout:
+                    if new_errors >= common_timeout * 2:
                         mark_domain_status(domain, "nxdomain")
                         delete_domain_if_known(domain)
                         return
