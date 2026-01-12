@@ -4,9 +4,6 @@
 # IMPORTS
 # =============================================================================
 
-from httpx import delete
-
-
 try:
     import argparse
     import atexit
@@ -90,7 +87,7 @@ colors = {
 }
 
 # HTTP status codes for special handling
-http_codes_to_hardfail = [418, 410]  # gone
+http_codes_to_hardfail = [451, 418, 410]  # gone
 
 # Define maintained branches (adjust as needed)
 backport_branches = ["4.5", "4.4", "4.3"]
