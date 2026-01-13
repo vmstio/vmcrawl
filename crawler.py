@@ -1820,13 +1820,6 @@ def process_mastodon_instance(
     total_users = users["total"]
     active_month_users = users["activeMonth"]
 
-    if active_month_users == 0:
-        vmc_output(f"{db_domain}: MAU reported as 0", "yellow", use_tqdm=True)
-        log_error(domain, "MAU reported as 0")
-        increment_domain_error(domain, "MAU")
-        delete_domain_if_known(domain)
-        return
-
     if version.parse(software_version.split("-")[0]) > version.parse(
         version_main_branch
     ):
