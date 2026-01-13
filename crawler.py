@@ -1374,7 +1374,7 @@ def check_robots_txt(domain, http_client):
             handle_http_status_code(domain, target, response)
             return False
     except httpx.RequestError as exception:
-        handle_tcp_exception(domain, exception)
+        handle_tcp_exception(domain, target, exception)
         return False
     return True
 
@@ -1506,7 +1506,7 @@ def check_nodeinfo(domain, backend_domain, http_client):
         else:
             handle_http_status_code(domain, target, response)
     except httpx.RequestError as exception:
-        handle_tcp_exception(domain, exception)
+        handle_tcp_exception(domain, target, exception)
     except json.JSONDecodeError as exception:
         handle_json_exception(domain, target, exception)
     return None
@@ -1537,7 +1537,7 @@ def check_nodeinfo_20(domain, nodeinfo_20_url, http_client, from_cache=False):
         else:
             handle_http_status_code(domain, target, response)
     except httpx.RequestError as exception:
-        handle_tcp_exception(domain, exception)
+        handle_tcp_exception(domain, target, exception)
         return False
     except json.JSONDecodeError as exception:
         handle_json_exception(domain, target, exception)
@@ -1784,7 +1784,8 @@ def check_and_record_domains(
             pass
         except Exception as exception:
             if not shutdown_event.is_set():
-                handle_tcp_exception(domain, exception)
+                target = "shutdown"
+                handle_tcp_exception(domain, target, exception)
 
     executor = ThreadPoolExecutor(max_workers=max_workers)
     try:
