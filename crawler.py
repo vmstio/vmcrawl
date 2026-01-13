@@ -542,8 +542,11 @@ def clean_version_suffix_more(software_version: str) -> str:
 
 def clean_version_strings(software_version: str) -> str:
     """Remove unwanted strings and fix typos in version strings."""
-    # Remove unwanted suffixes
-    unwanted_strings = ["-pre", "-theconnector", "-theatlsocial"]
+    # Remove unwanted suffixes (including everything after -pre)
+    software_version = re.sub(r"-pre.*", "", software_version)
+
+    # Remove other unwanted strings
+    unwanted_strings = ["-theconnector", "-theatlsocial"]
     for unwanted_string in unwanted_strings:
         software_version = software_version.replace(unwanted_string, "")
 
