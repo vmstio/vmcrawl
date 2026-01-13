@@ -1403,20 +1403,9 @@ def handle_tcp_exception(domain, exception):
         vmc_output(f"{domain}: {cleaned_message}", "yellow", use_tqdm=True)
         log_error(domain, cleaned_message)
         increment_domain_error(domain, error_reason)
-    elif any(
-        msg in error_message.casefold()
-        for msg in [
-            "timed out",
-            "connection reset by peer",
-            "network is unreachable",
-            "connection refused",
-            "could not connect to host",
-            "no route to host",
-            "streamreset",
-            "server disconnected",
-        ]
-    ):
-        error_reason = "TCP"
+    else:
+        # All other errors (TCP, HTTP, etc.) categorized as HTTP
+        error_reason = "HTTP"
         if "streamreset" in error_message.casefold():
             cleaned_message = "HTTP/2 stream was abruptly terminated"
         else:
@@ -1428,22 +1417,6 @@ def handle_tcp_exception(domain, exception):
                 .lstrip()
                 .rstrip(" .")
             )
-        # Fallback to original if cleaning resulted in empty string
-        if not cleaned_message:
-            cleaned_message = "TCP connection error"
-        vmc_output(f"{domain}: {cleaned_message}", "yellow", use_tqdm=True)
-        log_error(domain, cleaned_message)
-        increment_domain_error(domain, error_reason)
-    else:
-        error_reason = "HTTP"
-        cleaned_message = (
-            re.sub(r"\s*(\[[^\]]*\]|\([^)]*\))", "", error_message)
-            .replace(":", "")
-            .replace(",", "")
-            .split(" for ", 1)[0]
-            .lstrip()
-            .rstrip(" .")
-        )
         # Fallback to original if cleaning resulted in empty string
         if not cleaned_message:
             cleaned_message = str(exception)[:100] or "HTTP request error"
