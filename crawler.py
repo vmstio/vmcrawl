@@ -1589,7 +1589,7 @@ def mark_as_non_mastodon(domain, other_platform):
 
 def get_instance_uri(backend_domain: str, http_client: httpx.Client) -> str | None:
     """Fetch the instance API and extract the 'uri' field."""
-    instance_api_url = f"https://{backend_domain}/api/v1/instance"
+    instance_api_url = f"https://{backend_domain}/api/v2/instance"
     target = "instance_api"
 
     try:
@@ -1606,7 +1606,7 @@ def get_instance_uri(backend_domain: str, http_client: httpx.Client) -> str | No
                 return None
 
             if isinstance(instance_data, dict):
-                uri = instance_data.get("uri")
+                uri = instance_data.get("domain")
                 return uri
             return None
         else:
