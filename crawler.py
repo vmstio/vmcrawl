@@ -1108,51 +1108,6 @@ def delete_domain_from_raw(domain: str) -> None:
                 conn.rollback()
 
 
-def get_cached_nodeinfo_url(domain):
-    """Retrieve cached nodeinfo_20_url from database if available."""
-    with db_pool.connection() as conn:
-        with conn.cursor() as cursor:
-            try:
-                cursor.execute(
-                    "SELECT nodeinfo FROM raw_domains WHERE domain = %s", (domain,)
-                )
-                result = cursor.fetchone()
-                if result and result[0]:
-                    return result[0]
-                return None
-            except Exception as exception:
-                vmc_output(
-                    f"{domain}: Failed to retrieve cached nodeinfo URL {exception}",
-                    "red",
-                    use_tqdm=True,
-                )
-                return None
-
-
-def save_nodeinfo_url(domain, nodeinfo_20_url):
-    """Save nodeinfo_20_url to database for future use."""
-    with db_pool.connection() as conn:
-        with conn.cursor() as cursor:
-            try:
-                _ = cursor.execute(
-                    """
-                    INSERT INTO raw_domains (domain, nodeinfo)
-                    VALUES (%s, %s)
-                    ON CONFLICT(domain) DO UPDATE SET
-                    nodeinfo = excluded.nodeinfo
-                    """,
-                    (domain, nodeinfo_20_url),
-                )
-                conn.commit()
-            except Exception as exception:
-                vmc_output(
-                    f"{domain}: Failed to save nodeinfo URL {exception}",
-                    "red",
-                    use_tqdm=True,
-                )
-                conn.rollback()
-
-
 def update_mastodon_domain(
     actual_domain,
     software_version,
@@ -1856,36 +1811,6 @@ def process_domain(domain, http_client, nightly_version_ranges):
     if not check_robots_txt(domain, http_client):
         return
 
-    # Check if we have a cached nodeinfo_20_url to skip discovery process
-    cached_nodeinfo_url = get_cached_nodeinfo_url(domain)
-    if cached_nodeinfo_url:
-        # Use cached URL directly, skip webfinger and nodeinfo discovery
-        nodeinfo_20_result = check_nodeinfo_20(
-            domain, cached_nodeinfo_url, http_client, from_cache=True
-        )
-
-        # If cached URL fails, clear cache and fall through to full discovery
-        if nodeinfo_20_result is False or not nodeinfo_20_result:
-            save_nodeinfo_url(domain, None)  # Clear invalid cached URL
-            # Fall through to full discovery process below
-        else:
-            # Cached URL worked, process the result
-            backend_domain = urlparse(cached_nodeinfo_url).netloc
-
-            if is_mastodon_instance(nodeinfo_20_result):
-                # Get the actual domain from the instance API
-                instance_uri = get_instance_uri(backend_domain, http_client)
-
-                process_mastodon_instance(
-                    domain,
-                    nodeinfo_20_result,
-                    nightly_version_ranges,
-                    actual_domain=instance_uri,
-                )
-            else:
-                mark_as_non_mastodon(domain, nodeinfo_20_result["software"]["name"])
-            return
-
     # No cached URL, perform full discovery process
     webfinger_result = check_webfinger(domain, http_client)
     if not webfinger_result:
@@ -1900,9 +1825,6 @@ def process_domain(domain, http_client, nightly_version_ranges):
         return
 
     nodeinfo_20_url = nodeinfo_result["nodeinfo_20_url"]
-
-    # Save the discovered nodeinfo_20_url for future use
-    save_nodeinfo_url(domain, nodeinfo_20_url)
 
     nodeinfo_20_result = check_nodeinfo_20(domain, nodeinfo_20_url, http_client)
     if nodeinfo_20_result is False:
