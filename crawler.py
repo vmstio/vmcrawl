@@ -972,7 +972,7 @@ def save_nodeinfo_software(domain: str, software_data: dict[str, Any]) -> None:
         domain: The domain being processed
         software_data: The 'software' dict from nodeinfo_20_result (contains 'name')
     """
-    software_name = software_data.get("name", "unknown")
+    software_name = software_data.get("name", "unknown").lower().replace(" ", "-")
 
     with db_pool.connection() as conn:
         with conn.cursor() as cursor:
