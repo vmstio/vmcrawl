@@ -1730,6 +1730,11 @@ def process_domain(domain, http_client, nightly_version_ranges):
         # Get the actual domain from the instance API
         instance_uri = get_instance_uri(backend_domain, http_client)
 
+        if instance_uri is None:
+            # Instance API endpoint is required for Mastodon instances
+            mark_as_non_mastodon(domain, nodeinfo_20_result["software"]["name"])
+            return
+
         process_mastodon_instance(
             domain,
             nodeinfo_20_result,
