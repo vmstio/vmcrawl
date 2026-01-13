@@ -1108,6 +1108,37 @@ def delete_domain_from_raw(domain: str) -> None:
                 conn.rollback()
 
 
+def save_nodeinfo_software(domain: str, software_data: dict[str, Any]) -> None:
+    """Save software name from nodeinfo to raw_domains.nodeinfo for the given domain.
+
+    Args:
+        domain: The domain being processed
+        software_data: The 'software' dict from nodeinfo_20_result (contains 'name')
+    """
+    software_name = software_data.get("name", "unknown")
+
+    with db_pool.connection() as conn:
+        with conn.cursor() as cursor:
+            try:
+                _ = cursor.execute(
+                    """
+                    INSERT INTO raw_domains (domain, nodeinfo)
+                    VALUES (%s, %s)
+                    ON CONFLICT(domain) DO UPDATE SET
+                    nodeinfo = excluded.nodeinfo
+                    """,
+                    (domain, software_name),
+                )
+                conn.commit()
+            except Exception as exception:
+                vmc_output(
+                    f"{domain}: Failed to save nodeinfo software {exception}",
+                    "red",
+                    use_tqdm=True,
+                )
+                conn.rollback()
+
+
 def update_mastodon_domain(
     actual_domain,
     software_version,
@@ -2052,6 +2083,11 @@ async def process_domain_async(domain, nightly_version_ranges):
             )
             if not nodeinfo_20_result or not isinstance(nodeinfo_20_result, dict):
                 return
+
+            # Save software information from nodeinfo to database
+            software_data = nodeinfo_20_result.get("software")
+            if software_data and isinstance(software_data, dict):
+                save_nodeinfo_software(domain, software_data)
 
             if is_mastodon_instance(nodeinfo_20_result):
                 # Get instance URI from instance API response
