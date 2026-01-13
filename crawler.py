@@ -1162,7 +1162,7 @@ def handle_http_status_code(domain, target, response):
     error_message = f"HTTP {code} on {target}"
     vmc_output(f"{domain}: {error_message}", "yellow", use_tqdm=True)
     log_error(domain, error_message)
-    increment_domain_error(domain, code)
+    increment_domain_error(domain, f"{code}+{target}")
 
 
 def handle_http_failed(domain, target, response):
@@ -1174,7 +1174,7 @@ def handle_http_failed(domain, target, response):
     delete_domain_if_known(domain)
 
 
-def handle_tcp_exception(domain, exception):
+def handle_tcp_exception(domain, target, exception):
     """Handle TCP/connection exceptions with appropriate categorization."""
     error_message = str(exception)
 
@@ -1183,7 +1183,7 @@ def handle_tcp_exception(domain, exception):
         error_reason = "FILE"
         vmc_output(f"{domain}: Response too large", "yellow", use_tqdm=True)
         log_error(domain, "Response exceeds size limit")
-        increment_domain_error(domain, error_reason)
+        increment_domain_error(domain, f"{error_reason}+{target}")
         return
 
     # Handle bad file descriptor (usually from cancellation/cleanup issues)
@@ -1191,7 +1191,7 @@ def handle_tcp_exception(domain, exception):
         error_reason = "FILE"
         vmc_output(f"{domain}: Connection closed unexpectedly", "yellow", use_tqdm=True)
         log_error(domain, "Bad file descriptor")
-        increment_domain_error(domain, error_reason)
+        increment_domain_error(domain, f"{error_reason}+{target}")
         return
 
     if "_ssl.c" in error_message.casefold():
@@ -1209,7 +1209,7 @@ def handle_tcp_exception(domain, exception):
             cleaned_message = "SSL connection error"
         vmc_output(f"{domain}: {cleaned_message}", "yellow", use_tqdm=True)
         log_error(domain, cleaned_message)
-        increment_domain_error(domain, error_reason)
+        increment_domain_error(domain, f"{error_reason}+{target}")
     elif any(
         msg in error_message.casefold()
         for msg in [
@@ -1234,7 +1234,7 @@ def handle_tcp_exception(domain, exception):
             cleaned_message = "DNS resolution failed"
         vmc_output(f"{domain}: {cleaned_message}", "yellow", use_tqdm=True)
         log_error(domain, cleaned_message)
-        increment_domain_error(domain, error_reason)
+        increment_domain_error(domain, f"{error_reason}+{target}")
     else:
         # All other errors (TCP, HTTP, etc.) categorized as HTTP
         error_reason = "HTTP"
@@ -1254,7 +1254,7 @@ def handle_tcp_exception(domain, exception):
             cleaned_message = str(exception)[:100] or "HTTP request error"
         vmc_output(f"{domain}: {cleaned_message}", "yellow", use_tqdm=True)
         log_error(domain, cleaned_message)
-        increment_domain_error(domain, error_reason)
+        increment_domain_error(domain, f"{error_reason}+{target}")
 
 
 def handle_json_exception(domain, target, exception):
@@ -1263,7 +1263,7 @@ def handle_json_exception(domain, target, exception):
     error_reason = f"JSON+{target}"
     vmc_output(f"{domain}: {target} {error_message}", "yellow", use_tqdm=True)
     log_error(domain, error_message)
-    increment_domain_error(domain, error_reason)
+    increment_domain_error(domain, f"{error_reason}+{target}")
 
 
 # =============================================================================
@@ -1439,7 +1439,7 @@ def check_webfinger(domain, http_client):
             handle_http_status_code(domain, target, response)
             return False
     except httpx.RequestError as exception:
-        handle_tcp_exception(domain, exception)
+        handle_tcp_exception(domain, target, exception)
         return False
     except json.JSONDecodeError as exception:
         handle_json_exception(domain, target, exception)
