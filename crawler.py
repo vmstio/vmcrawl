@@ -502,7 +502,6 @@ def clean_version(
     software_version = clean_version_dumbstring(software_version)
     software_version = clean_version_date(software_version)
     software_version = clean_version_suffix_more(software_version)
-    software_version = clean_version_hometown(software_version)
     software_version = clean_version_development(software_version)
     software_version = clean_version_wrongpatch(software_version)
     software_version = clean_version_doubledash(software_version)
@@ -572,17 +571,6 @@ def clean_version_development(software_version: str) -> str:
     patterns = {r"rc(\d+)": r"-rc.\1", r"beta(\d+)": r"-beta.\1"}
     for pattern, replacement in patterns.items():
         software_version = re.sub(pattern, replacement, software_version)
-    return software_version
-
-
-def clean_version_hometown(software_version: str) -> str:
-    """Map Hometown version numbers to corresponding Mastodon versions."""
-    if software_version == "1.0.6":
-        software_version = "3.5.3"
-    elif software_version == "1.0.7":
-        software_version = "3.5.5"
-    elif software_version == "3.4.6ht":
-        software_version = "3.4.6"
     return software_version
 
 
@@ -1574,7 +1562,7 @@ def is_mastodon_instance(nodeinfo_20_result: dict[str, Any]) -> bool:
     if software_name is None:
         return False
 
-    return software_name.lower() in {"mastodon", "hometown", "kmyblue", "glitchcafe"}
+    return software_name.lower() in {"mastodon"}
 
 
 def mark_as_non_mastodon(domain, other_platform):
