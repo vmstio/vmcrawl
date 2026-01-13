@@ -1904,80 +1904,6 @@ async def process_domain_async(domain, nightly_version_ranges):
             handle_tcp_exception(domain, exception)
             return
 
-        # Check if we have cached nodeinfo URL
-        cached_nodeinfo_url = get_cached_nodeinfo_url(domain)
-
-        if cached_nodeinfo_url:
-            # Use cached URL - can fetch nodeinfo and instance API concurrently
-            backend_domain = urlparse(cached_nodeinfo_url).netloc
-
-            try:
-                # Fetch both concurrently (HTTP/2 multiplexing!)
-                nodeinfo_task = get_httpx_async(cached_nodeinfo_url, client)
-                instance_task = get_httpx_async(
-                    f"https://{backend_domain}/api/v1/instance", client
-                )
-
-                nodeinfo_resp, instance_resp = await asyncio.gather(
-                    nodeinfo_task, instance_task, return_exceptions=True
-                )
-
-                # Process nodeinfo response
-                if isinstance(nodeinfo_resp, Exception):
-                    save_nodeinfo_url(domain, None)
-                    # Fall through to full discovery
-                elif isinstance(nodeinfo_resp, httpx.Response):
-                    if nodeinfo_resp.status_code == 200:
-                        content_type = nodeinfo_resp.headers.get("Content-Type", "")
-                        if "json" in content_type and nodeinfo_resp.content:
-                            nodeinfo_20_result = parse_json_with_fallback(
-                                nodeinfo_resp, domain, "nodeinfo_20 (cached)"
-                            )
-
-                            if (
-                                nodeinfo_20_result
-                                and isinstance(nodeinfo_20_result, dict)
-                                and is_mastodon_instance(nodeinfo_20_result)
-                            ):
-                                # Get instance URI from instance API response
-                                instance_uri = None
-                                if (
-                                    isinstance(instance_resp, httpx.Response)
-                                    and instance_resp.status_code == 200
-                                ):
-                                    instance_data = parse_json_with_fallback(
-                                        instance_resp, backend_domain, "instance_api"
-                                    )
-                                    if instance_data and isinstance(
-                                        instance_data, dict
-                                    ):
-                                        instance_uri = instance_data.get("uri")
-
-                                process_mastodon_instance(
-                                    domain,
-                                    nodeinfo_20_result,
-                                    nightly_version_ranges,
-                                    actual_domain=instance_uri,
-                                )
-                                return
-                            elif nodeinfo_20_result and isinstance(
-                                nodeinfo_20_result, dict
-                            ):
-                                mark_as_non_mastodon(
-                                    domain, nodeinfo_20_result["software"]["name"]
-                                )
-                                return
-
-                        # Cached URL failed, clear and fall through
-                        save_nodeinfo_url(domain, None)
-                    else:
-                        # Cached URL failed, clear and fall through
-                        save_nodeinfo_url(domain, None)
-
-            except Exception:
-                # Error with cached path, fall through to full discovery
-                save_nodeinfo_url(domain, None)
-
         # Full discovery process - fetch webfinger
         try:
             webfinger_url = f"https://{domain}/.well-known/webfinger?resource=acct:{domain}@{domain}"
@@ -2088,9 +2014,6 @@ async def process_domain_async(domain, nightly_version_ranges):
             if not nodeinfo_20_url:
                 handle_json_exception(domain, "nodeinfo", "no nodeinfo 2.0 link found")
                 return
-
-            # Cache the nodeinfo URL
-            save_nodeinfo_url(domain, nodeinfo_20_url)
 
             # Fetch nodeinfo_20 and instance API concurrently (HTTP/2 multiplexing!)
             nodeinfo_20_task = get_httpx_async(nodeinfo_20_url, client)
