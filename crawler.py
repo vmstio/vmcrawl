@@ -1191,7 +1191,7 @@ def handle_tcp_exception(domain, exception):
 
     # Handle response size violations
     if isinstance(exception, ValueError) and "too large" in error_message.casefold():
-        error_reason = "SIZE"
+        error_reason = "FILE"
         vmc_output(f"{domain}: Response too large", "yellow", use_tqdm=True)
         log_error(domain, "Response exceeds size limit")
         increment_domain_error(domain, error_reason)
@@ -1199,7 +1199,7 @@ def handle_tcp_exception(domain, exception):
 
     # Handle bad file descriptor (usually from cancellation/cleanup issues)
     if "bad file descriptor" in error_message.casefold():
-        error_reason = "FD"
+        error_reason = "FILE"
         vmc_output(f"{domain}: Connection closed unexpectedly", "yellow", use_tqdm=True)
         log_error(domain, "Bad file descriptor")
         increment_domain_error(domain, error_reason)
@@ -2587,17 +2587,14 @@ def load_from_database(user_choice):
         "9": "SELECT domain FROM raw_domains WHERE norobots = TRUE ORDER BY domain",
         "10": "SELECT domain FROM raw_domains WHERE reason = 'SSL' ORDER BY errors ASC",
         "11": "SELECT domain FROM raw_domains WHERE reason = 'HTTP' ORDER BY errors ASC",
-        "12": "SELECT domain FROM raw_domains WHERE reason = 'TCP' ORDER BY errors ASC",
-        "13": "SELECT domain FROM raw_domains WHERE reason = 'DNS' ORDER BY errors ASC",
+        "12": "SELECT domain FROM raw_domains WHERE reason = 'DNS' ORDER BY errors ASC",
         "20": "SELECT domain FROM raw_domains WHERE reason ~ '^2[0-9]{2}' ORDER BY errors ASC",
         "21": "SELECT domain FROM raw_domains WHERE reason ~ '^3[0-9]{2}' ORDER BY errors ASC",
         "22": "SELECT domain FROM raw_domains WHERE reason ~ '^4[0-9]{2}' ORDER BY errors ASC",
         "23": "SELECT domain FROM raw_domains WHERE reason ~ '^5[0-9]{2}' ORDER BY errors ASC",
         "30": "SELECT domain FROM raw_domains WHERE reason LIKE '%JSON%' ORDER BY errors ASC",
-        "31": "SELECT domain FROM raw_domains WHERE reason LIKE '%MAU%' ORDER BY errors ASC",
-        "32": "SELECT domain FROM raw_domains WHERE reason LIKE '%FD%' ORDER BY errors ASC",
-        "33": "SELECT domain FROM raw_domains WHERE reason LIKE '%SIZE%' ORDER BY errors ASC",
-        "34": "SELECT domain FROM raw_domains WHERE reason LIKE '%TYPE%' ORDER BY errors ASC",
+        "31": "SELECT domain FROM raw_domains WHERE reason LIKE '%FILE%' ORDER BY errors ASC",
+        "32": "SELECT domain FROM raw_domains WHERE reason LIKE '%TYPE%' ORDER BY errors ASC",
         "40": "SELECT domain FROM mastodon_domains WHERE software_version != ALL(%(versions)s::text[]) ORDER BY active_users_monthly DESC",
         "41": "SELECT domain FROM mastodon_domains WHERE software_version LIKE %s ORDER BY active_users_monthly DESC",
         "42": "SELECT domain FROM mastodon_domains ORDER BY active_users_monthly DESC",
@@ -2694,16 +2691,13 @@ def get_menu_options() -> dict[str, dict[str, str]]:
         "Retry connection errors": {
             "10": "SSL",
             "11": "HTTP",
-            "12": "TCP",
-            "13": "DNS",
+            "12": "DNS",
         },
         "Retry HTTP errors": {"20": "2xx", "21": "3xx", "22": "4xx", "23": "5xx"},
         "Retry target errors": {
-            "30": "JSON",
-            "31": "MAU",
-            "32": "Descriptor",
-            "33": "File Size",
-            "34": "File Type",
+            "30": "Bad JSON",
+            "31": "Bad Size",
+            "32": "Bad Type",
         },
         "Retry known instances": {
             "40": "Unpatched",
