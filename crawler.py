@@ -1580,7 +1580,8 @@ def is_mastodon_instance(nodeinfo_20_result: dict[str, Any]) -> bool:
 def mark_as_non_mastodon(domain, other_platform):
     """Mark a domain as a non-Mastodon platform."""
     if not other_platform:
-        other_platform = "Unknown Platform"
+        other_platform = "Unknown"
+    other_platform = other_platform.lower().replace(" ", "-")
     vmc_output(f"{domain}: {other_platform}", "cyan", use_tqdm=True)
     mark_ignore_domain(domain)
     delete_domain_if_known(domain)
