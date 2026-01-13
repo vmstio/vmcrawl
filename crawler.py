@@ -498,8 +498,7 @@ def clean_version(
 ) -> str:
     """Apply all version cleaning transformations."""
     software_version = clean_version_suffix(software_version_full)
-    software_version = clean_version_oddstring(software_version)
-    software_version = clean_version_dumbstring(software_version)
+    software_version = clean_version_strings(software_version)
     software_version = clean_version_date(software_version)
     software_version = clean_version_suffix_more(software_version)
     software_version = clean_version_development(software_version)
@@ -541,18 +540,17 @@ def clean_version_suffix_more(software_version: str) -> str:
     return software_version
 
 
-def clean_version_dumbstring(software_version: str) -> str:
-    """Remove known unwanted strings from versions."""
+def clean_version_strings(software_version: str) -> str:
+    """Remove unwanted strings and fix typos in version strings."""
+    # Remove unwanted suffixes
     unwanted_strings = ["-pre", "-theconnector", "-theatlsocial"]
     for unwanted_string in unwanted_strings:
         software_version = software_version.replace(unwanted_string, "")
-    return software_version
 
-
-def clean_version_oddstring(software_version: str) -> str:
-    """Replace known typos in version strings."""
+    # Fix known typos
     if "mastau" in software_version:
         software_version = software_version.replace("mastau", "alpha")
+
     return software_version
 
 
