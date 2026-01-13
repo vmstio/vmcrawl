@@ -137,7 +137,8 @@ except psycopg.Error as exception:
 # HTTP CLIENT CONFIGURATION
 # =============================================================================
 
-common_timeout = int(os.getenv("VMCRAWL_COMMON_TIMEOUT", "7"))
+http_timeout = int(os.getenv("VMCRAWL_HTTP_TIMEOUT", "2"))
+http_redirect = int(os.getenv("VMCRAWL_HTTP_REDIRECT", "1"))
 http_custom_user_agent = f"{appname}/{appversion} (https://docs.vmst.io/{appname})"
 http_custom_headers = {"User-Agent": http_custom_user_agent}
 
@@ -156,9 +157,9 @@ http_client = httpx.Client(
     http2=True,
     follow_redirects=True,
     headers=http_custom_headers,
-    timeout=common_timeout,
+    timeout=http_timeout,
     limits=limits,
-    max_redirects=common_timeout,
+    max_redirects=http_redirect,
 )
 
 # Track domains that require HTTP/1.1 fallback to avoid retrying HTTP/2
@@ -331,9 +332,9 @@ def get_httpx(url: str, http_client: httpx.Client) -> httpx.Response:
             http2=False,
             follow_redirects=True,
             headers=http_custom_headers,
-            timeout=common_timeout,
+            timeout=http_timeout,
             limits=limits,
-            max_redirects=common_timeout,
+            max_redirects=http_redirect,
         ) as fallback_client:
             return stream_with_size_limit(fallback_client, url)
 
@@ -355,9 +356,9 @@ def get_httpx(url: str, http_client: httpx.Client) -> httpx.Response:
                 http2=False,
                 follow_redirects=True,
                 headers=http_custom_headers,
-                timeout=common_timeout,
+                timeout=http_timeout,
                 limits=limits,
-                max_redirects=common_timeout,
+                max_redirects=http_redirect,
             ) as fallback_client:
                 return stream_with_size_limit(fallback_client, url)
         else:
@@ -425,9 +426,9 @@ async def get_httpx_async(url: str, http_client: httpx.AsyncClient) -> httpx.Res
             http2=False,
             follow_redirects=True,
             headers=http_custom_headers,
-            timeout=common_timeout,
+            timeout=http_timeout,
             limits=limits,
-            max_redirects=common_timeout,
+            max_redirects=http_redirect,
         ) as fallback_client:
             return await stream_with_size_limit_async(fallback_client, url)
 
@@ -449,9 +450,9 @@ async def get_httpx_async(url: str, http_client: httpx.AsyncClient) -> httpx.Res
                 http2=False,
                 follow_redirects=True,
                 headers=http_custom_headers,
-                timeout=common_timeout,
+                timeout=http_timeout,
                 limits=limits,
-                max_redirects=common_timeout,
+                max_redirects=http_redirect,
             ) as fallback_client:
                 return await stream_with_size_limit_async(fallback_client, url)
         else:
@@ -930,7 +931,7 @@ def increment_domain_error(domain: str, error_reason: str) -> None:
                         new_errors = 1
 
                     # If DNS errors reach threshold, mark as NXDOMAIN
-                    if new_errors >= common_timeout * 2:
+                    if new_errors >= 15:
                         mark_domain_status(domain, "nxdomain")
                         delete_domain_if_known(domain)
                         return
@@ -1967,9 +1968,9 @@ async def process_domain_async(domain, nightly_version_ranges):
         http2=True,
         follow_redirects=True,
         headers=http_custom_headers,
-        timeout=common_timeout,
+        timeout=http_timeout,
         limits=limits,
-        max_redirects=common_timeout,
+        max_redirects=http_redirect,
     ) as client:
         # Check robots.txt first (must complete before proceeding)
         try:
