@@ -1578,7 +1578,7 @@ def mark_as_non_mastodon(domain, other_platform):
 
 def get_instance_uri(backend_domain: str, http_client: httpx.Client) -> str | None:
     """Fetch the instance API and extract the 'uri' field."""
-    instance_api_url = f"https://{backend_domain}/api/v2/instance"
+    instance_api_url = f"https://{backend_domain}/api/v1/instance"
     target = "instance_api"
 
     try:
@@ -1595,7 +1595,7 @@ def get_instance_uri(backend_domain: str, http_client: httpx.Client) -> str | No
                 return None
 
             if isinstance(instance_data, dict):
-                uri = instance_data.get("domain")
+                uri = instance_data.get("uri")
                 return uri
             return None
         else:
@@ -2575,8 +2575,9 @@ def load_from_database(user_choice):
     query_map = {
         "0": "SELECT domain FROM raw_domains WHERE errors = 0 ORDER BY LENGTH(DOMAIN) ASC",
         "1": "SELECT domain FROM raw_domains WHERE (failed IS NULL OR failed = FALSE) AND (ignore IS NULL OR ignore = FALSE) AND (nxdomain IS NULL OR nxdomain = FALSE) AND (norobots IS NULL OR norobots = FALSE) AND (baddata IS NULL OR baddata = FALSE) ORDER BY domain ASC",
-        "5": "SELECT domain FROM raw_domains WHERE errors IS NOT NULL ORDER BY errors ASC",
-        "6": "SELECT domain FROM raw_domains WHERE ignore = TRUE ORDER BY domain",
+        "4": "SELECT domain FROM raw_domains WHERE errors IS NOT NULL ORDER BY errors ASC",
+        "5": "SELECT domain FROM raw_domains WHERE ignore = TRUE AND nodeinfo = 'mastodon' ORDER BY domain",
+        "6": "SELECT domain FROM raw_domains WHERE ignore = TRUE AND nodeinfo = 'mastodon' ORDER BY domain",
         "7": "SELECT domain FROM raw_domains WHERE failed = TRUE ORDER BY domain",
         "8": "SELECT domain FROM raw_domains WHERE nxdomain = TRUE ORDER BY domain",
         "9": "SELECT domain FROM raw_domains WHERE norobots = TRUE ORDER BY domain",
@@ -2676,10 +2677,11 @@ def get_menu_options() -> dict[str, dict[str, str]]:
         "Process new domains": {"0": "Uncrawled"},
         "Change process direction": {"1": "Standard", "2": "Reverse", "3": "Random"},
         "Retry any (non-fatal) errors": {
-            "5": "Any",
+            "4": "Any",
         },
         "Retry fatal errors": {
-            "6": "Ignored",
+            "5": "Ignored",
+            "6": "Platform",
             "7": "Failed",
             "8": "NXDOMAIN",
             "9": "Prohibited",
