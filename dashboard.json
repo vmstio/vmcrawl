@@ -1,65 +1,4 @@
 {
-  "__inputs": [
-    {
-      "name": "DS_GRAFANA-POSTGRESQL-DATASOURCE-1",
-      "label": "grafana-postgresql-datasource-1",
-      "description": "",
-      "type": "datasource",
-      "pluginId": "grafana-postgresql-datasource",
-      "pluginName": "PostgreSQL"
-    }
-  ],
-  "__elements": {},
-  "__requires": [
-    {
-      "type": "panel",
-      "id": "barchart",
-      "name": "Bar chart",
-      "version": ""
-    },
-    {
-      "type": "panel",
-      "id": "bargauge",
-      "name": "Bar gauge",
-      "version": ""
-    },
-    {
-      "type": "panel",
-      "id": "gauge",
-      "name": "Gauge",
-      "version": ""
-    },
-    {
-      "type": "grafana",
-      "id": "grafana",
-      "name": "Grafana",
-      "version": "12.4.0-20983762500"
-    },
-    {
-      "type": "datasource",
-      "id": "grafana-postgresql-datasource",
-      "name": "PostgreSQL",
-      "version": "12.4.0-20781422371.patch2"
-    },
-    {
-      "type": "panel",
-      "id": "piechart",
-      "name": "Pie chart",
-      "version": ""
-    },
-    {
-      "type": "panel",
-      "id": "stat",
-      "name": "Stat",
-      "version": ""
-    },
-    {
-      "type": "panel",
-      "id": "table",
-      "name": "Table",
-      "version": ""
-    }
-  ],
   "annotations": {
     "list": [
       {
@@ -80,6 +19,7 @@
   "editable": true,
   "fiscalYearStartMonth": 0,
   "graphTooltip": 0,
+  "id": 0,
   "links": [],
   "liveNow": true,
   "panels": [
@@ -99,7 +39,7 @@
     {
       "datasource": {
         "type": "grafana-postgresql-datasource",
-        "uid": "${DS_GRAFANA-POSTGRESQL-DATASOURCE-1}"
+        "uid": "df4ti9acrqsxsa"
       },
       "fieldConfig": {
         "defaults": {
@@ -149,7 +89,7 @@
         {
           "datasource": {
             "type": "grafana-postgresql-datasource",
-            "uid": "${DS_GRAFANA-POSTGRESQL-DATASOURCE-1}"
+            "uid": "df4ti9acrqsxsa"
           },
           "editorMode": "code",
           "format": "table",
@@ -181,7 +121,7 @@
     {
       "datasource": {
         "type": "grafana-postgresql-datasource",
-        "uid": "${DS_GRAFANA-POSTGRESQL-DATASOURCE-1}"
+        "uid": "df4ti9acrqsxsa"
       },
       "fieldConfig": {
         "defaults": {
@@ -231,7 +171,7 @@
         {
           "datasource": {
             "type": "grafana-postgresql-datasource",
-            "uid": "${DS_GRAFANA-POSTGRESQL-DATASOURCE-1}"
+            "uid": "df4ti9acrqsxsa"
           },
           "editorMode": "code",
           "format": "table",
@@ -263,7 +203,7 @@
     {
       "datasource": {
         "type": "grafana-postgresql-datasource",
-        "uid": "${DS_GRAFANA-POSTGRESQL-DATASOURCE-1}"
+        "uid": "df4ti9acrqsxsa"
       },
       "fieldConfig": {
         "defaults": {
@@ -313,7 +253,7 @@
         {
           "datasource": {
             "type": "grafana-postgresql-datasource",
-            "uid": "${DS_GRAFANA-POSTGRESQL-DATASOURCE-1}"
+            "uid": "df4ti9acrqsxsa"
           },
           "editorMode": "code",
           "format": "table",
@@ -345,7 +285,7 @@
     {
       "datasource": {
         "type": "grafana-postgresql-datasource",
-        "uid": "${DS_GRAFANA-POSTGRESQL-DATASOURCE-1}"
+        "uid": "df4ti9acrqsxsa"
       },
       "description": "Count of distinct Mastodon versions, after various fork/meta identifiers are removed and nightly releases are normalized.",
       "fieldConfig": {
@@ -395,7 +335,7 @@
         {
           "datasource": {
             "type": "grafana-postgresql-datasource",
-            "uid": "${DS_GRAFANA-POSTGRESQL-DATASOURCE-1}"
+            "uid": "df4ti9acrqsxsa"
           },
           "editorMode": "code",
           "format": "table",
@@ -427,7 +367,7 @@
     {
       "datasource": {
         "type": "grafana-postgresql-datasource",
-        "uid": "${DS_GRAFANA-POSTGRESQL-DATASOURCE-1}"
+        "uid": "df4ti9acrqsxsa"
       },
       "description": "Count of distinct Mastodon versions, before various fork/meta identifiers are removed and nightly releases are normalized.",
       "fieldConfig": {
@@ -477,7 +417,7 @@
         {
           "datasource": {
             "type": "grafana-postgresql-datasource",
-            "uid": "${DS_GRAFANA-POSTGRESQL-DATASOURCE-1}"
+            "uid": "df4ti9acrqsxsa"
           },
           "editorMode": "code",
           "format": "table",
@@ -519,7 +459,7 @@
         {
           "datasource": {
             "type": "grafana-postgresql-datasource",
-            "uid": "${DS_GRAFANA-POSTGRESQL-DATASOURCE-1}"
+            "uid": "df4ti9acrqsxsa"
           },
           "fieldConfig": {
             "defaults": {
@@ -544,7 +484,7 @@
             "h": 4,
             "w": 3,
             "x": 0,
-            "y": 6
+            "y": 46
           },
           "id": 81,
           "options": {
@@ -569,7 +509,7 @@
             {
               "datasource": {
                 "type": "grafana-postgresql-datasource",
-                "uid": "${DS_GRAFANA-POSTGRESQL-DATASOURCE-1}"
+                "uid": "df4ti9acrqsxsa"
               },
               "editorMode": "code",
               "format": "table",
@@ -601,7 +541,7 @@
         {
           "datasource": {
             "type": "grafana-postgresql-datasource",
-            "uid": "${DS_GRAFANA-POSTGRESQL-DATASOURCE-1}"
+            "uid": "df4ti9acrqsxsa"
           },
           "fieldConfig": {
             "defaults": {
@@ -626,7 +566,7 @@
             "h": 4,
             "w": 3,
             "x": 3,
-            "y": 6
+            "y": 46
           },
           "id": 78,
           "options": {
@@ -651,7 +591,7 @@
             {
               "datasource": {
                 "type": "grafana-postgresql-datasource",
-                "uid": "${DS_GRAFANA-POSTGRESQL-DATASOURCE-1}"
+                "uid": "df4ti9acrqsxsa"
               },
               "editorMode": "code",
               "format": "table",
@@ -683,7 +623,7 @@
         {
           "datasource": {
             "type": "grafana-postgresql-datasource",
-            "uid": "${DS_GRAFANA-POSTGRESQL-DATASOURCE-1}"
+            "uid": "df4ti9acrqsxsa"
           },
           "fieldConfig": {
             "defaults": {
@@ -708,7 +648,7 @@
             "h": 4,
             "w": 3,
             "x": 6,
-            "y": 6
+            "y": 46
           },
           "id": 85,
           "options": {
@@ -733,7 +673,7 @@
             {
               "datasource": {
                 "type": "grafana-postgresql-datasource",
-                "uid": "${DS_GRAFANA-POSTGRESQL-DATASOURCE-1}"
+                "uid": "df4ti9acrqsxsa"
               },
               "editorMode": "code",
               "format": "table",
@@ -765,7 +705,7 @@
         {
           "datasource": {
             "type": "grafana-postgresql-datasource",
-            "uid": "${DS_GRAFANA-POSTGRESQL-DATASOURCE-1}"
+            "uid": "df4ti9acrqsxsa"
           },
           "fieldConfig": {
             "defaults": {
@@ -790,7 +730,7 @@
             "h": 4,
             "w": 3,
             "x": 9,
-            "y": 6
+            "y": 46
           },
           "id": 84,
           "options": {
@@ -815,7 +755,7 @@
             {
               "datasource": {
                 "type": "grafana-postgresql-datasource",
-                "uid": "${DS_GRAFANA-POSTGRESQL-DATASOURCE-1}"
+                "uid": "df4ti9acrqsxsa"
               },
               "editorMode": "code",
               "format": "table",
@@ -847,7 +787,7 @@
         {
           "datasource": {
             "type": "grafana-postgresql-datasource",
-            "uid": "${DS_GRAFANA-POSTGRESQL-DATASOURCE-1}"
+            "uid": "df4ti9acrqsxsa"
           },
           "fieldConfig": {
             "defaults": {
@@ -872,7 +812,7 @@
             "h": 4,
             "w": 3,
             "x": 12,
-            "y": 6
+            "y": 46
           },
           "id": 79,
           "options": {
@@ -897,7 +837,7 @@
             {
               "datasource": {
                 "type": "grafana-postgresql-datasource",
-                "uid": "${DS_GRAFANA-POSTGRESQL-DATASOURCE-1}"
+                "uid": "df4ti9acrqsxsa"
               },
               "editorMode": "code",
               "format": "table",
@@ -929,7 +869,7 @@
         {
           "datasource": {
             "type": "grafana-postgresql-datasource",
-            "uid": "${DS_GRAFANA-POSTGRESQL-DATASOURCE-1}"
+            "uid": "df4ti9acrqsxsa"
           },
           "fieldConfig": {
             "defaults": {
@@ -954,7 +894,7 @@
             "h": 4,
             "w": 3,
             "x": 15,
-            "y": 6
+            "y": 46
           },
           "id": 80,
           "options": {
@@ -979,7 +919,7 @@
             {
               "datasource": {
                 "type": "grafana-postgresql-datasource",
-                "uid": "${DS_GRAFANA-POSTGRESQL-DATASOURCE-1}"
+                "uid": "df4ti9acrqsxsa"
               },
               "editorMode": "code",
               "format": "table",
@@ -1011,7 +951,7 @@
         {
           "datasource": {
             "type": "grafana-postgresql-datasource",
-            "uid": "${DS_GRAFANA-POSTGRESQL-DATASOURCE-1}"
+            "uid": "df4ti9acrqsxsa"
           },
           "fieldConfig": {
             "defaults": {
@@ -1036,7 +976,7 @@
             "h": 4,
             "w": 3,
             "x": 18,
-            "y": 6
+            "y": 46
           },
           "id": 82,
           "options": {
@@ -1061,7 +1001,7 @@
             {
               "datasource": {
                 "type": "grafana-postgresql-datasource",
-                "uid": "${DS_GRAFANA-POSTGRESQL-DATASOURCE-1}"
+                "uid": "df4ti9acrqsxsa"
               },
               "editorMode": "code",
               "format": "table",
@@ -1093,7 +1033,7 @@
         {
           "datasource": {
             "type": "grafana-postgresql-datasource",
-            "uid": "${DS_GRAFANA-POSTGRESQL-DATASOURCE-1}"
+            "uid": "df4ti9acrqsxsa"
           },
           "fieldConfig": {
             "defaults": {
@@ -1118,7 +1058,7 @@
             "h": 4,
             "w": 3,
             "x": 21,
-            "y": 6
+            "y": 46
           },
           "id": 83,
           "options": {
@@ -1143,7 +1083,7 @@
             {
               "datasource": {
                 "type": "grafana-postgresql-datasource",
-                "uid": "${DS_GRAFANA-POSTGRESQL-DATASOURCE-1}"
+                "uid": "df4ti9acrqsxsa"
               },
               "editorMode": "code",
               "format": "table",
@@ -1192,7 +1132,7 @@
     {
       "datasource": {
         "type": "grafana-postgresql-datasource",
-        "uid": "${DS_GRAFANA-POSTGRESQL-DATASOURCE-1}"
+        "uid": "df4ti9acrqsxsa"
       },
       "description": "Count of instances running latest patches for development branch (main), compared to the total instances on development branch.",
       "fieldConfig": {
@@ -1251,7 +1191,7 @@
         {
           "datasource": {
             "type": "grafana-postgresql-datasource",
-            "uid": "${DS_GRAFANA-POSTGRESQL-DATASOURCE-1}"
+            "uid": "df4ti9acrqsxsa"
           },
           "editorMode": "code",
           "format": "table",
@@ -1279,7 +1219,7 @@
         {
           "datasource": {
             "type": "grafana-postgresql-datasource",
-            "uid": "${DS_GRAFANA-POSTGRESQL-DATASOURCE-1}"
+            "uid": "df4ti9acrqsxsa"
           },
           "editorMode": "code",
           "format": "table",
@@ -1330,7 +1270,7 @@
     {
       "datasource": {
         "type": "grafana-postgresql-datasource",
-        "uid": "${DS_GRAFANA-POSTGRESQL-DATASOURCE-1}"
+        "uid": "df4ti9acrqsxsa"
       },
       "description": "Count of instances running latest patches for branch release-0 (latest), compared to the total instances on branch release-0.",
       "fieldConfig": {
@@ -1389,7 +1329,7 @@
         {
           "datasource": {
             "type": "grafana-postgresql-datasource",
-            "uid": "${DS_GRAFANA-POSTGRESQL-DATASOURCE-1}"
+            "uid": "df4ti9acrqsxsa"
           },
           "editorMode": "code",
           "format": "table",
@@ -1417,7 +1357,7 @@
         {
           "datasource": {
             "type": "grafana-postgresql-datasource",
-            "uid": "${DS_GRAFANA-POSTGRESQL-DATASOURCE-1}"
+            "uid": "df4ti9acrqsxsa"
           },
           "editorMode": "code",
           "format": "table",
@@ -1463,7 +1403,7 @@
     {
       "datasource": {
         "type": "grafana-postgresql-datasource",
-        "uid": "${DS_GRAFANA-POSTGRESQL-DATASOURCE-1}"
+        "uid": "df4ti9acrqsxsa"
       },
       "description": "Count of instances running latest patches for branch release-1 (previous), compared to the total instances on branch release-1.",
       "fieldConfig": {
@@ -1522,7 +1462,7 @@
         {
           "datasource": {
             "type": "grafana-postgresql-datasource",
-            "uid": "${DS_GRAFANA-POSTGRESQL-DATASOURCE-1}"
+            "uid": "df4ti9acrqsxsa"
           },
           "editorMode": "code",
           "format": "table",
@@ -1550,7 +1490,7 @@
         {
           "datasource": {
             "type": "grafana-postgresql-datasource",
-            "uid": "${DS_GRAFANA-POSTGRESQL-DATASOURCE-1}"
+            "uid": "df4ti9acrqsxsa"
           },
           "editorMode": "code",
           "format": "table",
@@ -1596,7 +1536,7 @@
     {
       "datasource": {
         "type": "grafana-postgresql-datasource",
-        "uid": "${DS_GRAFANA-POSTGRESQL-DATASOURCE-1}"
+        "uid": "df4ti9acrqsxsa"
       },
       "description": "Count of instances running latest patches for branch release-2 (deprecated) or older, compared to the total instances on branch release-2 or older.",
       "fieldConfig": {
@@ -1655,7 +1595,7 @@
         {
           "datasource": {
             "type": "grafana-postgresql-datasource",
-            "uid": "${DS_GRAFANA-POSTGRESQL-DATASOURCE-1}"
+            "uid": "df4ti9acrqsxsa"
           },
           "editorMode": "code",
           "format": "table",
@@ -1683,7 +1623,7 @@
         {
           "datasource": {
             "type": "grafana-postgresql-datasource",
-            "uid": "${DS_GRAFANA-POSTGRESQL-DATASOURCE-1}"
+            "uid": "df4ti9acrqsxsa"
           },
           "editorMode": "code",
           "format": "table",
@@ -1729,7 +1669,7 @@
     {
       "datasource": {
         "type": "grafana-postgresql-datasource",
-        "uid": "${DS_GRAFANA-POSTGRESQL-DATASOURCE-1}"
+        "uid": "df4ti9acrqsxsa"
       },
       "description": "Count of monthly active users (MAUs) on instances running latest patches for development branch (main), compared to the total instances on development branch.",
       "fieldConfig": {
@@ -1788,7 +1728,7 @@
         {
           "datasource": {
             "type": "grafana-postgresql-datasource",
-            "uid": "${DS_GRAFANA-POSTGRESQL-DATASOURCE-1}"
+            "uid": "df4ti9acrqsxsa"
           },
           "editorMode": "code",
           "format": "table",
@@ -1816,7 +1756,7 @@
         {
           "datasource": {
             "type": "grafana-postgresql-datasource",
-            "uid": "${DS_GRAFANA-POSTGRESQL-DATASOURCE-1}"
+            "uid": "df4ti9acrqsxsa"
           },
           "editorMode": "code",
           "format": "table",
@@ -1867,7 +1807,7 @@
     {
       "datasource": {
         "type": "grafana-postgresql-datasource",
-        "uid": "${DS_GRAFANA-POSTGRESQL-DATASOURCE-1}"
+        "uid": "df4ti9acrqsxsa"
       },
       "description": "Count of monthly active users (MAUs) on instances running latest patches for branch release-0 (latest), compared to the total instances on branch release-0.",
       "fieldConfig": {
@@ -1926,7 +1866,7 @@
         {
           "datasource": {
             "type": "grafana-postgresql-datasource",
-            "uid": "${DS_GRAFANA-POSTGRESQL-DATASOURCE-1}"
+            "uid": "df4ti9acrqsxsa"
           },
           "editorMode": "code",
           "format": "table",
@@ -1954,7 +1894,7 @@
         {
           "datasource": {
             "type": "grafana-postgresql-datasource",
-            "uid": "${DS_GRAFANA-POSTGRESQL-DATASOURCE-1}"
+            "uid": "df4ti9acrqsxsa"
           },
           "editorMode": "code",
           "format": "table",
@@ -2005,7 +1945,7 @@
     {
       "datasource": {
         "type": "grafana-postgresql-datasource",
-        "uid": "${DS_GRAFANA-POSTGRESQL-DATASOURCE-1}"
+        "uid": "df4ti9acrqsxsa"
       },
       "description": "Count of monthly active users (MAUs) on instances running latest patches for branch release-1 (previous), compared to the MAUs on branch release-1.",
       "fieldConfig": {
@@ -2064,7 +2004,7 @@
         {
           "datasource": {
             "type": "grafana-postgresql-datasource",
-            "uid": "${DS_GRAFANA-POSTGRESQL-DATASOURCE-1}"
+            "uid": "df4ti9acrqsxsa"
           },
           "editorMode": "code",
           "format": "table",
@@ -2092,7 +2032,7 @@
         {
           "datasource": {
             "type": "grafana-postgresql-datasource",
-            "uid": "${DS_GRAFANA-POSTGRESQL-DATASOURCE-1}"
+            "uid": "df4ti9acrqsxsa"
           },
           "editorMode": "code",
           "format": "table",
@@ -2143,7 +2083,7 @@
     {
       "datasource": {
         "type": "grafana-postgresql-datasource",
-        "uid": "${DS_GRAFANA-POSTGRESQL-DATASOURCE-1}"
+        "uid": "df4ti9acrqsxsa"
       },
       "description": "Count of monthly active users (MAUs) on  instances running latest patches for branch release-2 (deprecated) or older, compared to the MAUs on branch release-2 or older.",
       "fieldConfig": {
@@ -2202,7 +2142,7 @@
         {
           "datasource": {
             "type": "grafana-postgresql-datasource",
-            "uid": "${DS_GRAFANA-POSTGRESQL-DATASOURCE-1}"
+            "uid": "df4ti9acrqsxsa"
           },
           "editorMode": "code",
           "format": "table",
@@ -2230,7 +2170,7 @@
         {
           "datasource": {
             "type": "grafana-postgresql-datasource",
-            "uid": "${DS_GRAFANA-POSTGRESQL-DATASOURCE-1}"
+            "uid": "df4ti9acrqsxsa"
           },
           "editorMode": "code",
           "format": "table",
@@ -2294,7 +2234,7 @@
     {
       "datasource": {
         "type": "grafana-postgresql-datasource",
-        "uid": "${DS_GRAFANA-POSTGRESQL-DATASOURCE-1}"
+        "uid": "df4ti9acrqsxsa"
       },
       "fieldConfig": {
         "defaults": {
@@ -2408,7 +2348,7 @@
         {
           "datasource": {
             "type": "grafana-postgresql-datasource",
-            "uid": "${DS_GRAFANA-POSTGRESQL-DATASOURCE-1}"
+            "uid": "df4ti9acrqsxsa"
           },
           "editorMode": "code",
           "format": "table",
@@ -2440,7 +2380,7 @@
     {
       "datasource": {
         "type": "grafana-postgresql-datasource",
-        "uid": "${DS_GRAFANA-POSTGRESQL-DATASOURCE-1}"
+        "uid": "df4ti9acrqsxsa"
       },
       "fieldConfig": {
         "defaults": {
@@ -2529,7 +2469,7 @@
         {
           "datasource": {
             "type": "grafana-postgresql-datasource",
-            "uid": "${DS_GRAFANA-POSTGRESQL-DATASOURCE-1}"
+            "uid": "df4ti9acrqsxsa"
           },
           "editorMode": "code",
           "format": "table",
@@ -2561,7 +2501,7 @@
     {
       "datasource": {
         "type": "grafana-postgresql-datasource",
-        "uid": "${DS_GRAFANA-POSTGRESQL-DATASOURCE-1}"
+        "uid": "df4ti9acrqsxsa"
       },
       "fieldConfig": {
         "defaults": {
@@ -2635,7 +2575,7 @@
         {
           "datasource": {
             "type": "grafana-postgresql-datasource",
-            "uid": "${DS_GRAFANA-POSTGRESQL-DATASOURCE-1}"
+            "uid": "df4ti9acrqsxsa"
           },
           "editorMode": "code",
           "format": "table",
@@ -2667,7 +2607,7 @@
     {
       "datasource": {
         "type": "grafana-postgresql-datasource",
-        "uid": "${DS_GRAFANA-POSTGRESQL-DATASOURCE-1}"
+        "uid": "df4ti9acrqsxsa"
       },
       "fieldConfig": {
         "defaults": {
@@ -2741,7 +2681,7 @@
         {
           "datasource": {
             "type": "grafana-postgresql-datasource",
-            "uid": "${DS_GRAFANA-POSTGRESQL-DATASOURCE-1}"
+            "uid": "df4ti9acrqsxsa"
           },
           "editorMode": "code",
           "format": "table",
@@ -2786,7 +2726,7 @@
     {
       "datasource": {
         "type": "grafana-postgresql-datasource",
-        "uid": "${DS_GRAFANA-POSTGRESQL-DATASOURCE-1}"
+        "uid": "df4ti9acrqsxsa"
       },
       "fieldConfig": {
         "defaults": {
@@ -2843,7 +2783,7 @@
         {
           "datasource": {
             "type": "grafana-postgresql-datasource",
-            "uid": "${DS_GRAFANA-POSTGRESQL-DATASOURCE-1}"
+            "uid": "df4ti9acrqsxsa"
           },
           "editorMode": "code",
           "format": "table",
@@ -2875,7 +2815,7 @@
     {
       "datasource": {
         "type": "grafana-postgresql-datasource",
-        "uid": "${DS_GRAFANA-POSTGRESQL-DATASOURCE-1}"
+        "uid": "df4ti9acrqsxsa"
       },
       "fieldConfig": {
         "defaults": {
@@ -2933,7 +2873,7 @@
         {
           "datasource": {
             "type": "grafana-postgresql-datasource",
-            "uid": "${DS_GRAFANA-POSTGRESQL-DATASOURCE-1}"
+            "uid": "df4ti9acrqsxsa"
           },
           "editorMode": "code",
           "format": "table",
@@ -2970,6 +2910,576 @@
         "x": 0,
         "y": 73
       },
+      "id": 87,
+      "panels": [],
+      "title": "Historical",
+      "type": "row"
+    },
+    {
+      "datasource": {
+        "type": "grafana-postgresql-datasource",
+        "uid": "df4ti9acrqsxsa"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "axisBorderShow": false,
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "fillOpacity": 80,
+            "gradientMode": "none",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "lineWidth": 1,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": 0
+              },
+              {
+                "color": "red",
+                "value": 80
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 74
+      },
+      "id": 90,
+      "options": {
+        "barRadius": 0,
+        "barWidth": 0.97,
+        "fullHighlight": false,
+        "groupWidth": 0.7,
+        "legend": {
+          "calcs": [],
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "orientation": "horizontal",
+        "showValue": "never",
+        "stacking": "normal",
+        "tooltip": {
+          "hideZeros": false,
+          "mode": "single",
+          "sort": "none"
+        },
+        "xField": "time",
+        "xTickLabelRotation": 0,
+        "xTickLabelSpacing": 0
+      },
+      "pluginVersion": "12.4.0-20983762500",
+      "targets": [
+        {
+          "dataset": "",
+          "datasource": {
+            "type": "grafana-postgresql-datasource",
+            "uid": "df4ti9acrqsxsa"
+          },
+          "editorMode": "code",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "SELECT\n  statistics.date AS time,\n  statistics.main_instances AS \"Main Branch\",\n  statistics.latest_instances AS \"Latest Branch\",\n  statistics.previous_instances AS \"Previous Branch\",\n  statistics.deprecated_instances AS \"Deprecated Branch\",\n  statistics.eol_instances AS \"EOL Branches\"\nFROM\n  statistics\nORDER BY\n  statistics.date DESC\nLIMIT 30;",
+          "refId": "A",
+          "sql": {
+            "columns": [
+              {
+                "parameters": [],
+                "type": "function"
+              }
+            ],
+            "groupBy": [
+              {
+                "property": {
+                  "type": "string"
+                },
+                "type": "groupBy"
+              }
+            ],
+            "limit": 50
+          }
+        }
+      ],
+      "title": "Branches by Instance",
+      "transformations": [
+        {
+          "id": "organize",
+          "options": {}
+        },
+        {
+          "id": "sortBy",
+          "options": {
+            "fields": {},
+            "sort": [
+              {
+                "field": "time"
+              }
+            ]
+          }
+        },
+        {
+          "id": "formatTime",
+          "options": {
+            "outputFormat": "DD-MMM",
+            "timeField": "time",
+            "timezone": "utc",
+            "useTimezone": true
+          }
+        }
+      ],
+      "type": "barchart"
+    },
+    {
+      "datasource": {
+        "type": "grafana-postgresql-datasource",
+        "uid": "df4ti9acrqsxsa"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "axisBorderShow": false,
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "fillOpacity": 80,
+            "gradientMode": "none",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "lineWidth": 1,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": 0
+              },
+              {
+                "color": "red",
+                "value": 80
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 74
+      },
+      "id": 91,
+      "options": {
+        "barRadius": 0,
+        "barWidth": 0.97,
+        "fullHighlight": false,
+        "groupWidth": 0.7,
+        "legend": {
+          "calcs": [],
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "orientation": "horizontal",
+        "showValue": "never",
+        "stacking": "normal",
+        "tooltip": {
+          "hideZeros": false,
+          "mode": "single",
+          "sort": "none"
+        },
+        "xField": "time",
+        "xTickLabelRotation": 0,
+        "xTickLabelSpacing": 0
+      },
+      "pluginVersion": "12.4.0-20983762500",
+      "targets": [
+        {
+          "dataset": "",
+          "datasource": {
+            "type": "grafana-postgresql-datasource",
+            "uid": "df4ti9acrqsxsa"
+          },
+          "editorMode": "code",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "SELECT\n  statistics.date AS time,\n  statistics.main_branch_mau AS \"Main Branch\",\n  statistics.latest_branch_mau AS \"Latest Branch\",\n  statistics.previous_branch_mau AS \"Previous Branch\",\n  statistics.deprecated_branch_mau AS \"Deprecated Branch\",\n  statistics.eol_branch_mau AS \"EOL Branches\"\nFROM\n  statistics\nORDER BY\n  statistics.date DESC\nLIMIT 30;",
+          "refId": "A",
+          "sql": {
+            "columns": [
+              {
+                "parameters": [],
+                "type": "function"
+              }
+            ],
+            "groupBy": [
+              {
+                "property": {
+                  "type": "string"
+                },
+                "type": "groupBy"
+              }
+            ],
+            "limit": 50
+          }
+        }
+      ],
+      "title": "Branches by MAU",
+      "transformations": [
+        {
+          "id": "organize",
+          "options": {}
+        },
+        {
+          "id": "sortBy",
+          "options": {
+            "fields": {},
+            "sort": [
+              {
+                "field": "time"
+              }
+            ]
+          }
+        },
+        {
+          "id": "formatTime",
+          "options": {
+            "outputFormat": "DD-MMM",
+            "timeField": "time",
+            "timezone": "utc",
+            "useTimezone": true
+          }
+        }
+      ],
+      "type": "barchart"
+    },
+    {
+      "datasource": {
+        "type": "grafana-postgresql-datasource",
+        "uid": "df4ti9acrqsxsa"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "axisBorderShow": false,
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "fillOpacity": 80,
+            "gradientMode": "none",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "lineWidth": 1,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          },
+          "fieldMinMax": false,
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": 0
+              },
+              {
+                "color": "red",
+                "value": 80
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 82
+      },
+      "id": 88,
+      "options": {
+        "barRadius": 0,
+        "barWidth": 0.97,
+        "fullHighlight": false,
+        "groupWidth": 0.7,
+        "legend": {
+          "calcs": [],
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "orientation": "horizontal",
+        "showValue": "never",
+        "stacking": "normal",
+        "tooltip": {
+          "hideZeros": false,
+          "mode": "single",
+          "sort": "none"
+        },
+        "xField": "time",
+        "xTickLabelRotation": 0,
+        "xTickLabelSpacing": 0
+      },
+      "pluginVersion": "12.4.0-20983762500",
+      "targets": [
+        {
+          "dataset": "",
+          "datasource": {
+            "type": "grafana-postgresql-datasource",
+            "uid": "df4ti9acrqsxsa"
+          },
+          "editorMode": "code",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "SELECT\n  statistics.date AS time,\n  statistics.main_patched_instances AS \"Main Branch\",\n  statistics.latest_patched_instances AS \"Latest Branch\",\n  statistics.previous_patched_instances AS \"Previous Branch\",\n  statistics.deprecated_patched_instances AS \"Deprecated Branch\"\nFROM\n  statistics\nORDER BY\n  statistics.date DESC\nLIMIT 30;",
+          "refId": "A",
+          "sql": {
+            "columns": [
+              {
+                "parameters": [],
+                "type": "function"
+              }
+            ],
+            "groupBy": [
+              {
+                "property": {
+                  "type": "string"
+                },
+                "type": "groupBy"
+              }
+            ],
+            "limit": 50
+          }
+        }
+      ],
+      "title": "Patches by Instance",
+      "transformations": [
+        {
+          "id": "organize",
+          "options": {}
+        },
+        {
+          "id": "sortBy",
+          "options": {
+            "fields": {},
+            "sort": [
+              {
+                "field": "time"
+              }
+            ]
+          }
+        },
+        {
+          "id": "formatTime",
+          "options": {
+            "outputFormat": "DD-MMM",
+            "timeField": "time",
+            "timezone": "utc",
+            "useTimezone": true
+          }
+        }
+      ],
+      "type": "barchart"
+    },
+    {
+      "datasource": {
+        "type": "grafana-postgresql-datasource",
+        "uid": "df4ti9acrqsxsa"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "axisBorderShow": false,
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "fillOpacity": 80,
+            "gradientMode": "none",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "lineWidth": 1,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": 0
+              },
+              {
+                "color": "red",
+                "value": 80
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 82
+      },
+      "id": 89,
+      "options": {
+        "barRadius": 0,
+        "barWidth": 0.97,
+        "fullHighlight": false,
+        "groupWidth": 0.7,
+        "legend": {
+          "calcs": [],
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "orientation": "horizontal",
+        "showValue": "never",
+        "stacking": "normal",
+        "tooltip": {
+          "hideZeros": false,
+          "mode": "single",
+          "sort": "none"
+        },
+        "xField": "time",
+        "xTickLabelRotation": 0,
+        "xTickLabelSpacing": 0
+      },
+      "pluginVersion": "12.4.0-20983762500",
+      "targets": [
+        {
+          "dataset": "",
+          "datasource": {
+            "type": "grafana-postgresql-datasource",
+            "uid": "df4ti9acrqsxsa"
+          },
+          "editorMode": "code",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "SELECT\n  statistics.date AS time,\n  statistics.main_patched_mau AS \"Main Branch\",\n  statistics.latest_patched_mau AS \"Latest Branch\",\n  statistics.previous_patched_mau AS \"Previous Branch\",\n  statistics.deprecated_patched_mau AS \"Deprecated Branch\"\nFROM\n  statistics\nORDER BY\n  statistics.date DESC\nLIMIT 30;",
+          "refId": "A",
+          "sql": {
+            "columns": [
+              {
+                "parameters": [],
+                "type": "function"
+              }
+            ],
+            "groupBy": [
+              {
+                "property": {
+                  "type": "string"
+                },
+                "type": "groupBy"
+              }
+            ],
+            "limit": 50
+          }
+        }
+      ],
+      "title": "Patches by MAU",
+      "transformations": [
+        {
+          "id": "organize",
+          "options": {}
+        },
+        {
+          "id": "sortBy",
+          "options": {
+            "fields": {},
+            "sort": [
+              {
+                "field": "time"
+              }
+            ]
+          }
+        },
+        {
+          "id": "formatTime",
+          "options": {
+            "outputFormat": "DD-MMM",
+            "timeField": "time",
+            "timezone": "utc",
+            "useTimezone": true
+          }
+        }
+      ],
+      "type": "barchart"
+    },
+    {
+      "collapsed": false,
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 90
+      },
       "id": 17,
       "panels": [],
       "title": "Top 10 Lists",
@@ -2978,7 +3488,7 @@
     {
       "datasource": {
         "type": "grafana-postgresql-datasource",
-        "uid": "${DS_GRAFANA-POSTGRESQL-DATASOURCE-1}"
+        "uid": "df4ti9acrqsxsa"
       },
       "fieldConfig": {
         "defaults": {
@@ -3029,7 +3539,7 @@
         "h": 12,
         "w": 12,
         "x": 0,
-        "y": 74
+        "y": 91
       },
       "id": 12,
       "options": {
@@ -3059,7 +3569,7 @@
         {
           "datasource": {
             "type": "grafana-postgresql-datasource",
-            "uid": "${DS_GRAFANA-POSTGRESQL-DATASOURCE-1}"
+            "uid": "df4ti9acrqsxsa"
           },
           "editorMode": "code",
           "format": "table",
@@ -3091,7 +3601,7 @@
     {
       "datasource": {
         "type": "grafana-postgresql-datasource",
-        "uid": "${DS_GRAFANA-POSTGRESQL-DATASOURCE-1}"
+        "uid": "df4ti9acrqsxsa"
       },
       "fieldConfig": {
         "defaults": {
@@ -3142,7 +3652,7 @@
         "h": 12,
         "w": 12,
         "x": 12,
-        "y": 74
+        "y": 91
       },
       "id": 48,
       "options": {
@@ -3172,7 +3682,7 @@
         {
           "datasource": {
             "type": "grafana-postgresql-datasource",
-            "uid": "${DS_GRAFANA-POSTGRESQL-DATASOURCE-1}"
+            "uid": "df4ti9acrqsxsa"
           },
           "editorMode": "code",
           "format": "table",
@@ -3204,7 +3714,7 @@
     {
       "datasource": {
         "type": "grafana-postgresql-datasource",
-        "uid": "${DS_GRAFANA-POSTGRESQL-DATASOURCE-1}"
+        "uid": "df4ti9acrqsxsa"
       },
       "fieldConfig": {
         "defaults": {
@@ -3269,7 +3779,7 @@
         "h": 13,
         "w": 12,
         "x": 0,
-        "y": 86
+        "y": 103
       },
       "id": 13,
       "options": {
@@ -3282,7 +3792,7 @@
         {
           "datasource": {
             "type": "grafana-postgresql-datasource",
-            "uid": "${DS_GRAFANA-POSTGRESQL-DATASOURCE-1}"
+            "uid": "df4ti9acrqsxsa"
           },
           "editorMode": "code",
           "format": "table",
@@ -3314,7 +3824,7 @@
     {
       "datasource": {
         "type": "grafana-postgresql-datasource",
-        "uid": "${DS_GRAFANA-POSTGRESQL-DATASOURCE-1}"
+        "uid": "df4ti9acrqsxsa"
       },
       "fieldConfig": {
         "defaults": {
@@ -3378,7 +3888,7 @@
         "h": 13,
         "w": 12,
         "x": 12,
-        "y": 86
+        "y": 103
       },
       "id": 47,
       "options": {
@@ -3391,7 +3901,7 @@
         {
           "datasource": {
             "type": "grafana-postgresql-datasource",
-            "uid": "${DS_GRAFANA-POSTGRESQL-DATASOURCE-1}"
+            "uid": "df4ti9acrqsxsa"
           },
           "editorMode": "code",
           "format": "table",
@@ -3423,7 +3933,7 @@
     {
       "datasource": {
         "type": "grafana-postgresql-datasource",
-        "uid": "${DS_GRAFANA-POSTGRESQL-DATASOURCE-1}"
+        "uid": "df4ti9acrqsxsa"
       },
       "fieldConfig": {
         "defaults": {
@@ -3488,7 +3998,7 @@
         "h": 12,
         "w": 24,
         "x": 0,
-        "y": 99
+        "y": 116
       },
       "id": 10,
       "options": {
@@ -3507,7 +4017,7 @@
         {
           "datasource": {
             "type": "grafana-postgresql-datasource",
-            "uid": "${DS_GRAFANA-POSTGRESQL-DATASOURCE-1}"
+            "uid": "df4ti9acrqsxsa"
           },
           "editorMode": "code",
           "format": "table",
@@ -3548,7 +4058,7 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 111
+        "y": 128
       },
       "id": 9,
       "panels": [],
@@ -3558,7 +4068,7 @@
     {
       "datasource": {
         "type": "grafana-postgresql-datasource",
-        "uid": "${DS_GRAFANA-POSTGRESQL-DATASOURCE-1}"
+        "uid": "df4ti9acrqsxsa"
       },
       "fieldConfig": {
         "defaults": {
@@ -3623,7 +4133,7 @@
         "h": 28,
         "w": 24,
         "x": 0,
-        "y": 112
+        "y": 129
       },
       "id": 76,
       "options": {
@@ -3642,7 +4152,7 @@
         {
           "datasource": {
             "type": "grafana-postgresql-datasource",
-            "uid": "${DS_GRAFANA-POSTGRESQL-DATASOURCE-1}"
+            "uid": "df4ti9acrqsxsa"
           },
           "editorMode": "code",
           "format": "table",
@@ -3693,7 +4203,6 @@
   "timezone": "browser",
   "title": "vmcrawl",
   "uid": "aedqo0q7klrswa",
-  "version": 32,
-  "weekStart": "",
-  "id": null
+  "version": 33,
+  "weekStart": ""
 }
