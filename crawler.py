@@ -14,6 +14,7 @@ try:
     import os
     import random
     import re
+    import ssl
     import sys
     import threading
     import time
@@ -152,6 +153,14 @@ limits = httpx.Limits(
     keepalive_expiry=30.0,
 )
 
+# Create SSL context with TLS 1.2+ and disable post-quantum key exchange
+# Some servers reject MLKEM (post-quantum crypto) with "tlsv1 alert internal error"
+# This is a known issue with OpenSSL 3.6.0+ and certain server configurations
+ssl_context = ssl.create_default_context()
+ssl_context.minimum_version = ssl.TLSVersion.TLSv1_2
+# Disable MLKEM post-quantum key exchange (SSL_OP_NO_MLKEM)
+ssl_context.options |= 0x800000
+
 http_client = httpx.Client(
     http2=False,
     follow_redirects=True,
@@ -159,6 +168,7 @@ http_client = httpx.Client(
     timeout=http_timeout,
     limits=limits,
     max_redirects=http_redirect,
+    verify=ssl_context,
 )
 
 # =============================================================================
