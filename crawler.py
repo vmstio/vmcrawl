@@ -1281,7 +1281,7 @@ def should_skip_domain(
     user_choice,
 ):
     """Check if a domain should be skipped based on its status."""
-    if user_choice in ["5", "6"] and domain in ignored_domains:
+    if user_choice not in ["5", "6"] and domain in ignored_domains:
         vmc_output(f"{domain}: Other Platform", "cyan", use_tqdm=True)
         delete_domain_if_known(domain)
         return True
