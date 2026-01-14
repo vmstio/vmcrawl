@@ -765,7 +765,7 @@ def increment_domain_error(domain: str, error_reason: str) -> None:
         with conn.cursor() as cursor:
             try:
                 # Only increment count for DNS errors
-                if error_reason == "DNS":
+                if error_reason.startswith("DNS"):
                     cursor.execute(
                         "SELECT errors FROM raw_domains WHERE domain = %s", (domain,)
                     )
