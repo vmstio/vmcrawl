@@ -2583,10 +2583,10 @@ def load_from_database(user_choice):
         "10": "SELECT domain FROM raw_domains WHERE reason = 'SSL' ORDER BY errors ASC",
         "11": "SELECT domain FROM raw_domains WHERE reason = 'HTTP' ORDER BY errors ASC",
         "12": "SELECT domain FROM raw_domains WHERE reason = 'DNS' ORDER BY errors ASC",
-        "20": "SELECT domain FROM raw_domains WHERE reason ~ '^2[0-9]{2}' ORDER BY errors ASC",
-        "21": "SELECT domain FROM raw_domains WHERE reason ~ '^3[0-9]{2}' ORDER BY errors ASC",
-        "22": "SELECT domain FROM raw_domains WHERE reason ~ '^4[0-9]{2}' ORDER BY errors ASC",
-        "23": "SELECT domain FROM raw_domains WHERE reason ~ '^5[0-9]{2}' ORDER BY errors ASC",
+        "20": "SELECT domain FROM raw_domains WHERE reason ~ '^2[0-9]{2}.*' ORDER BY errors ASC",
+        "21": "SELECT domain FROM raw_domains WHERE reason ~ '^3[0-9]{2}.*' ORDER BY errors ASC",
+        "22": "SELECT domain FROM raw_domains WHERE reason ~ '^4[0-9]{2}.*' ORDER BY errors ASC",
+        "23": "SELECT domain FROM raw_domains WHERE reason ~ '^5[0-9]{2}.*' ORDER BY errors ASC",
         "30": "SELECT domain FROM raw_domains WHERE reason LIKE '%JSON%' ORDER BY errors ASC",
         "31": "SELECT domain FROM raw_domains WHERE reason LIKE '%FILE%' ORDER BY errors ASC",
         "32": "SELECT domain FROM raw_domains WHERE reason LIKE '%TYPE%' ORDER BY errors ASC",
@@ -2694,7 +2694,7 @@ def get_menu_options() -> dict[str, dict[str, str]]:
             "30": "Bad JSON",
             "31": "Bad Size",
             "32": "Bad Type",
-            "33": "Bad MAU"
+            "33": "Bad MAU",
         },
         "Retry known instances": {
             "40": "Unpatched",
