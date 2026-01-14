@@ -2590,6 +2590,7 @@ def load_from_database(user_choice):
         "30": "SELECT domain FROM raw_domains WHERE reason LIKE '%JSON%' ORDER BY errors ASC",
         "31": "SELECT domain FROM raw_domains WHERE reason LIKE '%FILE%' ORDER BY errors ASC",
         "32": "SELECT domain FROM raw_domains WHERE reason LIKE '%TYPE%' ORDER BY errors ASC",
+        "33": "SELECT domain FROM raw_domains WHERE reason LIKE '%MAU%' ORDER BY errors ASC",
         "40": "SELECT domain FROM mastodon_domains WHERE software_version != ALL(%(versions)s::text[]) ORDER BY active_users_monthly DESC",
         "41": "SELECT domain FROM mastodon_domains WHERE software_version LIKE %s ORDER BY active_users_monthly DESC",
         "42": "SELECT domain FROM mastodon_domains ORDER BY active_users_monthly DESC",
@@ -2693,6 +2694,7 @@ def get_menu_options() -> dict[str, dict[str, str]]:
             "30": "Bad JSON",
             "31": "Bad Size",
             "32": "Bad Type",
+            "33": "Bad MAU"
         },
         "Retry known instances": {
             "40": "Unpatched",
