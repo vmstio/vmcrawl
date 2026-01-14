@@ -1721,7 +1721,10 @@ def process_domain(domain, http_client, nightly_version_ranges):
 
         if instance_uri is None:
             # Instance API endpoint is required for Mastodon instances
-            mark_as_non_mastodon(domain, nodeinfo_20_result["software"]["name"])
+            error_to_print = "could not retrieve instance URI"
+            vmc_output(f"{domain}: {error_to_print}", "yellow", use_tqdm=True)
+            log_error(domain, error_to_print)
+            increment_domain_error(domain, "API")
             return
 
         process_mastodon_instance(
@@ -2592,6 +2595,7 @@ def load_from_database(user_choice):
         "31": "SELECT domain FROM raw_domains WHERE reason LIKE '%FILE%' ORDER BY errors ASC",
         "32": "SELECT domain FROM raw_domains WHERE reason LIKE '%TYPE%' ORDER BY errors ASC",
         "33": "SELECT domain FROM raw_domains WHERE reason LIKE '%MAU%' ORDER BY errors ASC",
+        "34": "SELECT domain FROM raw_domains WHERE reason LIKE '%API%' ORDER BY errors ASC",
         "40": "SELECT domain FROM mastodon_domains WHERE software_version != ALL(%(versions)s::text[]) ORDER BY active_users_monthly DESC",
         "41": "SELECT domain FROM mastodon_domains WHERE software_version LIKE %s ORDER BY active_users_monthly DESC",
         "42": "SELECT domain FROM mastodon_domains ORDER BY active_users_monthly DESC",
@@ -2697,6 +2701,7 @@ def get_menu_options() -> dict[str, dict[str, str]]:
             "31": "Bad Size",
             "32": "Bad Type",
             "33": "Bad MAU",
+            "34": "Bad API",
         },
         "Retry known instances": {
             "40": "Unpatched",
