@@ -131,13 +131,14 @@ docker run -d --name vmcrawl --env-file .env vmcrawl
 
 ## Scripts
 
-The project includes three main scripts:
+The project includes four main scripts:
 
 | Script       | Purpose                                                                    |
 | ------------ | -------------------------------------------------------------------------- |
 | `crawler.py` | Main crawling engine that processes domains, collects version/user data, and generates statistics |
 | `fetch.py`   | Fetches new domains from federated instance peer lists                     |
 | `nightly.py` | Manages nightly/development version tracking in the database               |
+| `dni.py`     | Fetches and manages IFTAS DNI (Do Not Interact) list of blocked domains    |
 
 ### Automated Tasks
 
@@ -356,6 +357,60 @@ docker exec -it vmcrawl uv run nightly.py
 ```
 
 This displays current nightly version entries and allows you to add new versions as they are released. Nightly versions are used to identify instances running pre-release software (alpha, beta, rc versions).
+
+### DNI List Management
+
+The `dni.py` script fetches and manages the IFTAS DNI (Do Not Interact) list:
+
+**Fetch and import DNI list:**
+
+**Native:**
+```bash
+uv run dni.py
+```
+
+**Docker:**
+```bash
+docker exec vmcrawl uv run dni.py
+```
+
+**List all DNI domains:**
+
+**Native:**
+```bash
+uv run dni.py --list
+```
+
+**Docker:**
+```bash
+docker exec vmcrawl uv run dni.py --list
+```
+
+**Count DNI domains:**
+
+**Native:**
+```bash
+uv run dni.py --count
+```
+
+**Docker:**
+```bash
+docker exec vmcrawl uv run dni.py --count
+```
+
+**Use custom CSV URL:**
+
+**Native:**
+```bash
+uv run dni.py --url https://example.com/custom-dni-list.csv
+```
+
+**Docker:**
+```bash
+docker exec vmcrawl uv run dni.py --url https://example.com/custom-dni-list.csv
+```
+
+The DNI list is sourced from IFTAS (Independent Federated Trust & Safety) and contains domains that have been identified for various trust and safety concerns. All domains imported from the IFTAS list are tagged with the comment "iftas" in the database.
 
 ## Configuration
 

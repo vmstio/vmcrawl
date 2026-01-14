@@ -84,6 +84,13 @@ CREATE TABLE nightly_versions (
     end_date DATE
   );
 
+CREATE TABLE
+  dni (
+    domain TEXT PRIMARY KEY,
+    comment TEXT,
+    timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+  );
+
 INSERT INTO
   bad_tld (tld)
 VALUES

@@ -211,3 +211,6 @@ __marimo__/
 
 # UV
 uv.lock
+
+# Zed
+.claude

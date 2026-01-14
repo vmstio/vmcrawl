@@ -1071,6 +1071,20 @@ def get_junk_keywords():
     return set()
 
 
+def get_dni_domains():
+    """Get list of DNI (Do Not Interact) domains to filter domains."""
+    with db_pool.connection() as conn:
+        with conn.cursor() as cursor:
+            try:
+                cursor.execute("SELECT domain FROM dni")
+                # Use set for O(1) lookup instead of O(n) list iteration
+                return {row[0] for row in cursor}
+            except Exception as exception:
+                vmc_output(f"Failed to obtain DNI domain list: {exception}", "red")
+                conn.rollback()
+    return set()
+
+
 def get_bad_tld():
     """Get list of prohibited TLDs."""
     with db_pool.connection() as conn:
@@ -1306,10 +1320,15 @@ def should_skip_domain(
     return False
 
 
-def is_junk_or_bad_tld(domain, junk_domains, bad_tlds, domain_endings):
+def is_junk_or_bad_tld(domain, junk_domains, dni_domains, bad_tlds, domain_endings):
     """Check if a domain is junk or has a prohibited TLD."""
     if any(junk in domain for junk in junk_domains):
         vmc_output(f"{domain}: Purging known junk domain", "cyan", use_tqdm=True)
+        delete_domain_if_known(domain)
+        delete_domain_from_raw(domain)
+        return True
+    if any(dni in domain for dni in dni_domains):
+        vmc_output(f"{domain}: Purging known dni domain", "cyan", use_tqdm=True)
         delete_domain_if_known(domain)
         delete_domain_from_raw(domain)
         return True
@@ -1749,6 +1768,7 @@ def check_and_record_domains(
     failed_domains,
     user_choice,
     junk_domains,
+    dni_domains,
     bad_tlds,
     domain_endings,
     http_client,
@@ -1778,7 +1798,9 @@ def check_and_record_domains(
         ):
             return
 
-        if is_junk_or_bad_tld(domain, junk_domains, bad_tlds, domain_endings):
+        if is_junk_or_bad_tld(
+            domain, junk_domains, dni_domains, bad_tlds, domain_endings
+        ):
             return
 
         try:
@@ -2900,6 +2922,7 @@ def main():
             sys.exit(1)
 
         junk_domains = get_junk_keywords()
+        dni_domains = get_dni_domains()
         bad_tlds = get_bad_tld()
         domain_endings = get_domain_endings()
         failed_domains = get_failed_domains()
@@ -2918,6 +2941,7 @@ def main():
             failed_domains,
             user_choice,
             junk_domains,
+            dni_domains,
             bad_tlds,
             domain_endings,
             http_client,

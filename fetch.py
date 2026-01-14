@@ -186,6 +186,21 @@ def get_junk_keywords():
                 return None
 
 
+def get_dni_domains():
+    """Get list of dni domains to filter domains."""
+    with db_pool.connection() as conn:
+        with conn.cursor() as cursor:
+            try:
+                cursor.execute("SELECT domain FROM dni")
+                keywords = [row[0] for row in cursor.fetchall()]
+                conn.commit()
+                return keywords
+            except Exception as e:
+                vmc_output(f"Failed to obtain dni domain list: {e}", "orange")
+                conn.rollback()
+                return None
+
+
 def get_bad_tld():
     """Get list of prohibited TLDs."""
     with db_pool.connection() as conn:
@@ -285,6 +300,7 @@ def detect_vowels(domain):
 def get_domains(api_url, domain, domain_endings):
     """Fetch peer domains from a Mastodon instance API."""
     keywords = get_junk_keywords() or []
+    dni = get_dni_domains() or []
     bad_tlds = get_bad_tld() or []
 
     try:
@@ -296,6 +312,7 @@ def get_domains(api_url, domain, domain_endings):
             if is_valid_domain(item)
             and not has_emoji_chars(item)
             and not any(keyword in item for keyword in keywords)
+            and not any(item in domain for domain in dni)
             and not any(item.endswith(f".{tld}") for tld in bad_tlds)
             and any(
                 item.endswith(f".{domain_ending}") for domain_ending in domain_endings
