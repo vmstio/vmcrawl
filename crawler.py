@@ -1144,9 +1144,19 @@ def get_failed_domains():
     return get_domains_by_status("failed")
 
 
-def get_ignored_domains():
-    """Get list of domains marked as ignored."""
-    return get_domains_by_status("ignore")
+def get_not_masto_domains():
+    """Get list of domains where nodeinfo is not 'mastodon'."""
+    with db_pool.connection() as conn:
+        with conn.cursor() as cursor:
+            try:
+                query = "SELECT domain FROM raw_domains WHERE nodeinfo IS NOT NULL AND nodeinfo != 'mastodon'"
+                _ = cursor.execute(query)
+                # Use set for O(1) lookup, stream results
+                return {row[0].strip() for row in cursor if row[0] and row[0].strip()}
+            except Exception as exception:
+                vmc_output(f"Failed to obtain non-mastodon domains: {exception}", "red")
+                conn.rollback()
+    return set()
 
 
 def get_baddata_domains():
@@ -1297,7 +1307,7 @@ def handle_json_exception(domain, target, exception):
 
 def should_skip_domain(
     domain,
-    ignored_domains,
+    not_masto_domains,
     baddata_domains,
     failed_domains,
     nxdomain_domains,
@@ -1305,7 +1315,7 @@ def should_skip_domain(
     user_choice,
 ):
     """Check if a domain should be skipped based on its status."""
-    if user_choice not in ["5", "6"] and domain in ignored_domains:
+    if user_choice not in ["5", "6"] and domain in not_masto_domains:
         vmc_output(f"{domain}: Other Platform", "cyan", use_tqdm=True)
         delete_domain_if_known(domain)
         return True
@@ -1601,7 +1611,7 @@ def mark_as_non_mastodon(domain, other_platform):
         other_platform = "Unknown"
     other_platform = other_platform.lower().replace(" ", "-")
     vmc_output(f"{domain}: {other_platform}", "cyan", use_tqdm=True)
-    mark_ignore_domain(domain)
+    clear_domain_error(domain)
     delete_domain_if_known(domain)
 
 
@@ -1773,7 +1783,7 @@ def process_domain(domain, http_client, nightly_version_ranges):
 
 def check_and_record_domains(
     domain_list,
-    ignored_domains,
+    not_masto_domains,
     baddata_domains,
     failed_domains,
     user_choice,
@@ -1799,7 +1809,7 @@ def check_and_record_domains(
 
         if should_skip_domain(
             domain,
-            ignored_domains,
+            not_masto_domains,
             baddata_domains,
             failed_domains,
             nxdomain_domains,
@@ -2717,7 +2727,7 @@ def get_menu_options() -> dict[str, dict[str, str]]:
             "5": "Known",
         },
         "Retry fatal errors": {
-            "6": "Ignored",
+            "6": "Other",
             "7": "Failed",
             "8": "NXDOMAIN",
             "9": "Prohibited",
@@ -2936,7 +2946,7 @@ def main():
         bad_tlds = get_bad_tld()
         domain_endings = get_domain_endings()
         failed_domains = get_failed_domains()
-        ignored_domains = get_ignored_domains()
+        not_masto_domains = get_not_masto_domains()
         baddata_domains = get_baddata_domains()
         nxdomain_domains = get_nxdomain_domains()
         norobots_domains = get_norobots_domains()
@@ -2946,7 +2956,7 @@ def main():
 
         check_and_record_domains(
             domain_list,
-            ignored_domains,
+            not_masto_domains,
             baddata_domains,
             failed_domains,
             user_choice,
