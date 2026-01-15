@@ -808,7 +808,7 @@ def increment_domain_error(domain: str, error_reason: str) -> None:
                     new_errors = current_errors + 1
 
                     # If SSL errors reach threshold, mark as ignored
-                    if new_errors >= 15:
+                    if new_errors >= 30:
                         mark_domain_status(domain, "ignore")
                         delete_domain_if_known(domain)
                         return
