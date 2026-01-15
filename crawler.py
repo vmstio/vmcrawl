@@ -2622,7 +2622,7 @@ def load_from_database(user_choice):
         "1": "SELECT domain FROM raw_domains WHERE (failed IS NULL OR failed = FALSE) AND (ignore IS NULL OR ignore = FALSE) AND (nxdomain IS NULL OR nxdomain = FALSE) AND (norobots IS NULL OR norobots = FALSE) AND (baddata IS NULL OR baddata = FALSE) ORDER BY domain ASC",
         "4": "SELECT domain FROM raw_domains WHERE errors IS NOT NULL ORDER BY errors ASC",
         "5": "SELECT rd.domain FROM raw_domains rd WHERE rd.nodeinfo = 'mastodon' AND NOT EXISTS (SELECT 1 FROM mastodon_domains md WHERE md.domain = rd.domain) AND (rd.reason IS NOT NULL OR rd.nxdomain IS NOT NULL) AND rd.reason <> 'API' ORDER BY rd.domain;",
-        "6": "SELECT domain FROM raw_domains WHERE ignore = TRUE AND nodeinfo = 'mastodon' ORDER BY domain",
+        "6": "SELECT domain FROM raw_domains WHERE nodeinfo != 'mastodon' ORDER BY domain",
         "7": "SELECT domain FROM raw_domains WHERE failed = TRUE ORDER BY domain",
         "8": "SELECT domain FROM raw_domains WHERE nxdomain = TRUE ORDER BY domain",
         "9": "SELECT domain FROM raw_domains WHERE norobots = TRUE ORDER BY domain",
