@@ -768,11 +768,13 @@ def log_error(domain: str, error_to_print: str) -> None:
 def increment_domain_error(domain: str, error_reason: str) -> None:
     """Increment error count for a domain and record the error reason.
 
-    Only increments error count if the previous error reason started with DNS or SSL.
+    Only increments error count if the previous error reason started with DNS, SSL, or HTTP.
     For other error types, the count is set to null while still recording the error reason.
+    Counter resets to 1 when switching between error types.
 
     DNS errors: After 15 consecutive errors, mark as NXDOMAIN.
-    SSL errors: After 15 consecutive errors, mark as ignored.
+    SSL errors: After 30 consecutive errors, mark as ignored.
+    HTTP errors: After 30 consecutive errors, mark as ignored.
     """
     with db_pool.connection() as conn:
         with conn.cursor() as cursor:
@@ -812,11 +814,26 @@ def increment_domain_error(domain: str, error_reason: str) -> None:
                         mark_domain_status(domain, "ignore")
                         delete_domain_if_known(domain)
                         return
-                elif error_reason.startswith("DNS") or error_reason.startswith("SSL"):
-                    # Switched error types (DNS<->SSL) or first error of this type - reset to 1
+                elif error_reason.startswith("HTTP") and previous_reason.startswith(
+                    "HTTP"
+                ):
+                    # Same HTTP error type - increment
+                    new_errors = current_errors + 1
+
+                    # If HTTP errors reach threshold, mark as ignored
+                    if new_errors >= 30:
+                        mark_domain_status(domain, "ignore")
+                        delete_domain_if_known(domain)
+                        return
+                elif (
+                    error_reason.startswith("DNS")
+                    or error_reason.startswith("SSL")
+                    or error_reason.startswith("HTTP")
+                ):
+                    # Switched error types or first error of this type - reset to 1
                     new_errors = 1
                 else:
-                    # For non-DNS/SSL errors, set count to null
+                    # For non-DNS/SSL/HTTP errors, set count to null
                     new_errors = None
 
                 _ = cursor.execute(
