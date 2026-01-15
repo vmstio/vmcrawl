@@ -768,31 +768,55 @@ def log_error(domain: str, error_to_print: str) -> None:
 def increment_domain_error(domain: str, error_reason: str) -> None:
     """Increment error count for a domain and record the error reason.
 
-    Only increments error count for DNS errors. For other error types,
-    the count is set to null while still recording the error reason.
+    Only increments error count if the previous error reason started with DNS or SSL.
+    For other error types, the count is set to null while still recording the error reason.
+
+    DNS errors: After 15 consecutive errors, mark as NXDOMAIN.
+    SSL errors: After 15 consecutive errors, mark as ignored.
     """
     with db_pool.connection() as conn:
         with conn.cursor() as cursor:
             try:
-                # Only increment count for DNS errors
-                if error_reason.startswith("DNS"):
-                    cursor.execute(
-                        "SELECT errors FROM raw_domains WHERE domain = %s", (domain,)
-                    )
-                    result = cursor.fetchone()
-                    if result:
-                        current_errors = result[0] if result[0] is not None else 0
-                        new_errors = current_errors + 1
-                    else:
-                        new_errors = 1
+                # Fetch current errors and previous error reason
+                cursor.execute(
+                    "SELECT errors, reason FROM raw_domains WHERE domain = %s",
+                    (domain,),
+                )
+                result = cursor.fetchone()
+
+                if result:
+                    current_errors = result[0] if result[0] is not None else 0
+                    previous_reason = result[1] if result[1] is not None else ""
+                else:
+                    current_errors = 0
+                    previous_reason = ""
+
+                # Determine if we should increment or reset
+                if error_reason.startswith("DNS") and previous_reason.startswith("DNS"):
+                    # Same DNS error type - increment
+                    new_errors = current_errors + 1
 
                     # If DNS errors reach threshold, mark as NXDOMAIN
                     if new_errors >= 15:
                         mark_domain_status(domain, "nxdomain")
                         delete_domain_if_known(domain)
                         return
+                elif error_reason.startswith("SSL") and previous_reason.startswith(
+                    "SSL"
+                ):
+                    # Same SSL error type - increment
+                    new_errors = current_errors + 1
+
+                    # If SSL errors reach threshold, mark as ignored
+                    if new_errors >= 15:
+                        mark_domain_status(domain, "ignore")
+                        delete_domain_if_known(domain)
+                        return
+                elif error_reason.startswith("DNS") or error_reason.startswith("SSL"):
+                    # Switched error types (DNS<->SSL) or first error of this type - reset to 1
+                    new_errors = 1
                 else:
-                    # For non-DNS errors, set count to null
+                    # For non-DNS/SSL errors, set count to null
                     new_errors = None
 
                 _ = cursor.execute(
