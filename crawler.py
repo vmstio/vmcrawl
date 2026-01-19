@@ -1235,9 +1235,10 @@ def handle_http_failed(domain, target, response):
 def handle_tcp_exception(domain, target, exception):
     """Handle TCP/connection exceptions with appropriate categorization."""
     error_message = str(exception)
+    error_message_lower = error_message.casefold()
 
     # Handle response size violations
-    if isinstance(exception, ValueError) and "too large" in error_message.casefold():
+    if isinstance(exception, ValueError) and "too large" in error_message_lower:
         error_reason = "FILE"
         vmc_output(f"{domain}: Response too large", "yellow", use_tqdm=True)
         log_error(domain, "Response exceeds size limit")
@@ -1245,14 +1246,25 @@ def handle_tcp_exception(domain, target, exception):
         return
 
     # Handle bad file descriptor (usually from cancellation/cleanup issues)
-    if "bad file descriptor" in error_message.casefold():
+    if "bad file descriptor" in error_message_lower:
         error_reason = "FILE"
         vmc_output(f"{domain}: Connection closed unexpectedly", "yellow", use_tqdm=True)
         log_error(domain, "Bad file descriptor")
         increment_domain_error(domain, f"{error_reason}+{target}")
         return
 
-    if "_ssl.c" in error_message.casefold():
+    # Check for SSL/TLS errors (includes certificate validation failures)
+    ssl_indicators = [
+        "_ssl.c",
+        "ssl",
+        "tls",
+        "certificate",
+        "cert",
+        "sslcertverficationerror",
+        "handshake",
+        "cipher",
+    ]
+    if any(indicator in error_message_lower for indicator in ssl_indicators):
         error_reason = "SSL"
         cleaned_message = (
             re.sub(r"\s*(\[[^\]]*\]|\([^)]*\))", "", error_message)
@@ -1268,8 +1280,9 @@ def handle_tcp_exception(domain, target, exception):
         vmc_output(f"{domain}: {cleaned_message}", "yellow", use_tqdm=True)
         log_error(domain, cleaned_message)
         increment_domain_error(domain, f"{error_reason}+{target}")
+    # Check for DNS resolution errors
     elif any(
-        msg in error_message.casefold()
+        msg in error_message_lower
         for msg in [
             "no address associated with hostname",
             "temporary failure in name resolution",
