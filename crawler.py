@@ -1294,22 +1294,19 @@ def handle_tcp_exception(domain, target, exception):
         log_error(domain, cleaned_message)
         increment_domain_error(domain, f"{error_reason}+{target}")
     else:
-        # All other errors (TCP, HTTP, etc.) categorized as HTTP
+        # All other errors (TCP, HTTP, etc.) categorized as TCP
         error_reason = "TCP"
-        if "streamreset" in error_message.casefold():
-            cleaned_message = "HTTP/2 stream was abruptly terminated"
-        else:
-            cleaned_message = (
-                re.sub(r"\s*(\[[^\]]*\]|\([^)]*\))", "", error_message)
-                .replace(":", "")
-                .replace(",", "")
-                .split(" for ", 1)[0]
-                .lstrip()
-                .rstrip(" .")
-            )
+        cleaned_message = (
+            re.sub(r"\s*(\[[^\]]*\]|\([^)]*\))", "", error_message)
+            .replace(":", "")
+            .replace(",", "")
+            .split(" for ", 1)[0]
+            .lstrip()
+            .rstrip(" .")
+        )
         # Fallback to original if cleaning resulted in empty string
         if not cleaned_message:
-            cleaned_message = str(exception)[:100] or "HTTP request error"
+            cleaned_message = str(exception)[:100] or "TCP error"
         vmc_output(f"{domain}: {cleaned_message}", "yellow", use_tqdm=True)
         log_error(domain, cleaned_message)
         increment_domain_error(domain, f"{error_reason}+{target}")
