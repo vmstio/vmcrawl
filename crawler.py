@@ -1312,7 +1312,7 @@ def handle_tcp_exception(domain, target, exception):
         increment_domain_error(domain, f"{error_reason}+{target}")
     else:
         # All other errors (TCP, HTTP, etc.) categorized as HTTP
-        error_reason = "HTTP"
+        error_reason = "TCP"
         if "streamreset" in error_message.casefold():
             cleaned_message = "HTTP/2 stream was abruptly terminated"
         else:
