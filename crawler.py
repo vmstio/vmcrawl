@@ -768,13 +768,13 @@ def log_error(domain: str, error_to_print: str) -> None:
 def increment_domain_error(domain: str, error_reason: str) -> None:
     """Increment error count for a domain and record the error reason.
 
-    Only increments error count if the previous error reason started with DNS, SSL, or HTTP.
+    Only increments error count if the previous error reason started with DNS, SSL, or TCP.
     For other error types, the count is set to null while still recording the error reason.
     Counter resets to 1 when switching between error types.
 
     DNS errors: After 15 consecutive errors, mark as NXDOMAIN.
     SSL errors: After 30 consecutive errors, mark as ignored.
-    HTTP errors: After 30 consecutive errors, mark as ignored.
+    TCP errors: After 30 consecutive errors, mark as ignored.
     """
     with db_pool.connection() as conn:
         with conn.cursor() as cursor:
@@ -814,13 +814,13 @@ def increment_domain_error(domain: str, error_reason: str) -> None:
                         mark_domain_status(domain, "ignore")
                         delete_domain_if_known(domain)
                         return
-                elif error_reason.startswith("HTTP") and previous_reason.startswith(
-                    "HTTP"
+                elif error_reason.startswith("TCP") and previous_reason.startswith(
+                    "TCP"
                 ):
-                    # Same HTTP error type - increment
+                    # Same TCP error type - increment
                     new_errors = current_errors + 1
 
-                    # If HTTP errors reach threshold, mark as ignored
+                    # If TCP errors reach threshold, mark as ignored
                     if new_errors >= 30:
                         mark_domain_status(domain, "ignore")
                         delete_domain_if_known(domain)
@@ -828,12 +828,12 @@ def increment_domain_error(domain: str, error_reason: str) -> None:
                 elif (
                     error_reason.startswith("DNS")
                     or error_reason.startswith("SSL")
-                    or error_reason.startswith("HTTP")
+                    or error_reason.startswith("TCP")
                 ):
                     # Switched error types or first error of this type - reset to 1
                     new_errors = 1
                 else:
-                    # For non-DNS/SSL/HTTP errors, set count to null
+                    # For non-DNS/SSL/TCP errors, set count to null
                     new_errors = None
 
                 _ = cursor.execute(
@@ -2668,7 +2668,7 @@ def load_from_database(user_choice):
         "8": "SELECT domain FROM raw_domains WHERE nxdomain = TRUE ORDER BY domain",
         "9": "SELECT domain FROM raw_domains WHERE norobots = TRUE ORDER BY domain",
         "10": "SELECT domain FROM raw_domains WHERE reason LIKE 'SSL%' ORDER BY errors ASC",
-        "11": "SELECT domain FROM raw_domains WHERE reason LIKE 'HTTP%' ORDER BY errors ASC",
+        "11": "SELECT domain FROM raw_domains WHERE reason LIKE 'TCP%' ORDER BY errors ASC",
         "12": "SELECT domain FROM raw_domains WHERE reason LIKE 'DNS%' ORDER BY errors ASC",
         "20": "SELECT domain FROM raw_domains WHERE reason ~ '^2[0-9]{2}.*' ORDER BY errors ASC",
         "21": "SELECT domain FROM raw_domains WHERE reason ~ '^3[0-9]{2}.*' ORDER BY errors ASC",
@@ -2775,10 +2775,10 @@ def get_menu_options() -> dict[str, dict[str, str]]:
         },
         "Retry connection errors": {
             "10": "SSL",
-            "11": "HTTP",
+            "11": "TCP",
             "12": "DNS",
         },
-        "Retry HTTP errors": {"20": "2xx", "21": "3xx", "22": "4xx", "23": "5xx"},
+        "Retry TCP errors": {"20": "2xx", "21": "3xx", "22": "4xx", "23": "5xx"},
         "Retry target errors": {
             "30": "Bad JSON",
             "31": "Bad Size",
