@@ -773,9 +773,12 @@ def increment_domain_error(domain: str, error_reason: str) -> None:
     Counter resets to 1 when switching between error types.
 
     DNS errors: After 15 consecutive errors, mark as NXDOMAIN.
-    SSL errors: After 30 consecutive errors, mark as ignored.
-    TCP errors: After 30 consecutive errors, mark as ignored.
+    SSL errors: After 15 consecutive errors, mark as ignored.
+    TCP errors: After 15 consecutive errors, mark as ignored.
     """
+    ERROR_THRESHOLD = 15
+    TRACKED_ERROR_TYPES = ("DNS", "SSL", "TCP")
+
     with db_pool.connection() as conn:
         with conn.cursor() as cursor:
             try:
@@ -785,55 +788,35 @@ def increment_domain_error(domain: str, error_reason: str) -> None:
                     (domain,),
                 )
                 result = cursor.fetchone()
+                current_errors = result[0] if result and result[0] is not None else 0
+                previous_reason = result[1] if result and result[1] is not None else ""
 
-                if result:
-                    current_errors = result[0] if result[0] is not None else 0
-                    previous_reason = result[1] if result[1] is not None else ""
-                else:
-                    current_errors = 0
-                    previous_reason = ""
+                # Get error type prefix (DNS, SSL, TCP, or None)
+                error_type = next(
+                    (t for t in TRACKED_ERROR_TYPES if error_reason.startswith(t)),
+                    None,
+                )
+                previous_type = next(
+                    (t for t in TRACKED_ERROR_TYPES if previous_reason.startswith(t)),
+                    None,
+                )
 
-                # Determine if we should increment or reset
-                if error_reason.startswith("DNS") and previous_reason.startswith("DNS"):
-                    # Same DNS error type - increment
+                # Determine new error count
+                if error_type and error_type == previous_type:
+                    # Same error type - increment
                     new_errors = current_errors + 1
 
-                    # If DNS errors reach threshold, mark as NXDOMAIN
-                    if new_errors >= 15:
-                        mark_domain_status(domain, "nxdomain")
+                    # Check if threshold reached
+                    if new_errors >= ERROR_THRESHOLD:
+                        status = "nxdomain" if error_type == "DNS" else "ignore"
+                        mark_domain_status(domain, status)
                         delete_domain_if_known(domain)
                         return
-                elif error_reason.startswith("SSL") and previous_reason.startswith(
-                    "SSL"
-                ):
-                    # Same SSL error type - increment
-                    new_errors = current_errors + 1
-
-                    # If SSL errors reach threshold, mark as ignored
-                    if new_errors >= 30:
-                        mark_domain_status(domain, "ignore")
-                        delete_domain_if_known(domain)
-                        return
-                elif error_reason.startswith("TCP") and previous_reason.startswith(
-                    "TCP"
-                ):
-                    # Same TCP error type - increment
-                    new_errors = current_errors + 1
-
-                    # If TCP errors reach threshold, mark as ignored
-                    if new_errors >= 30:
-                        mark_domain_status(domain, "ignore")
-                        delete_domain_if_known(domain)
-                        return
-                elif (
-                    error_reason.startswith("DNS")
-                    or error_reason.startswith("SSL")
-                    or error_reason.startswith("TCP")
-                ):
-                    # Switched error types or first error of this type - reset to 1
+                elif error_type:
+                    # Different tracked error type or first occurrence - reset to 1
                     new_errors = 1
                 else:
-                    # For non-DNS/SSL/TCP errors, set count to null
+                    # Non-tracked error types - set count to null
                     new_errors = None
 
                 _ = cursor.execute(
