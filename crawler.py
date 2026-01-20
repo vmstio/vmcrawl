@@ -1512,13 +1512,10 @@ def check_host_meta(domain, http_client):
 
     Returns the backend domain if found, or None if not available.
     """
-    target = "host_meta"
     url = f"https://{domain}/.well-known/host-meta"
     try:
         response = get_httpx(url, http_client)
         if response.status_code == 200:
-            content_type = response.headers.get("Content-Type", "")
-
             # host-meta is typically XML
             if not response.content:
                 return None
@@ -1548,8 +1545,9 @@ def check_host_meta(domain, http_client):
                         if backend_domain and backend_domain != domain:
                             return backend_domain
 
-            except Exception:
+            except Exception:  # noqa: BLE001
                 # XML parsing failed, not a valid host-meta
+                # Broad exception is intentional - any parsing error should be silent
                 return None
 
         # host-meta not available or failed
@@ -1562,8 +1560,9 @@ def check_host_meta(domain, http_client):
 
 def check_webfinger(domain, http_client):
     """Check WebFinger endpoint for backend domain discovery.
-    
-    Returns {"backend_domain": domain} on success, False on failure.
+
+    Returns {"backend_domain": domain} on success, None on failure.
+    Failures are silent (no logging) since this is a fallback method.
     """
     target = "webfinger"
     url = f"https://{domain}/.well-known/webfinger?resource=acct:{domain}@{domain}"
@@ -1575,67 +1574,56 @@ def check_webfinger(domain, http_client):
         if response.status_code == 200:
             # Validate content type
             if "json" not in content_type:
-                handle_incorrect_file_type(domain, target, content_type)
-                return False
+                return None
 
             # Validate content exists
             if not response.content or content_length == "0":
-                exception = "returned empty content"
-                handle_json_exception(domain, target, exception)
-                return False
+                return None
 
             # Parse and validate JSON structure
             data = parse_json_with_fallback(response, domain, target)
             if not data or not isinstance(data, dict):
-                if data is False:
-                    return False
-                exception = "returned non-dict JSON"
-                handle_json_exception(domain, target, exception)
-                return False
+                return None
 
             # Check for specific error message indicating non-Mastodon platform
             error = data.get("error")
             message = data.get("message")
-            if error == "unknown" and message == "Failed to resolve actor via webfinger":
-                exception = "Failed to resolve actor via webfinger"
-                handle_json_exception(domain, target, exception)
-                return False
+            if (
+                error == "unknown"
+                and message == "Failed to resolve actor via webfinger"
+            ):
+                return None
 
             # Validate aliases exist
             aliases = data.get("aliases", [])
             if not aliases:
-                exception = "has no aliases"
-                handle_json_exception(domain, target, exception)
-                return False
+                return None
 
             # Find first HTTPS alias
             first_alias = next((alias for alias in aliases if "https" in alias), None)
             if not first_alias:
-                exception = "has no https alias"
-                handle_json_exception(domain, target, exception)
-                return False
+                return None
 
             # Extract and validate backend domain
             backend_domain = urlparse(first_alias).netloc
             if "localhost" in backend_domain:
-                exception = "points to localhost"
-                handle_json_exception(domain, target, exception)
-                return False
+                return None
 
             return {"backend_domain": backend_domain}
 
         elif response.status_code in http_codes_to_hardfail:
+            # Hard failures should still be logged
             handle_http_failed(domain, target, response)
-            return False
+            return None
         else:
-            handle_http_status_code(domain, target, response)
-            return False
-    except httpx.RequestError as exception:
-        handle_tcp_exception(domain, target, exception)
-        return False
-    except json.JSONDecodeError as exception:
-        handle_json_exception(domain, target, exception)
-        return False
+            # Other HTTP errors are silent (fallback behavior)
+            return None
+    except httpx.RequestError:
+        # Connection errors are silent (fallback behavior)
+        return None
+    except json.JSONDecodeError:
+        # JSON errors are silent (fallback behavior)
+        return None
 
 
 def check_nodeinfo(domain, backend_domain, http_client):

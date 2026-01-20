@@ -179,8 +179,16 @@
 
 ## Error Handling
 
-- **robots.txt blocks**: Stop immediately
-- **Host-meta fails**: Continue to webfinger (silent)
-- **Webfinger fails**: Continue to nodeinfo with original domain
-- **NodeInfo fails**: Stop, log error
-- **Non-Mastodon detected**: Mark and skip
+- **robots.txt blocks**: Stop immediately, mark as norobots
+- **Host-meta fails**: Continue to webfinger (silent, no logging)
+- **Webfinger fails**: Continue to nodeinfo with original domain (silent, no logging)
+- **NodeInfo fails**: Stop, log error, increment error counter (ONLY logged failure)
+- **Non-Mastodon detected**: Mark and skip (not an error)
+
+### Why Silent Failures?
+
+Host-meta and webfinger are **discovery mechanisms** - their failure doesn't mean the domain is broken, just that we need to try another method. Only when **all** methods fail (nodeinfo returns nothing) do we log it as an actual error.
+
+This prevents triple-counting errors:
+- ❌ OLD: host-meta fail (count +1) → webfinger fail (count +2) → nodeinfo fail (count +3) = 3 errors
+- ✅ NEW: host-meta fail (silent) → webfinger fail (silent) → nodeinfo fail (count +1) = 1 error
