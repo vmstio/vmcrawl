@@ -2733,7 +2733,7 @@ def load_from_database(user_choice):
         "50": "SELECT domain FROM mastodon_domains WHERE software_version != ALL(%(versions)s::text[]) ORDER BY active_users_monthly DESC",
         "51": "SELECT domain FROM mastodon_domains WHERE software_version LIKE %s ORDER BY active_users_monthly DESC",
         "52": "SELECT domain FROM mastodon_domains ORDER BY active_users_monthly DESC",
-        "53": "SELECT domain FROM raw_domains WHERE nodeinfo = 'mastodon' ORDER BY domain DESC",
+        "53": "SELECT domain FROM raw_domains WHERE nodeinfo = 'mastodon' ORDER BY domain",
     }
 
     params = None
