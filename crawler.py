@@ -1167,9 +1167,11 @@ def get_failed_domains():
     """Get list of domains marked as failed."""
     return get_domains_by_status("failed")
 
+
 def get_ignored_domains():
     """Get list of domains marked as ignored."""
     return get_domains_by_status("ignore")
+
 
 def get_not_masto_domains():
     """Get list of domains where nodeinfo is not 'mastodon'."""
@@ -1362,9 +1364,7 @@ def should_skip_domain(
         delete_domain_if_known(domain)
         return True
     if user_choice != "12" and domain in failed_domains:
-        vmc_output(
-            f"{domain}: Failed Domain", "cyan", use_tqdm=True
-        )
+        vmc_output(f"{domain}: Failed Domain", "cyan", use_tqdm=True)
         delete_domain_if_known(domain)
         return True
     if user_choice != "13" and domain in nxdomain_domains:
