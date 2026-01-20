@@ -1167,6 +1167,9 @@ def get_failed_domains():
     """Get list of domains marked as failed."""
     return get_domains_by_status("failed")
 
+def get_ignored_domains():
+    """Get list of domains marked as ignored."""
+    return get_domains_by_status("ignore")
 
 def get_not_masto_domains():
     """Get list of domains where nodeinfo is not 'mastodon'."""
@@ -1344,26 +1347,31 @@ def should_skip_domain(
     not_masto_domains,
     baddata_domains,
     failed_domains,
+    ignored_domains,
     nxdomain_domains,
     norobots_domains,
     user_choice,
 ):
     """Check if a domain should be skipped based on its status."""
-    if user_choice not in ["5", "6"] and domain in not_masto_domains:
+    if user_choice != "10" and domain in not_masto_domains:
         vmc_output(f"{domain}: Other Platform", "cyan", use_tqdm=True)
         delete_domain_if_known(domain)
         return True
-    if user_choice != "7" and domain in failed_domains:
+    if user_choice != "11" and domain in ignored_domains:
+        vmc_output(f"{domain}: Ignored Domain", "cyan", use_tqdm=True)
+        delete_domain_if_known(domain)
+        return True
+    if user_choice != "12" and domain in failed_domains:
         vmc_output(
-            f"{domain}: Authentication Required (401/403)", "cyan", use_tqdm=True
+            f"{domain}: Failed Domain", "cyan", use_tqdm=True
         )
         delete_domain_if_known(domain)
         return True
-    if user_choice != "8" and domain in nxdomain_domains:
-        vmc_output(f"{domain}: Hard Failed (418/410)", "cyan", use_tqdm=True)
+    if user_choice != "13" and domain in nxdomain_domains:
+        vmc_output(f"{domain}: NXDOMAIN", "cyan", use_tqdm=True)
         delete_domain_if_known(domain)
         return True
-    if user_choice != "9" and domain in norobots_domains:
+    if user_choice != "14" and domain in norobots_domains:
         vmc_output(f"{domain}: Crawling Prohibited", "cyan", use_tqdm=True)
         delete_domain_if_known(domain)
         return True
@@ -1820,6 +1828,7 @@ def check_and_record_domains(
     not_masto_domains,
     baddata_domains,
     failed_domains,
+    ignored_domains,
     user_choice,
     junk_domains,
     dni_domains,
@@ -1846,6 +1855,7 @@ def check_and_record_domains(
             not_masto_domains,
             baddata_domains,
             failed_domains,
+            ignored_domains,
             nxdomain_domains,
             norobots_domains,
             user_choice,
@@ -2656,25 +2666,26 @@ def load_from_database(user_choice):
         "1": "SELECT domain FROM raw_domains WHERE (failed IS NULL OR failed = FALSE) AND (ignore IS NULL OR ignore = FALSE) AND (nxdomain IS NULL OR nxdomain = FALSE) AND (norobots IS NULL OR norobots = FALSE) AND (baddata IS NULL OR baddata = FALSE) ORDER BY domain ASC",
         "4": "SELECT domain FROM raw_domains WHERE errors IS NOT NULL ORDER BY errors ASC",
         "5": "SELECT domain FROM raw_domains WHERE nodeinfo = 'mastodon' AND (reason IS NOT NULL AND reason <> 'API') ORDER BY domain;",
-        "6": "SELECT domain FROM raw_domains WHERE nodeinfo != 'mastodon' ORDER BY domain",
-        "7": "SELECT domain FROM raw_domains WHERE failed = TRUE ORDER BY domain",
-        "8": "SELECT domain FROM raw_domains WHERE nxdomain = TRUE ORDER BY domain",
-        "9": "SELECT domain FROM raw_domains WHERE norobots = TRUE ORDER BY domain",
-        "10": "SELECT domain FROM raw_domains WHERE reason LIKE 'SSL%' ORDER BY errors ASC",
-        "11": "SELECT domain FROM raw_domains WHERE reason LIKE 'TCP%' ORDER BY errors ASC",
-        "12": "SELECT domain FROM raw_domains WHERE reason LIKE 'DNS%' ORDER BY errors ASC",
-        "20": "SELECT domain FROM raw_domains WHERE reason ~ '^2[0-9]{2}.*' ORDER BY errors ASC",
-        "21": "SELECT domain FROM raw_domains WHERE reason ~ '^3[0-9]{2}.*' ORDER BY errors ASC",
-        "22": "SELECT domain FROM raw_domains WHERE reason ~ '^4[0-9]{2}.*' ORDER BY errors ASC",
-        "23": "SELECT domain FROM raw_domains WHERE reason ~ '^5[0-9]{2}.*' ORDER BY errors ASC",
-        "30": "SELECT domain FROM raw_domains WHERE reason LIKE 'JSON%' ORDER BY errors ASC",
-        "31": "SELECT domain FROM raw_domains WHERE reason LIKE 'FILE%' ORDER BY errors ASC",
-        "32": "SELECT domain FROM raw_domains WHERE reason LIKE 'TYPE%' ORDER BY errors ASC",
-        "33": "SELECT domain FROM raw_domains WHERE reason LIKE 'MAU%' ORDER BY errors ASC",
-        "34": "SELECT domain FROM raw_domains WHERE reason LIKE 'API%' ORDER BY errors ASC",
-        "40": "SELECT domain FROM mastodon_domains WHERE software_version != ALL(%(versions)s::text[]) ORDER BY active_users_monthly DESC",
-        "41": "SELECT domain FROM mastodon_domains WHERE software_version LIKE %s ORDER BY active_users_monthly DESC",
-        "42": "SELECT domain FROM mastodon_domains ORDER BY active_users_monthly DESC",
+        "10": "SELECT domain FROM raw_domains WHERE nodeinfo != 'mastodon' ORDER BY domain",
+        "11": "SELECT domain FROM raw_domains WHERE ignore = TRUE ORDER BY domain",
+        "12": "SELECT domain FROM raw_domains WHERE failed = TRUE ORDER BY domain",
+        "13": "SELECT domain FROM raw_domains WHERE nxdomain = TRUE ORDER BY domain",
+        "14": "SELECT domain FROM raw_domains WHERE norobots = TRUE ORDER BY domain",
+        "20": "SELECT domain FROM raw_domains WHERE reason LIKE 'SSL%' ORDER BY errors ASC",
+        "21": "SELECT domain FROM raw_domains WHERE reason LIKE 'TCP%' ORDER BY errors ASC",
+        "22": "SELECT domain FROM raw_domains WHERE reason LIKE 'DNS%' ORDER BY errors ASC",
+        "30": "SELECT domain FROM raw_domains WHERE reason ~ '^2[0-9]{2}.*' ORDER BY errors ASC",
+        "31": "SELECT domain FROM raw_domains WHERE reason ~ '^3[0-9]{2}.*' ORDER BY errors ASC",
+        "32": "SELECT domain FROM raw_domains WHERE reason ~ '^4[0-9]{2}.*' ORDER BY errors ASC",
+        "33": "SELECT domain FROM raw_domains WHERE reason ~ '^5[0-9]{2}.*' ORDER BY errors ASC",
+        "40": "SELECT domain FROM raw_domains WHERE reason LIKE 'JSON%' ORDER BY errors ASC",
+        "41": "SELECT domain FROM raw_domains WHERE reason LIKE 'FILE%' ORDER BY errors ASC",
+        "42": "SELECT domain FROM raw_domains WHERE reason LIKE 'TYPE%' ORDER BY errors ASC",
+        "43": "SELECT domain FROM raw_domains WHERE reason LIKE 'MAU%' ORDER BY errors ASC",
+        "44": "SELECT domain FROM raw_domains WHERE reason LIKE 'API%' ORDER BY errors ASC",
+        "50": "SELECT domain FROM mastodon_domains WHERE software_version != ALL(%(versions)s::text[]) ORDER BY active_users_monthly DESC",
+        "51": "SELECT domain FROM mastodon_domains WHERE software_version LIKE %s ORDER BY active_users_monthly DESC",
+        "52": "SELECT domain FROM mastodon_domains ORDER BY active_users_monthly DESC",
     }
 
     params = None
@@ -2761,28 +2772,29 @@ def get_menu_options() -> dict[str, dict[str, str]]:
             "5": "Known",
         },
         "Retry fatal errors": {
-            "6": "Other",
-            "7": "Failed",
-            "8": "NXDOMAIN",
-            "9": "Prohibited",
+            "10": "Other",
+            "11": "Ignored",
+            "12": "Failed",
+            "13": "NXDOMAIN",
+            "14": "Prohibited",
         },
         "Retry connection errors": {
-            "10": "SSL",
-            "11": "TCP",
-            "12": "DNS",
+            "20": "SSL",
+            "21": "TCP",
+            "22": "DNS",
         },
-        "Retry TCP errors": {"20": "2xx", "21": "3xx", "22": "4xx", "23": "5xx"},
+        "Retry TCP errors": {"30": "2xx", "31": "3xx", "32": "4xx", "33": "5xx"},
         "Retry target errors": {
-            "30": "Bad JSON",
-            "31": "Bad Size",
-            "32": "Bad Type",
-            "33": "Bad MAU",
-            "34": "Bad API",
+            "40": "Bad JSON",
+            "41": "Bad Size",
+            "42": "Bad Type",
+            "43": "Bad MAU",
+            "44": "Bad API",
         },
         "Retry known instances": {
-            "40": "Unpatched",
-            "41": f"{version_main_branch}/main",
-            "42": "All",
+            "50": "Unpatched",
+            "51": f"{version_main_branch}/main",
+            "52": "All",
         },
     }
 
@@ -2906,12 +2918,6 @@ def main():
         help="only process new domains added to the database (same as menu item 0)",
     )
     parser.add_argument(
-        "-d",
-        "--buffer",
-        action="store_true",
-        help="only process domains which recently reached the error threshold (same as menu item 51)",
-    )
-    parser.add_argument(
         "-t",
         "--target",
         type=str,
@@ -2945,8 +2951,6 @@ def main():
             else:
                 if args.new:
                     user_choice = "0"
-                elif args.buffer:
-                    user_choice = "51"
                 elif is_running_headless():
                     user_choice = "3"
                 else:
@@ -2980,6 +2984,7 @@ def main():
         bad_tlds = get_bad_tld()
         domain_endings = get_domain_endings()
         failed_domains = get_failed_domains()
+        ignored_domains = get_ignored_domains()
         not_masto_domains = get_not_masto_domains()
         baddata_domains = get_baddata_domains()
         nxdomain_domains = get_nxdomain_domains()
@@ -2993,6 +2998,7 @@ def main():
             not_masto_domains,
             baddata_domains,
             failed_domains,
+            ignored_domains,
             user_choice,
             junk_domains,
             dni_domains,
