@@ -768,13 +768,15 @@ def log_error(domain: str, error_to_print: str) -> None:
 def increment_domain_error(domain: str, error_reason: str) -> None:
     """Increment error count for a domain and record the error reason.
 
-    Only increments error count if the previous error reason started with DNS, SSL, or TCP.
+    Only increments error count if the previous error reason started with DNS, SSL, TCP, or HTTP 4xx,
+    AND the domain's nodeinfo is NOT set to 'mastodon'.
     For other error types, the count is set to null while still recording the error reason.
     Counter resets to 1 when switching between error types.
 
     DNS errors: After 15 consecutive errors, mark as NXDOMAIN.
     SSL errors: After 15 consecutive errors, mark as ignored.
     TCP errors: After 15 consecutive errors, mark as ignored.
+    HTTP 4xx errors: After 15 consecutive errors, mark as ignored.
     """
     ERROR_THRESHOLD = 15
     TRACKED_ERROR_TYPES = ("DNS", "SSL", "TCP")
@@ -782,24 +784,65 @@ def increment_domain_error(domain: str, error_reason: str) -> None:
     with db_pool.connection() as conn:
         with conn.cursor() as cursor:
             try:
-                # Fetch current errors and previous error reason
+                # Fetch current errors, previous error reason, and nodeinfo
                 cursor.execute(
-                    "SELECT errors, reason FROM raw_domains WHERE domain = %s",
+                    "SELECT errors, reason, nodeinfo FROM raw_domains WHERE domain = %s",
                     (domain,),
                 )
                 result = cursor.fetchone()
                 current_errors = result[0] if result and result[0] is not None else 0
                 previous_reason = result[1] if result and result[1] is not None else ""
+                nodeinfo = result[2] if result and result[2] is not None else None
 
-                # Get error type prefix (DNS, SSL, TCP, or None)
-                error_type = next(
-                    (t for t in TRACKED_ERROR_TYPES if error_reason.startswith(t)),
-                    None,
-                )
-                previous_type = next(
-                    (t for t in TRACKED_ERROR_TYPES if previous_reason.startswith(t)),
-                    None,
-                )
+                # Skip error counting if nodeinfo is set to 'mastodon'
+                if nodeinfo == "mastodon":
+                    # Still record the error reason, but don't increment counter
+                    _ = cursor.execute(
+                        """
+                        INSERT INTO raw_domains (domain, failed, ignore, errors, reason, nxdomain, norobots)
+                        VALUES (%s, %s, %s, %s, %s, %s, %s)
+                        ON CONFLICT(domain) DO UPDATE SET
+                        failed = excluded.failed,
+                        ignore = excluded.ignore,
+                        errors = excluded.errors,
+                        reason = excluded.reason,
+                        nxdomain = excluded.nxdomain,
+                        norobots = excluded.norobots
+                    """,
+                        (domain, None, None, None, error_reason, None, None),
+                    )
+                    conn.commit()
+                    return
+
+                # Get error type prefix (DNS, SSL, TCP, HTTP 4xx, or None)
+                # Check for HTTP 4xx errors first (any string starting with 4 followed by two digits)
+                def is_http_4xx(reason: str) -> bool:
+                    """Check if error reason starts with a 4xx HTTP status code."""
+                    return (
+                        len(reason) >= 3 and reason[0] == "4" and reason[1:3].isdigit()
+                    )
+
+                error_type = None
+                if is_http_4xx(error_reason):
+                    error_type = "HTTP4XX"
+                else:
+                    error_type = next(
+                        (t for t in TRACKED_ERROR_TYPES if error_reason.startswith(t)),
+                        None,
+                    )
+
+                previous_type = None
+                if is_http_4xx(previous_reason):
+                    previous_type = "HTTP4XX"
+                else:
+                    previous_type = next(
+                        (
+                            t
+                            for t in TRACKED_ERROR_TYPES
+                            if previous_reason.startswith(t)
+                        ),
+                        None,
+                    )
 
                 # Determine new error count
                 if error_type and error_type == previous_type:
@@ -808,7 +851,11 @@ def increment_domain_error(domain: str, error_reason: str) -> None:
 
                     # Check if threshold reached
                     if new_errors >= ERROR_THRESHOLD:
-                        status = "nxdomain" if error_type == "DNS" else "ignore"
+                        if error_type == "DNS":
+                            status = "nxdomain"
+                        else:
+                            # SSL, TCP, or HTTP4XX all mark as ignore
+                            status = "ignore"
                         mark_domain_status(domain, status)
                         delete_domain_if_known(domain)
                         return
