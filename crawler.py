@@ -1537,9 +1537,55 @@ def check_webfinger(domain, http_client):
                 handle_json_exception(domain, target, exception)
                 return False
 
-            # Validate aliases exist
+            # Check for specific error message indicating non-Mastodon platform
+            error = data.get("error")
+            message = data.get("message")
+            if (
+                error == "unknown"
+                and message == "Failed to resolve actor via webfinger"
+            ):
+                # This specific error suggests it's not Mastodon
+                # Check nodeinfo to identify the platform properly
+                nodeinfo_result = check_nodeinfo(domain, domain, http_client)
+                if nodeinfo_result and isinstance(nodeinfo_result, dict):
+                    nodeinfo_20_url = nodeinfo_result.get("nodeinfo_20_url")
+                    if nodeinfo_20_url:
+                        nodeinfo_20_result = check_nodeinfo_20(
+                            domain, nodeinfo_20_url, http_client
+                        )
+                        if nodeinfo_20_result and isinstance(nodeinfo_20_result, dict):
+                            software_data = nodeinfo_20_result.get("software")
+                            if software_data and isinstance(software_data, dict):
+                                save_nodeinfo_software(domain, software_data)
+                                software_name = software_data.get("name", "unknown")
+                                if software_name.lower() != "mastodon":
+                                    mark_as_non_mastodon(domain, software_name)
+                                    return False
+                # If we couldn't determine via nodeinfo, fall through to normal error handling
+                exception = "Failed to resolve actor via webfinger"
+                handle_json_exception(domain, target, exception)
+                return False
+
+            # Check if aliases field exists - Mastodon has it, but other platforms (like Lemmy) don't
             aliases = data.get("aliases", [])
             if not aliases:
+                # Missing aliases suggests non-Mastodon platform, check nodeinfo
+                nodeinfo_result = check_nodeinfo(domain, domain, http_client)
+                if nodeinfo_result and isinstance(nodeinfo_result, dict):
+                    nodeinfo_20_url = nodeinfo_result.get("nodeinfo_20_url")
+                    if nodeinfo_20_url:
+                        nodeinfo_20_result = check_nodeinfo_20(
+                            domain, nodeinfo_20_url, http_client
+                        )
+                        if nodeinfo_20_result and isinstance(nodeinfo_20_result, dict):
+                            software_data = nodeinfo_20_result.get("software")
+                            if software_data and isinstance(software_data, dict):
+                                save_nodeinfo_software(domain, software_data)
+                                software_name = software_data.get("name", "unknown")
+                                if software_name.lower() != "mastodon":
+                                    mark_as_non_mastodon(domain, software_name)
+                                    return False
+                # If nodeinfo check failed or it claims to be Mastodon, treat as error
                 exception = "has no aliases"
                 handle_json_exception(domain, target, exception)
                 return False
