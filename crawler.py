@@ -2663,7 +2663,7 @@ def load_from_database(user_choice):
     """Load domain list from database based on user menu selection."""
     query_map = {
         "0": "SELECT domain FROM raw_domains WHERE errors = 0 ORDER BY LENGTH(DOMAIN) ASC",
-        "1": "SELECT domain FROM raw_domains WHERE (failed IS NULL OR failed = FALSE) AND (ignore IS NULL OR ignore = FALSE) AND (nxdomain IS NULL OR nxdomain = FALSE) AND (norobots IS NULL OR norobots = FALSE) AND (baddata IS NULL OR baddata = FALSE) ORDER BY domain ASC",
+        "1": "SELECT domain FROM raw_domains WHERE (failed IS NULL OR failed = FALSE) AND (ignore IS NULL OR ignore = FALSE) AND (nxdomain IS NULL OR nxdomain = FALSE) AND (norobots IS NULL OR norobots = FALSE) AND (baddata IS NULL OR baddata = FALSE) AND (nodeinfo = 'mastodon' OR nodeinfo IS NULL) ORDER BY domain ASC",
         "4": "SELECT domain FROM raw_domains WHERE errors IS NOT NULL ORDER BY errors ASC",
         "5": "SELECT domain FROM raw_domains WHERE nodeinfo = 'mastodon' AND (reason IS NOT NULL AND reason <> 'API') ORDER BY domain;",
         "10": "SELECT domain FROM raw_domains WHERE nodeinfo != 'mastodon' ORDER BY domain",
