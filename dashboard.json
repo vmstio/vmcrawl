@@ -2774,7 +2774,7 @@
         "defaults": {
           "color": {
             "fixedColor": "purple",
-            "mode": "fixed"
+            "mode": "shades"
           },
           "custom": {
             "hideFrom": {
@@ -3001,7 +3001,7 @@
         "defaults": {
           "color": {
             "fixedColor": "green",
-            "mode": "fixed"
+            "mode": "shades"
           },
           "custom": {
             "hideFrom": {
@@ -3118,9 +3118,25 @@
           },
           "decimals": 1,
           "mappings": [],
-          "unit": "none"
+          "unit": "locale"
         },
-        "overrides": []
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "EOL"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "fixedColor": "red",
+                  "mode": "fixed"
+                }
+              }
+            ]
+          }
+        ]
       },
       "gridPos": {
         "h": 18,
@@ -3142,7 +3158,7 @@
         "pieType": "donut",
         "reduceOptions": {
           "calcs": [
-            "sum"
+            "lastNotNull"
           ],
           "fields": "",
           "values": true
@@ -3185,7 +3201,7 @@
           }
         }
       ],
-      "title": "EOL Branch by Instances",
+      "title": "Supported Branch by Instances",
       "type": "piechart"
     },
     {
@@ -3208,9 +3224,25 @@
           },
           "decimals": 1,
           "mappings": [],
-          "unit": "none"
+          "unit": "locale"
         },
-        "overrides": []
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "EOL"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "fixedColor": "red",
+                  "mode": "fixed"
+                }
+              }
+            ]
+          }
+        ]
       },
       "gridPos": {
         "h": 18,
@@ -3232,7 +3264,7 @@
         "pieType": "donut",
         "reduceOptions": {
           "calcs": [
-            "sum"
+            "lastNotNull"
           ],
           "fields": "",
           "values": true
@@ -3275,7 +3307,7 @@
           }
         }
       ],
-      "title": "EOL Branch by MAU",
+      "title": "Supported Branch by MAUs",
       "type": "piechart"
     },
     {
@@ -3484,7 +3516,7 @@
         "x": 12,
         "y": 77
       },
-      "id": 91,
+      "id": 89,
       "options": {
         "barRadius": 0,
         "barWidth": 0.97,
@@ -3519,7 +3551,7 @@
           "editorMode": "code",
           "format": "table",
           "rawQuery": true,
-          "rawSql": "SELECT\n  statistics.date AS time,\n  statistics.main_branch_mau AS \"Main Branch\",\n  statistics.latest_branch_mau AS \"Latest Branch\",\n  statistics.previous_branch_mau AS \"Previous Branch\",\n  statistics.deprecated_branch_mau AS \"Deprecated Branch\",\n  statistics.eol_branch_mau AS \"EOL Branches\"\nFROM\n  statistics\nORDER BY\n  statistics.date DESC\nLIMIT 7;",
+          "rawSql": "SELECT\n  statistics.date AS time,\n  statistics.main_patched_mau AS \"Main Branch\",\n  statistics.latest_patched_mau AS \"Latest Branch\",\n  statistics.previous_patched_mau AS \"Previous Branch\",\n  statistics.deprecated_patched_mau AS \"Deprecated Branch\"\nFROM\n  statistics\nORDER BY\n  statistics.date DESC\nLIMIT 7;",
           "refId": "A",
           "sql": {
             "columns": [
@@ -3540,7 +3572,7 @@
           }
         }
       ],
-      "title": "Branches by MAU",
+      "title": "Patches by MAU",
       "transformations": [
         {
           "id": "organize",
@@ -3763,7 +3795,7 @@
         "x": 12,
         "y": 85
       },
-      "id": 89,
+      "id": 91,
       "options": {
         "barRadius": 0,
         "barWidth": 0.97,
@@ -3798,7 +3830,7 @@
           "editorMode": "code",
           "format": "table",
           "rawQuery": true,
-          "rawSql": "SELECT\n  statistics.date AS time,\n  statistics.main_patched_mau AS \"Main Branch\",\n  statistics.latest_patched_mau AS \"Latest Branch\",\n  statistics.previous_patched_mau AS \"Previous Branch\",\n  statistics.deprecated_patched_mau AS \"Deprecated Branch\"\nFROM\n  statistics\nORDER BY\n  statistics.date DESC\nLIMIT 7;",
+          "rawSql": "SELECT\n  statistics.date AS time,\n  statistics.main_branch_mau AS \"Main Branch\",\n  statistics.latest_branch_mau AS \"Latest Branch\",\n  statistics.previous_branch_mau AS \"Previous Branch\",\n  statistics.deprecated_branch_mau AS \"Deprecated Branch\",\n  statistics.eol_branch_mau AS \"EOL Branches\"\nFROM\n  statistics\nORDER BY\n  statistics.date DESC\nLIMIT 7;",
           "refId": "A",
           "sql": {
             "columns": [
@@ -3819,7 +3851,7 @@
           }
         }
       ],
-      "title": "Patches by MAU",
+      "title": "Branches by MAU",
       "transformations": [
         {
           "id": "organize",
@@ -4771,7 +4803,7 @@
   "timezone": "browser",
   "title": "vmcrawl",
   "uid": "aedqo0q7klrswa",
-  "version": 44,
+  "version": 46,
   "weekStart": "",
   "id": null
 }
