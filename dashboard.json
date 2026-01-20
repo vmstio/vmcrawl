@@ -1,4 +1,65 @@
 {
+  "__inputs": [
+    {
+      "name": "DS_GRAFANA-POSTGRESQL-DATASOURCE-1",
+      "label": "grafana-postgresql-datasource-1",
+      "description": "",
+      "type": "datasource",
+      "pluginId": "grafana-postgresql-datasource",
+      "pluginName": "PostgreSQL"
+    }
+  ],
+  "__elements": {},
+  "__requires": [
+    {
+      "type": "panel",
+      "id": "barchart",
+      "name": "Bar chart",
+      "version": ""
+    },
+    {
+      "type": "panel",
+      "id": "bargauge",
+      "name": "Bar gauge",
+      "version": ""
+    },
+    {
+      "type": "panel",
+      "id": "gauge",
+      "name": "Gauge",
+      "version": ""
+    },
+    {
+      "type": "grafana",
+      "id": "grafana",
+      "name": "Grafana",
+      "version": "12.4.0-21014103788"
+    },
+    {
+      "type": "datasource",
+      "id": "grafana-postgresql-datasource",
+      "name": "PostgreSQL",
+      "version": "12.4.0-20781422371.patch3"
+    },
+    {
+      "type": "panel",
+      "id": "piechart",
+      "name": "Pie chart",
+      "version": ""
+    },
+    {
+      "type": "panel",
+      "id": "stat",
+      "name": "Stat",
+      "version": ""
+    },
+    {
+      "type": "panel",
+      "id": "table",
+      "name": "Table",
+      "version": ""
+    }
+  ],
   "annotations": {
     "list": [
       {
@@ -19,7 +80,6 @@
   "editable": true,
   "fiscalYearStartMonth": 0,
   "graphTooltip": 0,
-  "id": 0,
   "links": [],
   "liveNow": true,
   "panels": [
@@ -39,7 +99,7 @@
     {
       "datasource": {
         "type": "grafana-postgresql-datasource",
-        "uid": "df4ti9acrqsxsa"
+        "uid": "${DS_GRAFANA-POSTGRESQL-DATASOURCE-1}"
       },
       "fieldConfig": {
         "defaults": {
@@ -84,12 +144,12 @@
         "textMode": "auto",
         "wideLayout": true
       },
-      "pluginVersion": "12.4.0-20983762500",
+      "pluginVersion": "12.4.0-21014103788",
       "targets": [
         {
           "datasource": {
             "type": "grafana-postgresql-datasource",
-            "uid": "df4ti9acrqsxsa"
+            "uid": "${DS_GRAFANA-POSTGRESQL-DATASOURCE-1}"
           },
           "editorMode": "code",
           "format": "table",
@@ -115,13 +175,13 @@
           }
         }
       ],
-      "title": "Crawled Instances",
+      "title": "Active Instances",
       "type": "stat"
     },
     {
       "datasource": {
         "type": "grafana-postgresql-datasource",
-        "uid": "df4ti9acrqsxsa"
+        "uid": "${DS_GRAFANA-POSTGRESQL-DATASOURCE-1}"
       },
       "fieldConfig": {
         "defaults": {
@@ -166,12 +226,12 @@
         "textMode": "auto",
         "wideLayout": true
       },
-      "pluginVersion": "12.4.0-20983762500",
+      "pluginVersion": "12.4.0-21014103788",
       "targets": [
         {
           "datasource": {
             "type": "grafana-postgresql-datasource",
-            "uid": "df4ti9acrqsxsa"
+            "uid": "${DS_GRAFANA-POSTGRESQL-DATASOURCE-1}"
           },
           "editorMode": "code",
           "format": "table",
@@ -203,7 +263,7 @@
     {
       "datasource": {
         "type": "grafana-postgresql-datasource",
-        "uid": "df4ti9acrqsxsa"
+        "uid": "${DS_GRAFANA-POSTGRESQL-DATASOURCE-1}"
       },
       "fieldConfig": {
         "defaults": {
@@ -248,12 +308,12 @@
         "textMode": "auto",
         "wideLayout": true
       },
-      "pluginVersion": "12.4.0-20983762500",
+      "pluginVersion": "12.4.0-21014103788",
       "targets": [
         {
           "datasource": {
             "type": "grafana-postgresql-datasource",
-            "uid": "df4ti9acrqsxsa"
+            "uid": "${DS_GRAFANA-POSTGRESQL-DATASOURCE-1}"
           },
           "editorMode": "code",
           "format": "table",
@@ -285,7 +345,7 @@
     {
       "datasource": {
         "type": "grafana-postgresql-datasource",
-        "uid": "df4ti9acrqsxsa"
+        "uid": "${DS_GRAFANA-POSTGRESQL-DATASOURCE-1}"
       },
       "description": "Count of distinct Mastodon versions, after various fork/meta identifiers are removed and nightly releases are normalized.",
       "fieldConfig": {
@@ -330,12 +390,12 @@
         "textMode": "auto",
         "wideLayout": true
       },
-      "pluginVersion": "12.4.0-20983762500",
+      "pluginVersion": "12.4.0-21014103788",
       "targets": [
         {
           "datasource": {
             "type": "grafana-postgresql-datasource",
-            "uid": "df4ti9acrqsxsa"
+            "uid": "${DS_GRAFANA-POSTGRESQL-DATASOURCE-1}"
           },
           "editorMode": "code",
           "format": "table",
@@ -367,7 +427,7 @@
     {
       "datasource": {
         "type": "grafana-postgresql-datasource",
-        "uid": "df4ti9acrqsxsa"
+        "uid": "${DS_GRAFANA-POSTGRESQL-DATASOURCE-1}"
       },
       "description": "Count of distinct Mastodon versions, before various fork/meta identifiers are removed and nightly releases are normalized.",
       "fieldConfig": {
@@ -412,12 +472,12 @@
         "textMode": "auto",
         "wideLayout": true
       },
-      "pluginVersion": "12.4.0-20983762500",
+      "pluginVersion": "12.4.0-21014103788",
       "targets": [
         {
           "datasource": {
             "type": "grafana-postgresql-datasource",
-            "uid": "df4ti9acrqsxsa"
+            "uid": "${DS_GRAFANA-POSTGRESQL-DATASOURCE-1}"
           },
           "editorMode": "code",
           "format": "table",
@@ -459,7 +519,7 @@
         {
           "datasource": {
             "type": "grafana-postgresql-datasource",
-            "uid": "df4ti9acrqsxsa"
+            "uid": "${DS_GRAFANA-POSTGRESQL-DATASOURCE-1}"
           },
           "fieldConfig": {
             "defaults": {
@@ -484,89 +544,7 @@
             "h": 4,
             "w": 3,
             "x": 0,
-            "y": 46
-          },
-          "id": 81,
-          "options": {
-            "colorMode": "value",
-            "graphMode": "area",
-            "justifyMode": "auto",
-            "orientation": "auto",
-            "percentChangeColorMode": "standard",
-            "reduceOptions": {
-              "calcs": [
-                "lastNotNull"
-              ],
-              "fields": "",
-              "values": false
-            },
-            "showPercentChange": false,
-            "textMode": "auto",
-            "wideLayout": true
-          },
-          "pluginVersion": "12.4.0-20983762500",
-          "targets": [
-            {
-              "datasource": {
-                "type": "grafana-postgresql-datasource",
-                "uid": "df4ti9acrqsxsa"
-              },
-              "editorMode": "code",
-              "format": "table",
-              "rawQuery": true,
-              "rawSql": "SELECT COUNT(DISTINCT rd.domain) AS unique_domain_count\nFROM raw_domains rd\nWHERE rd.nodeinfo = 'mastodon'\n  AND rd.reason LIKE 'HTTP%'\n  AND EXISTS (\n    SELECT 1\n    FROM mastodon_domains md\n    WHERE md.domain = rd.domain\n  );",
-              "refId": "A",
-              "sql": {
-                "columns": [
-                  {
-                    "parameters": [],
-                    "type": "function"
-                  }
-                ],
-                "groupBy": [
-                  {
-                    "property": {
-                      "type": "string"
-                    },
-                    "type": "groupBy"
-                  }
-                ],
-                "limit": 50
-              }
-            }
-          ],
-          "title": "TCP Issues",
-          "type": "stat"
-        },
-        {
-          "datasource": {
-            "type": "grafana-postgresql-datasource",
-            "uid": "df4ti9acrqsxsa"
-          },
-          "fieldConfig": {
-            "defaults": {
-              "color": {
-                "mode": "thresholds"
-              },
-              "mappings": [],
-              "thresholds": {
-                "mode": "absolute",
-                "steps": [
-                  {
-                    "color": "yellow",
-                    "value": 0
-                  }
-                ]
-              },
-              "unit": "locale"
-            },
-            "overrides": []
-          },
-          "gridPos": {
-            "h": 4,
-            "w": 3,
-            "x": 3,
-            "y": 46
+            "y": 6
           },
           "id": 78,
           "options": {
@@ -591,7 +569,7 @@
             {
               "datasource": {
                 "type": "grafana-postgresql-datasource",
-                "uid": "df4ti9acrqsxsa"
+                "uid": "${DS_GRAFANA-POSTGRESQL-DATASOURCE-1}"
               },
               "editorMode": "code",
               "format": "table",
@@ -623,7 +601,89 @@
         {
           "datasource": {
             "type": "grafana-postgresql-datasource",
-            "uid": "df4ti9acrqsxsa"
+            "uid": "${DS_GRAFANA-POSTGRESQL-DATASOURCE-1}"
+          },
+          "fieldConfig": {
+            "defaults": {
+              "color": {
+                "mode": "thresholds"
+              },
+              "mappings": [],
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  {
+                    "color": "yellow",
+                    "value": 0
+                  }
+                ]
+              },
+              "unit": "locale"
+            },
+            "overrides": []
+          },
+          "gridPos": {
+            "h": 4,
+            "w": 3,
+            "x": 3,
+            "y": 6
+          },
+          "id": 81,
+          "options": {
+            "colorMode": "value",
+            "graphMode": "area",
+            "justifyMode": "auto",
+            "orientation": "auto",
+            "percentChangeColorMode": "standard",
+            "reduceOptions": {
+              "calcs": [
+                "lastNotNull"
+              ],
+              "fields": "",
+              "values": false
+            },
+            "showPercentChange": false,
+            "textMode": "auto",
+            "wideLayout": true
+          },
+          "pluginVersion": "12.4.0-20983762500",
+          "targets": [
+            {
+              "datasource": {
+                "type": "grafana-postgresql-datasource",
+                "uid": "${DS_GRAFANA-POSTGRESQL-DATASOURCE-1}"
+              },
+              "editorMode": "code",
+              "format": "table",
+              "rawQuery": true,
+              "rawSql": "SELECT COUNT(DISTINCT rd.domain) AS unique_domain_count\nFROM raw_domains rd\nWHERE rd.nodeinfo = 'mastodon'\n  AND rd.reason LIKE 'HTTP%'\n  AND EXISTS (\n    SELECT 1\n    FROM mastodon_domains md\n    WHERE md.domain = rd.domain\n  );",
+              "refId": "A",
+              "sql": {
+                "columns": [
+                  {
+                    "parameters": [],
+                    "type": "function"
+                  }
+                ],
+                "groupBy": [
+                  {
+                    "property": {
+                      "type": "string"
+                    },
+                    "type": "groupBy"
+                  }
+                ],
+                "limit": 50
+              }
+            }
+          ],
+          "title": "TCP Issues",
+          "type": "stat"
+        },
+        {
+          "datasource": {
+            "type": "grafana-postgresql-datasource",
+            "uid": "${DS_GRAFANA-POSTGRESQL-DATASOURCE-1}"
           },
           "fieldConfig": {
             "defaults": {
@@ -648,7 +708,7 @@
             "h": 4,
             "w": 3,
             "x": 6,
-            "y": 46
+            "y": 6
           },
           "id": 85,
           "options": {
@@ -673,7 +733,7 @@
             {
               "datasource": {
                 "type": "grafana-postgresql-datasource",
-                "uid": "df4ti9acrqsxsa"
+                "uid": "${DS_GRAFANA-POSTGRESQL-DATASOURCE-1}"
               },
               "editorMode": "code",
               "format": "table",
@@ -705,7 +765,7 @@
         {
           "datasource": {
             "type": "grafana-postgresql-datasource",
-            "uid": "df4ti9acrqsxsa"
+            "uid": "${DS_GRAFANA-POSTGRESQL-DATASOURCE-1}"
           },
           "fieldConfig": {
             "defaults": {
@@ -730,7 +790,7 @@
             "h": 4,
             "w": 3,
             "x": 9,
-            "y": 46
+            "y": 6
           },
           "id": 84,
           "options": {
@@ -755,7 +815,7 @@
             {
               "datasource": {
                 "type": "grafana-postgresql-datasource",
-                "uid": "df4ti9acrqsxsa"
+                "uid": "${DS_GRAFANA-POSTGRESQL-DATASOURCE-1}"
               },
               "editorMode": "code",
               "format": "table",
@@ -787,7 +847,7 @@
         {
           "datasource": {
             "type": "grafana-postgresql-datasource",
-            "uid": "df4ti9acrqsxsa"
+            "uid": "${DS_GRAFANA-POSTGRESQL-DATASOURCE-1}"
           },
           "fieldConfig": {
             "defaults": {
@@ -812,7 +872,7 @@
             "h": 4,
             "w": 3,
             "x": 12,
-            "y": 46
+            "y": 6
           },
           "id": 79,
           "options": {
@@ -837,7 +897,7 @@
             {
               "datasource": {
                 "type": "grafana-postgresql-datasource",
-                "uid": "df4ti9acrqsxsa"
+                "uid": "${DS_GRAFANA-POSTGRESQL-DATASOURCE-1}"
               },
               "editorMode": "code",
               "format": "table",
@@ -869,7 +929,7 @@
         {
           "datasource": {
             "type": "grafana-postgresql-datasource",
-            "uid": "df4ti9acrqsxsa"
+            "uid": "${DS_GRAFANA-POSTGRESQL-DATASOURCE-1}"
           },
           "fieldConfig": {
             "defaults": {
@@ -894,7 +954,7 @@
             "h": 4,
             "w": 3,
             "x": 15,
-            "y": 46
+            "y": 6
           },
           "id": 80,
           "options": {
@@ -919,7 +979,7 @@
             {
               "datasource": {
                 "type": "grafana-postgresql-datasource",
-                "uid": "df4ti9acrqsxsa"
+                "uid": "${DS_GRAFANA-POSTGRESQL-DATASOURCE-1}"
               },
               "editorMode": "code",
               "format": "table",
@@ -951,7 +1011,7 @@
         {
           "datasource": {
             "type": "grafana-postgresql-datasource",
-            "uid": "df4ti9acrqsxsa"
+            "uid": "${DS_GRAFANA-POSTGRESQL-DATASOURCE-1}"
           },
           "fieldConfig": {
             "defaults": {
@@ -976,7 +1036,7 @@
             "h": 4,
             "w": 3,
             "x": 18,
-            "y": 46
+            "y": 6
           },
           "id": 82,
           "options": {
@@ -1001,7 +1061,7 @@
             {
               "datasource": {
                 "type": "grafana-postgresql-datasource",
-                "uid": "df4ti9acrqsxsa"
+                "uid": "${DS_GRAFANA-POSTGRESQL-DATASOURCE-1}"
               },
               "editorMode": "code",
               "format": "table",
@@ -1033,7 +1093,7 @@
         {
           "datasource": {
             "type": "grafana-postgresql-datasource",
-            "uid": "df4ti9acrqsxsa"
+            "uid": "${DS_GRAFANA-POSTGRESQL-DATASOURCE-1}"
           },
           "fieldConfig": {
             "defaults": {
@@ -1058,7 +1118,7 @@
             "h": 4,
             "w": 3,
             "x": 21,
-            "y": 46
+            "y": 6
           },
           "id": 83,
           "options": {
@@ -1083,7 +1143,7 @@
             {
               "datasource": {
                 "type": "grafana-postgresql-datasource",
-                "uid": "df4ti9acrqsxsa"
+                "uid": "${DS_GRAFANA-POSTGRESQL-DATASOURCE-1}"
               },
               "editorMode": "code",
               "format": "table",
@@ -1111,6 +1171,334 @@
           ],
           "title": "File Issues",
           "type": "stat"
+        },
+        {
+          "datasource": {
+            "type": "grafana-postgresql-datasource",
+            "uid": "${DS_GRAFANA-POSTGRESQL-DATASOURCE-1}"
+          },
+          "fieldConfig": {
+            "defaults": {
+              "color": {
+                "mode": "thresholds"
+              },
+              "mappings": [],
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  {
+                    "color": "text",
+                    "value": 0
+                  }
+                ]
+              },
+              "unit": "locale"
+            },
+            "overrides": []
+          },
+          "gridPos": {
+            "h": 4,
+            "w": 6,
+            "x": 0,
+            "y": 10
+          },
+          "id": 92,
+          "options": {
+            "colorMode": "value",
+            "graphMode": "area",
+            "justifyMode": "auto",
+            "orientation": "auto",
+            "percentChangeColorMode": "standard",
+            "reduceOptions": {
+              "calcs": [
+                "lastNotNull"
+              ],
+              "fields": "",
+              "values": false
+            },
+            "showPercentChange": false,
+            "textMode": "auto",
+            "wideLayout": true
+          },
+          "pluginVersion": "12.4.0-20983762500",
+          "targets": [
+            {
+              "datasource": {
+                "type": "grafana-postgresql-datasource",
+                "uid": "${DS_GRAFANA-POSTGRESQL-DATASOURCE-1}"
+              },
+              "editorMode": "code",
+              "format": "table",
+              "rawQuery": true,
+              "rawSql": "SELECT COUNT(DISTINCT domain) AS unique_domain_count\nFROM raw_domains;",
+              "refId": "A",
+              "sql": {
+                "columns": [
+                  {
+                    "parameters": [],
+                    "type": "function"
+                  }
+                ],
+                "groupBy": [
+                  {
+                    "property": {
+                      "type": "string"
+                    },
+                    "type": "groupBy"
+                  }
+                ],
+                "limit": 50
+              }
+            }
+          ],
+          "title": "Crawled Domains",
+          "type": "stat"
+        },
+        {
+          "datasource": {
+            "type": "grafana-postgresql-datasource",
+            "uid": "${DS_GRAFANA-POSTGRESQL-DATASOURCE-1}"
+          },
+          "fieldConfig": {
+            "defaults": {
+              "color": {
+                "mode": "thresholds"
+              },
+              "mappings": [],
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  {
+                    "color": "text",
+                    "value": 0
+                  }
+                ]
+              },
+              "unit": "locale"
+            },
+            "overrides": []
+          },
+          "gridPos": {
+            "h": 4,
+            "w": 6,
+            "x": 6,
+            "y": 10
+          },
+          "id": 95,
+          "options": {
+            "colorMode": "value",
+            "graphMode": "area",
+            "justifyMode": "auto",
+            "orientation": "auto",
+            "percentChangeColorMode": "standard",
+            "reduceOptions": {
+              "calcs": [
+                "lastNotNull"
+              ],
+              "fields": "",
+              "values": false
+            },
+            "showPercentChange": false,
+            "textMode": "auto",
+            "wideLayout": true
+          },
+          "pluginVersion": "12.4.0-20983762500",
+          "targets": [
+            {
+              "datasource": {
+                "type": "grafana-postgresql-datasource",
+                "uid": "${DS_GRAFANA-POSTGRESQL-DATASOURCE-1}"
+              },
+              "editorMode": "code",
+              "format": "table",
+              "rawQuery": true,
+              "rawSql": "SELECT COUNT(DISTINCT domain) AS unique_domain_count\nFROM raw_domains WHERE \"nodeinfo\"::TEXT NOT ILIKE '%mastodon%';",
+              "refId": "A",
+              "sql": {
+                "columns": [
+                  {
+                    "parameters": [],
+                    "type": "function"
+                  }
+                ],
+                "groupBy": [
+                  {
+                    "property": {
+                      "type": "string"
+                    },
+                    "type": "groupBy"
+                  }
+                ],
+                "limit": 50
+              }
+            }
+          ],
+          "title": "Non-Mastodon Instances",
+          "type": "stat"
+        },
+        {
+          "datasource": {
+            "type": "grafana-postgresql-datasource",
+            "uid": "${DS_GRAFANA-POSTGRESQL-DATASOURCE-1}"
+          },
+          "fieldConfig": {
+            "defaults": {
+              "color": {
+                "mode": "thresholds"
+              },
+              "mappings": [],
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  {
+                    "color": "text",
+                    "value": 0
+                  }
+                ]
+              },
+              "unit": "locale"
+            },
+            "overrides": []
+          },
+          "gridPos": {
+            "h": 4,
+            "w": 6,
+            "x": 12,
+            "y": 10
+          },
+          "id": 93,
+          "options": {
+            "colorMode": "value",
+            "graphMode": "area",
+            "justifyMode": "auto",
+            "orientation": "auto",
+            "percentChangeColorMode": "standard",
+            "reduceOptions": {
+              "calcs": [
+                "lastNotNull"
+              ],
+              "fields": "",
+              "values": false
+            },
+            "showPercentChange": false,
+            "textMode": "auto",
+            "wideLayout": true
+          },
+          "pluginVersion": "12.4.0-20983762500",
+          "targets": [
+            {
+              "datasource": {
+                "type": "grafana-postgresql-datasource",
+                "uid": "${DS_GRAFANA-POSTGRESQL-DATASOURCE-1}"
+              },
+              "editorMode": "code",
+              "format": "table",
+              "rawQuery": true,
+              "rawSql": "SELECT COUNT(DISTINCT domain) AS unique_domain_count\nFROM raw_domains WHERE nxdomain",
+              "refId": "A",
+              "sql": {
+                "columns": [
+                  {
+                    "parameters": [],
+                    "type": "function"
+                  }
+                ],
+                "groupBy": [
+                  {
+                    "property": {
+                      "type": "string"
+                    },
+                    "type": "groupBy"
+                  }
+                ],
+                "limit": 50
+              }
+            }
+          ],
+          "title": "NXDOMAIN",
+          "type": "stat"
+        },
+        {
+          "datasource": {
+            "type": "grafana-postgresql-datasource",
+            "uid": "${DS_GRAFANA-POSTGRESQL-DATASOURCE-1}"
+          },
+          "fieldConfig": {
+            "defaults": {
+              "color": {
+                "mode": "thresholds"
+              },
+              "mappings": [],
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  {
+                    "color": "text",
+                    "value": 0
+                  }
+                ]
+              },
+              "unit": "locale"
+            },
+            "overrides": []
+          },
+          "gridPos": {
+            "h": 4,
+            "w": 6,
+            "x": 18,
+            "y": 10
+          },
+          "id": 94,
+          "options": {
+            "colorMode": "value",
+            "graphMode": "area",
+            "justifyMode": "auto",
+            "orientation": "auto",
+            "percentChangeColorMode": "standard",
+            "reduceOptions": {
+              "calcs": [
+                "lastNotNull"
+              ],
+              "fields": "",
+              "values": false
+            },
+            "showPercentChange": false,
+            "textMode": "auto",
+            "wideLayout": true
+          },
+          "pluginVersion": "12.4.0-20983762500",
+          "targets": [
+            {
+              "datasource": {
+                "type": "grafana-postgresql-datasource",
+                "uid": "${DS_GRAFANA-POSTGRESQL-DATASOURCE-1}"
+              },
+              "editorMode": "code",
+              "format": "table",
+              "rawQuery": true,
+              "rawSql": "SELECT COUNT(DISTINCT domain) AS unique_domain_count\nFROM raw_domains WHERE (ignore IS NOT NULL OR failed IS NOT NULL or norobots IS NOT NULL or baddata IS NOT NULL)",
+              "refId": "A",
+              "sql": {
+                "columns": [
+                  {
+                    "parameters": [],
+                    "type": "function"
+                  }
+                ],
+                "groupBy": [
+                  {
+                    "property": {
+                      "type": "string"
+                    },
+                    "type": "groupBy"
+                  }
+                ],
+                "limit": 50
+              }
+            }
+          ],
+          "title": "Other Skipped",
+          "type": "stat"
         }
       ],
       "title": "Crawler Health",
@@ -1132,7 +1520,7 @@
     {
       "datasource": {
         "type": "grafana-postgresql-datasource",
-        "uid": "df4ti9acrqsxsa"
+        "uid": "${DS_GRAFANA-POSTGRESQL-DATASOURCE-1}"
       },
       "description": "Count of instances running latest patches for development branch (main), compared to the total instances on development branch.",
       "fieldConfig": {
@@ -1186,12 +1574,12 @@
         "showThresholdMarkers": false,
         "sizing": "auto"
       },
-      "pluginVersion": "12.4.0-20983762500",
+      "pluginVersion": "12.4.0-21014103788",
       "targets": [
         {
           "datasource": {
             "type": "grafana-postgresql-datasource",
-            "uid": "df4ti9acrqsxsa"
+            "uid": "${DS_GRAFANA-POSTGRESQL-DATASOURCE-1}"
           },
           "editorMode": "code",
           "format": "table",
@@ -1219,7 +1607,7 @@
         {
           "datasource": {
             "type": "grafana-postgresql-datasource",
-            "uid": "df4ti9acrqsxsa"
+            "uid": "${DS_GRAFANA-POSTGRESQL-DATASOURCE-1}"
           },
           "editorMode": "code",
           "format": "table",
@@ -1270,7 +1658,7 @@
     {
       "datasource": {
         "type": "grafana-postgresql-datasource",
-        "uid": "df4ti9acrqsxsa"
+        "uid": "${DS_GRAFANA-POSTGRESQL-DATASOURCE-1}"
       },
       "description": "Count of instances running latest patches for branch release-0 (latest), compared to the total instances on branch release-0.",
       "fieldConfig": {
@@ -1324,12 +1712,12 @@
         "showThresholdMarkers": false,
         "sizing": "auto"
       },
-      "pluginVersion": "12.4.0-20983762500",
+      "pluginVersion": "12.4.0-21014103788",
       "targets": [
         {
           "datasource": {
             "type": "grafana-postgresql-datasource",
-            "uid": "df4ti9acrqsxsa"
+            "uid": "${DS_GRAFANA-POSTGRESQL-DATASOURCE-1}"
           },
           "editorMode": "code",
           "format": "table",
@@ -1357,7 +1745,7 @@
         {
           "datasource": {
             "type": "grafana-postgresql-datasource",
-            "uid": "df4ti9acrqsxsa"
+            "uid": "${DS_GRAFANA-POSTGRESQL-DATASOURCE-1}"
           },
           "editorMode": "code",
           "format": "table",
@@ -1403,7 +1791,7 @@
     {
       "datasource": {
         "type": "grafana-postgresql-datasource",
-        "uid": "df4ti9acrqsxsa"
+        "uid": "${DS_GRAFANA-POSTGRESQL-DATASOURCE-1}"
       },
       "description": "Count of instances running latest patches for branch release-1 (previous), compared to the total instances on branch release-1.",
       "fieldConfig": {
@@ -1457,12 +1845,12 @@
         "showThresholdMarkers": false,
         "sizing": "auto"
       },
-      "pluginVersion": "12.4.0-20983762500",
+      "pluginVersion": "12.4.0-21014103788",
       "targets": [
         {
           "datasource": {
             "type": "grafana-postgresql-datasource",
-            "uid": "df4ti9acrqsxsa"
+            "uid": "${DS_GRAFANA-POSTGRESQL-DATASOURCE-1}"
           },
           "editorMode": "code",
           "format": "table",
@@ -1490,7 +1878,7 @@
         {
           "datasource": {
             "type": "grafana-postgresql-datasource",
-            "uid": "df4ti9acrqsxsa"
+            "uid": "${DS_GRAFANA-POSTGRESQL-DATASOURCE-1}"
           },
           "editorMode": "code",
           "format": "table",
@@ -1536,7 +1924,7 @@
     {
       "datasource": {
         "type": "grafana-postgresql-datasource",
-        "uid": "df4ti9acrqsxsa"
+        "uid": "${DS_GRAFANA-POSTGRESQL-DATASOURCE-1}"
       },
       "description": "Count of instances running latest patches for branch release-2 (deprecated) or older, compared to the total instances on branch release-2 or older.",
       "fieldConfig": {
@@ -1590,12 +1978,12 @@
         "showThresholdMarkers": false,
         "sizing": "auto"
       },
-      "pluginVersion": "12.4.0-20983762500",
+      "pluginVersion": "12.4.0-21014103788",
       "targets": [
         {
           "datasource": {
             "type": "grafana-postgresql-datasource",
-            "uid": "df4ti9acrqsxsa"
+            "uid": "${DS_GRAFANA-POSTGRESQL-DATASOURCE-1}"
           },
           "editorMode": "code",
           "format": "table",
@@ -1623,7 +2011,7 @@
         {
           "datasource": {
             "type": "grafana-postgresql-datasource",
-            "uid": "df4ti9acrqsxsa"
+            "uid": "${DS_GRAFANA-POSTGRESQL-DATASOURCE-1}"
           },
           "editorMode": "code",
           "format": "table",
@@ -1669,7 +2057,7 @@
     {
       "datasource": {
         "type": "grafana-postgresql-datasource",
-        "uid": "df4ti9acrqsxsa"
+        "uid": "${DS_GRAFANA-POSTGRESQL-DATASOURCE-1}"
       },
       "description": "Count of monthly active users (MAUs) on instances running latest patches for development branch (main), compared to the total instances on development branch.",
       "fieldConfig": {
@@ -1723,12 +2111,12 @@
         "showThresholdMarkers": false,
         "sizing": "auto"
       },
-      "pluginVersion": "12.4.0-20983762500",
+      "pluginVersion": "12.4.0-21014103788",
       "targets": [
         {
           "datasource": {
             "type": "grafana-postgresql-datasource",
-            "uid": "df4ti9acrqsxsa"
+            "uid": "${DS_GRAFANA-POSTGRESQL-DATASOURCE-1}"
           },
           "editorMode": "code",
           "format": "table",
@@ -1756,7 +2144,7 @@
         {
           "datasource": {
             "type": "grafana-postgresql-datasource",
-            "uid": "df4ti9acrqsxsa"
+            "uid": "${DS_GRAFANA-POSTGRESQL-DATASOURCE-1}"
           },
           "editorMode": "code",
           "format": "table",
@@ -1807,7 +2195,7 @@
     {
       "datasource": {
         "type": "grafana-postgresql-datasource",
-        "uid": "df4ti9acrqsxsa"
+        "uid": "${DS_GRAFANA-POSTGRESQL-DATASOURCE-1}"
       },
       "description": "Count of monthly active users (MAUs) on instances running latest patches for branch release-0 (latest), compared to the total instances on branch release-0.",
       "fieldConfig": {
@@ -1861,12 +2249,12 @@
         "showThresholdMarkers": false,
         "sizing": "auto"
       },
-      "pluginVersion": "12.4.0-20983762500",
+      "pluginVersion": "12.4.0-21014103788",
       "targets": [
         {
           "datasource": {
             "type": "grafana-postgresql-datasource",
-            "uid": "df4ti9acrqsxsa"
+            "uid": "${DS_GRAFANA-POSTGRESQL-DATASOURCE-1}"
           },
           "editorMode": "code",
           "format": "table",
@@ -1894,7 +2282,7 @@
         {
           "datasource": {
             "type": "grafana-postgresql-datasource",
-            "uid": "df4ti9acrqsxsa"
+            "uid": "${DS_GRAFANA-POSTGRESQL-DATASOURCE-1}"
           },
           "editorMode": "code",
           "format": "table",
@@ -1945,7 +2333,7 @@
     {
       "datasource": {
         "type": "grafana-postgresql-datasource",
-        "uid": "df4ti9acrqsxsa"
+        "uid": "${DS_GRAFANA-POSTGRESQL-DATASOURCE-1}"
       },
       "description": "Count of monthly active users (MAUs) on instances running latest patches for branch release-1 (previous), compared to the MAUs on branch release-1.",
       "fieldConfig": {
@@ -1999,12 +2387,12 @@
         "showThresholdMarkers": false,
         "sizing": "auto"
       },
-      "pluginVersion": "12.4.0-20983762500",
+      "pluginVersion": "12.4.0-21014103788",
       "targets": [
         {
           "datasource": {
             "type": "grafana-postgresql-datasource",
-            "uid": "df4ti9acrqsxsa"
+            "uid": "${DS_GRAFANA-POSTGRESQL-DATASOURCE-1}"
           },
           "editorMode": "code",
           "format": "table",
@@ -2032,7 +2420,7 @@
         {
           "datasource": {
             "type": "grafana-postgresql-datasource",
-            "uid": "df4ti9acrqsxsa"
+            "uid": "${DS_GRAFANA-POSTGRESQL-DATASOURCE-1}"
           },
           "editorMode": "code",
           "format": "table",
@@ -2083,7 +2471,7 @@
     {
       "datasource": {
         "type": "grafana-postgresql-datasource",
-        "uid": "df4ti9acrqsxsa"
+        "uid": "${DS_GRAFANA-POSTGRESQL-DATASOURCE-1}"
       },
       "description": "Count of monthly active users (MAUs) on  instances running latest patches for branch release-2 (deprecated) or older, compared to the MAUs on branch release-2 or older.",
       "fieldConfig": {
@@ -2137,12 +2525,12 @@
         "showThresholdMarkers": false,
         "sizing": "auto"
       },
-      "pluginVersion": "12.4.0-20983762500",
+      "pluginVersion": "12.4.0-21014103788",
       "targets": [
         {
           "datasource": {
             "type": "grafana-postgresql-datasource",
-            "uid": "df4ti9acrqsxsa"
+            "uid": "${DS_GRAFANA-POSTGRESQL-DATASOURCE-1}"
           },
           "editorMode": "code",
           "format": "table",
@@ -2170,7 +2558,7 @@
         {
           "datasource": {
             "type": "grafana-postgresql-datasource",
-            "uid": "df4ti9acrqsxsa"
+            "uid": "${DS_GRAFANA-POSTGRESQL-DATASOURCE-1}"
           },
           "editorMode": "code",
           "format": "table",
@@ -2234,7 +2622,7 @@
     {
       "datasource": {
         "type": "grafana-postgresql-datasource",
-        "uid": "df4ti9acrqsxsa"
+        "uid": "${DS_GRAFANA-POSTGRESQL-DATASOURCE-1}"
       },
       "fieldConfig": {
         "defaults": {
@@ -2343,12 +2731,12 @@
           "sort": "none"
         }
       },
-      "pluginVersion": "12.4.0-20983762500",
+      "pluginVersion": "12.4.0-21014103788",
       "targets": [
         {
           "datasource": {
             "type": "grafana-postgresql-datasource",
-            "uid": "df4ti9acrqsxsa"
+            "uid": "${DS_GRAFANA-POSTGRESQL-DATASOURCE-1}"
           },
           "editorMode": "code",
           "format": "table",
@@ -2380,7 +2768,7 @@
     {
       "datasource": {
         "type": "grafana-postgresql-datasource",
-        "uid": "df4ti9acrqsxsa"
+        "uid": "${DS_GRAFANA-POSTGRESQL-DATASOURCE-1}"
       },
       "fieldConfig": {
         "defaults": {
@@ -2464,12 +2852,12 @@
           "sort": "none"
         }
       },
-      "pluginVersion": "12.4.0-20983762500",
+      "pluginVersion": "12.4.0-21014103788",
       "targets": [
         {
           "datasource": {
             "type": "grafana-postgresql-datasource",
-            "uid": "df4ti9acrqsxsa"
+            "uid": "${DS_GRAFANA-POSTGRESQL-DATASOURCE-1}"
           },
           "editorMode": "code",
           "format": "table",
@@ -2501,7 +2889,7 @@
     {
       "datasource": {
         "type": "grafana-postgresql-datasource",
-        "uid": "df4ti9acrqsxsa"
+        "uid": "${DS_GRAFANA-POSTGRESQL-DATASOURCE-1}"
       },
       "fieldConfig": {
         "defaults": {
@@ -2570,12 +2958,12 @@
           "sort": "none"
         }
       },
-      "pluginVersion": "12.4.0-20983762500",
+      "pluginVersion": "12.4.0-21014103788",
       "targets": [
         {
           "datasource": {
             "type": "grafana-postgresql-datasource",
-            "uid": "df4ti9acrqsxsa"
+            "uid": "${DS_GRAFANA-POSTGRESQL-DATASOURCE-1}"
           },
           "editorMode": "code",
           "format": "table",
@@ -2607,7 +2995,7 @@
     {
       "datasource": {
         "type": "grafana-postgresql-datasource",
-        "uid": "df4ti9acrqsxsa"
+        "uid": "${DS_GRAFANA-POSTGRESQL-DATASOURCE-1}"
       },
       "fieldConfig": {
         "defaults": {
@@ -2676,12 +3064,12 @@
           "sort": "none"
         }
       },
-      "pluginVersion": "12.4.0-20983762500",
+      "pluginVersion": "12.4.0-21014103788",
       "targets": [
         {
           "datasource": {
             "type": "grafana-postgresql-datasource",
-            "uid": "df4ti9acrqsxsa"
+            "uid": "${DS_GRAFANA-POSTGRESQL-DATASOURCE-1}"
           },
           "editorMode": "code",
           "format": "table",
@@ -2718,207 +3106,15 @@
         "x": 0,
         "y": 58
       },
-      "id": 65,
-      "panels": [],
-      "title": "Branch Adoption",
-      "type": "row"
-    },
-    {
-      "datasource": {
-        "type": "grafana-postgresql-datasource",
-        "uid": "df4ti9acrqsxsa"
-      },
-      "fieldConfig": {
-        "defaults": {
-          "color": {
-            "mode": "thresholds"
-          },
-          "mappings": [],
-          "min": 0,
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "color": "purple",
-                "value": 0
-              }
-            ]
-          }
-        },
-        "overrides": []
-      },
-      "gridPos": {
-        "h": 7,
-        "w": 24,
-        "x": 0,
-        "y": 59
-      },
-      "id": 70,
-      "options": {
-        "displayMode": "gradient",
-        "legend": {
-          "calcs": [],
-          "displayMode": "list",
-          "placement": "bottom",
-          "showLegend": false
-        },
-        "maxVizHeight": 300,
-        "minVizHeight": 16,
-        "minVizWidth": 8,
-        "namePlacement": "auto",
-        "orientation": "auto",
-        "reduceOptions": {
-          "calcs": [
-            "lastNotNull"
-          ],
-          "fields": "",
-          "values": false
-        },
-        "showUnfilled": true,
-        "sizing": "auto",
-        "valueMode": "color"
-      },
-      "pluginVersion": "12.4.0-20983762500",
-      "targets": [
-        {
-          "datasource": {
-            "type": "grafana-postgresql-datasource",
-            "uid": "df4ti9acrqsxsa"
-          },
-          "editorMode": "code",
-          "format": "table",
-          "rawQuery": true,
-          "rawSql": "SELECT \n    COUNT(CASE WHEN \n        software_version LIKE '5.0%' OR\n        software_version LIKE '4.9%' OR\n        software_version LIKE '4.8%' OR\n        software_version LIKE '4.7%' OR\n        software_version LIKE '4.6%' OR\n        software_version LIKE '4.5%'\n    THEN 1 END) * 100.0 / COUNT(*) AS \"4.5+\",\n\n    COUNT(CASE WHEN \n        software_version LIKE '5.0%' OR\n        software_version LIKE '4.9%' OR\n        software_version LIKE '4.8%' OR\n        software_version LIKE '4.7%' OR\n        software_version LIKE '4.6%' OR\n        software_version LIKE '4.5%' OR \n        software_version LIKE '4.4%' \n    THEN 1 END) * 100.0 / COUNT(*) AS \"4.4+\",\n\n    COUNT(CASE WHEN \n        software_version LIKE '5.0%' OR\n        software_version LIKE '4.9%' OR\n        software_version LIKE '4.8%' OR\n        software_version LIKE '4.7%' OR\n        software_version LIKE '4.6%' OR\n        software_version LIKE '4.5%' OR \n        software_version LIKE '4.4%' OR \n        software_version LIKE '4.3%'\n    THEN 1 END) * 100.0 / COUNT(*) AS \"4.3+\",\n\n    COUNT(CASE WHEN \n        software_version LIKE '4.6%' OR\n        software_version LIKE '4.5%' OR \n        software_version LIKE '4.4%' OR \n        software_version LIKE '4.3%' OR\n        software_version LIKE '4.2%'\n    THEN 1 END) * 100.0 / COUNT(*) AS \"4.2+\",\n\n    COUNT(CASE WHEN \n        software_version LIKE '5.0%' OR\n        software_version LIKE '4.9%' OR\n        software_version LIKE '4.8%' OR\n        software_version LIKE '4.7%' OR\n        software_version LIKE '4.6%' OR\n        software_version LIKE '4.5%' OR \n        software_version LIKE '4.4%' OR \n        software_version LIKE '4.3%' OR\n        software_version LIKE '4.2%' OR\n        software_version LIKE '4.1%'\n    THEN 1 END) * 100.0 / COUNT(*) AS \"4.1+\",\n\n    COUNT(CASE WHEN \n        software_version LIKE '5.0%' OR\n        software_version LIKE '4.9%' OR\n        software_version LIKE '4.8%' OR\n        software_version LIKE '4.7%' OR\n        software_version LIKE '4.6%' OR\n        software_version LIKE '4.5%' OR \n        software_version LIKE '4.4%' OR \n        software_version LIKE '4.3%' OR\n        software_version LIKE '4.2%' OR\n        software_version LIKE '4.1%' OR\n        software_version LIKE '4.0%'\n    THEN 1 END) * 100.0 / COUNT(*) AS \"4.0+\"\n\nFROM \n    mastodon_domains\nWHERE \n    software_version IS NOT NULL;\n",
-          "refId": "A",
-          "sql": {
-            "columns": [
-              {
-                "parameters": [],
-                "type": "function"
-              }
-            ],
-            "groupBy": [
-              {
-                "property": {
-                  "type": "string"
-                },
-                "type": "groupBy"
-              }
-            ],
-            "limit": 50
-          }
-        }
-      ],
-      "title": "Percent of Instances",
-      "type": "bargauge"
-    },
-    {
-      "datasource": {
-        "type": "grafana-postgresql-datasource",
-        "uid": "df4ti9acrqsxsa"
-      },
-      "fieldConfig": {
-        "defaults": {
-          "color": {
-            "mode": "thresholds"
-          },
-          "fieldMinMax": false,
-          "mappings": [],
-          "min": 0,
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "color": "purple",
-                "value": 0
-              }
-            ]
-          }
-        },
-        "overrides": []
-      },
-      "gridPos": {
-        "h": 7,
-        "w": 24,
-        "x": 0,
-        "y": 66
-      },
-      "id": 71,
-      "options": {
-        "displayMode": "gradient",
-        "legend": {
-          "calcs": [],
-          "displayMode": "list",
-          "placement": "bottom",
-          "showLegend": false
-        },
-        "maxVizHeight": 300,
-        "minVizHeight": 16,
-        "minVizWidth": 8,
-        "namePlacement": "auto",
-        "orientation": "auto",
-        "reduceOptions": {
-          "calcs": [
-            "lastNotNull"
-          ],
-          "fields": "",
-          "values": false
-        },
-        "showUnfilled": true,
-        "sizing": "auto",
-        "valueMode": "color"
-      },
-      "pluginVersion": "12.4.0-20983762500",
-      "targets": [
-        {
-          "datasource": {
-            "type": "grafana-postgresql-datasource",
-            "uid": "df4ti9acrqsxsa"
-          },
-          "editorMode": "code",
-          "format": "table",
-          "rawQuery": true,
-          "rawSql": "SELECT \n    SUM(CASE WHEN \n        software_version LIKE '5.0%' OR\n        software_version LIKE '4.9%' OR\n        software_version LIKE '4.8%' OR\n        software_version LIKE '4.7%' OR\n        software_version LIKE '4.6%' OR\n        software_version LIKE '4.5%' \n    THEN active_users_monthly ELSE 0 END) * 100.0 / \n        SUM(active_users_monthly) AS \"4.5+\",\n\n    SUM(CASE WHEN \n        software_version LIKE '4.6%' OR \n        software_version LIKE '4.5%' OR \n        software_version LIKE '4.4%' \n    THEN active_users_monthly ELSE 0 END) * 100.0 / \n        SUM(active_users_monthly) AS \"4.4+\",\n\n    SUM(CASE WHEN\n        software_version LIKE '5.0%' OR\n        software_version LIKE '4.9%' OR\n        software_version LIKE '4.8%' OR\n        software_version LIKE '4.7%' OR\n        software_version LIKE '4.6%' OR\n        software_version LIKE '4.5%' OR \n        software_version LIKE '4.4%' OR \n        software_version LIKE '4.3%'\n    THEN active_users_monthly ELSE 0 END) * 100.0 / \n        SUM(active_users_monthly) AS \"4.3+\",\n\n    SUM(CASE WHEN \n        software_version LIKE '5.0%' OR\n        software_version LIKE '4.9%' OR\n        software_version LIKE '4.8%' OR\n        software_version LIKE '4.7%' OR\n        software_version LIKE '4.6%' OR\n        software_version LIKE '4.5%' OR \n        software_version LIKE '4.4%' OR \n        software_version LIKE '4.3%' OR\n        software_version LIKE '4.2%'\n    THEN active_users_monthly ELSE 0 END) * 100.0 / \n        SUM(active_users_monthly) AS \"4.2+\",\n\n    SUM(CASE WHEN \n        software_version LIKE '5.0%' OR\n        software_version LIKE '4.9%' OR\n        software_version LIKE '4.8%' OR\n        software_version LIKE '4.7%' OR\n        software_version LIKE '4.6%' OR\n        software_version LIKE '4.5%' OR \n        software_version LIKE '4.4%' OR \n        software_version LIKE '4.3%' OR\n        software_version LIKE '4.2%' OR\n        software_version LIKE '4.1%'\n    THEN active_users_monthly ELSE 0 END) * 100.0 / \n        SUM(active_users_monthly) AS \"4.1+\",\n\n    SUM(CASE WHEN \n        software_version LIKE '5.0%' OR\n        software_version LIKE '4.9%' OR\n        software_version LIKE '4.8%' OR\n        software_version LIKE '4.7%' OR\n        software_version LIKE '4.6%' OR\n        software_version LIKE '4.5%' OR \n        software_version LIKE '4.4%' OR \n        software_version LIKE '4.3%' OR\n        software_version LIKE '4.2%' OR\n        software_version LIKE '4.1%' OR\n        software_version LIKE '4.0%'\n    THEN active_users_monthly ELSE 0 END) * 100.0 / \n        SUM(active_users_monthly) AS \"4.0+\"\nFROM \n    mastodon_domains\nWHERE \n    software_version IS NOT NULL\n    AND active_users_monthly IS NOT NULL;\n",
-          "refId": "A",
-          "sql": {
-            "columns": [
-              {
-                "parameters": [],
-                "type": "function"
-              }
-            ],
-            "groupBy": [
-              {
-                "property": {
-                  "type": "string"
-                },
-                "type": "groupBy"
-              }
-            ],
-            "limit": 50
-          }
-        }
-      ],
-      "title": "Percent of MAUs",
-      "type": "bargauge"
-    },
-    {
-      "collapsed": false,
-      "gridPos": {
-        "h": 1,
-        "w": 24,
-        "x": 0,
-        "y": 73
-      },
       "id": 87,
       "panels": [],
-      "title": "Historical",
+      "title": "Trend",
       "type": "row"
     },
     {
       "datasource": {
         "type": "grafana-postgresql-datasource",
-        "uid": "df4ti9acrqsxsa"
+        "uid": "${DS_GRAFANA-POSTGRESQL-DATASOURCE-1}"
       },
       "fieldConfig": {
         "defaults": {
@@ -2967,7 +3163,7 @@
         "h": 8,
         "w": 12,
         "x": 0,
-        "y": 74
+        "y": 59
       },
       "id": 90,
       "options": {
@@ -2993,18 +3189,18 @@
         "xTickLabelRotation": 0,
         "xTickLabelSpacing": 0
       },
-      "pluginVersion": "12.4.0-20983762500",
+      "pluginVersion": "12.4.0-21014103788",
       "targets": [
         {
           "dataset": "",
           "datasource": {
             "type": "grafana-postgresql-datasource",
-            "uid": "df4ti9acrqsxsa"
+            "uid": "${DS_GRAFANA-POSTGRESQL-DATASOURCE-1}"
           },
           "editorMode": "code",
           "format": "table",
           "rawQuery": true,
-          "rawSql": "SELECT\n  statistics.date AS time,\n  statistics.main_instances AS \"Main Branch\",\n  statistics.latest_instances AS \"Latest Branch\",\n  statistics.previous_instances AS \"Previous Branch\",\n  statistics.deprecated_instances AS \"Deprecated Branch\",\n  statistics.eol_instances AS \"EOL Branches\"\nFROM\n  statistics\nORDER BY\n  statistics.date DESC\nLIMIT 30;",
+          "rawSql": "SELECT\n  statistics.date AS time,\n  statistics.main_instances AS \"Main Branch\",\n  statistics.latest_instances AS \"Latest Branch\",\n  statistics.previous_instances AS \"Previous Branch\",\n  statistics.deprecated_instances AS \"Deprecated Branch\",\n  statistics.eol_instances AS \"EOL Branches\"\nFROM\n  statistics\nORDER BY\n  statistics.date DESC\nLIMIT 7;",
           "refId": "A",
           "sql": {
             "columns": [
@@ -3057,7 +3253,7 @@
     {
       "datasource": {
         "type": "grafana-postgresql-datasource",
-        "uid": "df4ti9acrqsxsa"
+        "uid": "${DS_GRAFANA-POSTGRESQL-DATASOURCE-1}"
       },
       "fieldConfig": {
         "defaults": {
@@ -3106,7 +3302,7 @@
         "h": 8,
         "w": 12,
         "x": 12,
-        "y": 74
+        "y": 59
       },
       "id": 91,
       "options": {
@@ -3132,18 +3328,18 @@
         "xTickLabelRotation": 0,
         "xTickLabelSpacing": 0
       },
-      "pluginVersion": "12.4.0-20983762500",
+      "pluginVersion": "12.4.0-21014103788",
       "targets": [
         {
           "dataset": "",
           "datasource": {
             "type": "grafana-postgresql-datasource",
-            "uid": "df4ti9acrqsxsa"
+            "uid": "${DS_GRAFANA-POSTGRESQL-DATASOURCE-1}"
           },
           "editorMode": "code",
           "format": "table",
           "rawQuery": true,
-          "rawSql": "SELECT\n  statistics.date AS time,\n  statistics.main_branch_mau AS \"Main Branch\",\n  statistics.latest_branch_mau AS \"Latest Branch\",\n  statistics.previous_branch_mau AS \"Previous Branch\",\n  statistics.deprecated_branch_mau AS \"Deprecated Branch\",\n  statistics.eol_branch_mau AS \"EOL Branches\"\nFROM\n  statistics\nORDER BY\n  statistics.date DESC\nLIMIT 30;",
+          "rawSql": "SELECT\n  statistics.date AS time,\n  statistics.main_branch_mau AS \"Main Branch\",\n  statistics.latest_branch_mau AS \"Latest Branch\",\n  statistics.previous_branch_mau AS \"Previous Branch\",\n  statistics.deprecated_branch_mau AS \"Deprecated Branch\",\n  statistics.eol_branch_mau AS \"EOL Branches\"\nFROM\n  statistics\nORDER BY\n  statistics.date DESC\nLIMIT 7;",
           "refId": "A",
           "sql": {
             "columns": [
@@ -3196,7 +3392,7 @@
     {
       "datasource": {
         "type": "grafana-postgresql-datasource",
-        "uid": "df4ti9acrqsxsa"
+        "uid": "${DS_GRAFANA-POSTGRESQL-DATASOURCE-1}"
       },
       "fieldConfig": {
         "defaults": {
@@ -3246,7 +3442,7 @@
         "h": 8,
         "w": 12,
         "x": 0,
-        "y": 82
+        "y": 67
       },
       "id": 88,
       "options": {
@@ -3272,18 +3468,18 @@
         "xTickLabelRotation": 0,
         "xTickLabelSpacing": 0
       },
-      "pluginVersion": "12.4.0-20983762500",
+      "pluginVersion": "12.4.0-21014103788",
       "targets": [
         {
           "dataset": "",
           "datasource": {
             "type": "grafana-postgresql-datasource",
-            "uid": "df4ti9acrqsxsa"
+            "uid": "${DS_GRAFANA-POSTGRESQL-DATASOURCE-1}"
           },
           "editorMode": "code",
           "format": "table",
           "rawQuery": true,
-          "rawSql": "SELECT\n  statistics.date AS time,\n  statistics.main_patched_instances AS \"Main Branch\",\n  statistics.latest_patched_instances AS \"Latest Branch\",\n  statistics.previous_patched_instances AS \"Previous Branch\",\n  statistics.deprecated_patched_instances AS \"Deprecated Branch\"\nFROM\n  statistics\nORDER BY\n  statistics.date DESC\nLIMIT 30;",
+          "rawSql": "SELECT\n  statistics.date AS time,\n  statistics.main_patched_instances AS \"Main Branch\",\n  statistics.latest_patched_instances AS \"Latest Branch\",\n  statistics.previous_patched_instances AS \"Previous Branch\",\n  statistics.deprecated_patched_instances AS \"Deprecated Branch\"\nFROM\n  statistics\nORDER BY\n  statistics.date DESC\nLIMIT 7;",
           "refId": "A",
           "sql": {
             "columns": [
@@ -3336,7 +3532,7 @@
     {
       "datasource": {
         "type": "grafana-postgresql-datasource",
-        "uid": "df4ti9acrqsxsa"
+        "uid": "${DS_GRAFANA-POSTGRESQL-DATASOURCE-1}"
       },
       "fieldConfig": {
         "defaults": {
@@ -3385,7 +3581,7 @@
         "h": 8,
         "w": 12,
         "x": 12,
-        "y": 82
+        "y": 67
       },
       "id": 89,
       "options": {
@@ -3411,18 +3607,18 @@
         "xTickLabelRotation": 0,
         "xTickLabelSpacing": 0
       },
-      "pluginVersion": "12.4.0-20983762500",
+      "pluginVersion": "12.4.0-21014103788",
       "targets": [
         {
           "dataset": "",
           "datasource": {
             "type": "grafana-postgresql-datasource",
-            "uid": "df4ti9acrqsxsa"
+            "uid": "${DS_GRAFANA-POSTGRESQL-DATASOURCE-1}"
           },
           "editorMode": "code",
           "format": "table",
           "rawQuery": true,
-          "rawSql": "SELECT\n  statistics.date AS time,\n  statistics.main_patched_mau AS \"Main Branch\",\n  statistics.latest_patched_mau AS \"Latest Branch\",\n  statistics.previous_patched_mau AS \"Previous Branch\",\n  statistics.deprecated_patched_mau AS \"Deprecated Branch\"\nFROM\n  statistics\nORDER BY\n  statistics.date DESC\nLIMIT 30;",
+          "rawSql": "SELECT\n  statistics.date AS time,\n  statistics.main_patched_mau AS \"Main Branch\",\n  statistics.latest_patched_mau AS \"Latest Branch\",\n  statistics.previous_patched_mau AS \"Previous Branch\",\n  statistics.deprecated_patched_mau AS \"Deprecated Branch\"\nFROM\n  statistics\nORDER BY\n  statistics.date DESC\nLIMIT 7;",
           "refId": "A",
           "sql": {
             "columns": [
@@ -3478,6 +3674,198 @@
         "h": 1,
         "w": 24,
         "x": 0,
+        "y": 75
+      },
+      "id": 65,
+      "panels": [],
+      "title": "Branch Adoption",
+      "type": "row"
+    },
+    {
+      "datasource": {
+        "type": "grafana-postgresql-datasource",
+        "uid": "${DS_GRAFANA-POSTGRESQL-DATASOURCE-1}"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "mappings": [],
+          "min": 0,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "purple",
+                "value": 0
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 7,
+        "w": 24,
+        "x": 0,
+        "y": 76
+      },
+      "id": 70,
+      "options": {
+        "displayMode": "gradient",
+        "legend": {
+          "calcs": [],
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": false
+        },
+        "maxVizHeight": 300,
+        "minVizHeight": 16,
+        "minVizWidth": 8,
+        "namePlacement": "auto",
+        "orientation": "auto",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "showUnfilled": true,
+        "sizing": "auto",
+        "valueMode": "color"
+      },
+      "pluginVersion": "12.4.0-21014103788",
+      "targets": [
+        {
+          "datasource": {
+            "type": "grafana-postgresql-datasource",
+            "uid": "${DS_GRAFANA-POSTGRESQL-DATASOURCE-1}"
+          },
+          "editorMode": "code",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "SELECT \n    COUNT(CASE WHEN \n        software_version LIKE '5.0%' OR\n        software_version LIKE '4.9%' OR\n        software_version LIKE '4.8%' OR\n        software_version LIKE '4.7%' OR\n        software_version LIKE '4.6%' OR\n        software_version LIKE '4.5%'\n    THEN 1 END) * 100.0 / COUNT(*) AS \"4.5+\",\n\n    COUNT(CASE WHEN \n        software_version LIKE '5.0%' OR\n        software_version LIKE '4.9%' OR\n        software_version LIKE '4.8%' OR\n        software_version LIKE '4.7%' OR\n        software_version LIKE '4.6%' OR\n        software_version LIKE '4.5%' OR \n        software_version LIKE '4.4%' \n    THEN 1 END) * 100.0 / COUNT(*) AS \"4.4+\",\n\n    COUNT(CASE WHEN \n        software_version LIKE '5.0%' OR\n        software_version LIKE '4.9%' OR\n        software_version LIKE '4.8%' OR\n        software_version LIKE '4.7%' OR\n        software_version LIKE '4.6%' OR\n        software_version LIKE '4.5%' OR \n        software_version LIKE '4.4%' OR \n        software_version LIKE '4.3%'\n    THEN 1 END) * 100.0 / COUNT(*) AS \"4.3+\",\n\n    COUNT(CASE WHEN \n        software_version LIKE '4.6%' OR\n        software_version LIKE '4.5%' OR \n        software_version LIKE '4.4%' OR \n        software_version LIKE '4.3%' OR\n        software_version LIKE '4.2%'\n    THEN 1 END) * 100.0 / COUNT(*) AS \"4.2+\",\n\n    COUNT(CASE WHEN \n        software_version LIKE '5.0%' OR\n        software_version LIKE '4.9%' OR\n        software_version LIKE '4.8%' OR\n        software_version LIKE '4.7%' OR\n        software_version LIKE '4.6%' OR\n        software_version LIKE '4.5%' OR \n        software_version LIKE '4.4%' OR \n        software_version LIKE '4.3%' OR\n        software_version LIKE '4.2%' OR\n        software_version LIKE '4.1%'\n    THEN 1 END) * 100.0 / COUNT(*) AS \"4.1+\",\n\n    COUNT(CASE WHEN \n        software_version LIKE '5.0%' OR\n        software_version LIKE '4.9%' OR\n        software_version LIKE '4.8%' OR\n        software_version LIKE '4.7%' OR\n        software_version LIKE '4.6%' OR\n        software_version LIKE '4.5%' OR \n        software_version LIKE '4.4%' OR \n        software_version LIKE '4.3%' OR\n        software_version LIKE '4.2%' OR\n        software_version LIKE '4.1%' OR\n        software_version LIKE '4.0%'\n    THEN 1 END) * 100.0 / COUNT(*) AS \"4.0+\"\n\nFROM \n    mastodon_domains\nWHERE \n    software_version IS NOT NULL;\n",
+          "refId": "A",
+          "sql": {
+            "columns": [
+              {
+                "parameters": [],
+                "type": "function"
+              }
+            ],
+            "groupBy": [
+              {
+                "property": {
+                  "type": "string"
+                },
+                "type": "groupBy"
+              }
+            ],
+            "limit": 50
+          }
+        }
+      ],
+      "title": "Percent of Instances",
+      "type": "bargauge"
+    },
+    {
+      "datasource": {
+        "type": "grafana-postgresql-datasource",
+        "uid": "${DS_GRAFANA-POSTGRESQL-DATASOURCE-1}"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "fieldMinMax": false,
+          "mappings": [],
+          "min": 0,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "purple",
+                "value": 0
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 7,
+        "w": 24,
+        "x": 0,
+        "y": 83
+      },
+      "id": 71,
+      "options": {
+        "displayMode": "gradient",
+        "legend": {
+          "calcs": [],
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": false
+        },
+        "maxVizHeight": 300,
+        "minVizHeight": 16,
+        "minVizWidth": 8,
+        "namePlacement": "auto",
+        "orientation": "auto",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "showUnfilled": true,
+        "sizing": "auto",
+        "valueMode": "color"
+      },
+      "pluginVersion": "12.4.0-21014103788",
+      "targets": [
+        {
+          "datasource": {
+            "type": "grafana-postgresql-datasource",
+            "uid": "${DS_GRAFANA-POSTGRESQL-DATASOURCE-1}"
+          },
+          "editorMode": "code",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "SELECT \n    SUM(CASE WHEN \n        software_version LIKE '5.0%' OR\n        software_version LIKE '4.9%' OR\n        software_version LIKE '4.8%' OR\n        software_version LIKE '4.7%' OR\n        software_version LIKE '4.6%' OR\n        software_version LIKE '4.5%' \n    THEN active_users_monthly ELSE 0 END) * 100.0 / \n        SUM(active_users_monthly) AS \"4.5+\",\n\n    SUM(CASE WHEN \n        software_version LIKE '4.6%' OR \n        software_version LIKE '4.5%' OR \n        software_version LIKE '4.4%' \n    THEN active_users_monthly ELSE 0 END) * 100.0 / \n        SUM(active_users_monthly) AS \"4.4+\",\n\n    SUM(CASE WHEN\n        software_version LIKE '5.0%' OR\n        software_version LIKE '4.9%' OR\n        software_version LIKE '4.8%' OR\n        software_version LIKE '4.7%' OR\n        software_version LIKE '4.6%' OR\n        software_version LIKE '4.5%' OR \n        software_version LIKE '4.4%' OR \n        software_version LIKE '4.3%'\n    THEN active_users_monthly ELSE 0 END) * 100.0 / \n        SUM(active_users_monthly) AS \"4.3+\",\n\n    SUM(CASE WHEN \n        software_version LIKE '5.0%' OR\n        software_version LIKE '4.9%' OR\n        software_version LIKE '4.8%' OR\n        software_version LIKE '4.7%' OR\n        software_version LIKE '4.6%' OR\n        software_version LIKE '4.5%' OR \n        software_version LIKE '4.4%' OR \n        software_version LIKE '4.3%' OR\n        software_version LIKE '4.2%'\n    THEN active_users_monthly ELSE 0 END) * 100.0 / \n        SUM(active_users_monthly) AS \"4.2+\",\n\n    SUM(CASE WHEN \n        software_version LIKE '5.0%' OR\n        software_version LIKE '4.9%' OR\n        software_version LIKE '4.8%' OR\n        software_version LIKE '4.7%' OR\n        software_version LIKE '4.6%' OR\n        software_version LIKE '4.5%' OR \n        software_version LIKE '4.4%' OR \n        software_version LIKE '4.3%' OR\n        software_version LIKE '4.2%' OR\n        software_version LIKE '4.1%'\n    THEN active_users_monthly ELSE 0 END) * 100.0 / \n        SUM(active_users_monthly) AS \"4.1+\",\n\n    SUM(CASE WHEN \n        software_version LIKE '5.0%' OR\n        software_version LIKE '4.9%' OR\n        software_version LIKE '4.8%' OR\n        software_version LIKE '4.7%' OR\n        software_version LIKE '4.6%' OR\n        software_version LIKE '4.5%' OR \n        software_version LIKE '4.4%' OR \n        software_version LIKE '4.3%' OR\n        software_version LIKE '4.2%' OR\n        software_version LIKE '4.1%' OR\n        software_version LIKE '4.0%'\n    THEN active_users_monthly ELSE 0 END) * 100.0 / \n        SUM(active_users_monthly) AS \"4.0+\"\nFROM \n    mastodon_domains\nWHERE \n    software_version IS NOT NULL\n    AND active_users_monthly IS NOT NULL;\n",
+          "refId": "A",
+          "sql": {
+            "columns": [
+              {
+                "parameters": [],
+                "type": "function"
+              }
+            ],
+            "groupBy": [
+              {
+                "property": {
+                  "type": "string"
+                },
+                "type": "groupBy"
+              }
+            ],
+            "limit": 50
+          }
+        }
+      ],
+      "title": "Percent of MAUs",
+      "type": "bargauge"
+    },
+    {
+      "collapsed": false,
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
         "y": 90
       },
       "id": 17,
@@ -3488,7 +3876,7 @@
     {
       "datasource": {
         "type": "grafana-postgresql-datasource",
-        "uid": "df4ti9acrqsxsa"
+        "uid": "${DS_GRAFANA-POSTGRESQL-DATASOURCE-1}"
       },
       "fieldConfig": {
         "defaults": {
@@ -3564,12 +3952,12 @@
         "xTickLabelRotation": 0,
         "xTickLabelSpacing": 0
       },
-      "pluginVersion": "12.4.0-20983762500",
+      "pluginVersion": "12.4.0-21014103788",
       "targets": [
         {
           "datasource": {
             "type": "grafana-postgresql-datasource",
-            "uid": "df4ti9acrqsxsa"
+            "uid": "${DS_GRAFANA-POSTGRESQL-DATASOURCE-1}"
           },
           "editorMode": "code",
           "format": "table",
@@ -3601,7 +3989,7 @@
     {
       "datasource": {
         "type": "grafana-postgresql-datasource",
-        "uid": "df4ti9acrqsxsa"
+        "uid": "${DS_GRAFANA-POSTGRESQL-DATASOURCE-1}"
       },
       "fieldConfig": {
         "defaults": {
@@ -3677,12 +4065,12 @@
         "xTickLabelRotation": 0,
         "xTickLabelSpacing": 0
       },
-      "pluginVersion": "12.4.0-20983762500",
+      "pluginVersion": "12.4.0-21014103788",
       "targets": [
         {
           "datasource": {
             "type": "grafana-postgresql-datasource",
-            "uid": "df4ti9acrqsxsa"
+            "uid": "${DS_GRAFANA-POSTGRESQL-DATASOURCE-1}"
           },
           "editorMode": "code",
           "format": "table",
@@ -3714,7 +4102,7 @@
     {
       "datasource": {
         "type": "grafana-postgresql-datasource",
-        "uid": "df4ti9acrqsxsa"
+        "uid": "${DS_GRAFANA-POSTGRESQL-DATASOURCE-1}"
       },
       "fieldConfig": {
         "defaults": {
@@ -3787,12 +4175,12 @@
         "enablePagination": true,
         "showHeader": true
       },
-      "pluginVersion": "12.4.0-20983762500",
+      "pluginVersion": "12.4.0-21014103788",
       "targets": [
         {
           "datasource": {
             "type": "grafana-postgresql-datasource",
-            "uid": "df4ti9acrqsxsa"
+            "uid": "${DS_GRAFANA-POSTGRESQL-DATASOURCE-1}"
           },
           "editorMode": "code",
           "format": "table",
@@ -3824,7 +4212,7 @@
     {
       "datasource": {
         "type": "grafana-postgresql-datasource",
-        "uid": "df4ti9acrqsxsa"
+        "uid": "${DS_GRAFANA-POSTGRESQL-DATASOURCE-1}"
       },
       "fieldConfig": {
         "defaults": {
@@ -3896,12 +4284,12 @@
         "enablePagination": true,
         "showHeader": true
       },
-      "pluginVersion": "12.4.0-20983762500",
+      "pluginVersion": "12.4.0-21014103788",
       "targets": [
         {
           "datasource": {
             "type": "grafana-postgresql-datasource",
-            "uid": "df4ti9acrqsxsa"
+            "uid": "${DS_GRAFANA-POSTGRESQL-DATASOURCE-1}"
           },
           "editorMode": "code",
           "format": "table",
@@ -3933,7 +4321,7 @@
     {
       "datasource": {
         "type": "grafana-postgresql-datasource",
-        "uid": "df4ti9acrqsxsa"
+        "uid": "${DS_GRAFANA-POSTGRESQL-DATASOURCE-1}"
       },
       "fieldConfig": {
         "defaults": {
@@ -4017,7 +4405,7 @@
         {
           "datasource": {
             "type": "grafana-postgresql-datasource",
-            "uid": "df4ti9acrqsxsa"
+            "uid": "${DS_GRAFANA-POSTGRESQL-DATASOURCE-1}"
           },
           "editorMode": "code",
           "format": "table",
@@ -4068,7 +4456,7 @@
     {
       "datasource": {
         "type": "grafana-postgresql-datasource",
-        "uid": "df4ti9acrqsxsa"
+        "uid": "${DS_GRAFANA-POSTGRESQL-DATASOURCE-1}"
       },
       "fieldConfig": {
         "defaults": {
@@ -4152,7 +4540,7 @@
         {
           "datasource": {
             "type": "grafana-postgresql-datasource",
-            "uid": "df4ti9acrqsxsa"
+            "uid": "${DS_GRAFANA-POSTGRESQL-DATASOURCE-1}"
           },
           "editorMode": "code",
           "format": "table",
@@ -4203,6 +4591,7 @@
   "timezone": "browser",
   "title": "vmcrawl",
   "uid": "aedqo0q7klrswa",
-  "version": 33,
-  "weekStart": ""
+  "version": 40,
+  "weekStart": "",
+  "id": null
 }
