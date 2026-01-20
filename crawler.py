@@ -2671,18 +2671,18 @@ def load_from_database(user_choice):
         "12": "SELECT domain FROM raw_domains WHERE failed = TRUE ORDER BY domain",
         "13": "SELECT domain FROM raw_domains WHERE nxdomain = TRUE ORDER BY domain",
         "14": "SELECT domain FROM raw_domains WHERE norobots = TRUE ORDER BY domain",
-        "20": "SELECT domain FROM raw_domains WHERE reason LIKE 'SSL%' ORDER BY errors ASC",
-        "21": "SELECT domain FROM raw_domains WHERE reason LIKE 'TCP%' ORDER BY errors ASC",
-        "22": "SELECT domain FROM raw_domains WHERE reason LIKE 'DNS%' ORDER BY errors ASC",
-        "30": "SELECT domain FROM raw_domains WHERE reason ~ '^2[0-9]{2}.*' ORDER BY errors ASC",
-        "31": "SELECT domain FROM raw_domains WHERE reason ~ '^3[0-9]{2}.*' ORDER BY errors ASC",
-        "32": "SELECT domain FROM raw_domains WHERE reason ~ '^4[0-9]{2}.*' ORDER BY errors ASC",
-        "33": "SELECT domain FROM raw_domains WHERE reason ~ '^5[0-9]{2}.*' ORDER BY errors ASC",
-        "40": "SELECT domain FROM raw_domains WHERE reason LIKE 'JSON%' ORDER BY errors ASC",
-        "41": "SELECT domain FROM raw_domains WHERE reason LIKE 'FILE%' ORDER BY errors ASC",
-        "42": "SELECT domain FROM raw_domains WHERE reason LIKE 'TYPE%' ORDER BY errors ASC",
-        "43": "SELECT domain FROM raw_domains WHERE reason LIKE 'MAU%' ORDER BY errors ASC",
-        "44": "SELECT domain FROM raw_domains WHERE reason LIKE 'API%' ORDER BY errors ASC",
+        "20": "SELECT domain FROM raw_domains WHERE reason LIKE 'SSL%' ORDER BY errors DESC",
+        "21": "SELECT domain FROM raw_domains WHERE reason LIKE 'TCP%' ORDER BY errors DESC",
+        "22": "SELECT domain FROM raw_domains WHERE reason LIKE 'DNS%' ORDER BY errors DESC",
+        "30": "SELECT domain FROM raw_domains WHERE reason ~ '^2[0-9]{2}.*' ORDER BY domain",
+        "31": "SELECT domain FROM raw_domains WHERE reason ~ '^3[0-9]{2}.*' ORDER BY domain",
+        "32": "SELECT domain FROM raw_domains WHERE reason ~ '^4[0-9]{2}.*' ORDER BY domain",
+        "33": "SELECT domain FROM raw_domains WHERE reason ~ '^5[0-9]{2}.*' ORDER BY domain",
+        "40": "SELECT domain FROM raw_domains WHERE reason LIKE 'JSON%' ORDER BY domain",
+        "41": "SELECT domain FROM raw_domains WHERE reason LIKE 'FILE%' ORDER BY dommain",
+        "42": "SELECT domain FROM raw_domains WHERE reason LIKE 'TYPE%' ORDER BY domain",
+        "43": "SELECT domain FROM raw_domains WHERE reason LIKE 'MAU%' ORDER BY domain",
+        "44": "SELECT domain FROM raw_domains WHERE reason LIKE 'API%' ORDER BY domain",
         "50": "SELECT domain FROM mastodon_domains WHERE software_version != ALL(%(versions)s::text[]) ORDER BY active_users_monthly DESC",
         "51": "SELECT domain FROM mastodon_domains WHERE software_version LIKE %s ORDER BY active_users_monthly DESC",
         "52": "SELECT domain FROM mastodon_domains ORDER BY active_users_monthly DESC",
@@ -2695,12 +2695,12 @@ def load_from_database(user_choice):
     else:
         query = query_map.get(user_choice)
 
-        if user_choice == "40":
+        if user_choice == "50":
             params = {"versions": all_patched_versions}
             vmc_output("Excluding versions:", "pink")
             for version in params["versions"]:
                 vmc_output(f" - {version}", "pink")
-        elif user_choice == "41":
+        elif user_choice == "51":
             params = [f"{version_main_branch}%"]
 
     if not query:
