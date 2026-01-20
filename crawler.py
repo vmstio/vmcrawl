@@ -2843,7 +2843,7 @@ def get_menu_options() -> dict[str, dict[str, str]]:
             "50": "Unpatched",
             "51": f"{version_main_branch}/main",
             "52": "Active",
-            "53": "All"
+            "53": "All",
         },
     }
 
