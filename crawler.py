@@ -1560,37 +1560,11 @@ def check_host_meta(domain, http_client):
         return None
 
 
-def try_platform_identification(domain, http_client):
-    """Fallback method to identify platform when webfinger fails.
-
-    Uses host-meta to discover backend domain, then checks nodeinfo.
-    Returns True if successfully identified as non-Mastodon, False otherwise.
-    """
-    # Try host-meta to discover backend domain
-    backend_domain = check_host_meta(domain, http_client)
-    if backend_domain is None:
-        backend_domain = domain
-
-    # Check nodeinfo to identify the platform
-    nodeinfo_result = check_nodeinfo(domain, backend_domain, http_client)
-    if nodeinfo_result and isinstance(nodeinfo_result, dict):
-        nodeinfo_20_url = nodeinfo_result.get("nodeinfo_20_url")
-        if nodeinfo_20_url:
-            nodeinfo_20_result = check_nodeinfo_20(domain, nodeinfo_20_url, http_client)
-            if nodeinfo_20_result and isinstance(nodeinfo_20_result, dict):
-                software_data = nodeinfo_20_result.get("software")
-                if software_data and isinstance(software_data, dict):
-                    save_nodeinfo_software(domain, software_data)
-                    software_name = software_data.get("name", "unknown")
-                    if software_name.lower() != "mastodon":
-                        mark_as_non_mastodon(domain, software_name)
-                        return True
-
-    return False
-
-
 def check_webfinger(domain, http_client):
-    """Check WebFinger endpoint for backend domain discovery."""
+    """Check WebFinger endpoint for backend domain discovery.
+    
+    Returns {"backend_domain": domain} on success, False on failure.
+    """
     target = "webfinger"
     url = f"https://{domain}/.well-known/webfinger?resource=acct:{domain}@{domain}"
     try:
@@ -1602,18 +1576,12 @@ def check_webfinger(domain, http_client):
             # Validate content type
             if "json" not in content_type:
                 handle_incorrect_file_type(domain, target, content_type)
-                # Try platform identification fallback
-                if try_platform_identification(domain, http_client):
-                    return False
                 return False
 
             # Validate content exists
             if not response.content or content_length == "0":
                 exception = "returned empty content"
                 handle_json_exception(domain, target, exception)
-                # Try platform identification fallback
-                if try_platform_identification(domain, http_client):
-                    return False
                 return False
 
             # Parse and validate JSON structure
@@ -1623,24 +1591,12 @@ def check_webfinger(domain, http_client):
                     return False
                 exception = "returned non-dict JSON"
                 handle_json_exception(domain, target, exception)
-                # Try platform identification fallback
-                if try_platform_identification(domain, http_client):
-                    return False
                 return False
 
             # Check for specific error message indicating non-Mastodon platform
             error = data.get("error")
             message = data.get("message")
-            if (
-                error == "unknown"
-                and message == "Failed to resolve actor via webfinger"
-            ):
-                # This specific error suggests it's not Mastodon
-                # Try platform identification fallback
-                if try_platform_identification(domain, http_client):
-                    return False
-
-                # If we couldn't identify via nodeinfo, treat as error
+            if error == "unknown" and message == "Failed to resolve actor via webfinger":
                 exception = "Failed to resolve actor via webfinger"
                 handle_json_exception(domain, target, exception)
                 return False
@@ -1648,12 +1604,6 @@ def check_webfinger(domain, http_client):
             # Validate aliases exist
             aliases = data.get("aliases", [])
             if not aliases:
-                # No aliases suggests non-Mastodon platform
-                # Try platform identification fallback
-                if try_platform_identification(domain, http_client):
-                    return False
-
-                # If we couldn't identify via nodeinfo, treat as error
                 exception = "has no aliases"
                 handle_json_exception(domain, target, exception)
                 return False
@@ -1663,9 +1613,6 @@ def check_webfinger(domain, http_client):
             if not first_alias:
                 exception = "has no https alias"
                 handle_json_exception(domain, target, exception)
-                # Try platform identification fallback
-                if try_platform_identification(domain, http_client):
-                    return False
                 return False
 
             # Extract and validate backend domain
@@ -1673,9 +1620,6 @@ def check_webfinger(domain, http_client):
             if "localhost" in backend_domain:
                 exception = "points to localhost"
                 handle_json_exception(domain, target, exception)
-                # Try platform identification fallback
-                if try_platform_identification(domain, http_client):
-                    return False
                 return False
 
             return {"backend_domain": backend_domain}
@@ -1685,21 +1629,12 @@ def check_webfinger(domain, http_client):
             return False
         else:
             handle_http_status_code(domain, target, response)
-            # Try platform identification fallback for non-200 status codes
-            if try_platform_identification(domain, http_client):
-                return False
             return False
     except httpx.RequestError as exception:
         handle_tcp_exception(domain, target, exception)
-        # Try platform identification fallback for connection errors
-        if try_platform_identification(domain, http_client):
-            return False
         return False
     except json.JSONDecodeError as exception:
         handle_json_exception(domain, target, exception)
-        # Try platform identification fallback for JSON errors
-        if try_platform_identification(domain, http_client):
-            return False
         return False
 
 
@@ -1946,13 +1881,31 @@ def process_domain(domain, http_client, nightly_version_ranges):
     if not check_robots_txt(domain, http_client):
         return
 
-    # No cached URL, perform full discovery process
-    webfinger_result = check_webfinger(domain, http_client)
-    if not webfinger_result:
-        return
+    # Try to discover backend domain via host-meta first
+    backend_domain = check_host_meta(domain, http_client)
 
-    backend_domain = webfinger_result["backend_domain"]
+    if backend_domain:
+        # host-meta succeeded, skip webfinger
+        vmc_output(
+            f"{domain}: Found backend via host-meta: {backend_domain}",
+            "white",
+            use_tqdm=True,
+        )
+    else:
+        # host-meta failed, try webfinger
+        webfinger_result = check_webfinger(domain, http_client)
+        if not webfinger_result:
+            # webfinger failed, try nodeinfo with original domain as fallback
+            backend_domain = domain
+            vmc_output(
+                f"{domain}: Both host-meta and webfinger failed, trying nodeinfo at original domain",
+                "white",
+                use_tqdm=True,
+            )
+        else:
+            backend_domain = webfinger_result["backend_domain"]
 
+    # Check nodeinfo at the discovered backend domain
     nodeinfo_result = check_nodeinfo(domain, backend_domain, http_client)
     if nodeinfo_result is False:
         return
