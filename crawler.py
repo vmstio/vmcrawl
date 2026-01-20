@@ -3,6 +3,7 @@
 # =============================================================================
 # IMPORTS
 # =============================================================================
+from datetime import UTC
 
 try:
     import argparse
@@ -97,7 +98,13 @@ backport_branches = ["4.5", "4.4", "4.3"]
 # DATABASE CONNECTION
 # =============================================================================
 
-conn_string = f"postgresql://{os.getenv('VMCRAWL_POSTGRES_USER')}:{os.getenv('VMCRAWL_POSTGRES_PASS')}@{os.getenv('VMCRAWL_POSTGRES_HOST', 'localhost')}:{os.getenv('VMCRAWL_POSTGRES_PORT', '5432')}/{os.getenv('VMCRAWL_POSTGRES_DATA')}"
+conn_string = (
+    f"postgresql://{os.getenv('VMCRAWL_POSTGRES_USER')}:"
+    f"{os.getenv('VMCRAWL_POSTGRES_PASS')}@"
+    f"{os.getenv('VMCRAWL_POSTGRES_HOST', 'localhost')}:"
+    f"{os.getenv('VMCRAWL_POSTGRES_PORT', '5432')}/"
+    f"{os.getenv('VMCRAWL_POSTGRES_DATA')}"
+)
 
 # Create connection pool for thread-safe database access
 # Scale connection pool size with number of worker threads
@@ -112,9 +119,9 @@ try:
         min_size=2,  # Keep 2 warm connections
         max_size=max_db_connections,
         timeout=30,
-        max_waiting=max_workers,  # Allow worker threads to queue briefly
+        max_waiting=max_workers,  # Allow worker threads to queue
     )
-    # Also maintain a single connection for backwards compatibility with module-level code
+    # Maintain single connection for backwards compatibility
     conn = psycopg.connect(conn_string)
 
     # Register cleanup handler to prevent threading errors on early exit
@@ -177,7 +184,7 @@ http_client = httpx.Client(
 
 
 def vmc_output(text: str, color: str, use_tqdm: bool = False, **kwargs: Any) -> None:
-    """Print colored output, optionally using tqdm.write for progress bar compatibility."""
+    """Print colored output, optionally using tqdm.write."""
     if use_tqdm:
         text = text.lower()
 
@@ -227,7 +234,9 @@ def is_cache_valid(cache_file_path: str, max_age_seconds: int) -> bool:
 
 
 def parse_json_with_fallback(
-    response: httpx.Response, domain: str, target: str
+    response: httpx.Response,
+    domain: str,
+    target: str,
 ) -> Any | bool:
     """Parse JSON from response with fallback decoder for malformed JSON.
 
@@ -288,9 +297,11 @@ def get_httpx(url: str, http_client: httpx.Client) -> httpx.Response:
             content_length = response.headers.get("Content-Length")
             if content_length and int(content_length) > max_response_size:
                 _ = stream_ctx.__exit__(None, None, None)
-                raise ValueError(
-                    f"Response too large: {content_length} bytes (max: {max_response_size})"
+                msg = (
+                    f"Response too large: {content_length} bytes "
+                    f"(max: {max_response_size})"
                 )
+                raise ValueError(msg)
 
             # Stream the response and check size as we download
             chunks = []
@@ -302,9 +313,11 @@ def get_httpx(url: str, http_client: httpx.Client) -> httpx.Response:
 
                 if total_size > max_response_size:
                     _ = stream_ctx.__exit__(None, None, None)
-                    raise ValueError(
-                        f"Response too large: {total_size} bytes (max: {max_response_size})"
+                    msg = (
+                        f"Response too large: {total_size} bytes "
+                        f"(max: {max_response_size})"
                     )
+                    raise ValueError(msg)
 
             # All data received within size limit - construct final response
             # We need to manually build a Response object with our collected data
@@ -333,7 +346,7 @@ def get_domain_endings() -> set[str]:
     max_cache_age = 86400  # 1 day in seconds
 
     if is_cache_valid(cache_file_path, max_cache_age):
-        with open(cache_file_path, "r") as cache_file:
+        with open(cache_file_path) as cache_file:
             # Use set for O(1) lookup
             return {line.strip().lower() for line in cache_file if line.strip()}
 
@@ -349,9 +362,11 @@ def get_domain_endings() -> set[str]:
             _ = cache_file.write("\n".join(sorted(domain_endings)))
         return domain_endings
 
-    raise Exception(
-        f"Failed to fetch domain endings. HTTP Status Code: {domain_endings_response.status_code}"
+    msg = (
+        f"Failed to fetch domain endings. "
+        f"HTTP Status Code: {domain_endings_response.status_code}"
     )
+    raise Exception(msg)
 
 
 # =============================================================================
@@ -396,7 +411,7 @@ def get_highest_mastodon_version() -> str | None:
                 if version.parse(release_version).is_prerelease:
                     continue
                 if highest_version is None or version.parse(
-                    release_version
+                    release_version,
                 ) > version.parse(highest_version):
                     highest_version = release_version
     except httpx.HTTPError as exception:
@@ -410,7 +425,7 @@ def get_backport_mastodon_versions():
     """Get the latest version for each backport branch from GitHub."""
     url = "https://api.github.com/repos/mastodon/mastodon/releases"
 
-    backport_versions = {branch: "" for branch in backport_branches}
+    backport_versions = dict.fromkeys(backport_branches, "")
 
     response = get_httpx(url, http_client)
     _ = response.raise_for_status()
@@ -473,7 +488,7 @@ def get_nightly_version_ranges() -> list[tuple[str, datetime, datetime | None]]:
             SELECT version, start_date, end_date
             FROM nightly_versions
             ORDER BY start_date DESC
-        """
+        """,
         )
         nightly_version_ranges = [(row[0], row[1], row[2]) for row in cur.fetchall()]
         nightly_version_ranges = [
@@ -589,8 +604,7 @@ def clean_version_doubledash(software_version: str) -> str:
     """Fix double dashes and trailing dashes in version strings."""
     if "--" in software_version:
         software_version = software_version.replace("--", "-")
-    if software_version.endswith("-"):
-        software_version = software_version[:-1]
+    software_version = software_version.removesuffix("-")
     return software_version
 
 
@@ -617,17 +631,14 @@ def clean_version_wrongpatch(software_version: str) -> str:
                     z = 0
                     return f"{x}.{y}.{z}{additional_data or ''}"
                 return software_version
-            elif y == m:
+            if y == m:
                 if z != 0:
                     z = 0
                     return f"{x}.{y}.{z}{additional_data or ''}"
                 return software_version
-            else:
-                return software_version
-        else:
             return software_version
-    else:
         return software_version
+    return software_version
 
 
 def clean_version_nightly(
@@ -638,7 +649,8 @@ def clean_version_nightly(
     software_version = re.sub(r"-nightly-\d{8}", "", software_version)
 
     match = re.match(
-        r"4\.[3456]\.0-nightly\.(\d{4}-\d{2}-\d{2})(-security)?", software_version
+        r"4\.[3456]\.0-nightly\.(\d{4}-\d{2}-\d{2})(-security)?",
+        software_version,
     )
     if match:
         nightly_date_str, is_security = match.groups()
@@ -711,7 +723,7 @@ def update_patch_versions():
     with conn.cursor() as cur:
         n_level = 0
         for n_level, (version, branch) in enumerate(
-            zip(version_backport_releases, backport_branches)
+            zip(version_backport_releases, backport_branches),
         ):
             cur.execute(
                 """
@@ -747,31 +759,33 @@ def delete_old_patch_versions():
 
 def log_error(domain: str, error_to_print: str) -> None:
     """Log an error for a domain to the error_log table."""
-    with db_pool.connection() as conn:
-        with conn.cursor() as cursor:
-            try:
-                _ = cursor.execute(
-                    """
+    with db_pool.connection() as conn, conn.cursor() as cursor:
+        try:
+            _ = cursor.execute(
+                """
                     INSERT INTO error_log (domain, error)
                     VALUES (%s, %s)
                 """,
-                    (domain, error_to_print),
-                )
-                conn.commit()
-            except Exception as exception:
-                vmc_output(
-                    f"{domain}: Failed to log error {exception}", "red", use_tqdm=True
-                )
-                conn.rollback()
+                (domain, error_to_print),
+            )
+            conn.commit()
+        except Exception as exception:
+            vmc_output(
+                f"{domain}: Failed to log error {exception}",
+                "red",
+                use_tqdm=True,
+            )
+            conn.rollback()
 
 
 def increment_domain_error(domain: str, error_reason: str) -> None:
     """Increment error count for a domain and record the error reason.
 
-    Only increments error count if the previous error reason started with DNS, SSL, TCP, or HTTP 4xx,
-    AND the domain's nodeinfo is NOT set to 'mastodon'.
-    For other error types, the count is set to null while still recording the error reason.
-    Counter resets to 1 when switching between error types.
+    Only increments error count if the previous error reason started with
+    DNS, SSL, TCP, or HTTP 4xx, AND the domain's nodeinfo is NOT set to
+    'mastodon'. For other error types, the count is set to null while still
+    recording the error reason. Counter resets to 1 when switching between
+    error types.
 
     DNS errors: After 15 consecutive errors, mark as NXDOMAIN.
     SSL errors: After 15 consecutive errors, mark as ignored.
@@ -781,25 +795,25 @@ def increment_domain_error(domain: str, error_reason: str) -> None:
     ERROR_THRESHOLD = 15
     TRACKED_ERROR_TYPES = ("DNS", "SSL", "TCP")
 
-    with db_pool.connection() as conn:
-        with conn.cursor() as cursor:
-            try:
-                # Fetch current errors, previous error reason, and nodeinfo
-                cursor.execute(
-                    "SELECT errors, reason, nodeinfo FROM raw_domains WHERE domain = %s",
-                    (domain,),
-                )
-                result = cursor.fetchone()
-                current_errors = result[0] if result and result[0] is not None else 0
-                previous_reason = result[1] if result and result[1] is not None else ""
-                nodeinfo = result[2] if result and result[2] is not None else None
+    with db_pool.connection() as conn, conn.cursor() as cursor:
+        try:
+            # Fetch current errors, previous error reason, and nodeinfo
+            cursor.execute(
+                "SELECT errors, reason, nodeinfo FROM raw_domains WHERE domain = %s",
+                (domain,),
+            )
+            result = cursor.fetchone()
+            current_errors = result[0] if result and result[0] is not None else 0
+            previous_reason = result[1] if result and result[1] is not None else ""
+            nodeinfo = result[2] if result and result[2] is not None else None
 
-                # Skip error counting if nodeinfo is set to 'mastodon'
-                if nodeinfo == "mastodon":
-                    # Still record the error reason, but don't increment counter
-                    _ = cursor.execute(
-                        """
-                        INSERT INTO raw_domains (domain, failed, ignore, errors, reason, nxdomain, norobots)
+            # Skip error counting if nodeinfo is set to 'mastodon'
+            if nodeinfo == "mastodon":
+                # Still record the error reason, but don't increment counter
+                _ = cursor.execute(
+                    """
+                        INSERT INTO raw_domains
+                        (domain, failed, ignore, errors, reason, nxdomain, norobots)
                         VALUES (%s, %s, %s, %s, %s, %s, %s)
                         ON CONFLICT(domain) DO UPDATE SET
                         failed = excluded.failed,
@@ -809,66 +823,61 @@ def increment_domain_error(domain: str, error_reason: str) -> None:
                         nxdomain = excluded.nxdomain,
                         norobots = excluded.norobots
                     """,
-                        (domain, None, None, None, error_reason, None, None),
-                    )
-                    conn.commit()
+                    (domain, None, None, None, error_reason, None, None),
+                )
+                conn.commit()
+                return
+
+            # Get error type prefix (DNS, SSL, TCP, HTTP 4xx, or None)
+            # Check for HTTP 4xx errors first
+            def is_http_4xx(reason: str) -> bool:
+                """Check if error reason starts with a 4xx HTTP status code."""
+                return len(reason) >= 3 and reason[0] == "4" and reason[1:3].isdigit()
+
+            error_type = None
+            if is_http_4xx(error_reason):
+                error_type = "HTTP4XX"
+            else:
+                error_type = next(
+                    (t for t in TRACKED_ERROR_TYPES if error_reason.startswith(t)),
+                    None,
+                )
+
+            previous_type = None
+            if is_http_4xx(previous_reason):
+                previous_type = "HTTP4XX"
+            else:
+                previous_type = next(
+                    (t for t in TRACKED_ERROR_TYPES if previous_reason.startswith(t)),
+                    None,
+                )
+
+            # Determine new error count
+            if error_type and error_type == previous_type:
+                # Same error type - increment
+                new_errors = current_errors + 1
+
+                # Check if threshold reached
+                if new_errors >= ERROR_THRESHOLD:
+                    if error_type == "DNS":
+                        status = "nxdomain"
+                    else:
+                        # SSL, TCP, or HTTP4XX all mark as ignore
+                        status = "ignore"
+                    mark_domain_status(domain, status)
+                    delete_domain_if_known(domain)
                     return
+            elif error_type:
+                # Different tracked error type or first occurrence - reset to 1
+                new_errors = 1
+            else:
+                # Non-tracked error types - set count to null
+                new_errors = None
 
-                # Get error type prefix (DNS, SSL, TCP, HTTP 4xx, or None)
-                # Check for HTTP 4xx errors first (any string starting with 4 followed by two digits)
-                def is_http_4xx(reason: str) -> bool:
-                    """Check if error reason starts with a 4xx HTTP status code."""
-                    return (
-                        len(reason) >= 3 and reason[0] == "4" and reason[1:3].isdigit()
-                    )
-
-                error_type = None
-                if is_http_4xx(error_reason):
-                    error_type = "HTTP4XX"
-                else:
-                    error_type = next(
-                        (t for t in TRACKED_ERROR_TYPES if error_reason.startswith(t)),
-                        None,
-                    )
-
-                previous_type = None
-                if is_http_4xx(previous_reason):
-                    previous_type = "HTTP4XX"
-                else:
-                    previous_type = next(
-                        (
-                            t
-                            for t in TRACKED_ERROR_TYPES
-                            if previous_reason.startswith(t)
-                        ),
-                        None,
-                    )
-
-                # Determine new error count
-                if error_type and error_type == previous_type:
-                    # Same error type - increment
-                    new_errors = current_errors + 1
-
-                    # Check if threshold reached
-                    if new_errors >= ERROR_THRESHOLD:
-                        if error_type == "DNS":
-                            status = "nxdomain"
-                        else:
-                            # SSL, TCP, or HTTP4XX all mark as ignore
-                            status = "ignore"
-                        mark_domain_status(domain, status)
-                        delete_domain_if_known(domain)
-                        return
-                elif error_type:
-                    # Different tracked error type or first occurrence - reset to 1
-                    new_errors = 1
-                else:
-                    # Non-tracked error types - set count to null
-                    new_errors = None
-
-                _ = cursor.execute(
-                    """
-                    INSERT INTO raw_domains (domain, failed, ignore, errors, reason, nxdomain, norobots)
+            _ = cursor.execute(
+                """
+                    INSERT INTO raw_domains
+                    (domain, failed, ignore, errors, reason, nxdomain, norobots)
                     VALUES (%s, %s, %s, %s, %s, %s, %s)
                     ON CONFLICT(domain) DO UPDATE SET
                     failed = excluded.failed,
@@ -878,26 +887,26 @@ def increment_domain_error(domain: str, error_reason: str) -> None:
                     nxdomain = excluded.nxdomain,
                     norobots = excluded.norobots
                 """,
-                    (domain, None, None, new_errors, error_reason, None, None),
-                )
-                conn.commit()
-            except Exception as exception:
-                vmc_output(
-                    f"{domain}: Failed to increment domain error {exception}",
-                    "red",
-                    use_tqdm=True,
-                )
-                conn.rollback()
+                (domain, None, None, new_errors, error_reason, None, None),
+            )
+            conn.commit()
+        except Exception as exception:
+            vmc_output(
+                f"{domain}: Failed to increment domain error {exception}",
+                "red",
+                use_tqdm=True,
+            )
+            conn.rollback()
 
 
 def clear_domain_error(domain: str) -> None:
     """Clear all error flags for a domain."""
-    with db_pool.connection() as conn:
-        with conn.cursor() as cursor:
-            try:
-                _ = cursor.execute(
-                    """
-                    INSERT INTO raw_domains (domain, failed, ignore, errors, reason, nxdomain, norobots)
+    with db_pool.connection() as conn, conn.cursor() as cursor:
+        try:
+            _ = cursor.execute(
+                """
+                    INSERT INTO raw_domains
+                    (domain, failed, ignore, errors, reason, nxdomain, norobots)
                     VALUES (%s, %s, %s, %s, %s, %s, %s)
                     ON CONFLICT(domain) DO UPDATE SET
                     failed = excluded.failed,
@@ -907,16 +916,16 @@ def clear_domain_error(domain: str) -> None:
                     nxdomain = excluded.nxdomain,
                     norobots = excluded.norobots
                 """,
-                    (domain, None, None, None, None, None, None),
-                )
-                conn.commit()
-            except Exception as exception:
-                vmc_output(
-                    f"{domain}: Failed to clear domain errors {exception}",
-                    "red",
-                    use_tqdm=True,
-                )
-                conn.rollback()
+                (domain, None, None, None, None, None, None),
+            )
+            conn.commit()
+        except Exception as exception:
+            vmc_output(
+                f"{domain}: Failed to clear domain errors {exception}",
+                "red",
+                use_tqdm=True,
+            )
+            conn.rollback()
 
 
 # =============================================================================
@@ -944,12 +953,12 @@ def mark_domain_status(domain: str, status_type: str) -> None:
 
     failed, ignore, errors, reason, nxdomain, norobots, label = status_map[status_type]
 
-    with db_pool.connection() as conn:
-        with conn.cursor() as cursor:
-            try:
-                _ = cursor.execute(
-                    """
-                    INSERT INTO raw_domains (domain, failed, ignore, errors, reason, nxdomain, norobots)
+    with db_pool.connection() as conn, conn.cursor() as cursor:
+        try:
+            _ = cursor.execute(
+                """
+                    INSERT INTO raw_domains
+                    (domain, failed, ignore, errors, reason, nxdomain, norobots)
                     VALUES (%s, %s, %s, %s, %s, %s, %s)
                     ON CONFLICT(domain) DO UPDATE SET
                     failed = excluded.failed,
@@ -959,12 +968,12 @@ def mark_domain_status(domain: str, status_type: str) -> None:
                     nxdomain = excluded.nxdomain,
                     norobots = excluded.norobots
                 """,
-                    (domain, failed, ignore, errors, reason, nxdomain, norobots),
-                )
-                conn.commit()
-            except Exception as exception:
-                vmc_output(f"Failed to mark domain {label}: {exception}", "red")
-                conn.rollback()
+                (domain, failed, ignore, errors, reason, nxdomain, norobots),
+            )
+            conn.commit()
+        except Exception as exception:
+            vmc_output(f"Failed to mark domain {label}: {exception}", "red")
+            conn.rollback()
 
 
 # Convenience wrapper functions for backwards compatibility
@@ -995,44 +1004,42 @@ def mark_norobots_domain(domain: str) -> None:
 
 def delete_domain_if_known(domain: str) -> None:
     """Delete a domain from the mastodon_domains table."""
-    with db_pool.connection() as conn:
-        with conn.cursor() as cursor:
-            try:
-                _ = cursor.execute(
-                    """
+    with db_pool.connection() as conn, conn.cursor() as cursor:
+        try:
+            _ = cursor.execute(
+                """
                     DELETE FROM mastodon_domains WHERE domain = %s
                     """,
-                    (domain,),
-                )
-                conn.commit()
-            except Exception as exception:
-                vmc_output(
-                    f"{domain}: Failed to delete known domain {exception}",
-                    "red",
-                    use_tqdm=True,
-                )
-                conn.rollback()
+                (domain,),
+            )
+            conn.commit()
+        except Exception as exception:
+            vmc_output(
+                f"{domain}: Failed to delete known domain {exception}",
+                "red",
+                use_tqdm=True,
+            )
+            conn.rollback()
 
 
 def delete_domain_from_raw(domain: str) -> None:
     """Delete a domain from the raw_domains table."""
-    with db_pool.connection() as conn:
-        with conn.cursor() as cursor:
-            try:
-                _ = cursor.execute(
-                    """
+    with db_pool.connection() as conn, conn.cursor() as cursor:
+        try:
+            _ = cursor.execute(
+                """
                     DELETE FROM raw_domains WHERE domain = %s
                     """,
-                    (domain,),
-                )
-                conn.commit()
-            except Exception as exception:
-                vmc_output(
-                    f"{domain}: Failed to delete known domain {exception}",
-                    "red",
-                    use_tqdm=True,
-                )
-                conn.rollback()
+                (domain,),
+            )
+            conn.commit()
+        except Exception as exception:
+            vmc_output(
+                f"{domain}: Failed to delete known domain {exception}",
+                "red",
+                use_tqdm=True,
+            )
+            conn.rollback()
 
 
 def save_nodeinfo_software(domain: str, software_data: dict[str, Any]) -> None:
@@ -1044,26 +1051,25 @@ def save_nodeinfo_software(domain: str, software_data: dict[str, Any]) -> None:
     """
     software_name = software_data.get("name", "unknown").lower().replace(" ", "-")
 
-    with db_pool.connection() as conn:
-        with conn.cursor() as cursor:
-            try:
-                _ = cursor.execute(
-                    """
+    with db_pool.connection() as conn, conn.cursor() as cursor:
+        try:
+            _ = cursor.execute(
+                """
                     INSERT INTO raw_domains (domain, nodeinfo)
                     VALUES (%s, %s)
                     ON CONFLICT(domain) DO UPDATE SET
                     nodeinfo = excluded.nodeinfo
                     """,
-                    (domain, software_name),
-                )
-                conn.commit()
-            except Exception as exception:
-                vmc_output(
-                    f"{domain}: Failed to save nodeinfo software {exception}",
-                    "red",
-                    use_tqdm=True,
-                )
-                conn.rollback()
+                (domain, software_name),
+            )
+            conn.commit()
+        except Exception as exception:
+            vmc_output(
+                f"{domain}: Failed to save nodeinfo software {exception}",
+                "red",
+                use_tqdm=True,
+            )
+            conn.rollback()
 
 
 def update_mastodon_domain(
@@ -1079,13 +1085,13 @@ def update_mastodon_domain(
         vmc_output("Attempted to insert empty domain, skipping", "red", use_tqdm=True)
         return
 
-    with db_pool.connection() as conn:
-        with conn.cursor() as cursor:
-            try:
-                _ = cursor.execute(
-                    """
+    with db_pool.connection() as conn, conn.cursor() as cursor:
+        try:
+            _ = cursor.execute(
+                """
                     INSERT INTO mastodon_domains
-                    (domain, software_version, total_users, active_users_monthly, timestamp, full_version)
+                    (domain, software_version, total_users,
+                     active_users_monthly, timestamp, full_version)
                     VALUES (%s, %s, %s, %s, %s, %s)
                     ON CONFLICT(domain) DO UPDATE SET
                     software_version = excluded.software_version,
@@ -1094,43 +1100,45 @@ def update_mastodon_domain(
                     timestamp = excluded.timestamp,
                     full_version = excluded.full_version
                 """,
-                    (
-                        actual_domain.strip(),
-                        software_version,
-                        total_users,
-                        active_month_users,
-                        datetime.now(timezone.utc),
-                        software_version_full,
-                    ),
-                )
-                conn.commit()
-            except Exception as exception:
-                vmc_output(f"{actual_domain}: {exception}", "red", use_tqdm=True)
-                conn.rollback()
+                (
+                    actual_domain.strip(),
+                    software_version,
+                    total_users,
+                    active_month_users,
+                    datetime.now(UTC),
+                    software_version_full,
+                ),
+            )
+            conn.commit()
+        except Exception as exception:
+            vmc_output(f"{actual_domain}: {exception}", "red", use_tqdm=True)
+            conn.rollback()
 
 
 def cleanup_old_domains():
     """Delete known domains older than 1 day."""
-    with db_pool.connection() as conn:
-        with conn.cursor() as cursor:
-            try:
-                cursor.execute(
-                    """
+    with db_pool.connection() as conn, conn.cursor() as cursor:
+        try:
+            cursor.execute(
+                """
                     DELETE FROM mastodon_domains
-                    WHERE timestamp <= (CURRENT_TIMESTAMP - INTERVAL '1 day') AT TIME ZONE 'UTC'
+                    WHERE timestamp <=
+                        (CURRENT_TIMESTAMP - INTERVAL '1 day') AT TIME ZONE 'UTC'
                     RETURNING domain
-                    """
-                )
-                deleted_domains = [row[0] for row in cursor.fetchall()]
-                if deleted_domains:
-                    for d in deleted_domains:
-                        vmc_output(
-                            f"{d}: Removed from known domains", "pink", use_tqdm=True
-                        )
-                conn.commit()
-            except Exception as exception:
-                vmc_output(f"Failed to clean up old domains: {exception}", "red")
-                conn.rollback()
+                    """,
+            )
+            deleted_domains = [row[0] for row in cursor.fetchall()]
+            if deleted_domains:
+                for d in deleted_domains:
+                    vmc_output(
+                        f"{d}: Removed from known domains",
+                        "pink",
+                        use_tqdm=True,
+                    )
+            conn.commit()
+        except Exception as exception:
+            vmc_output(f"Failed to clean up old domains: {exception}", "red")
+            conn.rollback()
 
 
 # =============================================================================
@@ -1140,43 +1148,40 @@ def cleanup_old_domains():
 
 def get_junk_keywords():
     """Get list of junk keywords to filter domains."""
-    with db_pool.connection() as conn:
-        with conn.cursor() as cursor:
-            try:
-                cursor.execute("SELECT keywords FROM junk_words")
-                # Use set for O(1) lookup instead of O(n) list iteration
-                return {row[0] for row in cursor}
-            except Exception as exception:
-                vmc_output(f"Failed to obtain junk keywords: {exception}", "red")
-                conn.rollback()
+    with db_pool.connection() as conn, conn.cursor() as cursor:
+        try:
+            cursor.execute("SELECT keywords FROM junk_words")
+            # Use set for O(1) lookup instead of O(n) list iteration
+            return {row[0] for row in cursor}
+        except Exception as exception:
+            vmc_output(f"Failed to obtain junk keywords: {exception}", "red")
+            conn.rollback()
     return set()
 
 
 def get_dni_domains():
     """Get list of DNI (Do Not Interact) domains to filter domains."""
-    with db_pool.connection() as conn:
-        with conn.cursor() as cursor:
-            try:
-                cursor.execute("SELECT domain FROM dni")
-                # Use set for O(1) lookup instead of O(n) list iteration
-                return {row[0] for row in cursor}
-            except Exception as exception:
-                vmc_output(f"Failed to obtain DNI domain list: {exception}", "red")
-                conn.rollback()
+    with db_pool.connection() as conn, conn.cursor() as cursor:
+        try:
+            cursor.execute("SELECT domain FROM dni")
+            # Use set for O(1) lookup instead of O(n) list iteration
+            return {row[0] for row in cursor}
+        except Exception as exception:
+            vmc_output(f"Failed to obtain DNI domain list: {exception}", "red")
+            conn.rollback()
     return set()
 
 
 def get_bad_tld():
     """Get list of prohibited TLDs."""
-    with db_pool.connection() as conn:
-        with conn.cursor() as cursor:
-            try:
-                cursor.execute("SELECT tld FROM bad_tld")
-                # Use set for O(1) lookup
-                return {row[0] for row in cursor}
-            except Exception as exception:
-                vmc_output(f"Failed to obtain bad TLDs: {exception}", "red")
-                conn.rollback()
+    with db_pool.connection() as conn, conn.cursor() as cursor:
+        try:
+            cursor.execute("SELECT tld FROM bad_tld")
+            # Use set for O(1) lookup
+            return {row[0] for row in cursor}
+        except Exception as exception:
+            vmc_output(f"Failed to obtain bad TLDs: {exception}", "red")
+            conn.rollback()
     return set()
 
 
@@ -1194,18 +1199,18 @@ def get_domains_by_status(status_column):
         vmc_output(f"Invalid status column: {status_column}", "red")
         return set()
 
-    with db_pool.connection() as conn:
-        with conn.cursor() as cursor:
-            try:
-                query = f"SELECT domain FROM raw_domains WHERE {status_column} = TRUE"
-                _ = cursor.execute(query)  # pyright: ignore[reportCallIssue,reportArgumentType]
-                # Use set for O(1) lookup, stream results
-                return {row[0].strip() for row in cursor if row[0] and row[0].strip()}
-            except Exception as exception:
-                vmc_output(
-                    f"Failed to obtain {status_column} domains: {exception}", "red"
-                )
-                conn.rollback()
+    with db_pool.connection() as conn, conn.cursor() as cursor:
+        try:
+            query = f"SELECT domain FROM raw_domains WHERE {status_column} = TRUE"
+            _ = cursor.execute(query)  # pyright: ignore[reportCallIssue,reportArgumentType]
+            # Use set for O(1) lookup, stream results
+            return {row[0].strip() for row in cursor if row[0] and row[0].strip()}
+        except Exception as exception:
+            vmc_output(
+                f"Failed to obtain {status_column} domains: {exception}",
+                "red",
+            )
+            conn.rollback()
     return set()
 
 
@@ -1222,16 +1227,18 @@ def get_ignored_domains():
 
 def get_not_masto_domains():
     """Get list of domains where nodeinfo is not 'mastodon'."""
-    with db_pool.connection() as conn:
-        with conn.cursor() as cursor:
-            try:
-                query = "SELECT domain FROM raw_domains WHERE nodeinfo IS NOT NULL AND nodeinfo != 'mastodon'"
-                _ = cursor.execute(query)
-                # Use set for O(1) lookup, stream results
-                return {row[0].strip() for row in cursor if row[0] and row[0].strip()}
-            except Exception as exception:
-                vmc_output(f"Failed to obtain non-mastodon domains: {exception}", "red")
-                conn.rollback()
+    with db_pool.connection() as conn, conn.cursor() as cursor:
+        try:
+            query = (
+                "SELECT domain FROM raw_domains "
+                "WHERE nodeinfo IS NOT NULL AND nodeinfo != 'mastodon'"
+            )
+            _ = cursor.execute(query)
+            # Use set for O(1) lookup, stream results
+            return {row[0].strip() for row in cursor if row[0] and row[0].strip()}
+        except Exception as exception:
+            vmc_output(f"Failed to obtain non-mastodon domains: {exception}", "red")
+            conn.rollback()
     return set()
 
 
@@ -1490,7 +1497,9 @@ def check_robots_txt(domain, http_client):
                         disallow_path == "/" or disallow_path == "*"
                     ):
                         vmc_output(
-                            f"{domain}: Crawling Prohibited", "orange", use_tqdm=True
+                            f"{domain}: Crawling Prohibited",
+                            "orange",
+                            use_tqdm=True,
                         )
                         mark_norobots_domain(domain)
                         delete_domain_if_known(domain)
@@ -1611,13 +1620,12 @@ def check_webfinger(domain, http_client):
 
             return {"backend_domain": backend_domain}
 
-        elif response.status_code in http_codes_to_hardfail:
+        if response.status_code in http_codes_to_hardfail:
             # Hard failures should still be logged
             handle_http_failed(domain, target, response)
             return None
-        else:
-            # Other HTTP errors are silent (fallback behavior)
-            return None
+        # Other HTTP errors are silent (fallback behavior)
+        return None
     except httpx.RequestError:
         # Connection errors are silent (fallback behavior)
         return None
@@ -1641,10 +1649,9 @@ def check_nodeinfo(domain, backend_domain, http_client):
                 exception = "reply is empty"
                 handle_json_exception(domain, target, exception)
                 return False
-            else:
-                data = parse_json_with_fallback(response, domain, target)
-                if data is False:
-                    return False
+            data = parse_json_with_fallback(response, domain, target)
+            if data is False:
+                return False
             if not isinstance(data, dict):
                 return None
             links = data.get("links")
@@ -1666,7 +1673,7 @@ def check_nodeinfo(domain, backend_domain, http_client):
                         if "href" in link:
                             nodeinfo_20_url = link["href"]
                             break
-                        elif (
+                        if (
                             i + 1 < len(links)
                             and "href" in links[i + 1]
                             and "rel" not in links[i + 1]
@@ -1680,11 +1687,10 @@ def check_nodeinfo(domain, backend_domain, http_client):
             exception = "no links in reply"
             handle_json_exception(domain, target, exception)
             return False
-        elif response.status_code in http_codes_to_hardfail:
+        if response.status_code in http_codes_to_hardfail:
             handle_http_failed(domain, target, response)
             return False
-        else:
-            handle_http_status_code(domain, target, response)
+        handle_http_status_code(domain, target, response)
     except httpx.RequestError as exception:
         handle_tcp_exception(domain, target, exception)
     except json.JSONDecodeError as exception:
@@ -1706,16 +1712,14 @@ def check_nodeinfo_20(domain, nodeinfo_20_url, http_client, from_cache=False):
                 exception = "reply empty"
                 handle_json_exception(domain, target, exception)
                 return False
-            else:
-                nodeinfo_20_result = parse_json_with_fallback(response, domain, target)
-                if nodeinfo_20_result is False:
-                    return False
-                return nodeinfo_20_result
-        elif response.status_code in http_codes_to_hardfail:
+            nodeinfo_20_result = parse_json_with_fallback(response, domain, target)
+            if nodeinfo_20_result is False:
+                return False
+            return nodeinfo_20_result
+        if response.status_code in http_codes_to_hardfail:
             handle_http_failed(domain, target, response)
             return False
-        else:
-            handle_http_status_code(domain, target, response)
+        handle_http_status_code(domain, target, response)
     except httpx.RequestError as exception:
         handle_tcp_exception(domain, target, exception)
         return False
@@ -1778,8 +1782,7 @@ def get_instance_uri(backend_domain: str, http_client: httpx.Client) -> str | No
                 uri = instance_data.get("uri")
                 return uri
             return None
-        else:
-            return None
+        return None
     except httpx.RequestError:
         return None
     except json.JSONDecodeError:
@@ -1798,14 +1801,17 @@ def process_mastodon_instance(
         domain: The original domain being crawled (used for error tracking)
         nodeinfo_20_result: NodeInfo 2.0 data
         nightly_version_ranges: Version ranges for nightly builds
-        actual_domain: The canonical domain from instance API (used for database updates)
+        actual_domain: The canonical domain from instance API
+            (used for database updates)
     """
-    # Use actual_domain for database operations if provided, otherwise fall back to domain
+    # Use actual_domain for database operations if provided,
+    # otherwise fall back to domain
     db_domain = actual_domain if actual_domain else domain
 
     software_version_full = nodeinfo_20_result["software"]["version"]
     software_version = clean_version(
-        nodeinfo_20_result["software"]["version"], nightly_version_ranges
+        nodeinfo_20_result["software"]["version"],
+        nightly_version_ranges,
     )
 
     users = nodeinfo_20_result.get("usage", {}).get("users", {})
@@ -1834,7 +1840,7 @@ def process_mastodon_instance(
     active_month_users = users["activeMonth"]
 
     if version.parse(software_version.split("-")[0]) > version.parse(
-        version_main_branch
+        version_main_branch,
     ):
         error_to_print = "Mastodon version invalid"
         vmc_output(f"{db_domain}: {error_to_print}", "yellow", use_tqdm=True)
@@ -1886,7 +1892,8 @@ def process_domain(domain, http_client, nightly_version_ranges):
             # webfinger failed, try nodeinfo with original domain as fallback
             backend_domain = domain
             vmc_output(
-                f"{domain}: Both host-meta and webfinger failed, trying nodeinfo at original domain",
+                f"{domain}: Both host-meta and webfinger failed, "
+                "trying nodeinfo at original domain",
                 "white",
                 use_tqdm=True,
             )
@@ -1980,7 +1987,11 @@ def check_and_record_domains(
             return
 
         if is_junk_or_bad_tld(
-            domain, junk_domains, dni_domains, bad_tlds, domain_endings
+            domain,
+            junk_domains,
+            dni_domains,
+            bad_tlds,
+            domain_endings,
         ):
             return
 
@@ -2061,7 +2072,8 @@ def get_unique_versions():
     value_to_return = 0
     try:
         cursor.execute(
-            "SELECT COUNT(DISTINCT software_version) AS unique_software_versions FROM mastodon_domains;"
+            "SELECT COUNT(DISTINCT software_version) "
+            "AS unique_software_versions FROM mastodon_domains;",
         )
         result = cursor.fetchone()
         value_to_return = result[0] if result is not None else 0
@@ -2115,7 +2127,7 @@ def get_main_branch_instances():
                 FROM patch_versions
                 WHERE n_level = -1
             );
-        """
+        """,
         )
         result = cursor.fetchone()
         value_to_return = result[0] if result is not None else 0
@@ -2142,7 +2154,7 @@ def get_latest_branch_instances():
                 FROM patch_versions
                 WHERE n_level = 0
             );
-        """
+        """,
         )
         result = cursor.fetchone()
         value_to_return = result[0] if result is not None else 0
@@ -2169,7 +2181,7 @@ def get_previous_branch_instances():
                 FROM patch_versions
                 WHERE n_level = 1
             );
-        """
+        """,
         )
         result = cursor.fetchone()
         value_to_return = result[0] if result is not None else 0
@@ -2195,9 +2207,10 @@ def get_deprecated_branch_instances():
                 SELECT 1
                 FROM patch_versions
                 WHERE n_level >= 2
-                  AND mastodon_domains.software_version LIKE patch_versions.branch || '.%'
+                  AND mastodon_domains.software_version LIKE
+                      patch_versions.branch || '.%'
             );
-        """
+        """,
         )
         result = cursor.fetchone()
         value_to_return = result[0] if result is not None else 0
@@ -2222,9 +2235,10 @@ def get_eol_branch_instances():
             WHERE EXISTS (
                 SELECT 1
                 FROM eol_versions
-                WHERE mastodon_domains.software_version LIKE eol_versions.software_version || '%'
+                WHERE mastodon_domains.software_version LIKE
+                    eol_versions.software_version || '%'
             );
-        """
+        """,
         )
         result = cursor.fetchone()
         value_to_return = result[0] if result is not None else 0
@@ -2256,7 +2270,7 @@ def get_main_patched_instances():
                 FROM patch_versions
                 WHERE main = True
             ) || '%';
-        """
+        """,
         )
         result = cursor.fetchone()
         value_to_return = result[0] if result is not None else 0
@@ -2283,7 +2297,7 @@ def get_latest_patched_instances():
                 FROM patch_versions
                 WHERE n_level = 0
             ) || '%';
-        """
+        """,
         )
         result = cursor.fetchone()
         value_to_return = result[0] if result is not None else 0
@@ -2310,7 +2324,7 @@ def get_previous_patched_instances():
                 FROM patch_versions
                 WHERE n_level = 1
             ) || '%';
-        """
+        """,
         )
         result = cursor.fetchone()
         value_to_return = result[0] if result is not None else 0
@@ -2336,9 +2350,10 @@ def get_deprecated_patched_instances():
                 SELECT 1
                 FROM patch_versions
                 WHERE n_level >= 2
-                  AND mastodon_domains.software_version LIKE patch_versions.software_version || '%'
+                  AND mastodon_domains.software_version LIKE
+                      patch_versions.software_version || '%'
             );
-        """
+        """,
         )
         result = cursor.fetchone()
         value_to_return = result[0] if result is not None else 0
@@ -2370,7 +2385,7 @@ def get_main_branch_mau():
                 FROM patch_versions
                 WHERE n_level = -1
             );
-        """
+        """,
         )
         result = cursor.fetchone()
         value_to_return = result[0] if result is not None else 0
@@ -2397,7 +2412,7 @@ def get_latest_branch_mau():
                 FROM patch_versions
                 WHERE n_level = 0
             );
-        """
+        """,
         )
         result = cursor.fetchone()
         value_to_return = result[0] if result is not None else 0
@@ -2424,7 +2439,7 @@ def get_previous_branch_mau():
                 FROM patch_versions
                 WHERE n_level = 1
             );
-        """
+        """,
         )
         result = cursor.fetchone()
         value_to_return = result[0] if result is not None else 0
@@ -2450,9 +2465,10 @@ def get_deprecated_branch_mau():
                 SELECT 1
                 FROM patch_versions
                 WHERE n_level >= 2
-                  AND mastodon_domains.software_version LIKE patch_versions.branch || '.%'
+                  AND mastodon_domains.software_version LIKE
+                      patch_versions.branch || '.%'
             );
-        """
+        """,
         )
         result = cursor.fetchone()
         value_to_return = result[0] if result is not None else 0
@@ -2477,9 +2493,10 @@ def get_eol_branch_mau():
             WHERE EXISTS (
                 SELECT 1
                 FROM eol_versions
-                WHERE mastodon_domains.software_version LIKE eol_versions.software_version || '%'
+                WHERE mastodon_domains.software_version LIKE
+                    eol_versions.software_version || '%'
             );
-        """
+        """,
         )
         result = cursor.fetchone()
         value_to_return = result[0] if result is not None else 0
@@ -2511,7 +2528,7 @@ def get_main_patched_mau():
                 FROM patch_versions
                 WHERE main = True
             ) || '%';
-        """
+        """,
         )
         result = cursor.fetchone()
         value_to_return = result[0] if result is not None else 0
@@ -2538,7 +2555,7 @@ def get_latest_patched_mau():
                 FROM patch_versions
                 WHERE n_level = 0
             ) || '%';
-        """
+        """,
         )
         result = cursor.fetchone()
         value_to_return = result[0] if result is not None else 0
@@ -2565,7 +2582,7 @@ def get_previous_patched_mau():
                 FROM patch_versions
                 WHERE n_level = 1
             ) || '%';
-        """
+        """,
         )
         result = cursor.fetchone()
         value_to_return = result[0] if result is not None else 0
@@ -2591,9 +2608,10 @@ def get_deprecated_patched_mau():
                 SELECT 1
                 FROM patch_versions
                 WHERE n_level >= 2
-                  AND mastodon_domains.software_version LIKE patch_versions.software_version || '%'
+                  AND mastodon_domains.software_version LIKE
+                      patch_versions.software_version || '%'
             );
-        """
+        """,
         )
         result = cursor.fetchone()
         value_to_return = result[0] if result is not None else 0
@@ -2722,24 +2740,25 @@ def save_statistics():
 
 def write_statistics_to_database(stats_values):
     """Write collected statistics to the database."""
-    with db_pool.connection() as conn:
-        with conn.cursor() as cursor:
-            try:
-                cursor.execute(
-                    """
+    with db_pool.connection() as conn, conn.cursor() as cursor:
+        try:
+            cursor.execute(
+                """
         INSERT INTO statistics (
-        date, mau, unique_versions, main_instances, latest_instances,
-        previous_instances, deprecated_instances, eol_instances,
-        main_patched_instances, latest_patched_instances,
-        previous_patched_instances, deprecated_patched_instances,
-        main_branch_mau, latest_branch_mau, previous_branch_mau,
+        date, mau, unique_versions, main_instances,
+        latest_instances, previous_instances, deprecated_instances,
+        eol_instances, main_patched_instances,
+        latest_patched_instances, previous_patched_instances,
+        deprecated_patched_instances, main_branch_mau,
+        latest_branch_mau, previous_branch_mau,
         deprecated_branch_mau, eol_branch_mau,
         main_patched_mau, latest_patched_mau,
         previous_patched_mau, deprecated_patched_mau
         )
         VALUES (
-        (SELECT CURRENT_DATE AT TIME ZONE 'UTC'), %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s,
-        %s, %s, %s, %s, %s, %s
+        (SELECT CURRENT_DATE AT TIME ZONE 'UTC'),
+        %s, %s, %s, %s, %s, %s, %s, %s, %s, %s,
+        %s, %s, %s, %s, %s, %s, %s, %s, %s, %s
         )
         ON CONFLICT (date) DO UPDATE SET
         mau = EXCLUDED.mau,
@@ -2763,12 +2782,12 @@ def write_statistics_to_database(stats_values):
         previous_patched_mau = EXCLUDED.previous_patched_mau,
         deprecated_patched_mau = EXCLUDED.deprecated_patched_mau
         """,
-                    stats_values,
-                )
-                conn.commit()
-            except Exception as e:
-                print(f"Failed to insert/update statistics: {e}")
-                conn.rollback()
+                stats_values,
+            )
+            conn.commit()
+        except Exception as e:
+            print(f"Failed to insert/update statistics: {e}")
+            conn.rollback()
 
 
 # =============================================================================
@@ -2779,31 +2798,102 @@ def write_statistics_to_database(stats_values):
 def load_from_database(user_choice):
     """Load domain list from database based on user menu selection."""
     query_map = {
-        "0": "SELECT domain FROM raw_domains WHERE errors = 0 ORDER BY LENGTH(DOMAIN) ASC",
-        "1": "SELECT domain FROM raw_domains WHERE (failed IS NULL OR failed = FALSE) AND (ignore IS NULL OR ignore = FALSE) AND (nxdomain IS NULL OR nxdomain = FALSE) AND (norobots IS NULL OR norobots = FALSE) AND (baddata IS NULL OR baddata = FALSE) AND (nodeinfo = 'mastodon' OR nodeinfo IS NULL) ORDER BY domain ASC",
-        "4": "SELECT domain FROM raw_domains WHERE errors IS NOT NULL ORDER BY errors ASC",
-        "5": "SELECT domain FROM raw_domains WHERE nodeinfo = 'mastodon' AND (reason IS NOT NULL AND reason <> 'API') ORDER BY domain;",
-        "10": "SELECT domain FROM raw_domains WHERE nodeinfo != 'mastodon' ORDER BY domain",
+        "0": (
+            "SELECT domain FROM raw_domains WHERE errors = 0 "
+            "ORDER BY LENGTH(DOMAIN) ASC"
+        ),
+        "1": (
+            "SELECT domain FROM raw_domains WHERE "
+            "(failed IS NULL OR failed = FALSE) AND "
+            "(ignore IS NULL OR ignore = FALSE) AND "
+            "(nxdomain IS NULL OR nxdomain = FALSE) AND "
+            "(norobots IS NULL OR norobots = FALSE) AND "
+            "(baddata IS NULL OR baddata = FALSE) AND "
+            "(nodeinfo = 'mastodon' OR nodeinfo IS NULL) "
+            "ORDER BY domain ASC"
+        ),
+        "4": (
+            "SELECT domain FROM raw_domains WHERE errors IS NOT NULL "
+            "ORDER BY errors ASC"
+        ),
+        "5": (
+            "SELECT domain FROM raw_domains WHERE nodeinfo = 'mastodon' "
+            "AND (reason IS NOT NULL AND reason <> 'API') ORDER BY domain;"
+        ),
+        "10": (
+            "SELECT domain FROM raw_domains WHERE nodeinfo != 'mastodon' "
+            "ORDER BY domain"
+        ),
         "11": "SELECT domain FROM raw_domains WHERE ignore = TRUE ORDER BY domain",
         "12": "SELECT domain FROM raw_domains WHERE failed = TRUE ORDER BY domain",
         "13": "SELECT domain FROM raw_domains WHERE nxdomain = TRUE ORDER BY domain",
         "14": "SELECT domain FROM raw_domains WHERE norobots = TRUE ORDER BY domain",
-        "20": "SELECT domain FROM raw_domains WHERE reason LIKE 'SSL%' AND (nodeinfo = 'mastodon' OR nodeinfo IS NULL) ORDER BY errors DESC",
-        "21": "SELECT domain FROM raw_domains WHERE reason LIKE 'TCP%' AND (nodeinfo = 'mastodon' OR nodeinfo IS NULL) ORDER BY errors DESC",
-        "22": "SELECT domain FROM raw_domains WHERE reason LIKE 'DNS%' AND (nodeinfo = 'mastodon' OR nodeinfo IS NULL) ORDER BY errors DESC",
-        "30": "SELECT domain FROM raw_domains WHERE reason ~ '^2[0-9]{2}.*' AND (nodeinfo = 'mastodon' OR nodeinfo IS NULL) ORDER BY domain",
-        "31": "SELECT domain FROM raw_domains WHERE reason ~ '^3[0-9]{2}.*' AND (nodeinfo = 'mastodon' OR nodeinfo IS NULL) ORDER BY domain",
-        "32": "SELECT domain FROM raw_domains WHERE reason ~ '^4[0-9]{2}.*' AND (nodeinfo = 'mastodon' OR nodeinfo IS NULL) ORDER BY domain",
-        "33": "SELECT domain FROM raw_domains WHERE reason ~ '^5[0-9]{2}.*' AND (nodeinfo = 'mastodon' OR nodeinfo IS NULL) ORDER BY domain",
-        "40": "SELECT domain FROM raw_domains WHERE reason LIKE 'JSON%' AND (nodeinfo = 'mastodon' OR nodeinfo IS NULL) ORDER BY domain",
-        "41": "SELECT domain FROM raw_domains WHERE reason LIKE 'FILE%' AND (nodeinfo = 'mastodon' OR nodeinfo IS NULL) ORDER BY dommain",
-        "42": "SELECT domain FROM raw_domains WHERE reason LIKE 'TYPE%' AND (nodeinfo = 'mastodon' OR nodeinfo IS NULL) ORDER BY domain",
-        "43": "SELECT domain FROM raw_domains WHERE reason LIKE 'MAU%' AND (nodeinfo = 'mastodon' OR nodeinfo IS NULL) ORDER BY domain",
-        "44": "SELECT domain FROM raw_domains WHERE reason LIKE 'API%' AND (nodeinfo = 'mastodon' OR nodeinfo IS NULL) ORDER BY domain",
-        "50": "SELECT domain FROM mastodon_domains WHERE software_version != ALL(%(versions)s::text[]) ORDER BY active_users_monthly DESC",
-        "51": "SELECT domain FROM mastodon_domains WHERE software_version LIKE %s ORDER BY active_users_monthly DESC",
-        "52": "SELECT domain FROM mastodon_domains ORDER BY active_users_monthly DESC",
-        "53": "SELECT domain FROM raw_domains WHERE nodeinfo = 'mastodon' ORDER BY domain",
+        "20": (
+            "SELECT domain FROM raw_domains WHERE reason LIKE 'SSL%' "
+            "AND (nodeinfo = 'mastodon' OR nodeinfo IS NULL) "
+            "ORDER BY errors DESC"
+        ),
+        "21": (
+            "SELECT domain FROM raw_domains WHERE reason LIKE 'TCP%' "
+            "AND (nodeinfo = 'mastodon' OR nodeinfo IS NULL) "
+            "ORDER BY errors DESC"
+        ),
+        "22": (
+            "SELECT domain FROM raw_domains WHERE reason LIKE 'DNS%' "
+            "AND (nodeinfo = 'mastodon' OR nodeinfo IS NULL) "
+            "ORDER BY errors DESC"
+        ),
+        "30": (
+            "SELECT domain FROM raw_domains WHERE reason ~ '^2[0-9]{2}.*' "
+            "AND (nodeinfo = 'mastodon' OR nodeinfo IS NULL) ORDER BY domain"
+        ),
+        "31": (
+            "SELECT domain FROM raw_domains WHERE reason ~ '^3[0-9]{2}.*' "
+            "AND (nodeinfo = 'mastodon' OR nodeinfo IS NULL) ORDER BY domain"
+        ),
+        "32": (
+            "SELECT domain FROM raw_domains WHERE reason ~ '^4[0-9]{2}.*' "
+            "AND (nodeinfo = 'mastodon' OR nodeinfo IS NULL) ORDER BY domain"
+        ),
+        "33": (
+            "SELECT domain FROM raw_domains WHERE reason ~ '^5[0-9]{2}.*' "
+            "AND (nodeinfo = 'mastodon' OR nodeinfo IS NULL) ORDER BY domain"
+        ),
+        "40": (
+            "SELECT domain FROM raw_domains WHERE reason LIKE 'JSON%' "
+            "AND (nodeinfo = 'mastodon' OR nodeinfo IS NULL) ORDER BY domain"
+        ),
+        "41": (
+            "SELECT domain FROM raw_domains WHERE reason LIKE 'FILE%' "
+            "AND (nodeinfo = 'mastodon' OR nodeinfo IS NULL) ORDER BY dommain"
+        ),
+        "42": (
+            "SELECT domain FROM raw_domains WHERE reason LIKE 'TYPE%' "
+            "AND (nodeinfo = 'mastodon' OR nodeinfo IS NULL) ORDER BY domain"
+        ),
+        "43": (
+            "SELECT domain FROM raw_domains WHERE reason LIKE 'MAU%' "
+            "AND (nodeinfo = 'mastodon' OR nodeinfo IS NULL) ORDER BY domain"
+        ),
+        "44": (
+            "SELECT domain FROM raw_domains WHERE reason LIKE 'API%' "
+            "AND (nodeinfo = 'mastodon' OR nodeinfo IS NULL) ORDER BY domain"
+        ),
+        "50": (
+            "SELECT domain FROM mastodon_domains WHERE "
+            "software_version != ALL(%(versions)s::text[]) "
+            "ORDER BY active_users_monthly DESC"
+        ),
+        "51": (
+            "SELECT domain FROM mastodon_domains WHERE software_version LIKE %s "
+            "ORDER BY active_users_monthly DESC"
+        ),
+        "52": (
+            "SELECT domain FROM mastodon_domains ORDER BY active_users_monthly DESC"
+        ),
+        "53": (
+            "SELECT domain FROM raw_domains WHERE nodeinfo = 'mastodon' ORDER BY domain"
+        ),
     }
 
     params = None
@@ -2825,25 +2915,24 @@ def load_from_database(user_choice):
         vmc_output(f"Choice {user_choice} is invalid, using default query", "pink")
         query = query_map["1"]
 
-    with db_pool.connection() as conn:
-        # Use server-side cursor for large result sets to avoid loading all into memory
-        with conn.cursor(name="domain_loader") as cursor:
-            cursor.itersize = 1000  # Fetch 1000 rows at a time
-            try:
-                if params:
-                    _ = cursor.execute(query, params)  # pyright: ignore[reportCallIssue,reportArgumentType]
-                else:
-                    _ = cursor.execute(query)  # pyright: ignore[reportCallIssue,reportArgumentType]
-                domain_list = [
-                    row[0].strip()
-                    for row in cursor
-                    if row[0] and row[0].strip() and not has_emoji_chars(row[0])
-                ]
-                conn.commit()
-            except Exception as exception:
-                vmc_output(f"Failed to obtain selected domain list: {exception}", "red")
-                conn.rollback()
-                domain_list = []
+    # Use server-side cursor for large result sets to avoid loading all into memory
+    with db_pool.connection() as conn, conn.cursor(name="domain_loader") as cursor:
+        cursor.itersize = 1000  # Fetch 1000 rows at a time
+        try:
+            if params:
+                _ = cursor.execute(query, params)  # pyright: ignore[reportCallIssue,reportArgumentType]
+            else:
+                _ = cursor.execute(query)  # pyright: ignore[reportCallIssue,reportArgumentType]
+            domain_list = [
+                row[0].strip()
+                for row in cursor
+                if row[0] and row[0].strip() and not has_emoji_chars(row[0])
+            ]
+            conn.commit()
+        except Exception as exception:
+            vmc_output(f"Failed to obtain selected domain list: {exception}", "red")
+            conn.rollback()
+            domain_list = []
 
     return domain_list
 
@@ -2851,27 +2940,30 @@ def load_from_database(user_choice):
 def load_from_file(file_name):
     """Load domain list from a file and add new domains to database."""
     domain_list = []
-    with db_pool.connection() as conn:
-        with conn.cursor() as cursor:
-            with open(os.path.expanduser(file_name), "r") as file:
-                for line in file:
-                    domain = line.strip()
-                    if not domain or has_emoji_chars(domain):
-                        continue
+    with (
+        db_pool.connection() as conn,
+        conn.cursor() as cursor,
+        open(os.path.expanduser(file_name)) as file,
+    ):
+        for line in file:
+            domain = line.strip()
+            if not domain or has_emoji_chars(domain):
+                continue
 
-                    domain_list.append(domain)
-                    cursor.execute(
-                        "SELECT COUNT(*) FROM raw_domains WHERE domain = %s", (domain,)
-                    )
-                    result = cursor.fetchone()
-                    exists = result is not None and result[0] > 0
+            domain_list.append(domain)
+            cursor.execute(
+                "SELECT COUNT(*) FROM raw_domains WHERE domain = %s",
+                (domain,),
+            )
+            result = cursor.fetchone()
+            exists = result is not None and result[0] > 0
 
-                    if not exists:
-                        cursor.execute(
-                            "INSERT INTO raw_domains (domain, errors) VALUES (%s, %s)",
-                            (domain, None),
-                        )
-                    conn.commit()
+            if not exists:
+                cursor.execute(
+                    "INSERT INTO raw_domains (domain, errors) VALUES (%s, %s)",
+                    (domain, None),
+                )
+            conn.commit()
     return domain_list
 
 
@@ -3022,7 +3114,7 @@ delete_old_patch_versions()
 def main():
     """Main entry point for the crawler."""
     parser = argparse.ArgumentParser(
-        description="Crawl version information from Mastodon instances."
+        description="Crawl version information from Mastodon instances.",
     )
     parser.add_argument(
         "-f",
@@ -3063,8 +3155,9 @@ def main():
             elif single_domain_target:
                 user_choice = 1
                 domain_list = single_domain_target.replace(" ", "").split(",")
+                domain_word = "s" if len(domain_list) > 1 else ""
                 vmc_output(
-                    f"Crawling domain{'s' if len(domain_list) > 1 else ''} from target argument",
+                    f"Crawling domain{domain_word} from target argument",
                     "cyan",
                 )
             else:
@@ -3082,7 +3175,8 @@ def main():
                         user_choice = selection
 
                 vmc_output(
-                    f"Crawling domains from database choice {user_choice}", "cyan"
+                    f"Crawling domains from database choice {user_choice}",
+                    "cyan",
                 )
                 domain_list = load_from_database(user_choice)
 
@@ -3158,7 +3252,6 @@ def main():
                 vmc_output(f"Failed to restart {appname}: {exception}", "red")
     else:
         sys.exit(0)
-    pass
 
 
 # =============================================================================

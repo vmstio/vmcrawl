@@ -44,13 +44,19 @@ parser.add_argument(
     "-l",
     "--limit",
     type=int,
-    help=f"limit the number of domains requested from database (default: {int(os.getenv('VMCRAWL_FETCH_LIMIT', '10'))})",
+    help=(
+        f"limit the number of domains requested from database "
+        f"(default: {int(os.getenv('VMCRAWL_FETCH_LIMIT', '10'))})"
+    ),
 )
 parser.add_argument(
     "-o",
     "--offset",
     type=int,
-    help=f"offset the top of the domains requested from database (default: {int(os.getenv('VMCRAWL_FETCH_OFFSET', '0'))})",
+    help=(
+        f"offset the top of the domains requested from database "
+        f"(default: {int(os.getenv('VMCRAWL_FETCH_OFFSET', '0'))})"
+    ),
 )
 parser.add_argument(
     "-r",
@@ -95,166 +101,159 @@ else:
 
 def fetch_exclude_domains():
     """Fetch domains to exclude from peer fetching."""
-    with db_pool.connection() as conn:
-        with conn.cursor() as cursor:
-            try:
-                cursor.execute(
-                    "SELECT string_agg('''' || domain || '''', ',') FROM no_peers"
-                )
-                result = cursor.fetchone()
-                if result is None or result[0] is None:
-                    return ""
-                exclude_domains_sql = result[0]
-                return exclude_domains_sql if exclude_domains_sql else ""
-            except Exception as e:
-                print(f"Failed to obtain excluded domain list: {e}")
-                conn.rollback()
-                return None
+    with db_pool.connection() as conn, conn.cursor() as cursor:
+        try:
+            cursor.execute(
+                "SELECT string_agg('''' || domain || '''', ',') FROM no_peers",
+            )
+            result = cursor.fetchone()
+            if result is None or result[0] is None:
+                return ""
+            exclude_domains_sql = result[0]
+            return exclude_domains_sql if exclude_domains_sql else ""
+        except Exception as e:
+            print(f"Failed to obtain excluded domain list: {e}")
+            conn.rollback()
+            return None
 
 
 def fetch_domain_list(exclude_domains_sql):
     """Fetch list of domains to query for peers."""
-    with db_pool.connection() as conn:
-        with conn.cursor() as cursor:
-            try:
-                min_active = int(os.getenv("VMCRAWL_FETCH_MIN_ACTIVE", "100"))
-                if exclude_domains_sql:
-                    # Using string concatenation for exclude_domains_sql since it's already
-                    # a properly formatted SQL list from the database
-                    query = (
-                        "SELECT domain FROM mastodon_domains "
-                        "WHERE active_users_monthly > %s "
-                        "AND domain NOT IN (" + exclude_domains_sql + ") "
-                        "ORDER BY active_users_monthly DESC"
-                    )
-                    cursor.execute(query, (min_active,))
-                else:
-                    cursor.execute(
-                        """
+    with db_pool.connection() as conn, conn.cursor() as cursor:
+        try:
+            min_active = int(os.getenv("VMCRAWL_FETCH_MIN_ACTIVE", "100"))
+            if exclude_domains_sql:
+                # Using string concatenation for exclude_domains_sql since it's already
+                # a properly formatted SQL list from the database
+                query = (
+                    "SELECT domain FROM mastodon_domains "
+                    "WHERE active_users_monthly > %s "
+                    "AND domain NOT IN (" + exclude_domains_sql + ") "
+                    "ORDER BY active_users_monthly DESC"
+                )
+                cursor.execute(query, (min_active,))
+            else:
+                cursor.execute(
+                    """
                         SELECT domain FROM mastodon_domains
                         WHERE active_users_monthly > %s
                         ORDER BY active_users_monthly DESC
                         """,
-                        (min_active,),
-                    )
-                result = [
-                    row[0] for row in cursor.fetchall() if not has_emoji_chars(row[0])
-                ]
+                    (min_active,),
+                )
+            result = [
+                row[0] for row in cursor.fetchall() if not has_emoji_chars(row[0])
+            ]
 
-                if args.random is True:
-                    random.shuffle(result)
+            if args.random is True:
+                random.shuffle(result)
 
-                # Apply offset and limit to the results
-                start = int(db_offset)
-                end = start + int(db_limit)
-                result = result[start:end]
+            # Apply offset and limit to the results
+            start = int(db_offset)
+            end = start + int(db_limit)
+            result = result[start:end]
 
-                return result if result else ["vmst.io"]
-            except Exception as e:
-                print(f"Failed to obtain primary domain list: {e}")
-                conn.rollback()
-                return None
+            return result if result else ["vmst.io"]
+        except Exception as e:
+            print(f"Failed to obtain primary domain list: {e}")
+            conn.rollback()
+            return None
 
 
 def get_existing_domains():
     """Get list of domains already in raw_domains table."""
-    with db_pool.connection() as conn:
-        with conn.cursor() as cursor:
-            try:
-                cursor.execute("SELECT domain FROM raw_domains")
-                existing_domains = [row[0] for row in cursor.fetchall()]
-                conn.commit()
-                return existing_domains
-            except Exception as e:
-                vmc_output(f"Failed to get list of existing domains: {e}", "orange")
-                conn.rollback()
-                return None
+    with db_pool.connection() as conn, conn.cursor() as cursor:
+        try:
+            cursor.execute("SELECT domain FROM raw_domains")
+            existing_domains = [row[0] for row in cursor.fetchall()]
+            conn.commit()
+            return existing_domains
+        except Exception as e:
+            vmc_output(f"Failed to get list of existing domains: {e}", "orange")
+            conn.rollback()
+            return None
 
 
 def get_junk_keywords():
     """Get list of junk keywords to filter domains."""
-    with db_pool.connection() as conn:
-        with conn.cursor() as cursor:
-            try:
-                cursor.execute("SELECT keywords FROM junk_words")
-                keywords = [row[0] for row in cursor.fetchall()]
-                conn.commit()
-                return keywords
-            except Exception as e:
-                vmc_output(f"Failed to obtain junk domain list: {e}", "orange")
-                conn.rollback()
-                return None
+    with db_pool.connection() as conn, conn.cursor() as cursor:
+        try:
+            cursor.execute("SELECT keywords FROM junk_words")
+            keywords = [row[0] for row in cursor.fetchall()]
+            conn.commit()
+            return keywords
+        except Exception as e:
+            vmc_output(f"Failed to obtain junk domain list: {e}", "orange")
+            conn.rollback()
+            return None
 
 
 def get_dni_domains():
     """Get list of dni domains to filter domains."""
-    with db_pool.connection() as conn:
-        with conn.cursor() as cursor:
-            try:
-                cursor.execute("SELECT domain FROM dni")
-                keywords = [row[0] for row in cursor.fetchall()]
-                conn.commit()
-                return keywords
-            except Exception as e:
-                vmc_output(f"Failed to obtain dni domain list: {e}", "orange")
-                conn.rollback()
-                return None
+    with db_pool.connection() as conn, conn.cursor() as cursor:
+        try:
+            cursor.execute("SELECT domain FROM dni")
+            keywords = [row[0] for row in cursor.fetchall()]
+            conn.commit()
+            return keywords
+        except Exception as e:
+            vmc_output(f"Failed to obtain dni domain list: {e}", "orange")
+            conn.rollback()
+            return None
 
 
 def get_bad_tld():
     """Get list of prohibited TLDs."""
-    with db_pool.connection() as conn:
-        with conn.cursor() as cursor:
-            try:
-                cursor.execute("SELECT tld FROM bad_tld")
-                tlds = [row[0] for row in cursor.fetchall()]
-                conn.commit()
-                return tlds
-            except Exception as e:
-                vmc_output(f"Failed to obtain bad TLD list: {e}", "orange")
-                conn.rollback()
-                return None
+    with db_pool.connection() as conn, conn.cursor() as cursor:
+        try:
+            cursor.execute("SELECT tld FROM bad_tld")
+            tlds = [row[0] for row in cursor.fetchall()]
+            conn.commit()
+            return tlds
+        except Exception as e:
+            vmc_output(f"Failed to obtain bad TLD list: {e}", "orange")
+            conn.rollback()
+            return None
 
 
 def add_to_no_peers(domain):
     """Add a domain to the no_peers exclusion list."""
-    with db_pool.connection() as conn:
-        with conn.cursor() as cursor:
-            try:
-                cursor.execute(
-                    "INSERT INTO no_peers (domain) VALUES (%s) ON CONFLICT (domain) DO NOTHING",
-                    (domain,),
-                )
-                if cursor.rowcount > 0:
-                    vmc_output(f"{domain} added to no_peers table", "red")
-                conn.commit()
-            except Exception as e:
-                vmc_output(f"Failed to add domain to no_peers list: {e}", "orange")
-                conn.rollback()
-                return None
+    with db_pool.connection() as conn, conn.cursor() as cursor:
+        try:
+            cursor.execute(
+                "INSERT INTO no_peers (domain) VALUES (%s) "
+                "ON CONFLICT (domain) DO NOTHING",
+                (domain,),
+            )
+            if cursor.rowcount > 0:
+                vmc_output(f"{domain} added to no_peers table", "red")
+            conn.commit()
+        except Exception as e:
+            vmc_output(f"Failed to add domain to no_peers list: {e}", "orange")
+            conn.rollback()
+            return
 
 
 def import_domains(domains):
     """Import new domains into raw_domains table."""
-    with db_pool.connection() as conn:
-        with conn.cursor() as cursor:
-            try:
-                if domains:
-                    values = [(domain.lower(), 0) for domain in domains]
-                    args_str = ",".join(["(%s,%s)" for _ in values])
-                    flattened_values = [item for sublist in values for item in sublist]
-                    cursor.execute(
-                        "INSERT INTO raw_domains (domain, errors) VALUES "
-                        + args_str
-                        + " ON CONFLICT (domain) DO NOTHING",
-                        flattened_values,
-                    )
-                    vmc_output(f"Imported {len(domains)} domains", "green")
-                    conn.commit()
-            except Exception as e:
-                vmc_output(f"Failed to import domain list: {e}", "orange")
-                conn.rollback()
-                return None
+    with db_pool.connection() as conn, conn.cursor() as cursor:
+        try:
+            if domains:
+                values = [(domain.lower(), 0) for domain in domains]
+                args_str = ",".join(["(%s,%s)" for _ in values])
+                flattened_values = [item for sublist in values for item in sublist]
+                cursor.execute(
+                    "INSERT INTO raw_domains (domain, errors) VALUES "
+                    + args_str
+                    + " ON CONFLICT (domain) DO NOTHING",
+                    flattened_values,
+                )
+                vmc_output(f"Imported {len(domains)} domains", "green")
+                conn.commit()
+        except Exception as e:
+            vmc_output(f"Failed to import domain list: {e}", "orange")
+            conn.rollback()
+            return
 
 
 # =============================================================================

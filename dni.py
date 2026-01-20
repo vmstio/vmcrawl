@@ -36,7 +36,7 @@ DNI_CSV_URL = "https://about.iftas.org/wp-content/uploads/2025/10/iftas-dni-late
 # =============================================================================
 
 parser = argparse.ArgumentParser(
-    description="Fetch IFTAS DNI (Do Not Interact) list and update database."
+    description="Fetch IFTAS DNI (Do Not Interact) list and update database.",
 )
 _ = parser.add_argument(
     "-l",
@@ -67,117 +67,111 @@ args = parser.parse_args()
 
 def create_dni_table() -> None:
     """Create the dni table if it doesn't exist."""
-    with db_pool.connection() as conn:
-        with conn.cursor() as cursor:
-            try:
-                _ = cursor.execute(
-                    """
+    with db_pool.connection() as conn, conn.cursor() as cursor:
+        try:
+            _ = cursor.execute(
+                """
                     CREATE TABLE IF NOT EXISTS dni (
                         domain TEXT PRIMARY KEY,
                         comment TEXT,
                         timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP
                     )
-                """
-                )
-                conn.commit()
-                vmc_output("DNI table verified/created", "green")
-            except Exception as e:
-                vmc_output(f"Failed to create DNI table: {e}", "red")
-                conn.rollback()
-                sys.exit(1)
+                """,
+            )
+            conn.commit()
+            vmc_output("DNI table verified/created", "green")
+        except Exception as e:
+            vmc_output(f"Failed to create DNI table: {e}", "red")
+            conn.rollback()
+            sys.exit(1)
 
 
 def get_existing_dni_domains() -> set[str]:
     """Get list of domains already in dni table."""
-    with db_pool.connection() as conn:
-        with conn.cursor() as cursor:
-            try:
-                _ = cursor.execute("SELECT domain FROM dni")
-                existing_domains: set[str] = {
-                    row[0]
-                    for row in cursor.fetchall()  # pyright: ignore[reportAny]
-                }
-                return existing_domains
-            except Exception as e:
-                vmc_output(f"Failed to get existing DNI domains: {e}", "orange")
-                conn.rollback()
-                return set()
+    with db_pool.connection() as conn, conn.cursor() as cursor:
+        try:
+            _ = cursor.execute("SELECT domain FROM dni")
+            existing_domains: set[str] = {
+                row[0]
+                for row in cursor.fetchall()  # pyright: ignore[reportAny]
+            }
+            return existing_domains
+        except Exception as e:
+            vmc_output(f"Failed to get existing DNI domains: {e}", "orange")
+            conn.rollback()
+            return set()
 
 
 def import_dni_domains(domains: list[str], comment: str = "iftas") -> int:
     """Import new domains into dni table with comment."""
-    with db_pool.connection() as conn:
-        with conn.cursor() as cursor:
-            try:
-                if domains:
-                    # Use batch insert for efficiency
-                    values: list[tuple[str, str]] = [
-                        (domain.lower(), comment) for domain in domains
-                    ]
-                    args_str = ",".join(["(%s, %s)" for _ in values])
-                    flattened_values: list[str] = [
-                        item for sublist in values for item in sublist
-                    ]
-                    _ = cursor.execute(
-                        "INSERT INTO dni (domain, comment) VALUES "
-                        + args_str
-                        + " ON CONFLICT (domain) DO NOTHING",
-                        flattened_values,
-                    )
-                    inserted_count = cursor.rowcount
-                    vmc_output(f"Imported {inserted_count} new DNI domains", "green")
-                    conn.commit()
-                    return inserted_count
-                else:
-                    vmc_output("No new domains to import", "yellow")
-                    return 0
-            except Exception as e:
-                vmc_output(f"Failed to import DNI domains: {e}", "orange")
-                conn.rollback()
-                return 0
+    with db_pool.connection() as conn, conn.cursor() as cursor:
+        try:
+            if domains:
+                # Use batch insert for efficiency
+                values: list[tuple[str, str]] = [
+                    (domain.lower(), comment) for domain in domains
+                ]
+                args_str = ",".join(["(%s, %s)" for _ in values])
+                flattened_values: list[str] = [
+                    item for sublist in values for item in sublist
+                ]
+                _ = cursor.execute(
+                    "INSERT INTO dni (domain, comment) VALUES "
+                    + args_str
+                    + " ON CONFLICT (domain) DO NOTHING",
+                    flattened_values,
+                )
+                inserted_count = cursor.rowcount
+                vmc_output(f"Imported {inserted_count} new DNI domains", "green")
+                conn.commit()
+                return inserted_count
+            vmc_output("No new domains to import", "yellow")
+            return 0
+        except Exception as e:
+            vmc_output(f"Failed to import DNI domains: {e}", "orange")
+            conn.rollback()
+            return 0
 
 
 def list_dni_domains() -> None:
     """Display all domains in the dni table."""
-    with db_pool.connection() as conn:
-        with conn.cursor() as cursor:
-            try:
-                _ = cursor.execute(
-                    "SELECT domain, comment, timestamp FROM dni ORDER BY domain"
-                )
-                domains = cursor.fetchall()
+    with db_pool.connection() as conn, conn.cursor() as cursor:
+        try:
+            _ = cursor.execute(
+                "SELECT domain, comment, timestamp FROM dni ORDER BY domain",
+            )
+            domains = cursor.fetchall()
 
-                if not domains:
-                    vmc_output("No domains found in DNI table", "yellow")
-                    return
+            if not domains:
+                vmc_output("No domains found in DNI table", "yellow")
+                return
 
-                vmc_output(f"\nDNI Domains ({len(domains)} total):", "cyan")
-                vmc_output("-" * 80, "cyan")
+            vmc_output(f"\nDNI Domains ({len(domains)} total):", "cyan")
+            vmc_output("-" * 80, "cyan")
 
-                for domain, comment, timestamp in domains:  # pyright: ignore[reportAny]
-                    comment_str = comment if comment else ""
-                    print(f"{domain:<40} {comment_str:<15} {timestamp}")
-                print()
+            for domain, comment, timestamp in domains:  # pyright: ignore[reportAny]
+                comment_str = comment if comment else ""
+                print(f"{domain:<40} {comment_str:<15} {timestamp}")
+            print()
 
-            except Exception as e:
-                vmc_output(f"Failed to list DNI domains: {e}", "red")
-                conn.rollback()
+        except Exception as e:
+            vmc_output(f"Failed to list DNI domains: {e}", "red")
+            conn.rollback()
 
 
 def count_dni_domains() -> int:
     """Display count of domains in the dni table."""
-    with db_pool.connection() as conn:
-        with conn.cursor() as cursor:
-            try:
-                _ = cursor.execute("SELECT COUNT(*) FROM dni")
-                result = cursor.fetchone()
-                count: int = result[0] if result else 0
-                vmc_output(f"Total DNI domains: {count}", "green")
-                return count
-            except Exception as e:
-                vmc_output(f"Failed to count DNI domains: {e}", "red")
-                conn.rollback()
-                return 0
+    with db_pool.connection() as conn, conn.cursor() as cursor:
+        try:
+            _ = cursor.execute("SELECT COUNT(*) FROM dni")
+            result = cursor.fetchone()
+            count: int = result[0] if result else 0
+            vmc_output(f"Total DNI domains: {count}", "green")
+            return count
+        except Exception as e:
+            vmc_output(f"Failed to count DNI domains: {e}", "red")
+            conn.rollback()
+            return 0
 
 
 # =============================================================================
@@ -217,7 +211,8 @@ def parse_dni_csv(csv_content: str) -> list[str]:
         # Check if #domain column exists
         if not reader.fieldnames or "#domain" not in reader.fieldnames:
             vmc_output(
-                f"CSV header '#domain' not found. Available headers: {reader.fieldnames}",
+                f"CSV header '#domain' not found. "
+                f"Available headers: {reader.fieldnames}",
                 "red",
             )
             return []

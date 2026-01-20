@@ -37,31 +37,31 @@ current_filename = os.path.basename(__file__)
 def display_current_versions():
     """Display all current nightly version entries."""
     try:
-        with db_pool.connection() as conn:
-            with conn.cursor() as cur:
-                cur.execute(
-                    """
+        with db_pool.connection() as conn, conn.cursor() as cur:
+            cur.execute(
+                """
                     SELECT version, start_date, end_date
                     FROM nightly_versions
                     ORDER BY start_date DESC
-                """
-                )
-                versions = cur.fetchall()
+                """,
+            )
+            versions = cur.fetchall()
 
-                if not versions:
-                    vmc_output("No nightly versions found in database", "yellow")
-                    return
+            if not versions:
+                vmc_output("No nightly versions found in database", "yellow")
+                return
 
-                vmc_output("\nCurrent Nightly Versions:", "cyan")
-                vmc_output("-" * 70, "cyan")
-                vmc_output(
-                    f"{'Version':<20} {'Start Date':<15} {'End Date':<15}", "bold"
-                )
-                vmc_output("-" * 70, "cyan")
+            vmc_output("\nCurrent Nightly Versions:", "cyan")
+            vmc_output("-" * 70, "cyan")
+            vmc_output(
+                f"{'Version':<20} {'Start Date':<15} {'End Date':<15}",
+                "bold",
+            )
+            vmc_output("-" * 70, "cyan")
 
-                for version, start_date, end_date in versions:
-                    print(f"{version:<20} {start_date} {end_date}")
-                print()
+            for version, start_date, end_date in versions:
+                print(f"{version:<20} {start_date} {end_date}")
+            print()
 
     except Exception as e:
         vmc_output(f"Error fetching nightly versions: {e}", "red")
@@ -71,19 +71,18 @@ def display_current_versions():
 def get_active_version():
     """Get the currently active nightly version (end_date = 2099-12-31)."""
     try:
-        with db_pool.connection() as conn:
-            with conn.cursor() as cur:
-                cur.execute(
-                    """
+        with db_pool.connection() as conn, conn.cursor() as cur:
+            cur.execute(
+                """
                     SELECT version, start_date, end_date
                     FROM nightly_versions
                     WHERE end_date = '2099-12-31'
                     ORDER BY start_date DESC
                     LIMIT 1
-                """
-                )
-                result = cur.fetchone()
-                return result if result else None
+                """,
+            )
+            result = cur.fetchone()
+            return result if result else None
     except Exception as e:
         vmc_output(f"Error fetching active version: {e}", "red")
         return None
@@ -95,7 +94,10 @@ def get_active_version():
 
 
 def add_nightly_version(
-    version, start_date, end_date="2099-12-31", auto_update_previous=True
+    version,
+    start_date,
+    end_date="2099-12-31",
+    auto_update_previous=True,
 ):
     """
     Add a new nightly version to the database.
@@ -104,13 +106,14 @@ def add_nightly_version(
         version: Version string (e.g., '4.9.0-alpha.7')
         start_date: Start date in YYYY-MM-DD format
         end_date: End date in YYYY-MM-DD format (default: 2099-12-31)
-        auto_update_previous: If True, automatically update the previous active version's end_date
+        auto_update_previous: If True, auto-update previous version end_date
     """
     try:
         # Validate dates
         if not validate_date(start_date):
             vmc_output(
-                f"Invalid start_date format: {start_date}. Use YYYY-MM-DD", "red"
+                f"Invalid start_date format: {start_date}. Use YYYY-MM-DD",
+                "red",
             )
             return False
 
@@ -119,19 +122,19 @@ def add_nightly_version(
             return False
 
         # Check if version already exists
-        with db_pool.connection() as conn:
-            with conn.cursor() as cur:
-                cur.execute(
-                    """
+        with db_pool.connection() as conn, conn.cursor() as cur:
+            cur.execute(
+                """
                     SELECT version FROM nightly_versions WHERE version = %s
                 """,
-                    (version,),
+                (version,),
+            )
+            if cur.fetchone():
+                vmc_output(
+                    f"Version {version} already exists in database",
+                    "yellow",
                 )
-                if cur.fetchone():
-                    vmc_output(
-                        f"Version {version} already exists in database", "yellow"
-                    )
-                    return False
+                return False
 
         # If auto-update is enabled, update the previous active version
         if auto_update_previous:
@@ -148,31 +151,29 @@ def add_nightly_version(
                 vmc_output(f"  Old end date: {old_end}", "cyan")
                 vmc_output(f"  New end date: {new_end_date}", "cyan")
 
-                with db_pool.connection() as conn:
-                    with conn.cursor() as cur:
-                        cur.execute(
-                            """
+                with db_pool.connection() as conn, conn.cursor() as cur:
+                    cur.execute(
+                        """
                             UPDATE nightly_versions
                             SET end_date = %s
                             WHERE version = %s
                         """,
-                            (new_end_date, old_version),
-                        )
-                        conn.commit()
+                        (new_end_date, old_version),
+                    )
+                    conn.commit()
 
                 vmc_output(f"Updated {old_version} end date to {new_end_date}", "green")
 
         # Insert new version
-        with db_pool.connection() as conn:
-            with conn.cursor() as cur:
-                cur.execute(
-                    """
+        with db_pool.connection() as conn, conn.cursor() as cur:
+            cur.execute(
+                """
                     INSERT INTO nightly_versions (version, start_date, end_date)
                     VALUES (%s, %s, %s)
                 """,
-                    (version, start_date, end_date),
-                )
-                conn.commit()
+                (version, start_date, end_date),
+            )
+            conn.commit()
 
         vmc_output("\nSuccessfully added nightly version:", "green")
         vmc_output(f"  Version: {version}", "green")
@@ -193,22 +194,21 @@ def update_end_date(version, new_end_date):
             vmc_output(f"Invalid date format: {new_end_date}. Use YYYY-MM-DD", "red")
             return False
 
-        with db_pool.connection() as conn:
-            with conn.cursor() as cur:
-                cur.execute(
-                    """
+        with db_pool.connection() as conn, conn.cursor() as cur:
+            cur.execute(
+                """
                     UPDATE nightly_versions
                     SET end_date = %s
                     WHERE version = %s
                 """,
-                    (new_end_date, version),
-                )
+                (new_end_date, version),
+            )
 
-                if cur.rowcount == 0:
-                    vmc_output(f"Version {version} not found in database", "yellow")
-                    return False
+            if cur.rowcount == 0:
+                vmc_output(f"Version {version} not found in database", "yellow")
+                return False
 
-                conn.commit()
+            conn.commit()
 
         vmc_output(f"Updated {version} end date to {new_end_date}", "green")
         return True
@@ -253,7 +253,7 @@ def interactive_add():
     # Get start date
     default_start_date = (datetime.now() + timedelta(days=1)).strftime("%Y-%m-%d")
     start_date_input = input(
-        f"Enter start date (YYYY-MM-DD) [default: {default_start_date}]: "
+        f"Enter start date (YYYY-MM-DD) [default: {default_start_date}]: ",
     ).strip()
     start_date = start_date_input if start_date_input else default_start_date
 
@@ -290,10 +290,13 @@ def interactive_add():
 def main():
     """Main entry point for nightly version management."""
     parser = argparse.ArgumentParser(
-        description="Manage nightly version entries in the database"
+        description="Manage nightly version entries in the database",
     )
     parser.add_argument(
-        "-l", "--list", action="store_true", help="List all nightly versions"
+        "-l",
+        "--list",
+        action="store_true",
+        help="List all nightly versions",
     )
     parser.add_argument(
         "-a",
@@ -308,7 +311,10 @@ def main():
         help="Version string (e.g., 4.9.0-alpha.7)",
     )
     parser.add_argument(
-        "-s", "--start-date", type=str, help="Start date in YYYY-MM-DD format"
+        "-s",
+        "--start-date",
+        type=str,
+        help="Start date in YYYY-MM-DD format",
     )
     parser.add_argument(
         "-e",
