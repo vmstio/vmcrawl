@@ -1383,7 +1383,7 @@ def handle_json_exception(domain, target, exception):
     error_reason = f"JSON+{target}"
     vmc_output(f"{domain}: {target} {error_message}", "yellow", use_tqdm=True)
     log_error(domain, error_message)
-    increment_domain_error(domain, f"{error_reason}+{target}")
+    increment_domain_error(domain, f"{error_reason}")
 
 
 # =============================================================================
