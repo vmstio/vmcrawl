@@ -50,7 +50,8 @@ CREATE TABLE
     nxdomain BOOLEAN DEFAULT NULL,
     norobots BOOLEAN DEFAULT NULL,
     baddata BOOLEAN DEFAULT NULL,
-    nodeinfo TEXT DEFAULT NULL
+    nodeinfo TEXT DEFAULT NULL,
+    alias BOOLEAN DEFAULT NULL
   );
 
 CREATE TABLE statistics (

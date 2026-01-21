@@ -233,6 +233,49 @@ def is_cache_valid(cache_file_path: str, max_age_seconds: int) -> bool:
 # =============================================================================
 
 
+def is_alias_domain(domain: str, backend_domain: str) -> bool:
+    """Check if backend_domain is an alias of domain.
+
+    Returns True if backend_domain is neither equal to domain nor a subdomain of it.
+    This indicates the domain is an alias/redirect to a different instance.
+
+    Args:
+        domain: The original domain being crawled
+        backend_domain: The discovered backend domain from host-meta/webfinger
+
+    Returns:
+        True if backend_domain is an alias (different root domain)
+        False if backend_domain equals domain or is a subdomain of domain
+
+    Examples:
+        is_alias_domain("example.com", "example.com") -> False
+        is_alias_domain("example.com", "social.example.com") -> False
+        is_alias_domain("example.com", "other.com") -> True
+        is_alias_domain("social.example.com", "example.com") -> True
+    """
+    # Normalize domains to lowercase
+    domain = domain.lower()
+    backend_domain = backend_domain.lower()
+
+    # If they're equal, not a duplicate
+    if domain == backend_domain:
+        return False
+
+    # Check if backend_domain is a subdomain of domain
+    # e.g., social.example.com is subdomain of example.com
+    if backend_domain.endswith(f".{domain}"):
+        return False
+
+    # Check if domain is a subdomain of backend_domain
+    # e.g., if domain is social.example.com and backend is example.com
+    # This is also an alias (forwarding to parent domain)
+    if domain.endswith(f".{backend_domain}"):
+        return True
+
+    # Otherwise, they're different root domains - this is an alias
+    return True
+
+
 def parse_json_with_fallback(
     response: httpx.Response,
     domain: str,
@@ -782,19 +825,22 @@ def increment_domain_error(domain: str, error_reason: str) -> None:
     """Increment error count for a domain and record the error reason.
 
     Only increments error count if the previous error reason started with
-    DNS, SSL, TCP, TYPE, or HTTP 4xx, AND the domain's nodeinfo is NOT set to
-    'mastodon'. For other error types, the count is set to null while still
-    recording the error reason. Counter resets to 1 when switching between
-    error types.
+    DNS, SSL, TCP, TYPE, FILE, or HTTP 2xx/3xx/4xx, AND the domain's nodeinfo
+    is NOT set to 'mastodon'. For other error types, the count is set to null
+    while still recording the error reason. Counter resets to 1 when switching
+    between error types.
 
     DNS errors: After 15 consecutive errors, mark as NXDOMAIN.
     SSL errors: After 15 consecutive errors, mark as ignored.
     TCP errors: After 15 consecutive errors, mark as ignored.
     TYPE errors: After 15 consecutive errors, mark as ignored.
+    FILE errors: After 15 consecutive errors, mark as ignored.
+    HTTP 2xx errors: After 15 consecutive errors, mark as ignored.
+    HTTP 3xx errors: After 15 consecutive errors, mark as ignored.
     HTTP 4xx errors: After 15 consecutive errors, mark as ignored.
     """
     ERROR_THRESHOLD = 15
-    TRACKED_ERROR_TYPES = ("DNS", "SSL", "TCP", "TYPE")
+    TRACKED_ERROR_TYPES = ("DNS", "SSL", "TCP", "TYPE", "FILE")
 
     with db_pool.connection() as conn, conn.cursor() as cursor:
         try:
@@ -829,14 +875,26 @@ def increment_domain_error(domain: str, error_reason: str) -> None:
                 conn.commit()
                 return
 
-            # Get error type prefix (DNS, SSL, TCP, HTTP 4xx, or None)
-            # Check for HTTP 4xx errors first
+            # Get error type prefix (DNS, SSL, TCP, TYPE, HTTP 2xx/3xx/4xx, or None)
+            # Check for HTTP status code errors
+            def is_http_2xx(reason: str) -> bool:
+                """Check if error reason starts with a 2xx HTTP status code."""
+                return len(reason) >= 3 and reason[0] == "2" and reason[1:3].isdigit()
+
+            def is_http_3xx(reason: str) -> bool:
+                """Check if error reason starts with a 3xx HTTP status code."""
+                return len(reason) >= 3 and reason[0] == "3" and reason[1:3].isdigit()
+
             def is_http_4xx(reason: str) -> bool:
                 """Check if error reason starts with a 4xx HTTP status code."""
                 return len(reason) >= 3 and reason[0] == "4" and reason[1:3].isdigit()
 
             error_type = None
-            if is_http_4xx(error_reason):
+            if is_http_2xx(error_reason):
+                error_type = "HTTP2XX"
+            elif is_http_3xx(error_reason):
+                error_type = "HTTP3XX"
+            elif is_http_4xx(error_reason):
                 error_type = "HTTP4XX"
             else:
                 error_type = next(
@@ -845,7 +903,11 @@ def increment_domain_error(domain: str, error_reason: str) -> None:
                 )
 
             previous_type = None
-            if is_http_4xx(previous_reason):
+            if is_http_2xx(previous_reason):
+                previous_type = "HTTP2XX"
+            elif is_http_3xx(previous_reason):
+                previous_type = "HTTP3XX"
+            elif is_http_4xx(previous_reason):
                 previous_type = "HTTP4XX"
             else:
                 previous_type = next(
@@ -863,7 +925,7 @@ def increment_domain_error(domain: str, error_reason: str) -> None:
                     if error_type == "DNS":
                         status = "nxdomain"
                     else:
-                        # SSL, TCP, or HTTP4XX all mark as ignore
+                        # SSL, TCP, TYPE, FILE, HTTP2XX, HTTP3XX, or HTTP4XX all mark as ignore
                         status = "ignore"
                     mark_domain_status(domain, status)
                     delete_domain_if_known(domain)
@@ -996,6 +1058,29 @@ def mark_nxdomain_domain(domain: str) -> None:
 def mark_norobots_domain(domain: str) -> None:
     """Mark a domain as norobots (crawling prohibited)."""
     mark_domain_status(domain, "norobots")
+
+
+def mark_alias_domain(domain: str) -> None:
+    """Mark a domain as an alias (redirect to another instance)."""
+    with db_pool.connection() as conn, conn.cursor() as cursor:
+        try:
+            _ = cursor.execute(
+                """
+                    INSERT INTO raw_domains (domain, alias)
+                    VALUES (%s, %s)
+                    ON CONFLICT(domain) DO UPDATE SET
+                    alias = excluded.alias
+                """,
+                (domain, True),
+            )
+            conn.commit()
+        except Exception as exception:
+            vmc_output(
+                f"{domain}: Failed to mark as alias {exception}",
+                "red",
+                use_tqdm=True,
+            )
+            conn.rollback()
 
 
 # =============================================================================
@@ -1258,6 +1343,11 @@ def get_norobots_domains():
     return get_domains_by_status("norobots")
 
 
+def get_alias_domains():
+    """Get list of domains marked as aliases."""
+    return get_domains_by_status("alias")
+
+
 # =============================================================================
 # ERROR HANDLING FUNCTIONS
 # =============================================================================
@@ -1407,6 +1497,7 @@ def should_skip_domain(
     ignored_domains,
     nxdomain_domains,
     norobots_domains,
+    alias_domains,
     user_choice,
 ):
     """Check if a domain should be skipped based on its status."""
@@ -1428,6 +1519,10 @@ def should_skip_domain(
         return True
     if user_choice != "14" and domain in norobots_domains:
         vmc_output(f"{domain}: Crawling Prohibited", "cyan", use_tqdm=True)
+        delete_domain_if_known(domain)
+        return True
+    if domain in alias_domains:
+        vmc_output(f"{domain}: Alias Domain", "cyan", use_tqdm=True)
         delete_domain_if_known(domain)
         return True
     if domain in baddata_domains:
@@ -1635,6 +1730,40 @@ def check_webfinger(domain, http_client):
         return None
 
 
+def sanitize_nodeinfo_url(url: str) -> str:
+    """Fix malformed nodeinfo URLs.
+
+    Common issues:
+    1. HTTP is used with port 443 (should be HTTPS)
+       Example: http://domain:443/nodeinfo/2.0.json
+    2. Double slashes in path (should be single slash)
+       Example: https://domain//api/nodeinfo/2.0.json
+    """
+    parsed = urlparse(url)
+
+    # If using http:// with port 443, change to https://
+    if parsed.scheme == "http" and parsed.port == 443:
+        # Reconstruct URL with https and remove explicit port 443
+        netloc = parsed.hostname or parsed.netloc.split(":")[0]
+        path = parsed.path
+        query = f"?{parsed.query}" if parsed.query else ""
+        fragment = f"#{parsed.fragment}" if parsed.fragment else ""
+        url = f"https://{netloc}{path}{query}{fragment}"
+        parsed = urlparse(url)
+
+    # Fix double (or more) slashes in path
+    if "//" in parsed.path:
+        # Replace multiple consecutive slashes with single slash
+        import re
+
+        clean_path = re.sub(r"/+", "/", parsed.path)
+        query = f"?{parsed.query}" if parsed.query else ""
+        fragment = f"#{parsed.fragment}" if parsed.fragment else ""
+        url = f"{parsed.scheme}://{parsed.netloc}{clean_path}{query}{fragment}"
+
+    return url
+
+
 def check_nodeinfo(domain, backend_domain, http_client):
     """Check NodeInfo well-known endpoint for NodeInfo 2.0 URL."""
     target = "nodeinfo"
@@ -1683,6 +1812,8 @@ def check_nodeinfo(domain, backend_domain, http_client):
                             break
 
                 if nodeinfo_20_url:
+                    # Sanitize URL to fix common misconfigurations
+                    nodeinfo_20_url = sanitize_nodeinfo_url(nodeinfo_20_url)
                     return {"nodeinfo_20_url": nodeinfo_20_url}
 
             exception = "no links in reply"
@@ -1933,6 +2064,17 @@ def process_domain(domain, http_client, nightly_version_ranges):
             increment_domain_error(domain, "API")
             return
 
+        # Check if this is an alias (redirect to another instance)
+        if is_alias_domain(domain, instance_uri):
+            vmc_output(
+                f"{domain}: Alias - redirects to {instance_uri}",
+                "cyan",
+                use_tqdm=True,
+            )
+            mark_alias_domain(domain)
+            delete_domain_if_known(domain)
+            return
+
         process_mastodon_instance(
             domain,
             nodeinfo_20_result,
@@ -1962,6 +2104,7 @@ def check_and_record_domains(
     http_client,
     nxdomain_domains,
     norobots_domains,
+    alias_domains,
     nightly_version_ranges,
 ):
     """Process a list of domains concurrently with progress tracking.
@@ -1983,6 +2126,7 @@ def check_and_record_domains(
             ignored_domains,
             nxdomain_domains,
             norobots_domains,
+            alias_domains,
             user_choice,
         ):
             return
@@ -3203,6 +3347,7 @@ def main():
         baddata_domains = get_baddata_domains()
         nxdomain_domains = get_nxdomain_domains()
         norobots_domains = get_norobots_domains()
+        alias_domains = get_alias_domains()
         nightly_version_ranges = get_nightly_version_ranges()
 
         cleanup_old_domains()
@@ -3221,6 +3366,7 @@ def main():
             http_client,
             nxdomain_domains,
             norobots_domains,
+            alias_domains,
             nightly_version_ranges,
         )
 
