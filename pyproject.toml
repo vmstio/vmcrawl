@@ -12,6 +12,8 @@ dependencies = [
     "toml",
     "packaging",
     "tqdm",
+    "fastapi",
+    "uvicorn[standard]",
 ]
 
 [tool.setuptools]
@@ -20,4 +22,5 @@ py-modules = [
     "fetch",
     "stats",
     "nightly",
+    "api",
 ]
