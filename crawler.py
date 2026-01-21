@@ -1132,7 +1132,7 @@ def cleanup_old_domains():
             if deleted_domains:
                 for d in deleted_domains:
                     vmc_output(
-                        f"{d}: Removed from known domains",
+                        f"{d}: Removed from active instance list",
                         "pink",
                         use_tqdm=True,
                     )
