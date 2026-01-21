@@ -782,7 +782,7 @@ def increment_domain_error(domain: str, error_reason: str) -> None:
     """Increment error count for a domain and record the error reason.
 
     Only increments error count if the previous error reason started with
-    DNS, SSL, TCP, or HTTP 4xx, AND the domain's nodeinfo is NOT set to
+    DNS, SSL, TCP, TYPE, or HTTP 4xx, AND the domain's nodeinfo is NOT set to
     'mastodon'. For other error types, the count is set to null while still
     recording the error reason. Counter resets to 1 when switching between
     error types.
@@ -790,10 +790,11 @@ def increment_domain_error(domain: str, error_reason: str) -> None:
     DNS errors: After 15 consecutive errors, mark as NXDOMAIN.
     SSL errors: After 15 consecutive errors, mark as ignored.
     TCP errors: After 15 consecutive errors, mark as ignored.
+    TYPE errors: After 15 consecutive errors, mark as ignored.
     HTTP 4xx errors: After 15 consecutive errors, mark as ignored.
     """
     ERROR_THRESHOLD = 15
-    TRACKED_ERROR_TYPES = ("DNS", "SSL", "TCP")
+    TRACKED_ERROR_TYPES = ("DNS", "SSL", "TCP", "TYPE")
 
     with db_pool.connection() as conn, conn.cursor() as cursor:
         try:
