@@ -839,6 +839,7 @@ def increment_domain_error(domain: str, error_reason: str) -> None:
     HTTP 3xx errors: After 15 consecutive errors, mark as ignored.
     HTTP 4xx errors: After 15 consecutive errors, mark as ignored.
     """
+    domain = domain.lower()
     ERROR_THRESHOLD = 15
     TRACKED_ERROR_TYPES = ("DNS", "SSL", "TCP", "TYPE", "FILE")
 
@@ -964,6 +965,7 @@ def increment_domain_error(domain: str, error_reason: str) -> None:
 
 def clear_domain_error(domain: str) -> None:
     """Clear all error flags for a domain."""
+    domain = domain.lower()
     with db_pool.connection() as conn, conn.cursor() as cursor:
         try:
             _ = cursor.execute(
@@ -1003,6 +1005,7 @@ def mark_domain_status(domain: str, status_type: str) -> None:
         domain: The domain to mark
         status_type: One of 'ignore', 'failed', 'nxdomain', 'norobots'
     """
+    domain = domain.lower()
     status_map = {
         "ignore": (None, True, None, None, None, None, "ignored"),
         "failed": (True, None, None, None, None, None, "failed"),
@@ -1062,6 +1065,7 @@ def mark_norobots_domain(domain: str) -> None:
 
 def mark_alias_domain(domain: str) -> None:
     """Mark a domain as an alias (redirect to another instance)."""
+    domain = domain.lower()
     with db_pool.connection() as conn, conn.cursor() as cursor:
         try:
             _ = cursor.execute(
@@ -1135,6 +1139,7 @@ def save_nodeinfo_software(domain: str, software_data: dict[str, Any]) -> None:
         domain: The domain being processed
         software_data: The 'software' dict from nodeinfo_20_result (contains 'name')
     """
+    domain = domain.lower()
     software_name = software_data.get("name", "unknown").lower().replace(" ", "-")
 
     with db_pool.connection() as conn, conn.cursor() as cursor:
@@ -1171,6 +1176,8 @@ def update_mastodon_domain(
         vmc_output("Attempted to insert empty domain, skipping", "red", use_tqdm=True)
         return
 
+    actual_domain = actual_domain.strip().lower()
+
     with db_pool.connection() as conn, conn.cursor() as cursor:
         try:
             _ = cursor.execute(
@@ -1187,7 +1194,7 @@ def update_mastodon_domain(
                     full_version = excluded.full_version
                 """,
                 (
-                    actual_domain.strip(),
+                    actual_domain,
                     software_version,
                     total_users,
                     active_month_users,
@@ -3108,7 +3115,7 @@ def load_from_file(file_name):
         open(os.path.expanduser(file_name)) as file,
     ):
         for line in file:
-            domain = line.strip()
+            domain = line.strip().lower()
             if not domain or has_emoji_chars(domain):
                 continue
 

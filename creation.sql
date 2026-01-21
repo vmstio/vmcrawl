@@ -17,7 +17,7 @@ CREATE TABLE
 
 CREATE TABLE
   mastodon_domains (
-    domain TEXT PRIMARY KEY,
+    domain TEXT PRIMARY KEY CHECK (domain = LOWER(domain)),
     software_version TEXT DEFAULT NULL,
     mau INTEGER DEFAULT NULL,
     users_monthly INTEGER DEFAULT NULL,
@@ -42,7 +42,7 @@ CREATE TABLE
 
 CREATE TABLE
   raw_domains (
-    domain TEXT PRIMARY KEY,
+    domain TEXT PRIMARY KEY CHECK (domain = LOWER(domain)),
     failed BOOLEAN DEFAULT NULL,
     ignore BOOLEAN DEFAULT NULL,
     errors INTEGER DEFAULT NULL,
