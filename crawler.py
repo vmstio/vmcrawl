@@ -3041,6 +3041,21 @@ def load_from_database(user_choice):
         "53": (
             "SELECT domain FROM raw_domains WHERE nodeinfo = 'mastodon' ORDER BY domain"
         ),
+        "54": (
+            "SELECT rd.domain "
+            "FROM raw_domains rd "
+            "WHERE rd.nodeinfo LIKE '%mastodon%' "
+            "AND rd.alias IS NOT TRUE "
+            "AND rd.norobots IS NOT TRUE "
+            "AND rd.failed IS NOT TRUE "
+            "AND rd.baddata IS NOT TRUE "
+            "AND NOT EXISTS ( "
+            "SELECT 1 "
+            "FROM mastodon_domains md "
+            "WHERE md.domain = rd.domain "
+            ") "
+            "ORDER BY rd.domain"
+        ),
     }
 
     params = None
@@ -3154,6 +3169,7 @@ def get_menu_options() -> dict[str, dict[str, str]]:
             "51": f"{version_main_branch}/main",
             "52": "Active",
             "53": "All",
+            "54": "Gone",
         },
     }
 
