@@ -311,7 +311,7 @@ def get_domains(api_url, domain, domain_endings):
             if is_valid_domain(item)
             and not has_emoji_chars(item)
             and not any(keyword in item for keyword in keywords)
-            and not any(item in domain for domain in dni)
+            and not any(dni_domain in item for dni_domain in dni)
             and not any(item.endswith(f".{tld}") for tld in bad_tlds)
             and any(
                 item.endswith(f".{domain_ending}") for domain_ending in domain_endings
