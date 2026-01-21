@@ -1275,12 +1275,12 @@ def get_domains_by_status(status_column):
     """Get list of domains filtered by status column.
 
     Args:
-        status_column: One of 'failed', 'ignore', 'baddata', 'nxdomain', 'norobots'
+        status_column: One of 'failed', 'ignore', 'baddata', 'nxdomain', 'norobots', 'alias'
 
     Returns:
         Set of domain strings
     """
-    valid_columns = ["failed", "ignore", "baddata", "nxdomain", "norobots"]
+    valid_columns = ["failed", "ignore", "baddata", "nxdomain", "norobots", "alias"]
     if status_column not in valid_columns:
         vmc_output(f"Invalid status column: {status_column}", "red")
         return set()
