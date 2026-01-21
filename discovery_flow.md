@@ -2,8 +2,8 @@
 
 ```
 ┌─────────────────────────────────────────────────────────────────────┐
-│                          START: process_domain                       │
-│                             (domain input)                           │
+│                          START: process_domain                      │
+│                             (domain input)                          │
 └────────────────────────────────┬────────────────────────────────────┘
                                  │
                                  ▼
@@ -32,7 +32,7 @@
                                             │
                                 ┌───────────┴────────────┐
                                 │                        │
-                              YES│                       │NO
+                             YES│                        │NO
                                 │                        │
                                 ▼                        ▼
                     ┌─────────────────────┐  ┌────────────────────────┐
@@ -46,7 +46,7 @@
                                │                         │
                                │             ┌───────────┴────────────┐
                                │             │                        │
-                               │           YES│                       │NO
+                               │          YES│                        │NO
                                │             │                        │
                                │             ▼                        ▼
                                │  ┌────────────────────┐  ┌────────────────────┐
@@ -68,7 +68,7 @@
                                                          │
                                              ┌───────────┴────────────┐
                                              │                        │
-                                           YES│                       │NO
+                                          YES│                        │NO
                                              │                        │
                                              ▼                        ▼
                                  ┌────────────────────┐   ┌──────────────┐
@@ -82,7 +82,7 @@
                                             │
                                 ┌───────────┴────────────┐
                                 │                        │
-                              YES│                       │NO
+                             YES│                        │NO
                                 │                        │
                                 ▼                        ▼
                     ┌─────────────────────┐  ┌──────────────┐
@@ -92,7 +92,7 @@
                     └──────────┬──────────┘
                                │
                    ┌───────────▼────────────┐
-                   │ is_mastodon_instance? │
+                   │ is_mastodon_instance?  │
                    └───────────┬────────────┘
                                │
                    ┌───────────┴────────────┐
@@ -117,7 +117,7 @@
                   │                         │
        ┌──────────┴───────────┐             │
        │                      │             │
-     YES│                     │NO           │
+    YES│                      │NO           │
        │                      │             │
        ▼                      ▼             │
 ┌────────────────┐  ┌──────────────┐        │
@@ -128,18 +128,31 @@
        │                                    │
        ▼                                    │
 ┌────────────────┐                          │
-│ Validate       │                          │
-│ version        │                          │
+│ is_alias_      │                          │
+│ domain()?      │                          │
+│ Check if URI   │                          │
+│ differs from   │                          │
+│ domain         │                          │
 └──────┬─────────┘                          │
        │                                    │
-       ▼                                    │
-┌────────────────┐                          │
-│ Save to        │                          │
-│ mastodon_      │                          │
-│ domains table  │                          │
-└──────┬─────────┘                          │
-       │                                    │
-       └────────────┬───────────────────────┘
+   ┌───┴────┐                               │
+   │        │                               │
+YES│        │NO                             │
+   │        │                               │
+   ▼        ▼                               │
+┌────────┐  ┌────────────────┐              │
+│ STOP/  │  │ Validate       │              │
+│ RETURN │  │ version        │              │
+│ (alias)│  └──────┬─────────┘              │
+│ Mark   │         │                        │
+│ domain │         ▼                        │
+│ as     │  ┌────────────────┐              │
+│ alias  │  │ Save to        │              │
+└────────┘  │ mastodon_      │              │
+            │ domains table  │              │
+            └──────┬─────────┘              │
+                   │                        │
+                   └────────────┬───────────┘
                     │
                     ▼
             ┌───────────────┐
@@ -177,6 +190,43 @@
 3. **NodeInfo Result**: Determines Mastodon vs non-Mastodon handling
 4. **Software Name**: Final classification (mastodon, lemmy, pixelfed, etc.)
 
+## Alias Detection
+
+After successfully identifying a Mastodon instance and retrieving its instance URI, the crawler checks if the domain is an **alias** (redirect) to another instance.
+
+### Alias Logic
+
+A domain is marked as an alias when:
+- The instance URI differs from the original domain
+- The instance URI is **not** a subdomain of the original domain
+
+### Examples
+
+**Not Aliases (Valid)**:
+- `example.com` → `example.com` (same domain)
+- `example.com` → `social.example.com` (subdomain allowed)
+
+**Aliases (Marked and skipped)**:
+- `example.com` → `other.com` (different root domain)
+- `social.example.com` → `example.com` (redirect to parent)
+- `alias.com` → `main-instance.org` (completely different)
+
+### Alias Handling
+
+When an alias is detected:
+1. Log message: `"{domain}: Alias - redirects to {instance_uri}"` (cyan)
+2. Mark domain with `alias = TRUE` in `raw_domains` table
+3. Delete domain from `mastodon_domains` if present
+4. Stop processing immediately
+
+### Skip Processing
+
+Domains marked as aliases are skipped during processing:
+- Loaded at startup via `get_alias_domains()`
+- Checked in `should_skip_domain()`
+- Always skipped (no user override option)
+- Log message: `"{domain}: Alias Domain"` (cyan)
+
 ## Error Handling
 
 - **robots.txt blocks**: Stop immediately, mark as norobots
@@ -184,6 +234,7 @@
 - **Webfinger fails**: Continue to nodeinfo with original domain (silent, no logging)
 - **NodeInfo fails**: Stop, log error, increment error counter (ONLY logged failure)
 - **Non-Mastodon detected**: Mark and skip (not an error)
+- **Alias detected**: Stop, mark as alias, skip in future runs
 
 ### Why Silent Failures?
 
