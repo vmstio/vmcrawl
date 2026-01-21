@@ -1521,7 +1521,7 @@ def should_skip_domain(
         vmc_output(f"{domain}: Crawling Prohibited", "cyan", use_tqdm=True)
         delete_domain_if_known(domain)
         return True
-    if domain in alias_domains:
+    if user_choice != "15" and domain in alias_domains:
         vmc_output(f"{domain}: Alias Domain", "cyan", use_tqdm=True)
         delete_domain_if_known(domain)
         return True
@@ -2954,6 +2954,7 @@ def load_from_database(user_choice):
             "(nxdomain IS NULL OR nxdomain = FALSE) AND "
             "(norobots IS NULL OR norobots = FALSE) AND "
             "(baddata IS NULL OR baddata = FALSE) AND "
+            "(alias IS NULL OR alias = FALSE) AND "
             "(nodeinfo = 'mastodon' OR nodeinfo IS NULL) "
             "ORDER BY domain ASC"
         ),
@@ -2973,6 +2974,7 @@ def load_from_database(user_choice):
         "12": "SELECT domain FROM raw_domains WHERE failed = TRUE ORDER BY domain",
         "13": "SELECT domain FROM raw_domains WHERE nxdomain = TRUE ORDER BY domain",
         "14": "SELECT domain FROM raw_domains WHERE norobots = TRUE ORDER BY domain",
+        "15": "SELECT domain FROM raw_domains WHERE alias = TRUE ORDER BY domain",
         "20": (
             "SELECT domain FROM raw_domains WHERE reason LIKE 'SSL%' "
             "AND (nodeinfo = 'mastodon' OR nodeinfo IS NULL) "
@@ -3132,6 +3134,7 @@ def get_menu_options() -> dict[str, dict[str, str]]:
             "12": "Failed",
             "13": "NXDOMAIN",
             "14": "Prohibited",
+            "15": "Alias",
         },
         "Retry connection errors": {
             "20": "SSL",
