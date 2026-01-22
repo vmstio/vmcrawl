@@ -650,6 +650,57 @@ async def get_raw_versions(_api_key: str | None = Depends(get_api_key)):
         raise HTTPException(status_code=500, detail=f"Database error: {str(e)}")
 
 
+@app.get("/stats/most-deployed", tags=["Statistics"])
+async def get_most_deployed(_api_key: str | None = Depends(get_api_key)):
+    """Get the most deployed Mastodon version by instance count and by MAU."""
+    try:
+        with db_pool.connection() as conn, conn.cursor() as cur:
+            # Most deployed by instance count
+            _ = cur.execute(
+                """
+                SELECT
+                    software_version,
+                    COUNT(*) as instance_count,
+                    SUM(active_users_monthly) as total_mau
+                FROM mastodon_domains
+                GROUP BY software_version
+                ORDER BY instance_count DESC
+                LIMIT 1
+            """
+            )
+            instance_result = cur.fetchone()
+
+            # Most deployed by MAU
+            _ = cur.execute(
+                """
+                SELECT
+                    software_version,
+                    COUNT(*) as instance_count,
+                    SUM(active_users_monthly) as total_mau
+                FROM mastodon_domains
+                GROUP BY software_version
+                ORDER BY total_mau DESC
+                LIMIT 1
+            """
+            )
+            mau_result = cur.fetchone()
+
+        return {
+            "by_instance_count": {
+                "version": instance_result[0] if instance_result else None,
+                "instance_count": instance_result[1] if instance_result else 0,
+                "total_mau": instance_result[2] if instance_result else 0,
+            },
+            "by_mau": {
+                "version": mau_result[0] if mau_result else None,
+                "instance_count": mau_result[1] if mau_result else 0,
+                "total_mau": mau_result[2] if mau_result else 0,
+            },
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Database error: {str(e)}")
+
+
 # =============================================================================
 # INSTANCE ENDPOINTS
 # =============================================================================
