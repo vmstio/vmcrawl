@@ -2045,11 +2045,6 @@ def process_domain(domain, http_client, nightly_version_ranges):
     if not nodeinfo_20_result:
         return
 
-    # Save software information from nodeinfo to database
-    software_data = nodeinfo_20_result.get("software")
-    if software_data and isinstance(software_data, dict):
-        save_nodeinfo_software(domain, software_data)
-
     if is_mastodon_instance(nodeinfo_20_result):
         # Get the actual domain from the instance API
         instance_uri = get_instance_uri(backend_domain, http_client)
@@ -2075,6 +2070,12 @@ def process_domain(domain, http_client, nightly_version_ranges):
             delete_domain_if_known(domain)
             return
 
+        # Save software information from nodeinfo to database
+        # Only save for validated Mastodon instances that aren't aliases
+        software_data = nodeinfo_20_result.get("software")
+        if software_data and isinstance(software_data, dict):
+            save_nodeinfo_software(domain, software_data)
+
         process_mastodon_instance(
             domain,
             nodeinfo_20_result,
@@ -2082,6 +2083,11 @@ def process_domain(domain, http_client, nightly_version_ranges):
             actual_domain=instance_uri,
         )
     else:
+        # Save software information for non-Mastodon platforms unconditionally
+        software_data = nodeinfo_20_result.get("software")
+        if software_data and isinstance(software_data, dict):
+            save_nodeinfo_software(domain, software_data)
+
         mark_as_non_mastodon(domain, nodeinfo_20_result["software"]["name"])
 
 
