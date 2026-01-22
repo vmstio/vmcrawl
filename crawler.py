@@ -1921,6 +1921,9 @@ def get_instance_uri(backend_domain: str, http_client: httpx.Client) -> str | No
 
             if isinstance(instance_data, dict):
                 uri = instance_data.get("uri")
+                # Normalize domain to lowercase for consistent comparison
+                if uri:
+                    return uri.strip().lower()
                 return uri
             return None
         return None
