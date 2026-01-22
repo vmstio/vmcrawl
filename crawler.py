@@ -813,7 +813,7 @@ def increment_domain_error(domain: str, error_reason: str) -> None:
     """Increment error count for a domain and record the error reason.
 
     Only increments error count if the previous error reason started with
-    DNS, SSL, TCP, TYPE, FILE, or HTTP 2xx/3xx/4xx, AND the domain's nodeinfo
+    DNS, SSL, TCP, TYPE, FILE, or HTTP 2xx/3xx/4xx/5xx, AND the domain's nodeinfo
     is NOT set to 'mastodon'. For other error types, the count is set to null
     while still recording the error reason. Counter resets to 1 when switching
     between error types.
@@ -826,6 +826,7 @@ def increment_domain_error(domain: str, error_reason: str) -> None:
     HTTP 2xx errors: After 15 consecutive errors, mark as ignored.
     HTTP 3xx errors: After 15 consecutive errors, mark as ignored.
     HTTP 4xx errors: After 15 consecutive errors, mark as ignored.
+    HTTP 5xx errors: After 15 consecutive errors, mark as ignored.
     """
     domain = domain.lower()
     ERROR_THRESHOLD = 15
@@ -864,7 +865,7 @@ def increment_domain_error(domain: str, error_reason: str) -> None:
                 conn.commit()
                 return
 
-            # Get error type prefix (DNS, SSL, TCP, TYPE, HTTP 2xx/3xx/4xx, or None)
+            # Get error type prefix (DNS, SSL, TCP, TYPE, HTTP 2xx/3xx/4xx/5xx, or None)
             # Check for HTTP status code errors
             def is_http_2xx(reason: str) -> bool:
                 """Check if error reason starts with a 2xx HTTP status code."""
@@ -878,6 +879,10 @@ def increment_domain_error(domain: str, error_reason: str) -> None:
                 """Check if error reason starts with a 4xx HTTP status code."""
                 return len(reason) >= 3 and reason[0] == "4" and reason[1:3].isdigit()
 
+            def is_http_5xx(reason: str) -> bool:
+                """Check if error reason starts with a 5xx HTTP status code."""
+                return len(reason) >= 3 and reason[0] == "5" and reason[1:3].isdigit()
+
             error_type = None
             if is_http_2xx(error_reason):
                 error_type = "HTTP2XX"
@@ -885,6 +890,8 @@ def increment_domain_error(domain: str, error_reason: str) -> None:
                 error_type = "HTTP3XX"
             elif is_http_4xx(error_reason):
                 error_type = "HTTP4XX"
+            elif is_http_5xx(error_reason):
+                error_type = "HTTP5XX"
             else:
                 error_type = next(
                     (t for t in TRACKED_ERROR_TYPES if error_reason.startswith(t)),
@@ -898,6 +905,8 @@ def increment_domain_error(domain: str, error_reason: str) -> None:
                 previous_type = "HTTP3XX"
             elif is_http_4xx(previous_reason):
                 previous_type = "HTTP4XX"
+            elif is_http_5xx(previous_reason):
+                previous_type = "HTTP5XX"
             else:
                 previous_type = next(
                     (t for t in TRACKED_ERROR_TYPES if previous_reason.startswith(t)),
@@ -914,7 +923,7 @@ def increment_domain_error(domain: str, error_reason: str) -> None:
                     if error_type == "DNS":
                         status = "nxdomain"
                     else:
-                        # SSL, TCP, TYPE, FILE, HTTP2XX, HTTP3XX, or HTTP4XX all mark as ignore
+                        # SSL, TCP, TYPE, FILE, HTTP2XX, HTTP3XX, HTTP4XX, or HTTP5XX all mark as ignore
                         status = "ignore"
                     mark_domain_status(domain, status)
                     delete_domain_if_known(domain)
@@ -2970,8 +2979,7 @@ def load_from_database(user_choice):
     """Load domain list from database based on user menu selection."""
     query_map = {
         "0": (
-            "SELECT domain FROM raw_domains WHERE errors = 0 "
-            "ORDER BY LENGTH(DOMAIN)"
+            "SELECT domain FROM raw_domains WHERE errors = 0 ORDER BY LENGTH(DOMAIN)"
         ),
         "1": (
             "SELECT domain FROM raw_domains WHERE "
@@ -2985,8 +2993,7 @@ def load_from_database(user_choice):
             "ORDER BY domain"
         ),
         "4": (
-            "SELECT domain FROM raw_domains WHERE reason IS NOT NULL "
-            "ORDER BY domain"
+            "SELECT domain FROM raw_domains WHERE reason IS NOT NULL ORDER BY domain"
         ),
         "5": (
             "SELECT domain FROM raw_domains WHERE reason IS NOT NULL "
@@ -3002,16 +3009,13 @@ def load_from_database(user_choice):
         "14": "SELECT domain FROM raw_domains WHERE norobots = TRUE ORDER BY domain",
         "15": "SELECT domain FROM raw_domains WHERE alias = TRUE ORDER BY domain",
         "20": (
-            "SELECT domain FROM raw_domains WHERE reason LIKE 'SSL%' "
-            "ORDER BY errors"
+            "SELECT domain FROM raw_domains WHERE reason LIKE 'SSL%' ORDER BY errors"
         ),
         "21": (
-            "SELECT domain FROM raw_domains WHERE reason LIKE 'TCP%' "
-            "ORDER BY errors"
+            "SELECT domain FROM raw_domains WHERE reason LIKE 'TCP%' ORDER BY errors"
         ),
         "22": (
-            "SELECT domain FROM raw_domains WHERE reason LIKE 'DNS%' "
-            "ORDER BY errors"
+            "SELECT domain FROM raw_domains WHERE reason LIKE 'DNS%' ORDER BY errors"
         ),
         "30": (
             "SELECT domain FROM raw_domains WHERE reason ~ '^2[0-9]{2}.*' "
@@ -3030,24 +3034,19 @@ def load_from_database(user_choice):
             "ORDER BY errors"
         ),
         "40": (
-            "SELECT domain FROM raw_domains WHERE reason LIKE 'JSON%' "
-            "ORDER BY errors"
+            "SELECT domain FROM raw_domains WHERE reason LIKE 'JSON%' ORDER BY errors"
         ),
         "41": (
-            "SELECT domain FROM raw_domains WHERE reason LIKE 'FILE%' "
-            "ORDER BY errors"
+            "SELECT domain FROM raw_domains WHERE reason LIKE 'FILE%' ORDER BY errors"
         ),
         "42": (
-            "SELECT domain FROM raw_domains WHERE reason LIKE 'TYPE%' "
-            "ORDER BY errors"
+            "SELECT domain FROM raw_domains WHERE reason LIKE 'TYPE%' ORDER BY errors"
         ),
         "43": (
-            "SELECT domain FROM raw_domains WHERE reason LIKE 'MAU%' "
-            "ORDER BY errors"
+            "SELECT domain FROM raw_domains WHERE reason LIKE 'MAU%' ORDER BY errors"
         ),
         "44": (
-            "SELECT domain FROM raw_domains WHERE reason LIKE 'API%' "
-            "ORDER BY errors"
+            "SELECT domain FROM raw_domains WHERE reason LIKE 'API%' ORDER BY errors"
         ),
         "50": (
             "SELECT domain FROM mastodon_domains WHERE "
