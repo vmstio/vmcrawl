@@ -991,38 +991,42 @@ def mark_domain_status(domain: str, status_type: str) -> None:
 
     Args:
         domain: The domain to mark
-        status_type: One of 'ignore', 'failed', 'nxdomain', 'norobots'
+        status_type: One of 'ignore', 'failed', 'nxdomain', 'norobots', 'alias'
     """
     domain = domain.lower()
     status_map = {
-        "ignore": (None, True, None, None, None, None, "ignored"),
-        "failed": (True, None, None, None, None, None, "failed"),
-        "nxdomain": (None, None, None, None, True, None, "NXDOMAIN"),
-        "norobots": (None, None, None, None, None, True, "NoRobots"),
+        "ignore": (None, True, None, None, None, None, None, "ignored"),
+        "failed": (True, None, None, None, None, None, None, "failed"),
+        "nxdomain": (None, None, None, None, True, None, None, "NXDOMAIN"),
+        "norobots": (None, None, None, None, None, True, None, "NoRobots"),
+        "alias": (None, None, None, None, None, None, True, "alias"),
     }
 
     if status_type not in status_map:
         vmc_output(f"Invalid status type: {status_type}", "red")
         return
 
-    failed, ignore, errors, reason, nxdomain, norobots, label = status_map[status_type]
+    failed, ignore, errors, reason, nxdomain, norobots, alias, label = status_map[
+        status_type
+    ]
 
     with db_pool.connection() as conn, conn.cursor() as cursor:
         try:
             _ = cursor.execute(
                 """
                     INSERT INTO raw_domains
-                    (domain, failed, ignore, errors, reason, nxdomain, norobots)
-                    VALUES (%s, %s, %s, %s, %s, %s, %s)
+                    (domain, failed, ignore, errors, reason, nxdomain, norobots, alias)
+                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
                     ON CONFLICT(domain) DO UPDATE SET
                     failed = excluded.failed,
                     ignore = excluded.ignore,
                     errors = excluded.errors,
                     reason = excluded.reason,
                     nxdomain = excluded.nxdomain,
-                    norobots = excluded.norobots
+                    norobots = excluded.norobots,
+                    alias = excluded.alias
                 """,
-                (domain, failed, ignore, errors, reason, nxdomain, norobots),
+                (domain, failed, ignore, errors, reason, nxdomain, norobots, alias),
             )
             conn.commit()
         except Exception as exception:
@@ -1053,26 +1057,7 @@ def mark_norobots_domain(domain: str) -> None:
 
 def mark_alias_domain(domain: str) -> None:
     """Mark a domain as an alias (redirect to another instance)."""
-    domain = domain.lower()
-    with db_pool.connection() as conn, conn.cursor() as cursor:
-        try:
-            _ = cursor.execute(
-                """
-                    INSERT INTO raw_domains (domain, alias)
-                    VALUES (%s, %s)
-                    ON CONFLICT(domain) DO UPDATE SET
-                    alias = excluded.alias
-                """,
-                (domain, True),
-            )
-            conn.commit()
-        except Exception as exception:
-            vmc_output(
-                f"{domain}: Failed to mark as alias {exception}",
-                "red",
-                use_tqdm=True,
-            )
-            conn.rollback()
+    mark_domain_status(domain, "alias")
 
 
 # =============================================================================
