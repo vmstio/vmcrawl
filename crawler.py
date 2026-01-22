@@ -2971,7 +2971,7 @@ def load_from_database(user_choice):
     query_map = {
         "0": (
             "SELECT domain FROM raw_domains WHERE errors = 0 "
-            "ORDER BY LENGTH(DOMAIN) ASC"
+            "ORDER BY LENGTH(DOMAIN)"
         ),
         "1": (
             "SELECT domain FROM raw_domains WHERE "
@@ -2982,15 +2982,15 @@ def load_from_database(user_choice):
             "(baddata IS NULL OR baddata = FALSE) AND "
             "(alias IS NULL OR alias = FALSE) AND "
             "(nodeinfo = 'mastodon' OR nodeinfo IS NULL) "
-            "ORDER BY domain ASC"
+            "ORDER BY domain"
         ),
         "4": (
-            "SELECT domain FROM raw_domains WHERE errors IS NOT NULL "
-            "ORDER BY errors ASC"
+            "SELECT domain FROM raw_domains WHERE reason IS NOT NULL "
+            "ORDER BY domain"
         ),
         "5": (
-            "SELECT domain FROM raw_domains WHERE nodeinfo = 'mastodon' "
-            "AND (reason IS NOT NULL AND reason <> 'API') ORDER BY domain;"
+            "SELECT domain FROM raw_domains WHERE reason IS NOT NULL "
+            "AND nodeinfo = 'mastodon' ORDER BY domain;"
         ),
         "10": (
             "SELECT domain FROM raw_domains WHERE nodeinfo != 'mastodon' "
@@ -3003,54 +3003,51 @@ def load_from_database(user_choice):
         "15": "SELECT domain FROM raw_domains WHERE alias = TRUE ORDER BY domain",
         "20": (
             "SELECT domain FROM raw_domains WHERE reason LIKE 'SSL%' "
-            "AND (nodeinfo = 'mastodon' OR nodeinfo IS NULL) "
-            "ORDER BY errors DESC"
+            "ORDER BY errors"
         ),
         "21": (
             "SELECT domain FROM raw_domains WHERE reason LIKE 'TCP%' "
-            "AND (nodeinfo = 'mastodon' OR nodeinfo IS NULL) "
-            "ORDER BY errors DESC"
+            "ORDER BY errors"
         ),
         "22": (
             "SELECT domain FROM raw_domains WHERE reason LIKE 'DNS%' "
-            "AND (nodeinfo = 'mastodon' OR nodeinfo IS NULL) "
-            "ORDER BY errors DESC"
+            "ORDER BY errors"
         ),
         "30": (
             "SELECT domain FROM raw_domains WHERE reason ~ '^2[0-9]{2}.*' "
-            "AND (nodeinfo = 'mastodon' OR nodeinfo IS NULL) ORDER BY domain"
+            "ORDER BY errors"
         ),
         "31": (
             "SELECT domain FROM raw_domains WHERE reason ~ '^3[0-9]{2}.*' "
-            "AND (nodeinfo = 'mastodon' OR nodeinfo IS NULL) ORDER BY domain"
+            "ORDER BY errors"
         ),
         "32": (
             "SELECT domain FROM raw_domains WHERE reason ~ '^4[0-9]{2}.*' "
-            "AND (nodeinfo = 'mastodon' OR nodeinfo IS NULL) ORDER BY domain"
+            "ORDER BY errors"
         ),
         "33": (
             "SELECT domain FROM raw_domains WHERE reason ~ '^5[0-9]{2}.*' "
-            "AND (nodeinfo = 'mastodon' OR nodeinfo IS NULL) ORDER BY domain"
+            "ORDER BY errors"
         ),
         "40": (
             "SELECT domain FROM raw_domains WHERE reason LIKE 'JSON%' "
-            "AND (nodeinfo = 'mastodon' OR nodeinfo IS NULL) ORDER BY domain"
+            "ORDER BY errors"
         ),
         "41": (
             "SELECT domain FROM raw_domains WHERE reason LIKE 'FILE%' "
-            "AND (nodeinfo = 'mastodon' OR nodeinfo IS NULL) ORDER BY dommain"
+            "ORDER BY errors"
         ),
         "42": (
             "SELECT domain FROM raw_domains WHERE reason LIKE 'TYPE%' "
-            "AND (nodeinfo = 'mastodon' OR nodeinfo IS NULL) ORDER BY domain"
+            "ORDER BY errors"
         ),
         "43": (
             "SELECT domain FROM raw_domains WHERE reason LIKE 'MAU%' "
-            "AND (nodeinfo = 'mastodon' OR nodeinfo IS NULL) ORDER BY domain"
+            "ORDER BY errors"
         ),
         "44": (
             "SELECT domain FROM raw_domains WHERE reason LIKE 'API%' "
-            "AND (nodeinfo = 'mastodon' OR nodeinfo IS NULL) ORDER BY domain"
+            "ORDER BY errors"
         ),
         "50": (
             "SELECT domain FROM mastodon_domains WHERE "
@@ -3066,21 +3063,6 @@ def load_from_database(user_choice):
         ),
         "53": (
             "SELECT domain FROM raw_domains WHERE nodeinfo = 'mastodon' ORDER BY domain"
-        ),
-        "54": (
-            "SELECT rd.domain "
-            "FROM raw_domains rd "
-            "WHERE rd.nodeinfo LIKE '%mastodon%' "
-            "AND rd.alias IS NOT TRUE "
-            "AND rd.norobots IS NOT TRUE "
-            "AND rd.failed IS NOT TRUE "
-            "AND rd.baddata IS NOT TRUE "
-            "AND NOT EXISTS ( "
-            "SELECT 1 "
-            "FROM mastodon_domains md "
-            "WHERE md.domain = rd.domain "
-            ") "
-            "ORDER BY rd.domain"
         ),
     }
 
@@ -3192,10 +3174,9 @@ def get_menu_options() -> dict[str, dict[str, str]]:
         },
         "Retry known instances": {
             "50": "Unpatched",
-            "51": f"{version_main_branch}/main",
+            "51": f"{version_main_branch}",
             "52": "Active",
             "53": "All",
-            "54": "Gone",
         },
     }
 
