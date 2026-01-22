@@ -818,18 +818,18 @@ def increment_domain_error(domain: str, error_reason: str) -> None:
     while still recording the error reason. Counter resets to 1 when switching
     between error types.
 
-    DNS errors: After 15 consecutive errors, mark as NXDOMAIN.
-    SSL errors: After 15 consecutive errors, mark as ignored.
-    TCP errors: After 15 consecutive errors, mark as ignored.
-    TYPE errors: After 15 consecutive errors, mark as ignored.
-    FILE errors: After 15 consecutive errors, mark as ignored.
-    HTTP 2xx errors: After 15 consecutive errors, mark as ignored.
-    HTTP 3xx errors: After 15 consecutive errors, mark as ignored.
-    HTTP 4xx errors: After 15 consecutive errors, mark as ignored.
-    HTTP 5xx errors: After 15 consecutive errors, mark as ignored.
+    DNS errors: After ERROR_THRESHOLD consecutive errors, mark as NXDOMAIN.
+    SSL errors: After ERROR_THRESHOLD consecutive errors, mark as ignored.
+    TCP errors: After ERROR_THRESHOLD consecutive errors, mark as ignored.
+    TYPE errors: After ERROR_THRESHOLD consecutive errors, mark as ignored.
+    FILE errors: After ERROR_THRESHOLD consecutive errors, mark as ignored.
+    HTTP 2xx errors: After ERROR_THRESHOLD consecutive errors, mark as ignored.
+    HTTP 3xx errors: After ERROR_THRESHOLD consecutive errors, mark as ignored.
+    HTTP 4xx errors: After ERROR_THRESHOLD consecutive errors, mark as ignored.
+    HTTP 5xx errors: After ERROR_THRESHOLD consecutive errors, mark as ignored.
     """
     domain = domain.lower()
-    ERROR_THRESHOLD = 15
+    ERROR_THRESHOLD = int(os.getenv("VMCRAWL_ERROR_BUFFER", "15"))
     TRACKED_ERROR_TYPES = ("DNS", "SSL", "TCP", "TYPE", "FILE")
 
     with db_pool.connection() as conn, conn.cursor() as cursor:
