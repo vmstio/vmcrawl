@@ -2063,18 +2063,8 @@ def process_domain(domain, http_client, nightly_version_ranges):
             return
 
         # Check if this is an alias (redirect to another instance)
-        # Check both backend_domain (from host-meta/webfinger) and instance_uri (from API)
-        # as some instances may have one configured correctly but not the other
-        if is_alias_domain(domain, backend_domain):
-            vmc_output(
-                f"{domain}: Alias - redirects to {backend_domain}",
-                "cyan",
-                use_tqdm=True,
-            )
-            mark_alias_domain(domain)
-            delete_domain_if_known(domain)
-            return
-
+        # Use instance_uri (from API) as the authoritative canonical domain
+        # Only domains that match the instance_uri should be stored
         if is_alias_domain(domain, instance_uri):
             vmc_output(
                 f"{domain}: Alias - redirects to {instance_uri}",
