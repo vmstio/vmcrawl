@@ -992,6 +992,7 @@ def mark_domain_status(domain: str, status_type: str) -> None:
     Args:
         domain: The domain to mark
         status_type: One of 'ignore', 'failed', 'nxdomain', 'norobots', 'alias'
+
     """
     domain = domain.lower()
     status_map = {
@@ -1015,7 +1016,8 @@ def mark_domain_status(domain: str, status_type: str) -> None:
             _ = cursor.execute(
                 """
                     INSERT INTO raw_domains
-                    (domain, failed, ignore, errors, reason, nxdomain, norobots, alias, nodeinfo)
+                    (domain, failed, ignore, errors, reason, nxdomain,
+                     norobots, alias, nodeinfo)
                     VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
                     ON CONFLICT(domain) DO UPDATE SET
                     failed = excluded.failed,
@@ -1117,26 +1119,48 @@ def delete_domain_from_raw(domain: str) -> None:
 
 
 def save_nodeinfo_software(domain: str, software_data: dict[str, Any]) -> None:
-    """Save software name from nodeinfo to raw_domains.nodeinfo for the given domain.
+    """Save software name from nodeinfo to raw_domains.nodeinfo for the domain.
+
+    When nodeinfo is set to anything other than 'mastodon', also clears
+    errors and reason since this is not an error condition - it's just a
+    different platform.
 
     Args:
         domain: The domain being processed
-        software_data: The 'software' dict from nodeinfo_20_result (contains 'name')
+        software_data: The 'software' dict from nodeinfo_20_result (contains
+            'name')
+
     """
     domain = domain.lower()
     software_name = software_data.get("name", "unknown").lower().replace(" ", "-")
 
     with db_pool.connection() as conn, conn.cursor() as cursor:
         try:
-            _ = cursor.execute(
-                """
-                    INSERT INTO raw_domains (domain, nodeinfo)
-                    VALUES (%s, %s)
-                    ON CONFLICT(domain) DO UPDATE SET
-                    nodeinfo = excluded.nodeinfo
-                    """,
-                (domain, software_name),
-            )
+            if software_name != "mastodon":
+                # For non-Mastodon platforms, clear errors and reason
+                _ = cursor.execute(
+                    """
+                        INSERT INTO raw_domains
+                        (domain, nodeinfo, errors, reason)
+                        VALUES (%s, %s, %s, %s)
+                        ON CONFLICT(domain) DO UPDATE SET
+                        nodeinfo = excluded.nodeinfo,
+                        errors = excluded.errors,
+                        reason = excluded.reason
+                        """,
+                    (domain, software_name, None, None),
+                )
+            else:
+                # For Mastodon, just update nodeinfo
+                _ = cursor.execute(
+                    """
+                        INSERT INTO raw_domains (domain, nodeinfo)
+                        VALUES (%s, %s)
+                        ON CONFLICT(domain) DO UPDATE SET
+                        nodeinfo = excluded.nodeinfo
+                        """,
+                    (domain, software_name),
+                )
             conn.commit()
         except Exception as exception:
             vmc_output(
