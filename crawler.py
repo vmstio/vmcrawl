@@ -995,28 +995,28 @@ def mark_domain_status(domain: str, status_type: str) -> None:
     """
     domain = domain.lower()
     status_map = {
-        "ignore": (None, True, None, None, None, None, None, "ignored"),
-        "failed": (True, None, None, None, None, None, None, "failed"),
-        "nxdomain": (None, None, None, None, True, None, None, "NXDOMAIN"),
-        "norobots": (None, None, None, None, None, True, None, "NoRobots"),
-        "alias": (None, None, None, None, None, None, True, "alias"),
+        "ignore": (None, True, None, None, None, None, None, None, "ignored"),
+        "failed": (True, None, None, None, None, None, None, None, "failed"),
+        "nxdomain": (None, None, None, None, True, None, None, None, "NXDOMAIN"),
+        "norobots": (None, None, None, None, None, True, None, None, "NoRobots"),
+        "alias": (None, None, None, None, None, None, True, None, "alias"),
     }
 
     if status_type not in status_map:
         vmc_output(f"Invalid status type: {status_type}", "red")
         return
 
-    failed, ignore, errors, reason, nxdomain, norobots, alias, label = status_map[
-        status_type
-    ]
+    failed, ignore, errors, reason, nxdomain, norobots, alias, nodeinfo, label = (
+        status_map[status_type]
+    )
 
     with db_pool.connection() as conn, conn.cursor() as cursor:
         try:
             _ = cursor.execute(
                 """
                     INSERT INTO raw_domains
-                    (domain, failed, ignore, errors, reason, nxdomain, norobots, alias)
-                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
+                    (domain, failed, ignore, errors, reason, nxdomain, norobots, alias, nodeinfo)
+                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
                     ON CONFLICT(domain) DO UPDATE SET
                     failed = excluded.failed,
                     ignore = excluded.ignore,
@@ -1024,9 +1024,20 @@ def mark_domain_status(domain: str, status_type: str) -> None:
                     reason = excluded.reason,
                     nxdomain = excluded.nxdomain,
                     norobots = excluded.norobots,
-                    alias = excluded.alias
+                    alias = excluded.alias,
+                    nodeinfo = excluded.nodeinfo
                 """,
-                (domain, failed, ignore, errors, reason, nxdomain, norobots, alias),
+                (
+                    domain,
+                    failed,
+                    ignore,
+                    errors,
+                    reason,
+                    nxdomain,
+                    norobots,
+                    alias,
+                    nodeinfo,
+                ),
             )
             conn.commit()
         except Exception as exception:
