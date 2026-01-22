@@ -325,6 +325,331 @@ async def get_branch_stats(_api_key: str | None = Depends(get_api_key)):
         raise HTTPException(status_code=500, detail=f"Database error: {str(e)}")
 
 
+@app.get("/stats/patch-adoption", tags=["Statistics"])
+async def get_patch_adoption(_api_key: str | None = Depends(get_api_key)):
+    """Get patch adoption statistics (percentage of instances and MAU that are patched)."""
+    try:
+        with db_pool.connection() as conn, conn.cursor() as cur:
+            # Calculate patched instances percentage
+            _ = cur.execute(
+                """
+                WITH version_cases AS (
+                  SELECT software_version
+                  FROM patch_versions
+                ),
+                eol_check AS (
+                  SELECT DISTINCT md.software_version
+                  FROM mastodon_domains md
+                  WHERE EXISTS (
+                    SELECT 1
+                    FROM eol_versions ev
+                    WHERE md.software_version LIKE ev.software_version || '.%'
+                       OR md.software_version LIKE ev.software_version || '%'
+                  )
+                ),
+                unpatched_or_eol AS (
+                  SELECT COUNT(*) AS cnt
+                  FROM mastodon_domains md
+                  WHERE md.software_version IN (SELECT software_version FROM eol_check)
+                     OR md.software_version NOT IN (SELECT software_version FROM version_cases)
+                ),
+                totals AS (
+                  SELECT COUNT(DISTINCT domain) AS total_domains
+                  FROM mastodon_domains
+                )
+                SELECT
+                  ((t.total_domains - u.cnt) * 100.0 / t.total_domains) AS patched_percent
+                FROM totals t
+                CROSS JOIN unpatched_or_eol u
+            """
+            )
+            instances_result = cur.fetchone()
+            patched_instances_percent = (
+                round(instances_result[0], 2) if instances_result else 0
+            )
+
+            # Calculate patched MAU percentage
+            _ = cur.execute(
+                """
+                WITH version_cases AS (
+                  SELECT software_version
+                  FROM patch_versions
+                ),
+                eol_check AS (
+                  SELECT DISTINCT md.software_version
+                  FROM mastodon_domains md
+                  WHERE EXISTS (
+                    SELECT 1
+                    FROM eol_versions ev
+                    WHERE md.software_version LIKE ev.software_version || '.%'
+                       OR md.software_version LIKE ev.software_version || '%'
+                  )
+                ),
+                totals AS (
+                  SELECT SUM(active_users_monthly) AS total_users
+                  FROM mastodon_domains
+                ),
+                unpatched_or_eol AS (
+                  SELECT SUM(active_users_monthly) AS cnt
+                  FROM mastodon_domains md
+                  WHERE md.software_version IN (SELECT software_version FROM eol_check)
+                     OR md.software_version NOT IN (SELECT software_version FROM version_cases)
+                )
+                SELECT
+                  ((t.total_users - u.cnt) * 100.0 / t.total_users) AS patched_users_percent
+                FROM totals t
+                CROSS JOIN unpatched_or_eol u
+            """
+            )
+            mau_result = cur.fetchone()
+            patched_mau_percent = round(mau_result[0], 2) if mau_result else 0
+
+        return {
+            "instances_patched_percent": patched_instances_percent,
+            "mau_patched_percent": patched_mau_percent,
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Database error: {str(e)}")
+
+
+@app.get("/stats/crawler-health", tags=["Statistics"])
+async def get_crawler_health(_api_key: str | None = Depends(get_api_key)):
+    """Get crawler health statistics (error counts by type)."""
+    try:
+        with db_pool.connection() as conn, conn.cursor() as cur:
+            # Instances Gone
+            _ = cur.execute(
+                """
+                SELECT
+                  (
+                    SELECT COUNT(DISTINCT domain)
+                    FROM raw_domains
+                    WHERE nodeinfo = 'mastodon'
+                      AND alias IS NULL
+                      AND failed IS NULL
+                      AND baddata IS NULL
+                      AND norobots IS NULL
+                  )
+                  -
+                  (
+                    SELECT COUNT(DISTINCT domain)
+                    FROM mastodon_domains
+                  ) AS difference
+            """
+            )
+            result = cur.fetchone()
+            instances_gone = result[0] if result else 0
+
+            # TCP Issues
+            _ = cur.execute(
+                """
+                SELECT COUNT(DISTINCT rd.domain) AS unique_domain_count
+                FROM raw_domains rd
+                WHERE rd.nodeinfo = 'mastodon'
+                  AND rd.reason LIKE 'TCP%'
+                  AND alias IS NULL
+                  AND EXISTS (
+                    SELECT 1
+                    FROM mastodon_domains md
+                    WHERE md.domain = rd.domain
+                  )
+            """
+            )
+            result = cur.fetchone()
+            tcp_issues = result[0] if result else 0
+
+            # SSL Issues
+            _ = cur.execute(
+                """
+                SELECT COUNT(DISTINCT rd.domain) AS unique_domain_count
+                FROM raw_domains rd
+                WHERE rd.nodeinfo = 'mastodon'
+                  AND rd.reason LIKE 'SSL%'
+                  AND ALIAS IS NULL
+                  AND EXISTS (
+                    SELECT 1
+                    FROM mastodon_domains md
+                    WHERE md.domain = rd.domain
+                  )
+            """
+            )
+            result = cur.fetchone()
+            ssl_issues = result[0] if result else 0
+
+            # DNS Issues
+            _ = cur.execute(
+                """
+                SELECT COUNT(DISTINCT rd.domain) AS unique_domain_count
+                FROM raw_domains rd
+                WHERE rd.nodeinfo = 'mastodon'
+                  AND rd.reason LIKE 'DNS%'
+                  AND ALIAS IS NULL
+                  AND EXISTS (
+                    SELECT 1
+                    FROM mastodon_domains md
+                    WHERE md.domain = rd.domain
+                  )
+            """
+            )
+            result = cur.fetchone()
+            dns_issues = result[0] if result else 0
+
+            # 5xx Issues
+            _ = cur.execute(
+                """
+                SELECT COUNT(DISTINCT rd.domain) AS unique_domain_count
+                FROM raw_domains rd
+                WHERE rd.nodeinfo = 'mastodon'
+                  AND rd.reason ~ '^5[0-9]{2}'
+                  AND ALIAS IS NULL
+                  AND EXISTS (
+                    SELECT 1
+                    FROM mastodon_domains md
+                    WHERE md.domain = rd.domain
+                  )
+            """
+            )
+            result = cur.fetchone()
+            http_5xx_issues = result[0] if result else 0
+
+            # 4xx Issues
+            _ = cur.execute(
+                """
+                SELECT COUNT(DISTINCT rd.domain) AS unique_domain_count
+                FROM raw_domains rd
+                WHERE rd.nodeinfo = 'mastodon'
+                  AND rd.reason ~ '^4[0-9]{2}'
+                  AND ALIAS IS NULL
+                  AND EXISTS (
+                    SELECT 1
+                    FROM mastodon_domains md
+                    WHERE md.domain = rd.domain
+                  )
+            """
+            )
+            result = cur.fetchone()
+            http_4xx_issues = result[0] if result else 0
+
+            # File Issues
+            _ = cur.execute(
+                """
+                SELECT COUNT(DISTINCT rd.domain) AS unique_domain_count
+                FROM raw_domains rd
+                WHERE rd.nodeinfo = 'mastodon'
+                  AND (rd.reason LIKE 'FILE%' or rd.reason LIKE 'TYPE%' or rd.reason LIKE 'JSON%')
+                  AND ALIAS IS NULL
+                  AND EXISTS (
+                    SELECT 1
+                    FROM mastodon_domains md
+                    WHERE md.domain = rd.domain
+                  )
+            """
+            )
+            result = cur.fetchone()
+            file_issues = result[0] if result else 0
+
+            # MAU Issues
+            _ = cur.execute(
+                """
+                SELECT COUNT(DISTINCT domain) AS unique_domain_count
+                FROM raw_domains
+                WHERE nodeinfo = 'mastodon' AND reason LIKE 'MAU%' AND alias IS NULL
+            """
+            )
+            result = cur.fetchone()
+            mau_issues = result[0] if result else 0
+
+        return {
+            "instances_gone": instances_gone,
+            "tcp_issues": tcp_issues,
+            "ssl_issues": ssl_issues,
+            "dns_issues": dns_issues,
+            "http_5xx_issues": http_5xx_issues,
+            "http_4xx_issues": http_4xx_issues,
+            "file_issues": file_issues,
+            "mau_issues": mau_issues,
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Database error: {str(e)}")
+
+
+@app.get("/stats/domains", tags=["Statistics"])
+async def get_domain_stats(_api_key: str | None = Depends(get_api_key)):
+    """Get domain statistics (known, dead, blocked, non-Mastodon)."""
+    try:
+        with db_pool.connection() as conn, conn.cursor() as cur:
+            # Known Domains
+            _ = cur.execute(
+                """
+                SELECT COUNT(DISTINCT domain) AS unique_domain_count
+                FROM raw_domains
+            """
+            )
+            result = cur.fetchone()
+            known_domains = result[0] if result else 0
+
+            # Dead Domains
+            _ = cur.execute(
+                """
+                SELECT COUNT(DISTINCT domain) AS unique_domain_count
+                FROM raw_domains
+                WHERE (ignore IS NOT NULL OR nxdomain IS NOT NULL OR failed IS NOT NULL OR alias IS NOT NULL)
+            """
+            )
+            result = cur.fetchone()
+            dead_domains = result[0] if result else 0
+
+            # Blocked Domains
+            _ = cur.execute(
+                """
+                SELECT COUNT(DISTINCT domain) AS unique_domain_count
+                FROM raw_domains
+                WHERE (reason LIKE 'API' OR norobots IS NOT NULL OR baddata IS NOT NULL)
+            """
+            )
+            result = cur.fetchone()
+            blocked_domains = result[0] if result else 0
+
+            # Non-Mastodon Instances
+            _ = cur.execute(
+                """
+                SELECT COUNT(DISTINCT domain) AS unique_domain_count
+                FROM raw_domains
+                WHERE "nodeinfo"::TEXT NOT ILIKE '%mastodon%'
+            """
+            )
+            result = cur.fetchone()
+            non_mastodon_instances = result[0] if result else 0
+
+        return {
+            "known_domains": known_domains,
+            "dead_domains": dead_domains,
+            "blocked_domains": blocked_domains,
+            "non_mastodon_instances": non_mastodon_instances,
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Database error: {str(e)}")
+
+
+@app.get("/stats/raw-versions", tags=["Statistics"])
+async def get_raw_versions(_api_key: str | None = Depends(get_api_key)):
+    """Get count of unique raw versions (before normalization/cleaning)."""
+    try:
+        with db_pool.connection() as conn, conn.cursor() as cur:
+            _ = cur.execute(
+                """
+                SELECT COUNT(DISTINCT full_version) AS unique_software_versions
+                FROM mastodon_domains
+            """
+            )
+            result = cur.fetchone()
+            raw_versions = result[0] if result else 0
+
+        return {"raw_versions": raw_versions}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Database error: {str(e)}")
+
+
 # =============================================================================
 # INSTANCE ENDPOINTS
 # =============================================================================
