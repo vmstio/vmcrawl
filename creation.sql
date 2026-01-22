@@ -119,19 +119,47 @@ VALUES
 INSERT INTO
   junk_words (keywords, comments)
 VALUES
-  ('activitypub-proxy.cf', 'ActivityPub abuse'),
-  ('activitypub-troll.cf', 'ActivityPub abuse');
+  ('activitypub-proxy.cf', NULL),
+  ('activitypub-troll.cf', NULL),
+  ('appspot.com', NULL),
+  ('balena-devices.com', NULL),
+  ('cf-ipfs.com', NULL),
+  ('cloud-xip.com', NULL),
+  ('deno.dev', NULL),
+  ('devtunnels.ms', NULL),
+  ('elestio.app', NULL),
+  ('fly.dev', NULL),
+  ('github.dev', NULL),
+  ('gitpod.io', NULL),
+  ('herokuapp.com', NULL),
+  ('lhr.life', NULL),
+  ('lhrtunnel.link', NULL),
+  ('linodeusercontent.com', NULL),
+  ('localhost.run', NULL),
+  ('loca.lt', NULL),
+  ('myterminus.com', NULL),
+  ('netlify.app', NULL),
+  ('ngrok.app', NULL),
+  ('ngrok.dev', NULL),
+  ('ngrok-free.app', NULL),
+  ('ngrok-free.dev', NULL),
+  ('ngrok.io', NULL),
+  ('nope.rodeo', NULL),
+  ('pages.dev', NULL),
+  ('penginn.net', NULL),
+  ('pikapod.net', NULL),
+  ('serveo.net', NULL),
+  ('spacehost.dev', NULL),
+  ('srv.us', NULL),
+  ('tunnelto.dev', NULL),
+  ('vercel.app', NULL),
+  ('wordpress.com', NULL),
+  ('workers.dev', NULL),
+  ('wpcomstaging.com', NULL);
 
 INSERT INTO
   nightly_versions (version, start_date, end_date)
 VALUES
-  ('4.6.0-alpha.1', '2025-11-01', '2099-12-31'),
-  ('4.5.0-rc.1', '2025-10-30', '2025-10-31'),
-  ('4.5.0-beta.2', '2025-10-22', '2025-10-29'),
-  ('4.5.0-beta.1', '2025-10-16', '2025-10-21'),
-  ('4.5.0-alpha.3', '2025-10-14', '2025-10-15'),
-  ('4.5.0-alpha.2', '2025-08-06', '2025-10-13'),
-  ('4.5.0-alpha.1', '2025-07-03', '2029-08-05'),
   ('4.4.0-rc.1', '2025-07-02', '2025-07-02'),
   ('4.4.0-beta.2', '2025-06-18', '2025-07-01'),
   ('4.4.0-beta.1', '2025-06-05', '2025-06-17'),
@@ -148,5 +176,14 @@ VALUES
   ('4.3.0-alpha.3', '2024-02-17', '2024-05-30'),
   ('4.3.0-alpha.2', '2024-02-15', '2024-02-17'),
   ('4.3.0-alpha.1', '2024-01-30', '2024-02-14'),
-  ('4.3.0-alpha.0', '2023-09-28', '2024-01-29');
+  ('4.3.0-alpha.0', '2023-09-28', '2024-01-29'),
+  ('4.5.0-alpha.1', '2025-07-03', '2029-08-05'),
+  ('4.5.0-alpha.2', '2025-08-06', '2025-10-13'),
+  ('4.5.0-beta.1', '2025-10-16', '2025-10-21'),
+  ('4.5.0-alpha.3', '2025-10-14', '2025-10-15'),
+  ('4.5.0-beta.2', '2025-10-22', '2025-10-29'),
+  ('4.5.0-rc.1', '2025-10-30', '2025-10-31'),
+  ('4.6.0-alpha.1', '2025-11-01', '2026-01-07'),
+  ('4.6.0-alpha.2', '2026-01-08', '2026-01-20'),
+  ('4.6.0-alpha.3', '2026-01-21', '2099-12-31');
 -- Note: 4.2.x and earlier do not have nightly builds
