@@ -236,46 +236,32 @@ def is_cache_valid(cache_file_path: str, max_age_seconds: int) -> bool:
 
 
 def is_alias_domain(domain: str, backend_domain: str) -> bool:
-    """Check if backend_domain is an alias of domain.
+    """Check if domain is an alias that should not be stored in the database.
 
-    Returns True if backend_domain is neither equal to domain nor a subdomain of it.
-    This indicates the domain is an alias/redirect to a different instance.
+    Only the authoritative/canonical domain (from backend_domain or instance API)
+    should be stored. Any domain that differs from the authoritative domain is an alias.
 
     Args:
         domain: The original domain being crawled
-        backend_domain: The discovered backend domain from host-meta/webfinger
+        backend_domain: The authoritative domain (from host-meta/webfinger/instance API)
 
     Returns:
-        True if backend_domain is an alias (different root domain)
-        False if backend_domain equals domain or is a subdomain of domain
+        True if domain is different from backend_domain (is an alias)
+        False if domain equals backend_domain (is authoritative)
 
     Examples:
-        is_alias_domain("example.com", "example.com") -> False
-        is_alias_domain("example.com", "social.example.com") -> False
-        is_alias_domain("example.com", "other.com") -> True
-        is_alias_domain("social.example.com", "example.com") -> True
+        is_alias_domain("example.com", "example.com") -> False (same, not alias)
+        is_alias_domain("example.com", "social.example.com") -> True (different, is alias)
+        is_alias_domain("social.example.com", "example.com") -> True (different, is alias)
+        is_alias_domain("example.com", "other.com") -> True (different, is alias)
     """
     # Normalize domains to lowercase
     domain = domain.lower()
     backend_domain = backend_domain.lower()
 
-    # If they're equal, not a duplicate
-    if domain == backend_domain:
-        return False
-
-    # Check if backend_domain is a subdomain of domain
-    # e.g., social.example.com is subdomain of example.com
-    if backend_domain.endswith(f".{domain}"):
-        return False
-
-    # Check if domain is a subdomain of backend_domain
-    # e.g., if domain is social.example.com and backend is example.com
-    # This is also an alias (forwarding to parent domain)
-    if domain.endswith(f".{backend_domain}"):
-        return True
-
-    # Otherwise, they're different root domains - this is an alias
-    return True
+    # Only exact match means not an alias
+    # Any difference means this domain is an alias of the authoritative domain
+    return domain != backend_domain
 
 
 def parse_json_with_fallback(
@@ -2077,7 +2063,18 @@ def process_domain(domain, http_client, nightly_version_ranges):
             return
 
         # Check if this is an alias (redirect to another instance)
-        # Compare against instance_uri (canonical domain from API) not backend_domain
+        # Check both backend_domain (from host-meta/webfinger) and instance_uri (from API)
+        # as some instances may have one configured correctly but not the other
+        if is_alias_domain(domain, backend_domain):
+            vmc_output(
+                f"{domain}: Alias - redirects to {backend_domain}",
+                "cyan",
+                use_tqdm=True,
+            )
+            mark_alias_domain(domain)
+            delete_domain_if_known(domain)
+            return
+
         if is_alias_domain(domain, instance_uri):
             vmc_output(
                 f"{domain}: Alias - redirects to {instance_uri}",
