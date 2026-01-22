@@ -2062,6 +2062,17 @@ def process_domain(domain, http_client, nightly_version_ranges):
     if is_mastodon_instance(nodeinfo_20_result):
         # Get the actual domain from the instance API
         instance_uri = get_instance_uri(backend_domain, http_client)
+        
+        # Check if this is an alias (redirect to another instance)
+        if is_alias_domain(domain, backend_domain):
+            vmc_output(
+                f"{domain}: Alias - redirects to {backend_domain}",
+                "cyan",
+                use_tqdm=True,
+            )
+            mark_alias_domain(domain)
+            delete_domain_if_known(domain)
+            return
 
         if instance_uri is None:
             # Instance API endpoint is required for Mastodon instances
@@ -2069,17 +2080,6 @@ def process_domain(domain, http_client, nightly_version_ranges):
             vmc_output(f"{domain}: {error_to_print}", "yellow", use_tqdm=True)
             log_error(domain, error_to_print)
             increment_domain_error(domain, "API")
-            return
-
-        # Check if this is an alias (redirect to another instance)
-        if is_alias_domain(domain, instance_uri):
-            vmc_output(
-                f"{domain}: Alias - redirects to {instance_uri}",
-                "cyan",
-                use_tqdm=True,
-            )
-            mark_alias_domain(domain)
-            delete_domain_if_known(domain)
             return
 
         process_mastodon_instance(
