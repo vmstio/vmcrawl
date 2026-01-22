@@ -86,38 +86,27 @@
                                 │                        │
                                 ▼                        ▼
                     ┌─────────────────────┐  ┌──────────────┐
-                    │ save_nodeinfo_      │  │ STOP/RETURN  │
-                    │ software()          │  │ (bad data)   │
-                    │ Save platform name  │  └──────────────┘
-                    └──────────┬──────────┘
-                               │
-                   ┌───────────▼────────────┐
-                   │ is_mastodon_instance?  │
-                   └───────────┬────────────┘
+                    │ is_mastodon_        │  │ STOP/RETURN  │
+                    │ instance?           │  │ (bad data)   │
+                    └──────────┬──────────┘  └──────────────┘
                                │
                    ┌───────────┴────────────┐
                    │                        │
-                 YES│                       │NO
+                YES│                        │NO
                    │                        │
                    ▼                        ▼
        ┌──────────────────────┐  ┌──────────────────────┐
-       │ process_mastodon_    │  │ mark_as_non_mastodon │
-       │ instance()           │  │ delete_domain_if_    │
-       └──────────┬───────────┘  │ known()              │
-                  │              │ (Lemmy, Pixelfed,    │
-                  ▼              │  etc.)               │
-       ┌──────────────────────┐  └──────────┬───────────┘
-       │ get_instance_uri()   │             │
-       │ /api/v1/instance     │             │
-       └──────────┬───────────┘             │
-                  │                         │
-       ┌──────────▼───────────┐             │
-       │ Instance URI found?  │             │
-       └──────────┬───────────┘             │
-                  │                         │
-       ┌──────────┴───────────┐             │
-       │                      │             │
-    YES│                      │NO           │
+       │ get_instance_uri()   │  │ save_nodeinfo_       │
+       │ /api/v1/instance     │  │ software()           │
+       └──────────┬───────────┘  │ Save platform name   │
+                  │              │ to nodeinfo column   │
+       ┌──────────▼───────────┐  │                      │
+       │ Instance URI found?  │  │ mark_as_non_mastodon │
+       └──────────┬───────────┘  │ delete_domain_if_    │
+                  │              │ known()              │
+       ┌──────────┴───────────┐  │ (Lemmy, Pixelfed,    │
+       │                      │  │  etc.)               │
+    YES│                      │NO└──────────┬───────────┘
        │                      │             │
        ▼                      ▼             │
 ┌────────────────┐  ┌──────────────┐        │
@@ -141,14 +130,17 @@ YES│        │NO                             │
    │        │                               │
    ▼        ▼                               │
 ┌────────┐  ┌────────────────┐              │
-│ STOP/  │  │ Validate       │              │
-│ RETURN │  │ version        │              │
-│ (alias)│  └──────┬─────────┘              │
-│ Mark   │         │                        │
-│ domain │         ▼                        │
-│ as     │  ┌────────────────┐              │
-│ alias  │  │ Save to        │              │
-└────────┘  │ mastodon_      │              │
+│ STOP/  │  │ save_nodeinfo_ │              │
+│ RETURN │  │ software()     │              │
+│ (alias)│  │ Save platform  │              │
+│ Mark   │  │ name to        │              │
+│ domain │  │ nodeinfo column│              │
+│ as     │  │                │              │
+│ alias  │  │ Validate       │              │
+└────────┘  │ version        │              │
+            │                │              │
+            │ Save to        │              │
+            │ mastodon_      │              │
             │ domains table  │              │
             └──────┬─────────┘              │
                    │                        │
@@ -189,6 +181,9 @@ YES│        │NO                             │
 2. **Webfinger Failure**: Use original domain (graceful degradation)
 3. **NodeInfo Result**: Determines Mastodon vs non-Mastodon handling
 4. **Software Name**: Final classification (mastodon, lemmy, pixelfed, etc.)
+5. **Software Data Timing**: 
+   - For **Mastodon instances**: Saved only after validation and alias check (prevents saving data for aliases)
+   - For **non-Mastodon platforms**: Saved unconditionally to `nodeinfo` column in `raw_domains`
 
 ## Alias Detection
 
@@ -215,9 +210,9 @@ A domain is marked as an alias when:
 
 When an alias is detected:
 1. Log message: `"{domain}: Alias - redirects to {instance_uri}"` (cyan)
-2. Mark domain with `alias = TRUE` in `raw_domains` table
+2. Mark domain with `alias = TRUE` in `raw_domains` table using `mark_domain_status(domain, "alias")`
 3. Delete domain from `mastodon_domains` if present
-4. Stop processing immediately
+4. Stop processing immediately (software data is NOT saved for aliases)
 
 ### Skip Processing
 
@@ -229,13 +224,26 @@ Domains marked as aliases are skipped during processing:
 
 ## Error Handling
 
-- **robots.txt blocks**: Stop immediately, mark as norobots
+- **robots.txt blocks**: Stop immediately, mark as norobots using `mark_domain_status(domain, "norobots")`
 - **Host-meta fails**: Continue to webfinger (silent, no logging)
 - **Webfinger fails**: Continue to nodeinfo with original domain (silent, no logging)
 - **NodeInfo fails**: Stop, log error, increment error counter (ONLY logged failure)
-- **Non-Mastodon detected**: Mark and skip (not an error)
-- **Alias detected**: Stop, mark as alias, skip in future runs
+- **Non-Mastodon detected**: Save software name to `nodeinfo` column, mark and skip (not an error)
+- **Alias detected**: Stop, mark as alias using `mark_domain_status(domain, "alias")`, skip in future runs
 
 ### Why Silent Failures?
 
 Host-meta and webfinger are **discovery mechanisms** - their failure doesn't mean the domain is broken, just that we need to try another method. Only when **all** methods fail (nodeinfo returns nothing) do we log it as an actual error.
+
+### Software Data Storage
+
+The `save_nodeinfo_software()` function stores the platform name from NodeInfo to the `raw_domains.nodeinfo` column:
+
+- **For Mastodon instances**: Software data is saved ONLY after:
+  1. Instance URI is successfully retrieved
+  2. Domain is verified to NOT be an alias
+  3. This prevents saving "mastodon" for domains that redirect elsewhere
+  
+- **For non-Mastodon platforms**: Software data is saved unconditionally
+  - Platforms like Lemmy, Pixelfed, Misskey, etc. are saved immediately
+  - Non-Mastodon platforms also have their `errors` and `reason` fields cleared since being a different platform is not an error condition
