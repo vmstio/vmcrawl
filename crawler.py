@@ -154,9 +154,11 @@ http_custom_headers = {"User-Agent": http_custom_user_agent}
 max_response_size = int(os.getenv("VMCRAWL_MAX_RESPONSE_SIZE", str(10 * 1024 * 1024)))
 
 # Create limits object for httpx
+# Scale connection limits with number of worker threads
+# Each thread may need multiple connections (robots.txt, host-meta, nodeinfo, etc.)
 limits = httpx.Limits(
-    max_keepalive_connections=5,
-    max_connections=10,
+    max_keepalive_connections=max_workers * 5,
+    max_connections=max_workers * 10,
     keepalive_expiry=30.0,
 )
 
@@ -2062,7 +2064,7 @@ def process_domain(domain, http_client, nightly_version_ranges):
     if is_mastodon_instance(nodeinfo_20_result):
         # Get the actual domain from the instance API
         instance_uri = get_instance_uri(backend_domain, http_client)
-        
+
         # Check if this is an alias (redirect to another instance)
         if is_alias_domain(domain, backend_domain):
             vmc_output(
