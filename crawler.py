@@ -888,15 +888,16 @@ def increment_domain_error(
                 _ = cursor.execute(
                     """
                         INSERT INTO raw_domains
-                        (domain, failed, ignore, errors, reason, nxdomain, norobots)
-                        VALUES (%s, %s, %s, %s, %s, %s, %s)
+                        (domain, failed, ignore, errors, reason, nxdomain, norobots, noapi)
+                        VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
                         ON CONFLICT(domain) DO UPDATE SET
                         failed = excluded.failed,
                         ignore = excluded.ignore,
                         errors = excluded.errors,
                         reason = excluded.reason,
                         nxdomain = excluded.nxdomain,
-                        norobots = excluded.norobots
+                        norobots = excluded.norobots,
+                        noapi = excluded.noapi
                     """,
                     (
                         domain,
@@ -905,6 +906,7 @@ def increment_domain_error(
                         errors_value,
                         reason_value,
                         nxdomain_value,
+                        None,
                         None,
                     ),
                 )
@@ -985,15 +987,16 @@ def increment_domain_error(
             _ = cursor.execute(
                 """
                     INSERT INTO raw_domains
-                    (domain, failed, ignore, errors, reason, nxdomain, norobots)
-                    VALUES (%s, %s, %s, %s, %s, %s, %s)
+                    (domain, failed, ignore, errors, reason, nxdomain, norobots, noapi)
+                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
                     ON CONFLICT(domain) DO UPDATE SET
                     failed = excluded.failed,
                     ignore = excluded.ignore,
                     errors = excluded.errors,
                     reason = excluded.reason,
                     nxdomain = excluded.nxdomain,
-                    norobots = excluded.norobots
+                    norobots = excluded.norobots,
+                    noapi = excluded.noapi
                 """,
                 (
                     domain,
@@ -1002,6 +1005,7 @@ def increment_domain_error(
                     new_errors,
                     error_reason,
                     nxdomain_value,
+                    None,
                     None,
                 ),
             )
@@ -1023,17 +1027,18 @@ def clear_domain_error(domain: str) -> None:
             _ = cursor.execute(
                 """
                     INSERT INTO raw_domains
-                    (domain, failed, ignore, errors, reason, nxdomain, norobots)
-                    VALUES (%s, %s, %s, %s, %s, %s, %s)
+                    (domain, failed, ignore, errors, reason, nxdomain, norobots, noapi)
+                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
                     ON CONFLICT(domain) DO UPDATE SET
                     failed = excluded.failed,
                     ignore = excluded.ignore,
                     errors = excluded.errors,
                     reason = excluded.reason,
                     nxdomain = excluded.nxdomain,
-                    norobots = excluded.norobots
+                    norobots = excluded.norobots,
+                    noapi = excluded.noapi
                 """,
-                (domain, None, None, None, None, None, None),
+                (domain, None, None, None, None, None, None, None),
             )
             conn.commit()
         except Exception as exception:
@@ -1055,25 +1060,35 @@ def mark_domain_status(domain: str, status_type: str) -> None:
 
     Args:
         domain: The domain to mark
-        status_type: One of 'ignore', 'failed', 'nxdomain', 'norobots', 'alias'
+        status_type: One of 'ignore', 'failed', 'nxdomain', 'norobots', 'noapi', 'alias'
 
     """
     domain = domain.lower()
     status_map = {
-        "ignore": (None, True, None, None, None, None, None, None, "ignored"),
-        "failed": (True, None, None, None, None, None, None, None, "failed"),
-        "nxdomain": (None, None, None, None, True, None, None, None, "NXDOMAIN"),
-        "norobots": (None, None, None, None, None, True, None, None, "NoRobots"),
-        "alias": (None, None, None, None, None, None, True, None, "alias"),
+        "ignore": (None, True, None, None, None, None, None, None, None, "ignored"),
+        "failed": (True, None, None, None, None, None, None, None, None, "failed"),
+        "nxdomain": (None, None, None, None, True, None, None, None, None, "NXDOMAIN"),
+        "norobots": (None, None, None, None, None, True, None, None, None, "NoRobots"),
+        "noapi": (None, None, None, None, None, None, True, None, None, "NoAPI"),
+        "alias": (None, None, None, None, None, None, None, True, None, "alias"),
     }
 
     if status_type not in status_map:
         vmc_output(f"Invalid status type: {status_type}", "red")
         return
 
-    failed, ignore, errors, reason, nxdomain, norobots, alias, nodeinfo, label = (
-        status_map[status_type]
-    )
+    (
+        failed,
+        ignore,
+        errors,
+        reason,
+        nxdomain,
+        norobots,
+        noapi,
+        alias,
+        nodeinfo,
+        label,
+    ) = status_map[status_type]
 
     with db_pool.connection() as conn, conn.cursor() as cursor:
         try:
@@ -1081,8 +1096,8 @@ def mark_domain_status(domain: str, status_type: str) -> None:
                 """
                     INSERT INTO raw_domains
                     (domain, failed, ignore, errors, reason, nxdomain,
-                     norobots, alias, nodeinfo)
-                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
+                     norobots, noapi, alias, nodeinfo)
+                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
                     ON CONFLICT(domain) DO UPDATE SET
                     failed = excluded.failed,
                     ignore = excluded.ignore,
@@ -1090,6 +1105,7 @@ def mark_domain_status(domain: str, status_type: str) -> None:
                     reason = excluded.reason,
                     nxdomain = excluded.nxdomain,
                     norobots = excluded.norobots,
+                    noapi = excluded.noapi,
                     alias = excluded.alias,
                     nodeinfo = excluded.nodeinfo
                 """,
@@ -1101,6 +1117,7 @@ def mark_domain_status(domain: str, status_type: str) -> None:
                     reason,
                     nxdomain,
                     norobots,
+                    noapi,
                     alias,
                     nodeinfo,
                 ),
@@ -1130,6 +1147,11 @@ def mark_nxdomain_domain(domain: str) -> None:
 def mark_norobots_domain(domain: str) -> None:
     """Mark a domain as norobots (crawling prohibited)."""
     mark_domain_status(domain, "norobots")
+
+
+def mark_noapi_domain(domain: str) -> None:
+    """Mark a domain as noapi (instance API requires authentication)."""
+    mark_domain_status(domain, "noapi")
 
 
 def mark_alias_domain(domain: str) -> None:
@@ -1354,12 +1376,20 @@ def get_domains_by_status(status_column):
     """Get list of domains filtered by status column.
 
     Args:
-        status_column: One of 'failed', 'ignore', 'baddata', 'nxdomain', 'norobots', 'alias'
+        status_column: One of 'failed', 'ignore', 'baddata', 'nxdomain', 'norobots', 'noapi', 'alias'
 
     Returns:
         Set of domain strings
     """
-    valid_columns = ["failed", "ignore", "baddata", "nxdomain", "norobots", "alias"]
+    valid_columns = [
+        "failed",
+        "ignore",
+        "baddata",
+        "nxdomain",
+        "norobots",
+        "noapi",
+        "alias",
+    ]
     if status_column not in valid_columns:
         vmc_output(f"Invalid status column: {status_column}", "red")
         return set()
@@ -1420,6 +1450,11 @@ def get_nxdomain_domains():
 def get_norobots_domains():
     """Get list of domains that prohibit crawling."""
     return get_domains_by_status("norobots")
+
+
+def get_noapi_domains():
+    """Get list of domains whose instance API requires authentication."""
+    return get_domains_by_status("noapi")
 
 
 def get_alias_domains():
@@ -1598,6 +1633,7 @@ def should_skip_domain(
     ignored_domains,
     nxdomain_domains,
     norobots_domains,
+    noapi_domains,
     alias_domains,
     user_choice,
 ):
@@ -1622,7 +1658,11 @@ def should_skip_domain(
         vmc_output(f"{domain}: Crawling Prohibited", "cyan", use_tqdm=True)
         delete_domain_if_known(domain)
         return True
-    if user_choice != "15" and domain in alias_domains:
+    if user_choice != "15" and domain in noapi_domains:
+        vmc_output(f"{domain}: API Authentication Required", "cyan", use_tqdm=True)
+        delete_domain_if_known(domain)
+        return True
+    if user_choice != "16" and domain in alias_domains:
         vmc_output(f"{domain}: Alias Domain", "cyan", use_tqdm=True)
         delete_domain_if_known(domain)
         return True
@@ -2038,11 +2078,18 @@ def mark_as_non_mastodon(domain, other_platform):
     delete_domain_if_known(domain)
 
 
-def get_instance_uri(backend_domain: str, http_client: httpx.Client) -> str | None:
+def get_instance_uri(
+    backend_domain: str, http_client: httpx.Client
+) -> tuple[str | None, bool]:
     """Fetch the instance API and extract the domain/uri field.
 
     First tries v2 instance API for 'domain' field, then falls back to
     v1 instance API for 'uri' field if v2 fails.
+
+    Returns:
+        tuple: (domain/uri string or None, is_401 boolean)
+            - First element is the domain/uri if successful, None otherwise
+            - Second element is True if a 401 response was encountered, False otherwise
     """
     # Try v2 API first
     instance_api_v2_url = f"https://{backend_domain}/api/v2/instance"
@@ -2050,6 +2097,8 @@ def get_instance_uri(backend_domain: str, http_client: httpx.Client) -> str | No
 
     try:
         response = get_httpx(instance_api_v2_url, http_client)
+        if response.status_code == 401:
+            return (None, True)
         if response.status_code == 200:
             content_type = response.headers.get("Content-Type", "")
             if "json" in content_type and response.content:
@@ -2060,7 +2109,7 @@ def get_instance_uri(backend_domain: str, http_client: httpx.Client) -> str | No
                     domain = instance_data.get("domain")
                     # Normalize domain to lowercase for consistent comparison
                     if domain:
-                        return domain.strip().lower()
+                        return (domain.strip().lower(), False)
     except (httpx.RequestError, json.JSONDecodeError):
         pass  # Fall through to v1 API
 
@@ -2070,31 +2119,33 @@ def get_instance_uri(backend_domain: str, http_client: httpx.Client) -> str | No
 
     try:
         response = get_httpx(instance_api_v1_url, http_client)
+        if response.status_code == 401:
+            return (None, True)
         if response.status_code == 200:
             content_type = response.headers.get("Content-Type", "")
             if "json" not in content_type:
-                return None
+                return (None, False)
             if not response.content:
-                return None
+                return (None, False)
 
             instance_data = parse_json_with_fallback(
                 response, backend_domain, target_v1
             )
             if instance_data is False or not instance_data:
-                return None
+                return (None, False)
 
             if isinstance(instance_data, dict):
                 uri = instance_data.get("uri")
                 # Normalize domain to lowercase for consistent comparison
                 if uri:
-                    return uri.strip().lower()
-                return uri
-            return None
-        return None
+                    return (uri.strip().lower(), False)
+                return (uri, False)
+            return (None, False)
+        return (None, False)
     except httpx.RequestError:
-        return None
+        return (None, False)
     except json.JSONDecodeError:
-        return None
+        return (None, False)
 
 
 def process_mastodon_instance(
@@ -2247,11 +2298,20 @@ def process_domain(domain, http_client, nightly_version_ranges, user_choice=None
 
     if is_mastodon_instance(nodeinfo_20_result):
         # Get the actual domain from the instance API
-        instance_uri = get_instance_uri(backend_domain, http_client)
+        instance_uri, is_401 = get_instance_uri(backend_domain, http_client)
+
+        if is_401:
+            # Instance API requires authentication (401 Unauthorized)
+            error_to_print = "Instance API requires authentication"
+            vmc_output(f"{domain}: {error_to_print}", "yellow", use_tqdm=True)
+            log_error(domain, error_to_print)
+            mark_noapi_domain(domain)
+            delete_domain_if_known(domain)
+            return
 
         if instance_uri is None:
             # Instance API endpoint is required for Mastodon instances
-            error_to_print = "could not validate instance API"
+            error_to_print = "could not retrieve instance URI"
             vmc_output(f"{domain}: {error_to_print}", "yellow", use_tqdm=True)
             log_error(domain, error_to_print)
             increment_domain_error(domain, "API", preserve_ignore, preserve_nxdomain)
@@ -2312,6 +2372,7 @@ def check_and_record_domains(
     http_client,
     nxdomain_domains,
     norobots_domains,
+    noapi_domains,
     alias_domains,
     nightly_version_ranges,
 ):
@@ -2334,6 +2395,7 @@ def check_and_record_domains(
             ignored_domains,
             nxdomain_domains,
             norobots_domains,
+            noapi_domains,
             alias_domains,
             user_choice,
         ):
@@ -3164,6 +3226,7 @@ def load_from_database(user_choice):
             "(ignore IS NULL OR ignore = FALSE) AND "
             "(nxdomain IS NULL OR nxdomain = FALSE) AND "
             "(norobots IS NULL OR norobots = FALSE) AND "
+            "(noapi IS NULL OR noapi = FALSE) AND "
             "(baddata IS NULL OR baddata = FALSE) AND "
             "(alias IS NULL OR alias = FALSE) AND "
             "(nodeinfo = 'mastodon' OR nodeinfo IS NULL) "
@@ -3184,7 +3247,8 @@ def load_from_database(user_choice):
         "12": "SELECT domain FROM raw_domains WHERE failed = TRUE ORDER BY domain",
         "13": "SELECT domain FROM raw_domains WHERE nxdomain = TRUE ORDER BY domain",
         "14": "SELECT domain FROM raw_domains WHERE norobots = TRUE ORDER BY domain",
-        "15": "SELECT domain FROM raw_domains WHERE alias = TRUE ORDER BY domain",
+        "15": "SELECT domain FROM raw_domains WHERE noapi = TRUE ORDER BY domain",
+        "16": "SELECT domain FROM raw_domains WHERE alias = TRUE ORDER BY domain",
         "20": (
             "SELECT domain FROM raw_domains WHERE reason LIKE 'SSL%' ORDER BY errors"
         ),
@@ -3333,7 +3397,8 @@ def get_menu_options() -> dict[str, dict[str, str]]:
             "12": "Failed",
             "13": "NXDOMAIN",
             "14": "Prohibited",
-            "15": "Alias",
+            "15": "NoAPI",
+            "16": "Alias",
         },
         "Retry connection errors": {
             "20": "SSL",
@@ -3549,6 +3614,7 @@ def main():
         baddata_domains = get_baddata_domains()
         nxdomain_domains = get_nxdomain_domains()
         norobots_domains = get_norobots_domains()
+        noapi_domains = get_noapi_domains()
         alias_domains = get_alias_domains()
         nightly_version_ranges = get_nightly_version_ranges()
 
@@ -3568,6 +3634,7 @@ def main():
             http_client,
             nxdomain_domains,
             norobots_domains,
+            noapi_domains,
             alias_domains,
             nightly_version_ranges,
         )

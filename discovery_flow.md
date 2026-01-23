@@ -97,25 +97,41 @@
                    ▼                        ▼
        ┌──────────────────────┐  ┌──────────────────────┐
        │ get_instance_uri()   │  │ save_nodeinfo_       │
-       │ /api/v1/instance     │  │ software()           │
-       └──────────┬───────────┘  │ Save platform name   │
-                  │              │ to nodeinfo column   │
-       ┌──────────▼───────────┐  │                      │
-       │ Instance URI found?  │  │ mark_as_non_mastodon │
-       └──────────┬───────────┘  │ delete_domain_if_    │
-                  │              │ known()              │
-       ┌──────────┴───────────┐  │ (Lemmy, Pixelfed,    │
-       │                      │  │  etc.)               │
-    YES│                      │NO└──────────┬───────────┘
+       │ Try v2 API first     │  │ software()           │
+       │ /api/v2/instance     │  │ Save platform name   │
+       │ (domain field)       │  │ to nodeinfo column   │
+       │ Fallback to v1 API   │  │                      │
+       │ /api/v1/instance     │  │ mark_as_non_mastodon │
+       │ (uri field)          │  │ delete_domain_if_    │
+       └──────────┬───────────┘  │ known()              │
+                  │              │ (Lemmy, Pixelfed,    │
+       ┌──────────▼───────────┐  │  etc.)               │
+       │ Returns 401?         │  └──────────┬───────────┘
+       └──────────┬───────────┘             │
+                  │                         │
+       ┌──────────┴───────────┐             │
+       │                      │             │
+    YES│                      │NO           │
        │                      │             │
        ▼                      ▼             │
-┌────────────────┐  ┌──────────────┐        │
-│ Use actual_    │  │ STOP/RETURN  │        │
-│ domain from    │  │ (no instance │        │
-│ instance URI   │  │  URI)        │        │
-└──────┬─────────┘  └──────────────┘        │
-       │                                    │
-       ▼                                    │
+┌────────────────┐  ┌──────────────────┐   │
+│ STOP/RETURN    │  │ Instance URI     │   │
+│ (noapi)        │  │ found?           │   │
+│ Mark domain as │  └──────────┬───────┘   │
+│ noapi, delete  │             │           │
+│ from known     │  ┌──────────┴───────┐   │
+│ domains        │  │                  │   │
+└────────────────┘  │               YES│NO │
+                 YES│                  │   │
+                    ▼                  ▼   │
+         ┌────────────────┐  ┌──────────────┐
+         │ Use actual_    │  │ STOP/RETURN  │
+         │ domain from    │  │ (no instance │
+         │ instance URI   │  │  URI)        │
+         └──────┬─────────┘  └──────────────┘
+                │                           │
+                │                           │
+                ▼                           │
 ┌────────────────┐                          │
 │ is_alias_      │                          │
 │ domain()?      │                          │
@@ -145,11 +161,11 @@ YES│        │NO                             │
             └──────┬─────────┘              │
                    │                        │
                    └────────────┬───────────┘
-                    │
-                    ▼
-            ┌───────────────┐
-            │  END/RETURN   │
-            └───────────────┘
+                                │
+                                ▼
+                        ┌───────────────┐
+                        │  END/RETURN   │
+                        └───────────────┘
 ```
 
 ## Discovery Methods (Priority Order)
@@ -174,6 +190,18 @@ YES│        │NO                             │
 - **Returns**: NodeInfo 2.0 URL
 - **Then fetches**: NodeInfo data with software.name
 - **Purpose**: Identify if Mastodon or other platform
+
+### 4. **instance API** (Required for Mastodon - Domain Validation)
+- **Primary URL**: `https://backend_domain/api/v2/instance`
+- **Fallback URL**: `https://backend_domain/api/v1/instance`
+- **Format**: JSON
+- **Returns**: 
+  - v2 API: `domain` field (authoritative domain name)
+  - v1 API: `uri` field (authoritative domain URI)
+- **Purpose**: Get canonical domain and detect aliases
+- **Special Handling**: 
+  - **401 Unauthorized**: Domain marked as `noapi = TRUE`, processing stops
+  - **Other errors**: Domain marked with error reason, error counter incremented
 
 ## Key Decision Points
 
@@ -216,11 +244,26 @@ When an alias is detected:
 
 ### Skip Processing
 
-Domains marked as aliases are skipped during processing:
+Domains marked with certain flags are skipped during processing:
+
+**Alias domains**:
 - Loaded at startup via `get_alias_domains()`
 - Checked in `should_skip_domain()`
-- Always skipped (no user override option)
+- Skipped unless user selects option "16" (Retry Alias)
 - Log message: `"{domain}: Alias Domain"` (cyan)
+
+**NoAPI domains** (Instance API requires authentication):
+- Loaded at startup via `get_noapi_domains()`
+- Checked in `should_skip_domain()`
+- Skipped unless user selects option "15" (Retry NoAPI)
+- Log message: `"{domain}: API Authentication Required"` (cyan)
+- Reason: Instance has restricted their API endpoints with authentication requirements
+
+**NoRobots domains** (Crawling prohibited):
+- Loaded at startup via `get_norobots_domains()`
+- Checked in `should_skip_domain()`
+- Skipped unless user selects option "14" (Retry Prohibited)
+- Log message: `"{domain}: Crawling Prohibited"` (cyan)
 
 ## Error Handling
 
@@ -229,6 +272,7 @@ Domains marked as aliases are skipped during processing:
 - **Webfinger fails**: Continue to nodeinfo with original domain (silent, no logging)
 - **NodeInfo fails**: Stop, log error, increment error counter (ONLY logged failure)
 - **Non-Mastodon detected**: Save software name to `nodeinfo` column, mark and skip (not an error)
+- **Instance API returns 401**: Stop immediately, mark as noapi using `mark_domain_status(domain, "noapi")`, delete from known domains
 - **Alias detected**: Stop, mark as alias using `mark_domain_status(domain, "alias")`, skip in future runs
 
 ### Why Silent Failures?
