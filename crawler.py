@@ -2204,7 +2204,7 @@ def process_mastodon_instance(
         error_to_print = "Mastodon version invalid"
         vmc_output(f"{db_domain}: {error_to_print}", "yellow", use_tqdm=True)
         log_error(domain, error_to_print)
-        increment_domain_error(domain, "MAU", preserve_ignore, preserve_nxdomain)
+        increment_domain_error(domain, "VER", preserve_ignore, preserve_nxdomain)
         delete_domain_if_known(domain)
         return
 
