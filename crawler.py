@@ -2039,12 +2039,37 @@ def mark_as_non_mastodon(domain, other_platform):
 
 
 def get_instance_uri(backend_domain: str, http_client: httpx.Client) -> str | None:
-    """Fetch the instance API and extract the 'uri' field."""
-    instance_api_url = f"https://{backend_domain}/api/v1/instance"
-    target = "instance_api"
+    """Fetch the instance API and extract the domain/uri field.
+
+    First tries v2 instance API for 'domain' field, then falls back to
+    v1 instance API for 'uri' field if v2 fails.
+    """
+    # Try v2 API first
+    instance_api_v2_url = f"https://{backend_domain}/api/v2/instance"
+    target_v2 = "instance_api_v2"
 
     try:
-        response = get_httpx(instance_api_url, http_client)
+        response = get_httpx(instance_api_v2_url, http_client)
+        if response.status_code == 200:
+            content_type = response.headers.get("Content-Type", "")
+            if "json" in content_type and response.content:
+                instance_data = parse_json_with_fallback(
+                    response, backend_domain, target_v2
+                )
+                if instance_data and isinstance(instance_data, dict):
+                    domain = instance_data.get("domain")
+                    # Normalize domain to lowercase for consistent comparison
+                    if domain:
+                        return domain.strip().lower()
+    except (httpx.RequestError, json.JSONDecodeError):
+        pass  # Fall through to v1 API
+
+    # Fallback to v1 API
+    instance_api_v1_url = f"https://{backend_domain}/api/v1/instance"
+    target_v1 = "instance_api"
+
+    try:
+        response = get_httpx(instance_api_v1_url, http_client)
         if response.status_code == 200:
             content_type = response.headers.get("Content-Type", "")
             if "json" not in content_type:
@@ -2052,7 +2077,9 @@ def get_instance_uri(backend_domain: str, http_client: httpx.Client) -> str | No
             if not response.content:
                 return None
 
-            instance_data = parse_json_with_fallback(response, backend_domain, target)
+            instance_data = parse_json_with_fallback(
+                response, backend_domain, target_v1
+            )
             if instance_data is False or not instance_data:
                 return None
 
