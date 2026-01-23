@@ -2202,6 +2202,14 @@ def process_mastodon_instance(
     total_users = users["total"]
     active_month_users = users["activeMonth"]
 
+    if active_month_users > total_users:
+        error_to_print = "Active user count invalid"
+        vmc_output(f"{db_domain}: {error_to_print}", "yellow", use_tqdm=True)
+        log_error(domain, error_to_print)
+        increment_domain_error(domain, "MAU", preserve_ignore, preserve_nxdomain)
+        delete_domain_if_known(domain)
+        return
+
     if version.parse(software_version.split("-")[0]) > version.parse(
         version_main_branch,
     ):
@@ -2217,7 +2225,7 @@ def process_mastodon_instance(
         db_domain,
         software_version,
         software_version_full,
-        total_users,
+        0,
         active_month_users,
     )
 
