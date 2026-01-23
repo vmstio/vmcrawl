@@ -155,11 +155,6 @@ async def get_summary_stats(_api_key: str | None = Depends(get_api_key)):
             result = cur.fetchone()
             total_mau = result[0] if result and result[0] else 0
 
-            # Total users
-            _ = cur.execute("SELECT SUM(total_users) FROM mastodon_domains")
-            result = cur.fetchone()
-            total_users = result[0] if result and result[0] else 0
-
             # Unique versions
             _ = cur.execute(
                 "SELECT COUNT(DISTINCT software_version) FROM mastodon_domains"
@@ -174,7 +169,6 @@ async def get_summary_stats(_api_key: str | None = Depends(get_api_key)):
 
         return {
             "total_instances": total_instances,
-            "total_users": total_users,
             "monthly_active_users": total_mau,
             "unique_versions": unique_versions,
             "last_updated": last_updated.isoformat() if last_updated else None,
@@ -193,8 +187,7 @@ async def get_version_stats(_api_key: str | None = Depends(get_api_key)):
                 SELECT
                     software_version,
                     COUNT(*) as instance_count,
-                    SUM(active_users_monthly) as total_mau,
-                    SUM(total_users) as total_users
+                    SUM(active_users_monthly) as total_mau
                 FROM mastodon_domains
                 GROUP BY software_version
                 ORDER BY instance_count DESC
@@ -208,7 +201,6 @@ async def get_version_stats(_api_key: str | None = Depends(get_api_key)):
                     "version": row[0],
                     "instances": row[1],
                     "monthly_active_users": row[2] or 0,
-                    "total_users": row[3] or 0,
                 }
                 for row in results
             ]
@@ -687,14 +679,13 @@ async def get_instances(
     _api_key: str | None = Depends(get_api_key),
     limit: int = Query(100, ge=1, le=1000, description="Number of results to return"),
     offset: int = Query(0, ge=0, description="Number of results to skip"),
-    sort_by: str = Query("mau", description="Sort field: mau, users, domain, version"),
+    sort_by: str = Query("mau", description="Sort field: mau, domain, version"),
     order: str = Query("desc", description="Sort order: asc or desc"),
 ):
     """Get a list of Mastodon instances with pagination."""
     # Validate sort_by
     valid_sort_fields = {
         "mau": "active_users_monthly",
-        "users": "total_users",
         "domain": "domain",
         "version": "software_version",
     }
@@ -720,7 +711,6 @@ async def get_instances(
                     domain,
                     software_version,
                     full_version,
-                    total_users,
                     active_users_monthly,
                     timestamp
                 FROM mastodon_domains
@@ -748,9 +738,8 @@ async def get_instances(
                     "domain": row[0],
                     "version": row[1],
                     "full_version": row[2],
-                    "total_users": row[3],
-                    "monthly_active_users": row[4],
-                    "last_updated": row[5].isoformat() if row[5] else None,
+                    "monthly_active_users": row[3],
+                    "last_updated": row[4].isoformat() if row[4] else None,
                 }
                 for row in results
             ],
@@ -770,7 +759,6 @@ async def get_instance(domain: str, _api_key: str | None = Depends(get_api_key))
                     domain,
                     software_version,
                     full_version,
-                    total_users,
                     active_users_monthly,
                     timestamp
                 FROM mastodon_domains
@@ -789,9 +777,8 @@ async def get_instance(domain: str, _api_key: str | None = Depends(get_api_key))
             "domain": result[0],
             "version": result[1],
             "full_version": result[2],
-            "total_users": result[3],
-            "monthly_active_users": result[4],
-            "last_updated": result[5].isoformat() if result[5] else None,
+            "monthly_active_users": result[3],
+            "last_updated": result[4].isoformat() if result[4] else None,
         }
     except HTTPException:
         raise
@@ -816,7 +803,6 @@ async def get_instances_by_version(
                     domain,
                     software_version,
                     full_version,
-                    total_users,
                     active_users_monthly,
                     timestamp
                 FROM mastodon_domains
@@ -846,9 +832,8 @@ async def get_instances_by_version(
                     "domain": row[0],
                     "version": row[1],
                     "full_version": row[2],
-                    "total_users": row[3],
-                    "monthly_active_users": row[4],
-                    "last_updated": row[5].isoformat() if row[5] else None,
+                    "monthly_active_users": row[3],
+                    "last_updated": row[4].isoformat() if row[4] else None,
                 }
                 for row in results
             ],
@@ -877,7 +862,6 @@ async def search_instances(
                     domain,
                     software_version,
                     full_version,
-                    total_users,
                     active_users_monthly,
                     timestamp
                 FROM mastodon_domains
@@ -897,9 +881,8 @@ async def search_instances(
                     "domain": row[0],
                     "version": row[1],
                     "full_version": row[2],
-                    "total_users": row[3],
-                    "monthly_active_users": row[4],
-                    "last_updated": row[5].isoformat() if row[5] else None,
+                    "monthly_active_users": row[3],
+                    "last_updated": row[4].isoformat() if row[4] else None,
                 }
                 for row in results
             ],
