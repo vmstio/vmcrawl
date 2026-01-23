@@ -1261,7 +1261,6 @@ def update_mastodon_domain(
     actual_domain,
     software_version,
     software_version_full,
-    total_users,
     active_month_users,
 ):
     """Insert or update a Mastodon domain in the database."""
@@ -1279,10 +1278,9 @@ def update_mastodon_domain(
                     INSERT INTO mastodon_domains
                     (domain, software_version, total_users,
                      active_users_monthly, timestamp, full_version)
-                    VALUES (%s, %s, %s, %s, %s, %s)
+                    VALUES (%s, %s, %s, %s, %s)
                     ON CONFLICT(domain) DO UPDATE SET
                     software_version = excluded.software_version,
-                    total_users = excluded.total_users,
                     active_users_monthly = excluded.active_users_monthly,
                     timestamp = excluded.timestamp,
                     full_version = excluded.full_version
@@ -1290,7 +1288,6 @@ def update_mastodon_domain(
                 (
                     actual_domain,
                     software_version,
-                    total_users,
                     active_month_users,
                     datetime.now(UTC),
                     software_version_full,
@@ -2199,16 +2196,7 @@ def process_mastodon_instance(
             delete_domain_if_known(domain)
             return
 
-    total_users = users["total"]
     active_month_users = users["activeMonth"]
-
-    if active_month_users > total_users:
-        error_to_print = "Active user count invalid"
-        vmc_output(f"{db_domain}: {error_to_print}", "yellow", use_tqdm=True)
-        log_error(domain, error_to_print)
-        increment_domain_error(domain, "MAU", preserve_ignore, preserve_nxdomain)
-        delete_domain_if_known(domain)
-        return
 
     if version.parse(software_version.split("-")[0]) > version.parse(
         version_main_branch,
@@ -2225,7 +2213,6 @@ def process_mastodon_instance(
         db_domain,
         software_version,
         software_version_full,
-        0,
         active_month_users,
     )
 
