@@ -2251,7 +2251,7 @@ def process_domain(domain, http_client, nightly_version_ranges, user_choice=None
 
         if instance_uri is None:
             # Instance API endpoint is required for Mastodon instances
-            error_to_print = "could not retrieve instance URI"
+            error_to_print = "could not validate instance API"
             vmc_output(f"{domain}: {error_to_print}", "yellow", use_tqdm=True)
             log_error(domain, error_to_print)
             increment_domain_error(domain, "API", preserve_ignore, preserve_nxdomain)
