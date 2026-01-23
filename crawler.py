@@ -873,11 +873,17 @@ def increment_domain_error(
             # - we're preserving ignore flag (retrying ignored domains), OR
             # - we're preserving nxdomain flag (retrying NXDOMAIN domains)
             if nodeinfo == "mastodon" or preserve_ignore or preserve_nxdomain:
-                # Still record the error reason, but preserve the current error count
-                # When retrying, keep the existing error count to avoid resetting progress
-                errors_value = (
-                    current_errors if (preserve_ignore or preserve_nxdomain) else None
-                )
+                # When preserving flags, don't record any error information
+                # For mastodon: record reason but clear counter
+                # For preserve_ignore/preserve_nxdomain: clear both counter and reason
+                if preserve_ignore or preserve_nxdomain:
+                    errors_value = None
+                    reason_value = None
+                else:
+                    # mastodon case: record reason but clear counter
+                    errors_value = None
+                    reason_value = error_reason
+
                 _ = cursor.execute(
                     """
                         INSERT INTO raw_domains
@@ -896,7 +902,7 @@ def increment_domain_error(
                         None,
                         ignore_value,
                         errors_value,
-                        error_reason,
+                        reason_value,
                         nxdomain_value,
                         None,
                     ),
