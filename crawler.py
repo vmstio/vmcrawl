@@ -857,6 +857,7 @@ def increment_domain_error(
                 (domain,),
             )
             result = cursor.fetchone()
+
             current_errors = result[0] if result and result[0] is not None else 0
             previous_reason = result[1] if result and result[1] is not None else ""
             nodeinfo = result[2] if result and result[2] is not None else None
@@ -908,6 +909,7 @@ def increment_domain_error(
                     ),
                 )
                 conn.commit()
+
                 return
 
             # Get error type prefix (DNS, SSL, TCP, TYPE, HTTP 2xx/3xx/4xx/5xx, or None)
