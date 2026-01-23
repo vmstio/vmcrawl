@@ -860,12 +860,13 @@ def increment_domain_error(
             current_errors = result[0] if result and result[0] is not None else 0
             previous_reason = result[1] if result and result[1] is not None else ""
             nodeinfo = result[2] if result and result[2] is not None else None
-            current_ignore = result[3] if result and result[3] is not None else None
-            current_nxdomain = result[4] if result and result[4] is not None else None
+            current_ignore = result[3] if result and result[3] is True else False
+            current_nxdomain = result[4] if result and result[4] is True else False
 
             # Determine flag values: preserve if requested, otherwise None
-            ignore_value = current_ignore if preserve_ignore else None
-            nxdomain_value = current_nxdomain if preserve_nxdomain else None
+            # When preserving, use True if currently set, otherwise None (to clear it)
+            ignore_value = True if (preserve_ignore and current_ignore) else None
+            nxdomain_value = True if (preserve_nxdomain and current_nxdomain) else None
 
             # Skip error counting if:
             # - nodeinfo is set to 'mastodon', OR
