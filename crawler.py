@@ -2303,7 +2303,7 @@ def process_domain(domain, http_client, nightly_version_ranges, user_choice=None
         if is_401:
             # Instance API requires authentication (401 Unauthorized)
             error_to_print = "Instance API requires authentication"
-            vmc_output(f"{domain}: {error_to_print}", "yellow", use_tqdm=True)
+            vmc_output(f"{domain}: {error_to_print}", "orange", use_tqdm=True)
             log_error(domain, error_to_print)
             mark_noapi_domain(domain)
             delete_domain_if_known(domain)
