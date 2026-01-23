@@ -880,6 +880,11 @@ def increment_domain_error(
                 if preserve_ignore or preserve_nxdomain:
                     errors_value = None
                     reason_value = None
+                    # DIAGNOSTIC: Log preserve action
+                    vmc_output(
+                        f"DIAGNOSTIC {domain}: Preserving flags - ignore={ignore_value}, nxdomain={nxdomain_value}, errors={errors_value}, reason={reason_value}",
+                        "yellow",
+                    )
                 else:
                     # mastodon case: record reason but clear counter
                     errors_value = None
@@ -2166,6 +2171,13 @@ def process_domain(domain, http_client, nightly_version_ranges, user_choice=None
     """
     preserve_ignore = user_choice == "11"
     preserve_nxdomain = user_choice == "13"
+
+    # DIAGNOSTIC: Log preserve flags
+    if preserve_ignore or preserve_nxdomain:
+        vmc_output(
+            f"DIAGNOSTIC {domain}: user_choice={user_choice}, preserve_ignore={preserve_ignore}, preserve_nxdomain={preserve_nxdomain}",
+            "yellow",
+        )
 
     if not check_robots_txt(domain, http_client, preserve_ignore, preserve_nxdomain):
         return
