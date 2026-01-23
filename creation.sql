@@ -19,8 +19,7 @@ CREATE TABLE
   mastodon_domains (
     domain TEXT PRIMARY KEY CHECK (domain = LOWER(domain)),
     software_version TEXT DEFAULT NULL,
-    mau INTEGER DEFAULT NULL,
-    users_monthly INTEGER DEFAULT NULL,
+    active_users_monthly INTEGER DEFAULT NULL,
     timestamp TIMESTAMP DEFAULT NULL,
     full_version TEXT DEFAULT NULL,
   );
