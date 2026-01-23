@@ -417,29 +417,6 @@ async def get_crawler_health(_api_key: str | None = Depends(get_api_key)):
     """Get crawler health statistics (error counts by type)."""
     try:
         with db_pool.connection() as conn, conn.cursor() as cur:
-            # Instances Gone
-            _ = cur.execute(
-                """
-                SELECT
-                  (
-                    SELECT COUNT(DISTINCT domain)
-                    FROM raw_domains
-                    WHERE nodeinfo = 'mastodon'
-                      AND alias IS NULL
-                      AND failed IS NULL
-                      AND baddata IS NULL
-                      AND norobots IS NULL
-                  )
-                  -
-                  (
-                    SELECT COUNT(DISTINCT domain)
-                    FROM mastodon_domains
-                  ) AS difference
-            """
-            )
-            result = cur.fetchone()
-            instances_gone = result[0] if result else 0
-
             # TCP Issues
             _ = cur.execute(
                 """
@@ -560,7 +537,6 @@ async def get_crawler_health(_api_key: str | None = Depends(get_api_key)):
             mau_issues = result[0] if result else 0
 
         return {
-            "instances_gone": instances_gone,
             "tcp_issues": tcp_issues,
             "ssl_issues": ssl_issues,
             "dns_issues": dns_issues,
@@ -604,7 +580,7 @@ async def get_domain_stats(_api_key: str | None = Depends(get_api_key)):
                 """
                 SELECT COUNT(DISTINCT domain) AS unique_domain_count
                 FROM raw_domains
-                WHERE (reason LIKE 'API' OR norobots IS NOT NULL OR baddata IS NOT NULL)
+                WHERE (noapi IS NOT NULL OR norobots IS NOT NULL OR baddata IS NOT NULL)
             """
             )
             result = cur.fetchone()
