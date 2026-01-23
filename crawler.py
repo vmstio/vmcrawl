@@ -268,6 +268,8 @@ def parse_json_with_fallback(
     response: httpx.Response,
     domain: str,
     target: str,
+    preserve_ignore: bool = False,
+    preserve_nxdomain: bool = False,
 ) -> Any | bool:
     """Parse JSON from response with fallback decoder for malformed JSON.
 
@@ -275,6 +277,8 @@ def parse_json_with_fallback(
         response: httpx Response object
         domain: Domain being processed (for error reporting)
         target: Target endpoint name (for error reporting)
+        preserve_ignore: If True, preserve the ignore flag when recording errors
+        preserve_nxdomain: If True, preserve the nxdomain flag when recording errors
 
     Returns:
         Parsed JSON data or False on error
@@ -287,7 +291,9 @@ def parse_json_with_fallback(
             data, _ = decoder.raw_decode(response.text, 0)
             return data
         except json.JSONDecodeError as exception:
-            handle_json_exception(domain, target, exception)
+            handle_json_exception(
+                domain, target, exception, preserve_ignore, preserve_nxdomain
+            )
             return False
 
 
@@ -809,7 +815,12 @@ def log_error(domain: str, error_to_print: str) -> None:
             conn.rollback()
 
 
-def increment_domain_error(domain: str, error_reason: str) -> None:
+def increment_domain_error(
+    domain: str,
+    error_reason: str,
+    preserve_ignore: bool = False,
+    preserve_nxdomain: bool = False,
+) -> None:
     """Increment error count for a domain and record the error reason.
 
     Only increments error count if the previous error reason started with
@@ -827,6 +838,12 @@ def increment_domain_error(domain: str, error_reason: str) -> None:
     HTTP 3xx errors: After ERROR_THRESHOLD consecutive errors, mark as ignored.
     HTTP 4xx errors: After ERROR_THRESHOLD consecutive errors, mark as ignored.
     HTTP 5xx errors: After ERROR_THRESHOLD consecutive errors, mark as ignored.
+
+    Args:
+        domain: The domain to update
+        error_reason: The error reason string
+        preserve_ignore: If True, preserve the ignore flag when recording errors
+        preserve_nxdomain: If True, preserve the nxdomain flag when recording errors
     """
     domain = domain.lower()
     ERROR_THRESHOLD = int(os.getenv("VMCRAWL_ERROR_BUFFER", "15"))
@@ -834,18 +851,27 @@ def increment_domain_error(domain: str, error_reason: str) -> None:
 
     with db_pool.connection() as conn, conn.cursor() as cursor:
         try:
-            # Fetch current errors, previous error reason, and nodeinfo
+            # Fetch current errors, previous error reason, nodeinfo, ignore flag, and nxdomain flag
             cursor.execute(
-                "SELECT errors, reason, nodeinfo FROM raw_domains WHERE domain = %s",
+                "SELECT errors, reason, nodeinfo, ignore, nxdomain FROM raw_domains WHERE domain = %s",
                 (domain,),
             )
             result = cursor.fetchone()
             current_errors = result[0] if result and result[0] is not None else 0
             previous_reason = result[1] if result and result[1] is not None else ""
             nodeinfo = result[2] if result and result[2] is not None else None
+            current_ignore = result[3] if result and result[3] is not None else None
+            current_nxdomain = result[4] if result and result[4] is not None else None
 
-            # Skip error counting if nodeinfo is set to 'mastodon'
-            if nodeinfo == "mastodon":
+            # Determine flag values: preserve if requested, otherwise None
+            ignore_value = current_ignore if preserve_ignore else None
+            nxdomain_value = current_nxdomain if preserve_nxdomain else None
+
+            # Skip error counting if:
+            # - nodeinfo is set to 'mastodon', OR
+            # - we're preserving ignore flag (retrying ignored domains), OR
+            # - we're preserving nxdomain flag (retrying NXDOMAIN domains)
+            if nodeinfo == "mastodon" or preserve_ignore or preserve_nxdomain:
                 # Still record the error reason, but don't increment counter
                 _ = cursor.execute(
                     """
@@ -860,7 +886,15 @@ def increment_domain_error(domain: str, error_reason: str) -> None:
                         nxdomain = excluded.nxdomain,
                         norobots = excluded.norobots
                     """,
-                    (domain, None, None, None, error_reason, None, None),
+                    (
+                        domain,
+                        None,
+                        ignore_value,
+                        None,
+                        error_reason,
+                        nxdomain_value,
+                        None,
+                    ),
                 )
                 conn.commit()
                 return
@@ -948,7 +982,15 @@ def increment_domain_error(domain: str, error_reason: str) -> None:
                     nxdomain = excluded.nxdomain,
                     norobots = excluded.norobots
                 """,
-                (domain, None, None, new_errors, error_reason, None, None),
+                (
+                    domain,
+                    None,
+                    ignore_value,
+                    new_errors,
+                    error_reason,
+                    nxdomain_value,
+                    None,
+                ),
             )
             conn.commit()
         except Exception as exception:
@@ -1377,7 +1419,9 @@ def get_alias_domains():
 # =============================================================================
 
 
-def handle_incorrect_file_type(domain, target, content_type):
+def handle_incorrect_file_type(
+    domain, target, content_type, preserve_ignore=False, preserve_nxdomain=False
+):
     """Handle responses with incorrect content type."""
     if content_type == "" or content_type is None:
         content_type = "missing Content-Type"
@@ -1385,16 +1429,20 @@ def handle_incorrect_file_type(domain, target, content_type):
     error_message = f"{target} is {clean_content_type}"
     vmc_output(f"{domain}: {error_message}", "yellow", use_tqdm=True)
     log_error(domain, error_message)
-    increment_domain_error(domain, f"TYPE+{target}")
+    increment_domain_error(domain, f"TYPE+{target}", preserve_ignore, preserve_nxdomain)
 
 
-def handle_http_status_code(domain, target, response):
+def handle_http_status_code(
+    domain, target, response, preserve_ignore=False, preserve_nxdomain=False
+):
     """Handle non-fatal HTTP status codes."""
     code = response.status_code
     error_message = f"HTTP {code} on {target}"
     vmc_output(f"{domain}: {error_message}", "yellow", use_tqdm=True)
     log_error(domain, error_message)
-    increment_domain_error(domain, f"{code}+{target}")
+    increment_domain_error(
+        domain, f"{code}+{target}", preserve_ignore, preserve_nxdomain
+    )
 
 
 def handle_http_failed(domain, target, response):
@@ -1406,7 +1454,9 @@ def handle_http_failed(domain, target, response):
     delete_domain_if_known(domain)
 
 
-def handle_tcp_exception(domain, target, exception):
+def handle_tcp_exception(
+    domain, target, exception, preserve_ignore=False, preserve_nxdomain=False
+):
     """Handle TCP/connection exceptions with appropriate categorization."""
     error_message = str(exception)
     error_message_lower = error_message.casefold()
@@ -1416,7 +1466,9 @@ def handle_tcp_exception(domain, target, exception):
         error_reason = "FILE"
         vmc_output(f"{domain}: Response too large", "yellow", use_tqdm=True)
         log_error(domain, "Response exceeds size limit")
-        increment_domain_error(domain, f"{error_reason}+{target}")
+        increment_domain_error(
+            domain, f"{error_reason}+{target}", preserve_ignore, preserve_nxdomain
+        )
         return
 
     # Handle bad file descriptor (usually from cancellation/cleanup issues)
@@ -1424,7 +1476,9 @@ def handle_tcp_exception(domain, target, exception):
         error_reason = "FILE"
         vmc_output(f"{domain}: Connection closed unexpectedly", "yellow", use_tqdm=True)
         log_error(domain, "Bad file descriptor")
-        increment_domain_error(domain, f"{error_reason}+{target}")
+        increment_domain_error(
+            domain, f"{error_reason}+{target}", preserve_ignore, preserve_nxdomain
+        )
         return
 
     # Check for SSL/TLS errors (includes certificate validation failures)
@@ -1453,7 +1507,9 @@ def handle_tcp_exception(domain, target, exception):
             cleaned_message = "SSL connection error"
         vmc_output(f"{domain}: {cleaned_message}", "yellow", use_tqdm=True)
         log_error(domain, cleaned_message)
-        increment_domain_error(domain, f"{error_reason}+{target}")
+        increment_domain_error(
+            domain, f"{error_reason}+{target}", preserve_ignore, preserve_nxdomain
+        )
     # Check for DNS resolution errors
     elif any(
         msg in error_message_lower
@@ -1479,7 +1535,9 @@ def handle_tcp_exception(domain, target, exception):
             cleaned_message = "DNS resolution failed"
         vmc_output(f"{domain}: {cleaned_message}", "yellow", use_tqdm=True)
         log_error(domain, cleaned_message)
-        increment_domain_error(domain, f"{error_reason}+{target}")
+        increment_domain_error(
+            domain, f"{error_reason}+{target}", preserve_ignore, preserve_nxdomain
+        )
     else:
         # All other errors (TCP, HTTP, etc.) categorized as TCP
         error_reason = "TCP"
@@ -1496,16 +1554,22 @@ def handle_tcp_exception(domain, target, exception):
             cleaned_message = str(exception)[:100] or "TCP error"
         vmc_output(f"{domain}: {cleaned_message}", "yellow", use_tqdm=True)
         log_error(domain, cleaned_message)
-        increment_domain_error(domain, f"{error_reason}+{target}")
+        increment_domain_error(
+            domain, f"{error_reason}+{target}", preserve_ignore, preserve_nxdomain
+        )
 
 
-def handle_json_exception(domain, target, exception):
+def handle_json_exception(
+    domain, target, exception, preserve_ignore=False, preserve_nxdomain=False
+):
     """Handle JSON parsing exceptions."""
     error_message = str(exception)
     error_reason = f"JSON+{target}"
     vmc_output(f"{domain}: {target} {error_message}", "yellow", use_tqdm=True)
     log_error(domain, error_message)
-    increment_domain_error(domain, f"{error_reason}")
+    increment_domain_error(
+        domain, f"{error_reason}", preserve_ignore, preserve_nxdomain
+    )
 
 
 # =============================================================================
@@ -1590,7 +1654,9 @@ def is_junk_or_bad_tld(domain, junk_domains, dni_domains, bad_tlds, domain_endin
 # =============================================================================
 
 
-def check_robots_txt(domain, http_client):
+def check_robots_txt(
+    domain, http_client, preserve_ignore=False, preserve_nxdomain=False
+):
     """Check robots.txt to ensure crawling is allowed."""
     target = "robots_txt"
     url = f"https://{domain}/robots.txt"
@@ -1602,7 +1668,9 @@ def check_robots_txt(domain, http_client):
                 content_type in mimetypes.types_map.values()
                 and not content_type.startswith("text/")
             ):
-                handle_incorrect_file_type(domain, target, content_type)
+                handle_incorrect_file_type(
+                    domain, target, content_type, preserve_ignore
+                )
                 return False
             robots_txt = response.text
             lines = robots_txt.splitlines()
@@ -1628,10 +1696,14 @@ def check_robots_txt(domain, http_client):
             handle_http_failed(domain, target, response)
             return False
         else:
-            handle_http_status_code(domain, target, response)
+            handle_http_status_code(
+                domain, target, response, preserve_ignore, preserve_nxdomain
+            )
             return False
     except httpx.RequestError as exception:
-        handle_tcp_exception(domain, target, exception)
+        handle_tcp_exception(
+            domain, target, exception, preserve_ignore, preserve_nxdomain
+        )
         return False
     return True
 
@@ -1788,7 +1860,9 @@ def sanitize_nodeinfo_url(url: str) -> str:
     return url
 
 
-def check_nodeinfo(domain, backend_domain, http_client):
+def check_nodeinfo(
+    domain, backend_domain, http_client, preserve_ignore=False, preserve_nxdomain=False
+):
     """Check NodeInfo well-known endpoint for NodeInfo 2.0 URL."""
     target = "nodeinfo"
     url = f"https://{backend_domain}/.well-known/nodeinfo"
@@ -1797,13 +1871,19 @@ def check_nodeinfo(domain, backend_domain, http_client):
         if response.status_code == 200:
             content_type = response.headers.get("Content-Type", "")
             if "json" not in content_type:
-                handle_incorrect_file_type(domain, target, content_type)
+                handle_incorrect_file_type(
+                    domain, target, content_type, preserve_ignore
+                )
                 return False
             if not response.content:
                 exception = "reply is empty"
-                handle_json_exception(domain, target, exception)
+                handle_json_exception(
+                    domain, target, exception, preserve_ignore, preserve_nxdomain
+                )
                 return False
-            data = parse_json_with_fallback(response, domain, target)
+            data = parse_json_with_fallback(
+                response, domain, target, preserve_ignore, preserve_nxdomain
+            )
             if data is False:
                 return False
             if not isinstance(data, dict):
@@ -1811,7 +1891,9 @@ def check_nodeinfo(domain, backend_domain, http_client):
             links = data.get("links")
             if links is not None and len(links) == 0:
                 exception = "empty links array in reply"
-                handle_json_exception(domain, target, exception)
+                handle_json_exception(
+                    domain, target, exception, preserve_ignore, preserve_nxdomain
+                )
                 return False
             if links:
                 nodeinfo_20_url = None
@@ -1841,20 +1923,35 @@ def check_nodeinfo(domain, backend_domain, http_client):
                     return {"nodeinfo_20_url": nodeinfo_20_url}
 
             exception = "no links in reply"
-            handle_json_exception(domain, target, exception)
+            handle_json_exception(
+                domain, target, exception, preserve_ignore, preserve_nxdomain
+            )
             return False
         if response.status_code in http_codes_to_hardfail:
             handle_http_failed(domain, target, response)
             return False
-        handle_http_status_code(domain, target, response)
+        handle_http_status_code(
+            domain, target, response, preserve_ignore, preserve_nxdomain
+        )
     except httpx.RequestError as exception:
-        handle_tcp_exception(domain, target, exception)
+        handle_tcp_exception(
+            domain, target, exception, preserve_ignore, preserve_nxdomain
+        )
     except json.JSONDecodeError as exception:
-        handle_json_exception(domain, target, exception)
+        handle_json_exception(
+            domain, target, exception, preserve_ignore, preserve_nxdomain
+        )
     return None
 
 
-def check_nodeinfo_20(domain, nodeinfo_20_url, http_client, from_cache=False):
+def check_nodeinfo_20(
+    domain,
+    nodeinfo_20_url,
+    http_client,
+    from_cache=False,
+    preserve_ignore=False,
+    preserve_nxdomain=False,
+):
     """Fetch and parse NodeInfo 2.0 data."""
     target = "nodeinfo_20" if not from_cache else "nodeinfo_20 (cached)"
     try:
@@ -1862,25 +1959,37 @@ def check_nodeinfo_20(domain, nodeinfo_20_url, http_client, from_cache=False):
         if response.status_code == 200:
             content_type = response.headers.get("Content-Type", "")
             if "json" not in content_type:
-                handle_incorrect_file_type(domain, target, content_type)
+                handle_incorrect_file_type(
+                    domain, target, content_type, preserve_ignore, preserve_nxdomain
+                )
                 return False
             if not response.content:
                 exception = "reply empty"
-                handle_json_exception(domain, target, exception)
+                handle_json_exception(
+                    domain, target, exception, preserve_ignore, preserve_nxdomain
+                )
                 return False
-            nodeinfo_20_result = parse_json_with_fallback(response, domain, target)
+            nodeinfo_20_result = parse_json_with_fallback(
+                response, domain, target, preserve_ignore, preserve_nxdomain
+            )
             if nodeinfo_20_result is False:
                 return False
             return nodeinfo_20_result
         if response.status_code in http_codes_to_hardfail:
             handle_http_failed(domain, target, response)
             return False
-        handle_http_status_code(domain, target, response)
+        handle_http_status_code(
+            domain, target, response, preserve_ignore, preserve_nxdomain
+        )
     except httpx.RequestError as exception:
-        handle_tcp_exception(domain, target, exception)
+        handle_tcp_exception(
+            domain, target, exception, preserve_ignore, preserve_nxdomain
+        )
         return False
     except json.JSONDecodeError as exception:
-        handle_json_exception(domain, target, exception)
+        handle_json_exception(
+            domain, target, exception, preserve_ignore, preserve_nxdomain
+        )
         return False
     return None
 
@@ -1953,6 +2062,8 @@ def process_mastodon_instance(
     nodeinfo_20_result,
     nightly_version_ranges,
     actual_domain=None,
+    preserve_ignore=False,
+    preserve_nxdomain=False,
 ):
     """Process a confirmed Mastodon instance and update the database.
 
@@ -1962,6 +2073,8 @@ def process_mastodon_instance(
         nightly_version_ranges: Version ranges for nightly builds
         actual_domain: The canonical domain from instance API
             (used for database updates)
+        preserve_ignore: If True, preserve the ignore flag when recording errors
+        preserve_nxdomain: If True, preserve the nxdomain flag when recording errors
     """
     # Use actual_domain for database operations if provided,
     # otherwise fall back to domain
@@ -1978,7 +2091,7 @@ def process_mastodon_instance(
         error_to_print = "No usage data in NodeInfo"
         vmc_output(f"{db_domain}: {error_to_print}", "yellow", use_tqdm=True)
         log_error(domain, error_to_print)
-        increment_domain_error(domain, "MAU")
+        increment_domain_error(domain, "MAU", preserve_ignore, preserve_nxdomain)
         delete_domain_if_known(domain)
         return
 
@@ -1991,7 +2104,7 @@ def process_mastodon_instance(
         if field not in users:
             vmc_output(f"{db_domain}: {error_msg}", "yellow", use_tqdm=True)
             log_error(domain, error_msg)
-            increment_domain_error(domain, "MAU")
+            increment_domain_error(domain, "MAU", preserve_ignore, preserve_nxdomain)
             delete_domain_if_known(domain)
             return
 
@@ -2004,7 +2117,7 @@ def process_mastodon_instance(
         error_to_print = "Mastodon version invalid"
         vmc_output(f"{db_domain}: {error_to_print}", "yellow", use_tqdm=True)
         log_error(domain, error_to_print)
-        increment_domain_error(domain, "MAU")
+        increment_domain_error(domain, "MAU", preserve_ignore, preserve_nxdomain)
         delete_domain_if_known(domain)
         return
 
@@ -2029,9 +2142,19 @@ def process_mastodon_instance(
         delete_domain_if_known(domain)
 
 
-def process_domain(domain, http_client, nightly_version_ranges):
-    """Main processing pipeline for a single domain."""
-    if not check_robots_txt(domain, http_client):
+def process_domain(domain, http_client, nightly_version_ranges, user_choice=None):
+    """Main processing pipeline for a single domain.
+
+    Args:
+        domain: The domain to process
+        http_client: The HTTP client to use
+        nightly_version_ranges: Version ranges for nightly builds
+        user_choice: The user's menu choice (used to determine if retrying ignored/nxdomain domains)
+    """
+    preserve_ignore = user_choice == "11"
+    preserve_nxdomain = user_choice == "13"
+
+    if not check_robots_txt(domain, http_client, preserve_ignore, preserve_nxdomain):
         return
 
     # Try to discover backend domain via host-meta first
@@ -2060,7 +2183,9 @@ def process_domain(domain, http_client, nightly_version_ranges):
             backend_domain = webfinger_result["backend_domain"]
 
     # Check nodeinfo at the discovered backend domain
-    nodeinfo_result = check_nodeinfo(domain, backend_domain, http_client)
+    nodeinfo_result = check_nodeinfo(
+        domain, backend_domain, http_client, preserve_ignore, preserve_nxdomain
+    )
     if nodeinfo_result is False:
         return
     if not nodeinfo_result:
@@ -2068,7 +2193,13 @@ def process_domain(domain, http_client, nightly_version_ranges):
 
     nodeinfo_20_url = nodeinfo_result["nodeinfo_20_url"]
 
-    nodeinfo_20_result = check_nodeinfo_20(domain, nodeinfo_20_url, http_client)
+    nodeinfo_20_result = check_nodeinfo_20(
+        domain,
+        nodeinfo_20_url,
+        http_client,
+        preserve_ignore=preserve_ignore,
+        preserve_nxdomain=preserve_nxdomain,
+    )
     if nodeinfo_20_result is False:
         return
     if not nodeinfo_20_result:
@@ -2083,7 +2214,7 @@ def process_domain(domain, http_client, nightly_version_ranges):
             error_to_print = "could not retrieve instance URI"
             vmc_output(f"{domain}: {error_to_print}", "yellow", use_tqdm=True)
             log_error(domain, error_to_print)
-            increment_domain_error(domain, "API")
+            increment_domain_error(domain, "API", preserve_ignore, preserve_nxdomain)
             return
 
         # Check if this is an alias (redirect to another instance)
@@ -2110,6 +2241,8 @@ def process_domain(domain, http_client, nightly_version_ranges):
             nodeinfo_20_result,
             nightly_version_ranges,
             actual_domain=instance_uri,
+            preserve_ignore=preserve_ignore,
+            preserve_nxdomain=preserve_nxdomain,
         )
     else:
         # Save software information for non-Mastodon platforms unconditionally
@@ -2176,13 +2309,17 @@ def check_and_record_domains(
             return
 
         try:
-            process_domain(domain, http_client, nightly_version_ranges)
+            process_domain(domain, http_client, nightly_version_ranges, user_choice)
         except httpx.CloseError:
             pass
         except Exception as exception:
             if not shutdown_event.is_set():
                 target = "shutdown"
-                handle_tcp_exception(domain, target, exception)
+                preserve_ignore = user_choice == "11"
+                preserve_nxdomain = user_choice == "13"
+                handle_tcp_exception(
+                    domain, target, exception, preserve_ignore, preserve_nxdomain
+                )
 
     executor = ThreadPoolExecutor(max_workers=max_workers)
     try:
