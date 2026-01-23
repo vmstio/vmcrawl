@@ -1276,7 +1276,7 @@ def update_mastodon_domain(
             _ = cursor.execute(
                 """
                     INSERT INTO mastodon_domains
-                    (domain, software_version, total_users,
+                    (domain, software_version,
                      active_users_monthly, timestamp, full_version)
                     VALUES (%s, %s, %s, %s, %s)
                     ON CONFLICT(domain) DO UPDATE SET
