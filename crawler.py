@@ -824,7 +824,7 @@ def increment_domain_error(
     """Increment error count for a domain and record the error reason.
 
     Only increments error count if the previous error reason started with
-    DNS, SSL, TCP, TYPE, FILE, or HTTP 2xx/3xx/4xx/5xx, AND the domain's nodeinfo
+    DNS, SSL, TCP, TYPE, FILE, API, JSON, or HTTP 2xx/3xx/4xx/5xx, AND the domain's nodeinfo
     is NOT set to 'mastodon'. For other error types, the count is set to null
     while still recording the error reason. Counter resets to 1 when switching
     between error types.
@@ -834,6 +834,8 @@ def increment_domain_error(
     TCP errors: After ERROR_THRESHOLD consecutive errors, mark as ignored.
     TYPE errors: After ERROR_THRESHOLD consecutive errors, mark as ignored.
     FILE errors: After ERROR_THRESHOLD consecutive errors, mark as ignored.
+    API errors: After ERROR_THRESHOLD consecutive errors, mark as ignored.
+    JSON errors: After ERROR_THRESHOLD consecutive errors, mark as ignored.
     HTTP 2xx errors: After ERROR_THRESHOLD consecutive errors, mark as ignored.
     HTTP 3xx errors: After ERROR_THRESHOLD consecutive errors, mark as ignored.
     HTTP 4xx errors: After ERROR_THRESHOLD consecutive errors, mark as ignored.
@@ -847,7 +849,7 @@ def increment_domain_error(
     """
     domain = domain.lower()
     ERROR_THRESHOLD = int(os.getenv("VMCRAWL_ERROR_BUFFER", "15"))
-    TRACKED_ERROR_TYPES = ("DNS", "SSL", "TCP", "TYPE", "FILE")
+    TRACKED_ERROR_TYPES = ("DNS", "SSL", "TCP", "TYPE", "FILE", "API", "JSON")
 
     with db_pool.connection() as conn, conn.cursor() as cursor:
         try:
@@ -1938,7 +1940,66 @@ def check_nodeinfo(
                 return False
             if not isinstance(data, dict):
                 return None
-            links = data.get("links")
+
+            # Check if this is a Matrix server (has m.server field)
+            if "m.server" in data:
+                vmc_output(f"{domain}: Matrix", "cyan", use_tqdm=True)
+                # Save nodeinfo as "matrix" and mark as non-Mastodon
+                with db_pool.connection() as conn, conn.cursor() as cursor:
+                    try:
+                        cursor.execute(
+                            """
+                                INSERT INTO raw_domains (domain, nodeinfo, errors, reason)
+                                VALUES (%s, %s, %s, %s)
+                                ON CONFLICT(domain) DO UPDATE SET
+                                nodeinfo = excluded.nodeinfo,
+                                errors = excluded.errors,
+                                reason = excluded.reason
+                            """,
+                            (domain.lower(), "matrix", None, None),
+                        )
+                        conn.commit()
+                    except Exception as exception:
+                        vmc_output(
+                            f"{domain}: Failed to save Matrix nodeinfo {exception}",
+                            "red",
+                            use_tqdm=True,
+                        )
+                        conn.rollback()
+                clear_domain_error(domain)
+                delete_domain_if_known(domain)
+                return False
+
+            # Check if this is actually nodeinfo data returned directly
+            # instead of a well-known document with links
+            if "software" in data and "version" in data:
+                # This is nodeinfo data returned directly at the well-known endpoint
+                # Return it as if it came from a nodeinfo_20 request
+                vmc_output(
+                    f"{domain}: NodeInfo data returned directly at well-known endpoint",
+                    "white",
+                    use_tqdm=True,
+                )
+                # Return a special marker indicating we already have the nodeinfo data
+                return {"nodeinfo_20_url": None, "nodeinfo_20_data": data}
+
+            # Support both lowercase and capitalized field names
+            links = data.get("links") or data.get("Links")
+
+            # Handle case where server returns a single link object instead of array
+            if (
+                links is None
+                and ("rel" in data or "Rel" in data)
+                and ("href" in data or "Href" in data)
+            ):
+                vmc_output(
+                    f"{domain}: Single link object returned instead of array",
+                    "white",
+                    use_tqdm=True,
+                )
+                # Wrap the single object in an array for consistent processing
+                links = [data]
+
             if links is not None and len(links) == 0:
                 exception = "empty links array in reply"
                 handle_json_exception(
@@ -1948,23 +2009,28 @@ def check_nodeinfo(
             if links:
                 nodeinfo_20_url = None
                 for i, link in enumerate(links):
-                    rel_value = link.get("rel", "")
-                    type_value = link.get("type", "")
-                    href_value = link.get("href", "")
+                    # Support both lowercase and capitalized field names
+                    rel_value = link.get("rel", "") or link.get("Rel", "")
+                    type_value = link.get("type", "") or link.get("Type", "")
+                    href_value = link.get("href", "") or link.get("Href", "")
                     if (
                         "nodeinfo.diaspora.software/ns/schema/" in rel_value
                         or "nodeinfo.diaspora.software/ns/schema/" in type_value
                         or "/nodeinfo/" in href_value
                     ):
-                        if "href" in link:
-                            nodeinfo_20_url = link["href"]
+                        # Support both lowercase and capitalized field names
+                        if "href" in link or "Href" in link:
+                            nodeinfo_20_url = link.get("href") or link.get("Href")
                             break
                         if (
                             i + 1 < len(links)
-                            and "href" in links[i + 1]
+                            and ("href" in links[i + 1] or "Href" in links[i + 1])
                             and "rel" not in links[i + 1]
+                            and "Rel" not in links[i + 1]
                         ):
-                            nodeinfo_20_url = links[i + 1]["href"]
+                            nodeinfo_20_url = links[i + 1].get("href") or links[
+                                i + 1
+                            ].get("Href")
                             break
 
                 if nodeinfo_20_url:
@@ -2277,19 +2343,25 @@ def process_domain(domain, http_client, nightly_version_ranges, user_choice=None
     if not nodeinfo_result:
         return
 
-    nodeinfo_20_url = nodeinfo_result["nodeinfo_20_url"]
+    # Check if nodeinfo data was returned directly from the well-known endpoint
+    if "nodeinfo_20_data" in nodeinfo_result:
+        # Use the data that was already returned
+        nodeinfo_20_result = nodeinfo_result["nodeinfo_20_data"]
+    else:
+        # Normal flow: fetch from the nodeinfo_20_url
+        nodeinfo_20_url = nodeinfo_result["nodeinfo_20_url"]
 
-    nodeinfo_20_result = check_nodeinfo_20(
-        domain,
-        nodeinfo_20_url,
-        http_client,
-        preserve_ignore=preserve_ignore,
-        preserve_nxdomain=preserve_nxdomain,
-    )
-    if nodeinfo_20_result is False:
-        return
-    if not nodeinfo_20_result:
-        return
+        nodeinfo_20_result = check_nodeinfo_20(
+            domain,
+            nodeinfo_20_url,
+            http_client,
+            preserve_ignore=preserve_ignore,
+            preserve_nxdomain=preserve_nxdomain,
+        )
+        if nodeinfo_20_result is False:
+            return
+        if not nodeinfo_20_result:
+            return
 
     if is_mastodon_instance(nodeinfo_20_result):
         # Get the actual domain from the instance API
