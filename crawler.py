@@ -890,8 +890,8 @@ def increment_domain_error(
                 _ = cursor.execute(
                     """
                         INSERT INTO raw_domains
-                        (domain, failed, ignore, errors, reason, nxdomain, norobots, noapi)
-                        VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
+                        (domain, failed, ignore, errors, reason, nxdomain, norobots, noapi, alias)
+                        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
                         ON CONFLICT(domain) DO UPDATE SET
                         failed = excluded.failed,
                         ignore = excluded.ignore,
@@ -899,7 +899,8 @@ def increment_domain_error(
                         reason = excluded.reason,
                         nxdomain = excluded.nxdomain,
                         norobots = excluded.norobots,
-                        noapi = excluded.noapi
+                        noapi = excluded.noapi,
+                        alias = excluded.alias
                     """,
                     (
                         domain,
@@ -908,6 +909,7 @@ def increment_domain_error(
                         errors_value,
                         reason_value,
                         nxdomain_value,
+                        None,
                         None,
                         None,
                     ),
@@ -989,8 +991,8 @@ def increment_domain_error(
             _ = cursor.execute(
                 """
                     INSERT INTO raw_domains
-                    (domain, failed, ignore, errors, reason, nxdomain, norobots, noapi)
-                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
+                    (domain, failed, ignore, errors, reason, nxdomain, norobots, noapi, alias)
+                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
                     ON CONFLICT(domain) DO UPDATE SET
                     failed = excluded.failed,
                     ignore = excluded.ignore,
@@ -998,7 +1000,8 @@ def increment_domain_error(
                     reason = excluded.reason,
                     nxdomain = excluded.nxdomain,
                     norobots = excluded.norobots,
-                    noapi = excluded.noapi
+                    noapi = excluded.noapi,
+                    alias = excluded.alias
                 """,
                 (
                     domain,
@@ -1007,6 +1010,7 @@ def increment_domain_error(
                     new_errors,
                     error_reason,
                     nxdomain_value,
+                    None,
                     None,
                     None,
                 ),
@@ -1029,8 +1033,8 @@ def clear_domain_error(domain: str) -> None:
             _ = cursor.execute(
                 """
                     INSERT INTO raw_domains
-                    (domain, failed, ignore, errors, reason, nxdomain, norobots, noapi)
-                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
+                    (domain, failed, ignore, errors, reason, nxdomain, norobots, noapi, alias)
+                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
                     ON CONFLICT(domain) DO UPDATE SET
                     failed = excluded.failed,
                     ignore = excluded.ignore,
@@ -1038,9 +1042,10 @@ def clear_domain_error(domain: str) -> None:
                     reason = excluded.reason,
                     nxdomain = excluded.nxdomain,
                     norobots = excluded.norobots,
-                    noapi = excluded.noapi
+                    noapi = excluded.noapi,
+                    alias = excluded.alias
                 """,
-                (domain, None, None, None, None, None, None, None),
+                (domain, None, None, None, None, None, None, None, None),
             )
             conn.commit()
         except Exception as exception:
