@@ -853,9 +853,10 @@ def increment_domain_error(
 
     with db_pool.connection() as conn, conn.cursor() as cursor:
         try:
-            # Fetch current errors, previous error reason, nodeinfo, ignore flag, and nxdomain flag
+            # Use SELECT FOR UPDATE to prevent race conditions between multiple crawlers
+            # This locks the row until the transaction commits
             cursor.execute(
-                "SELECT errors, reason, nodeinfo, ignore, nxdomain FROM raw_domains WHERE domain = %s",
+                "SELECT errors, reason, nodeinfo, ignore, nxdomain FROM raw_domains WHERE domain = %s FOR UPDATE",
                 (domain,),
             )
             result = cursor.fetchone()
@@ -1270,7 +1271,11 @@ def update_mastodon_domain(
     software_version_full,
     active_month_users,
 ):
-    """Insert or update a Mastodon domain in the database."""
+    """Insert or update a Mastodon domain in the database.
+
+    Uses timestamp checking to prevent stale data from overwriting fresh data
+    when multiple crawlers process the same domain concurrently.
+    """
     # Validate that domain is not empty
     if not actual_domain or not actual_domain.strip():
         vmc_output("Attempted to insert empty domain, skipping", "red", use_tqdm=True)
@@ -1280,6 +1285,7 @@ def update_mastodon_domain(
 
     with db_pool.connection() as conn, conn.cursor() as cursor:
         try:
+            new_timestamp = datetime.now(UTC)
             _ = cursor.execute(
                 """
                     INSERT INTO mastodon_domains
@@ -1291,12 +1297,13 @@ def update_mastodon_domain(
                     active_users_monthly = excluded.active_users_monthly,
                     timestamp = excluded.timestamp,
                     full_version = excluded.full_version
+                    WHERE mastodon_domains.timestamp < excluded.timestamp
                 """,
                 (
                     actual_domain,
                     software_version,
                     active_month_users,
-                    datetime.now(UTC),
+                    new_timestamp,
                     software_version_full,
                 ),
             )
@@ -1307,26 +1314,47 @@ def update_mastodon_domain(
 
 
 def cleanup_old_domains():
-    """Delete known domains older than 1 day."""
+    """Delete known domains older than 1 day.
+
+    Uses an advisory lock to ensure only one crawler instance performs
+    cleanup at a time, preventing race conditions where multiple instances
+    might delete domains that other instances just updated.
+    """
+    # Use a fixed advisory lock ID for cleanup operations
+    CLEANUP_LOCK_ID = 999999999
+
     with db_pool.connection() as conn, conn.cursor() as cursor:
         try:
-            cursor.execute(
-                """
-                    DELETE FROM mastodon_domains
-                    WHERE timestamp <=
-                        (CURRENT_TIMESTAMP - INTERVAL '1 day') AT TIME ZONE 'UTC'
-                    RETURNING domain
-                    """,
-            )
-            deleted_domains = [row[0] for row in cursor.fetchall()]
-            if deleted_domains:
-                for d in deleted_domains:
-                    vmc_output(
-                        f"{d}: Removed from active instance list",
-                        "pink",
-                        use_tqdm=True,
-                    )
-            conn.commit()
+            # Try to acquire cleanup lock (non-blocking)
+            cursor.execute("SELECT pg_try_advisory_lock(%s)", (CLEANUP_LOCK_ID,))
+            result = cursor.fetchone()
+            lock_acquired = result[0] if result else False
+
+            if not lock_acquired:
+                # Another instance is already running cleanup, skip
+                return
+
+            try:
+                cursor.execute(
+                    """
+                        DELETE FROM mastodon_domains
+                        WHERE timestamp <=
+                            (CURRENT_TIMESTAMP - INTERVAL '1 day') AT TIME ZONE 'UTC'
+                        RETURNING domain
+                        """,
+                )
+                deleted_domains = [row[0] for row in cursor.fetchall()]
+                if deleted_domains:
+                    for d in deleted_domains:
+                        vmc_output(
+                            f"{d}: Removed from active instance list",
+                            "pink",
+                            use_tqdm=True,
+                        )
+                conn.commit()
+            finally:
+                # Always release the cleanup lock
+                cursor.execute("SELECT pg_advisory_unlock(%s)", (CLEANUP_LOCK_ID,))
         except Exception as exception:
             vmc_output(f"Failed to clean up old domains: {exception}", "red")
             conn.rollback()
@@ -2120,6 +2148,46 @@ def check_nodeinfo_20(
 # =============================================================================
 
 
+def acquire_domain_lock(domain: str, conn) -> bool:
+    """Try to acquire an advisory lock for processing a domain.
+
+    Uses PostgreSQL advisory locks to prevent multiple crawler instances
+    from processing the same domain simultaneously. Returns True if lock
+    was acquired, False if another instance is already processing this domain.
+
+    Args:
+        domain: The domain to lock
+        conn: Database connection (not from pool, must be persistent)
+
+    Returns:
+        True if lock acquired, False if domain is already locked
+    """
+    # Convert domain to a numeric hash for pg_try_advisory_lock
+    # Use hashlib for consistent hashing across processes
+    domain_hash = int(hashlib.md5(domain.encode()).hexdigest()[:16], 16)
+    # PostgreSQL bigint max is 2^63-1, so we need to reduce the hash
+    lock_id = domain_hash % (2**63 - 1)
+
+    with conn.cursor() as cursor:
+        cursor.execute("SELECT pg_try_advisory_lock(%s)", (lock_id,))
+        result = cursor.fetchone()
+        return result[0] if result else False
+
+
+def release_domain_lock(domain: str, conn) -> None:
+    """Release the advisory lock for a domain.
+
+    Args:
+        domain: The domain to unlock
+        conn: Database connection used to acquire the lock
+    """
+    domain_hash = int(hashlib.md5(domain.encode()).hexdigest()[:16], 16)
+    lock_id = domain_hash % (2**63 - 1)
+
+    with conn.cursor() as cursor:
+        cursor.execute("SELECT pg_advisory_unlock(%s)", (lock_id,))
+
+
 def is_mastodon_instance(nodeinfo_20_result: dict[str, Any]) -> bool:
     """Check if the NodeInfo response indicates a Mastodon-compatible instance."""
     if not isinstance(nodeinfo_20_result, dict):
@@ -2311,6 +2379,35 @@ def process_domain(domain, http_client, nightly_version_ranges, user_choice=None
     preserve_ignore = user_choice == "11"
     preserve_nxdomain = user_choice == "13"
 
+    # Try to acquire lock for this domain to prevent concurrent processing
+    # Use a dedicated connection from the pool for the lock
+    with db_pool.connection() as lock_conn:
+        if not acquire_domain_lock(domain, lock_conn):
+            # Another crawler is already processing this domain, skip it
+            return
+
+        try:
+            # Process the domain while holding the lock
+            _process_domain_locked(
+                domain,
+                http_client,
+                nightly_version_ranges,
+                preserve_ignore,
+                preserve_nxdomain,
+            )
+        finally:
+            # Always release the lock, even if processing fails
+            release_domain_lock(domain, lock_conn)
+
+
+def _process_domain_locked(
+    domain, http_client, nightly_version_ranges, preserve_ignore, preserve_nxdomain
+):
+    """Internal function that processes a domain while holding an advisory lock.
+
+    This function contains the actual domain processing logic and should only
+    be called by process_domain() after acquiring the domain lock.
+    """
     if not check_robots_txt(domain, http_client, preserve_ignore, preserve_nxdomain):
         return
 
