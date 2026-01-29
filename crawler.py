@@ -111,7 +111,9 @@ conn_string = (
 # With PgBouncer: Connection multiplexing allows more application connections
 # Without PgBouncer: May need to adjust based on database server capacity
 max_workers = int(os.getenv("VMCRAWL_MAX_THREADS", "2"))
-max_db_connections = max_workers  # One connection per worker thread
+# Increase pool size to account for multiple crawler instances running concurrently
+# With 4-6 instances, we need more connections to avoid pool exhaustion
+max_db_connections = max_workers * 3  # 3x connections per worker for headroom
 
 try:
     db_pool = ConnectionPool(
@@ -119,7 +121,7 @@ try:
         min_size=2,  # Keep 2 warm connections
         max_size=max_db_connections,
         timeout=30,
-        max_waiting=max_workers,  # Allow worker threads to queue
+        max_waiting=max_workers * 2,  # Allow more queuing for multiple instances
     )
     # Maintain single connection for backwards compatibility
     conn = psycopg.connect(conn_string)
@@ -853,21 +855,38 @@ def increment_domain_error(
 
     with db_pool.connection() as conn, conn.cursor() as cursor:
         try:
-            # Use SKIP LOCKED to avoid blocking when another crawler has the row locked
-            # If locked, we skip and let the other crawler handle it
+            # First check if row exists (without locking)
             cursor.execute(
-                "SELECT errors, reason, nodeinfo, ignore, nxdomain FROM raw_domains WHERE domain = %s FOR UPDATE SKIP LOCKED",
+                "SELECT 1 FROM raw_domains WHERE domain = %s",
                 (domain,),
             )
-            result = cursor.fetchone()
+            row_exists = cursor.fetchone() is not None
 
-            # If no result, the row is either locked by another crawler or doesn't exist
-            # We'll still try the INSERT...ON CONFLICT which will handle both cases safely
-            current_errors = result[0] if result and result[0] is not None else 0
-            previous_reason = result[1] if result and result[1] is not None else ""
-            nodeinfo = result[2] if result and result[2] is not None else None
-            current_ignore = result[3] if result and result[3] is True else False
-            current_nxdomain = result[4] if result and result[4] is True else False
+            if row_exists:
+                # Row exists - try to lock it
+                cursor.execute(
+                    "SELECT errors, reason, nodeinfo, ignore, nxdomain FROM raw_domains WHERE domain = %s FOR UPDATE SKIP LOCKED",
+                    (domain,),
+                )
+                result = cursor.fetchone()
+
+                # If no result, the row is locked by another crawler
+                # Skip this update entirely - the other crawler will handle it
+                if not result:
+                    return
+
+                current_errors = result[0] if result[0] is not None else 0
+                previous_reason = result[1] if result[1] is not None else ""
+                nodeinfo = result[2] if result[2] is not None else None
+                current_ignore = result[3] if result[3] is True else False
+                current_nxdomain = result[4] if result[4] is True else False
+            else:
+                # Row doesn't exist yet - set defaults for INSERT
+                current_errors = 0
+                previous_reason = ""
+                nodeinfo = None
+                current_ignore = False
+                current_nxdomain = False
 
             # Determine flag values: preserve if requested, otherwise None
             # When preserving, use True if currently set, otherwise None (to clear it)
