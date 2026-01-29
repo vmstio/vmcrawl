@@ -848,7 +848,7 @@ def increment_domain_error(
         preserve_nxdomain: If True, preserve the nxdomain flag when recording errors
     """
     domain = domain.lower()
-    ERROR_THRESHOLD = int(os.getenv("VMCRAWL_ERROR_BUFFER", "15"))
+    ERROR_THRESHOLD = int(os.getenv("VMCRAWL_ERROR_BUFFER", "8"))
     TRACKED_ERROR_TYPES = ("DNS", "SSL", "TCP", "TYPE", "FILE", "API", "JSON")
 
     with db_pool.connection() as conn, conn.cursor() as cursor:
