@@ -111,9 +111,10 @@ conn_string = (
 # With PgBouncer: Connection multiplexing allows more application connections
 # Without PgBouncer: May need to adjust based on database server capacity
 max_workers = int(os.getenv("VMCRAWL_MAX_THREADS", "2"))
-# Increase pool size to account for multiple crawler instances running concurrently
-# With 4-6 instances, we need more connections to avoid pool exhaustion
-max_db_connections = max_workers * 3  # 3x connections per worker for headroom
+# Balance pool size for multiple concurrent instances (4-6) within server limit (96 total)
+# 6 instances × 15 connections = 90 connections (leaves headroom)
+# 4 instances × 15 connections = 60 connections (plenty of headroom)
+max_db_connections = 15  # Fixed size to fit within server pool limit
 
 try:
     db_pool = ConnectionPool(
@@ -121,7 +122,8 @@ try:
         min_size=2,  # Keep 2 warm connections
         max_size=max_db_connections,
         timeout=30,
-        max_waiting=max_workers * 2,  # Allow more queuing for multiple instances
+        max_waiting=max_workers
+        * 3,  # Allow more queuing since we have fewer connections
     )
     # Maintain single connection for backwards compatibility
     conn = psycopg.connect(conn_string)
