@@ -2148,46 +2148,6 @@ def check_nodeinfo_20(
 # =============================================================================
 
 
-def acquire_domain_lock(domain: str, conn) -> bool:
-    """Try to acquire an advisory lock for processing a domain.
-
-    Uses PostgreSQL advisory locks to prevent multiple crawler instances
-    from processing the same domain simultaneously. Returns True if lock
-    was acquired, False if another instance is already processing this domain.
-
-    Args:
-        domain: The domain to lock
-        conn: Database connection (not from pool, must be persistent)
-
-    Returns:
-        True if lock acquired, False if domain is already locked
-    """
-    # Convert domain to a numeric hash for pg_try_advisory_lock
-    # Use hashlib for consistent hashing across processes
-    domain_hash = int(hashlib.md5(domain.encode()).hexdigest()[:16], 16)
-    # PostgreSQL bigint max is 2^63-1, so we need to reduce the hash
-    lock_id = domain_hash % (2**63 - 1)
-
-    with conn.cursor() as cursor:
-        cursor.execute("SELECT pg_try_advisory_lock(%s)", (lock_id,))
-        result = cursor.fetchone()
-        return result[0] if result else False
-
-
-def release_domain_lock(domain: str, conn) -> None:
-    """Release the advisory lock for a domain.
-
-    Args:
-        domain: The domain to unlock
-        conn: Database connection used to acquire the lock
-    """
-    domain_hash = int(hashlib.md5(domain.encode()).hexdigest()[:16], 16)
-    lock_id = domain_hash % (2**63 - 1)
-
-    with conn.cursor() as cursor:
-        cursor.execute("SELECT pg_advisory_unlock(%s)", (lock_id,))
-
-
 def is_mastodon_instance(nodeinfo_20_result: dict[str, Any]) -> bool:
     """Check if the NodeInfo response indicates a Mastodon-compatible instance."""
     if not isinstance(nodeinfo_20_result, dict):
@@ -2379,35 +2339,6 @@ def process_domain(domain, http_client, nightly_version_ranges, user_choice=None
     preserve_ignore = user_choice == "11"
     preserve_nxdomain = user_choice == "13"
 
-    # Try to acquire lock for this domain to prevent concurrent processing
-    # Use a dedicated connection from the pool for the lock
-    with db_pool.connection() as lock_conn:
-        if not acquire_domain_lock(domain, lock_conn):
-            # Another crawler is already processing this domain, skip it
-            return
-
-        try:
-            # Process the domain while holding the lock
-            _process_domain_locked(
-                domain,
-                http_client,
-                nightly_version_ranges,
-                preserve_ignore,
-                preserve_nxdomain,
-            )
-        finally:
-            # Always release the lock, even if processing fails
-            release_domain_lock(domain, lock_conn)
-
-
-def _process_domain_locked(
-    domain, http_client, nightly_version_ranges, preserve_ignore, preserve_nxdomain
-):
-    """Internal function that processes a domain while holding an advisory lock.
-
-    This function contains the actual domain processing logic and should only
-    be called by process_domain() after acquiring the domain lock.
-    """
     if not check_robots_txt(domain, http_client, preserve_ignore, preserve_nxdomain):
         return
 
