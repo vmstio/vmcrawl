@@ -857,26 +857,15 @@ def increment_domain_error(
 
     with db_pool.connection() as conn, conn.cursor() as cursor:
         try:
-            # First check if row exists (without locking)
+            # Read current values without locking
+            # INSERT...ON CONFLICT handles atomicity, row locks not needed
             cursor.execute(
-                "SELECT 1 FROM raw_domains WHERE domain = %s",
+                "SELECT errors, reason, nodeinfo, ignore, nxdomain FROM raw_domains WHERE domain = %s",
                 (domain,),
             )
-            row_exists = cursor.fetchone() is not None
+            result = cursor.fetchone()
 
-            if row_exists:
-                # Row exists - try to lock it
-                cursor.execute(
-                    "SELECT errors, reason, nodeinfo, ignore, nxdomain FROM raw_domains WHERE domain = %s FOR UPDATE SKIP LOCKED",
-                    (domain,),
-                )
-                result = cursor.fetchone()
-
-                # If no result, the row is locked by another crawler
-                # Skip this update entirely - the other crawler will handle it
-                if not result:
-                    return
-
+            if result:
                 current_errors = result[0] if result[0] is not None else 0
                 previous_reason = result[1] if result[1] is not None else ""
                 nodeinfo = result[2] if result[2] is not None else None
