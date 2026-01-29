@@ -853,14 +853,16 @@ def increment_domain_error(
 
     with db_pool.connection() as conn, conn.cursor() as cursor:
         try:
-            # Use SELECT FOR UPDATE to prevent race conditions between multiple crawlers
-            # This locks the row until the transaction commits
+            # Use SKIP LOCKED to avoid blocking when another crawler has the row locked
+            # If locked, we skip and let the other crawler handle it
             cursor.execute(
-                "SELECT errors, reason, nodeinfo, ignore, nxdomain FROM raw_domains WHERE domain = %s FOR UPDATE",
+                "SELECT errors, reason, nodeinfo, ignore, nxdomain FROM raw_domains WHERE domain = %s FOR UPDATE SKIP LOCKED",
                 (domain,),
             )
             result = cursor.fetchone()
 
+            # If no result, the row is either locked by another crawler or doesn't exist
+            # We'll still try the INSERT...ON CONFLICT which will handle both cases safely
             current_errors = result[0] if result and result[0] is not None else 0
             previous_reason = result[1] if result and result[1] is not None else ""
             nodeinfo = result[2] if result and result[2] is not None else None
