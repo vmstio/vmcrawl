@@ -860,7 +860,7 @@ def increment_domain_error(
             # Read current values without locking
             # INSERT...ON CONFLICT handles atomicity, row locks not needed
             cursor.execute(
-                "SELECT errors, reason, nodeinfo, ignore, nxdomain FROM raw_domains WHERE domain = %s",
+                "SELECT errors, reason, nodeinfo, ignore, nxdomain, failed, norobots, noapi, alias FROM raw_domains WHERE domain = %s",
                 (domain,),
             )
             result = cursor.fetchone()
@@ -871,6 +871,10 @@ def increment_domain_error(
                 nodeinfo = result[2] if result[2] is not None else None
                 current_ignore = result[3] if result[3] is True else False
                 current_nxdomain = result[4] if result[4] is True else False
+                current_failed = result[5] if result[5] is True else False
+                current_norobots = result[6] if result[6] is True else False
+                current_noapi = result[7] if result[7] is True else False
+                current_alias = result[8] if result[8] is True else False
             else:
                 # Row doesn't exist yet - set defaults for INSERT
                 current_errors = 0
@@ -878,128 +882,76 @@ def increment_domain_error(
                 nodeinfo = None
                 current_ignore = False
                 current_nxdomain = False
+                current_failed = False
+                current_norobots = False
+                current_noapi = False
+                current_alias = False
+
+            # If domain is already marked with a terminal state, skip unless we're retrying
+            # This prevents another instance from overwriting these flags after they're set
+            if not preserve_ignore and current_ignore:
+                return  # Domain already marked as ignored
+            if not preserve_nxdomain and current_nxdomain:
+                return  # Domain already marked as NXDOMAIN
+            if current_failed:
+                return  # Domain already marked as failed (auth required)
+            if current_norobots:
+                return  # Domain already marked as norobots (crawling prohibited)
+            if current_noapi:
+                return  # Domain already marked as noapi (API requires auth)
+            if current_alias:
+                return  # Domain already marked as alias (redirects to another instance)
 
             # Determine flag values: preserve if requested, otherwise None
             # When preserving, use True if currently set, otherwise None (to clear it)
             ignore_value = True if (preserve_ignore and current_ignore) else None
             nxdomain_value = True if (preserve_nxdomain and current_nxdomain) else None
 
-            # Skip error counting if:
-            # - nodeinfo is set to 'mastodon', OR
-            # - we're preserving ignore flag (retrying ignored domains), OR
-            # - we're preserving nxdomain flag (retrying NXDOMAIN domains)
-            if nodeinfo == "mastodon" or preserve_ignore or preserve_nxdomain:
-                # When preserving flags, don't record any error information
-                # For mastodon: record reason but clear counter
-                # For preserve_ignore/preserve_nxdomain: clear both counter and reason
-                if preserve_ignore or preserve_nxdomain:
-                    errors_value = None
-                    reason_value = None
-                else:
-                    # mastodon case: record reason but clear counter
-                    errors_value = None
-                    reason_value = error_reason
+            # Helper function to get error type from reason string
+            def get_error_type(reason: str) -> str | None:
+                """Get error type category from error reason string."""
+                if not reason or len(reason) < 3:
+                    return None
 
-                _ = cursor.execute(
-                    """
-                        INSERT INTO raw_domains
-                        (domain, failed, ignore, errors, reason, nxdomain, norobots, noapi, alias)
-                        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
-                        ON CONFLICT(domain) DO UPDATE SET
-                        failed = excluded.failed,
-                        ignore = excluded.ignore,
-                        errors = excluded.errors,
-                        reason = excluded.reason,
-                        nxdomain = excluded.nxdomain,
-                        norobots = excluded.norobots,
-                        noapi = excluded.noapi,
-                        alias = excluded.alias
-                    """,
-                    (
-                        domain,
-                        None,
-                        ignore_value,
-                        errors_value,
-                        reason_value,
-                        nxdomain_value,
-                        None,
-                        None,
-                        None,
-                    ),
-                )
-                conn.commit()
+                # Check for HTTP status codes
+                if reason[0] in "2345" and reason[1:3].isdigit():
+                    return f"HTTP{reason[0]}XX"
 
-                return
-
-            # Get error type prefix (DNS, SSL, TCP, TYPE, HTTP 2xx/3xx/4xx/5xx, or None)
-            # Check for HTTP status code errors
-            def is_http_2xx(reason: str) -> bool:
-                """Check if error reason starts with a 2xx HTTP status code."""
-                return len(reason) >= 3 and reason[0] == "2" and reason[1:3].isdigit()
-
-            def is_http_3xx(reason: str) -> bool:
-                """Check if error reason starts with a 3xx HTTP status code."""
-                return len(reason) >= 3 and reason[0] == "3" and reason[1:3].isdigit()
-
-            def is_http_4xx(reason: str) -> bool:
-                """Check if error reason starts with a 4xx HTTP status code."""
-                return len(reason) >= 3 and reason[0] == "4" and reason[1:3].isdigit()
-
-            def is_http_5xx(reason: str) -> bool:
-                """Check if error reason starts with a 5xx HTTP status code."""
-                return len(reason) >= 3 and reason[0] == "5" and reason[1:3].isdigit()
-
-            error_type = None
-            if is_http_2xx(error_reason):
-                error_type = "HTTP2XX"
-            elif is_http_3xx(error_reason):
-                error_type = "HTTP3XX"
-            elif is_http_4xx(error_reason):
-                error_type = "HTTP4XX"
-            elif is_http_5xx(error_reason):
-                error_type = "HTTP5XX"
-            else:
-                error_type = next(
-                    (t for t in TRACKED_ERROR_TYPES if error_reason.startswith(t)),
+                # Check for other tracked error types
+                return next(
+                    (t for t in TRACKED_ERROR_TYPES if reason.startswith(t)),
                     None,
                 )
 
-            previous_type = None
-            if is_http_2xx(previous_reason):
-                previous_type = "HTTP2XX"
-            elif is_http_3xx(previous_reason):
-                previous_type = "HTTP3XX"
-            elif is_http_4xx(previous_reason):
-                previous_type = "HTTP4XX"
-            elif is_http_5xx(previous_reason):
-                previous_type = "HTTP5XX"
-            else:
-                previous_type = next(
-                    (t for t in TRACKED_ERROR_TYPES if previous_reason.startswith(t)),
-                    None,
-                )
-
-            # Determine new error count
-            if error_type and error_type == previous_type:
-                # Same error type - increment
-                new_errors = current_errors + 1
-
-                # Check if threshold reached
-                if new_errors >= ERROR_THRESHOLD:
-                    if error_type == "DNS":
-                        status = "nxdomain"
-                    else:
-                        # SSL, TCP, TYPE, FILE, HTTP2XX, HTTP3XX, HTTP4XX, or HTTP5XX all mark as ignore
-                        status = "ignore"
-                    mark_domain_status(domain, status)
-                    delete_domain_if_known(domain)
-                    return
-            elif error_type:
-                # Different tracked error type or first occurrence - reset to 1
-                new_errors = 1
-            else:
-                # Non-tracked error types - set count to null
+            # Skip error counting if nodeinfo is set to 'mastodon'
+            # For Mastodon instances, we still record the reason but clear the counter
+            if nodeinfo == "mastodon":
                 new_errors = None
+            else:
+                # Determine error type and calculate new error count
+                error_type = get_error_type(error_reason)
+                previous_type = get_error_type(previous_reason)
+
+                if error_type and error_type == previous_type:
+                    # Same error type - increment
+                    new_errors = current_errors + 1
+
+                    # Check if threshold reached
+                    if new_errors >= ERROR_THRESHOLD:
+                        if error_type == "DNS":
+                            status = "nxdomain"
+                        else:
+                            # SSL, TCP, TYPE, FILE, HTTP2XX, HTTP3XX, HTTP4XX, or HTTP5XX all mark as ignore
+                            status = "ignore"
+                        mark_domain_status(domain, status)
+                        delete_domain_if_known(domain)
+                        return
+                elif error_type:
+                    # Different tracked error type or first occurrence - reset to 1
+                    new_errors = 1
+                else:
+                    # Non-tracked error types - set count to null
+                    new_errors = None
 
             _ = cursor.execute(
                 """
