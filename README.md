@@ -131,17 +131,15 @@ docker run -d --name vmcrawl --env-file .env vmcrawl
 
 ## Scripts
 
-The project includes three main scripts:
+The project includes a single main script with multiple subcommands:
 
-| Script       | Purpose                                                                    |
-| ------------ | -------------------------------------------------------------------------- |
-| `crawler.py` | Main crawling engine that processes domains, collects version/user data, generates statistics, and fetches new domains from federated instance peer lists |
-| `nightly.py` | Manages nightly/development version tracking in the database               |
-| `dni.py`     | Fetches and manages IFTAS DNI (Do Not Interact) list of blocked domains    |
-
-The `crawler.py` script supports two modes:
-- **crawl** (default): Crawls version information from Mastodon instances
-- **fetch**: Fetches new domains from federated instance peer lists
+| Command              | Purpose                                                                    |
+| -------------------- | -------------------------------------------------------------------------- |
+| `crawler.py`         | Default crawl mode - processes domains, collects version/user data, generates statistics |
+| `crawler.py crawl`   | Same as default - crawl version information from Mastodon instances        |
+| `crawler.py fetch`   | Fetches new domains from federated instance peer lists                     |
+| `crawler.py dni`     | Fetches and manages IFTAS DNI (Do Not Interact) list of blocked domains    |
+| `crawler.py nightly` | Manages nightly/development version tracking in the database               |
 
 ### Automated Tasks
 
@@ -347,70 +345,94 @@ docker exec -it vmcrawl ./vmcrawl.sh --file /opt/vmcrawl/domains.txt
 
 ### Nightly Version Management
 
-The `nightly.py` script manages tracking of development/nightly versions:
+The `nightly` subcommand manages tracking of development/nightly versions:
 
 **Native:**
 ```bash
-uv run nightly.py
+./vmcrawl.sh nightly
 ```
 
 **Docker:**
 ```bash
-docker exec -it vmcrawl uv run nightly.py
+docker exec -it vmcrawl ./vmcrawl.sh nightly
 ```
 
 This displays current nightly version entries and allows you to add new versions as they are released. Nightly versions are used to identify instances running pre-release software (alpha, beta, rc versions).
 
+**List all nightly versions:**
+
+**Native:**
+```bash
+./vmcrawl.sh nightly --list
+```
+
+**Docker:**
+```bash
+docker exec vmcrawl ./vmcrawl.sh nightly --list
+```
+
+**Add a version via command line:**
+
+**Native:**
+```bash
+./vmcrawl.sh nightly --version 4.9.0-alpha.7 --start-date 2025-01-15
+```
+
+**Docker:**
+```bash
+docker exec vmcrawl ./vmcrawl.sh nightly --version 4.9.0-alpha.7 --start-date 2025-01-15
+```
+
 ### DNI List Management
 
-The `dni.py` script fetches and manages the IFTAS DNI (Do Not Interact) list:
+The `dni` subcommand fetches and manages the IFTAS DNI (Do Not Interact) list:
 
 **Fetch and import DNI list:**
 
 **Native:**
 ```bash
-uv run dni.py
+./vmcrawl.sh dni
 ```
 
 **Docker:**
 ```bash
-docker exec vmcrawl uv run dni.py
+docker exec vmcrawl ./vmcrawl.sh dni
 ```
 
 **List all DNI domains:**
 
 **Native:**
 ```bash
-uv run dni.py --list
+./vmcrawl.sh dni --list
 ```
 
 **Docker:**
 ```bash
-docker exec vmcrawl uv run dni.py --list
+docker exec vmcrawl ./vmcrawl.sh dni --list
 ```
 
 **Count DNI domains:**
 
 **Native:**
 ```bash
-uv run dni.py --count
+./vmcrawl.sh dni --count
 ```
 
 **Docker:**
 ```bash
-docker exec vmcrawl uv run dni.py --count
+docker exec vmcrawl ./vmcrawl.sh dni --count
 ```
 
 **Use custom CSV URL:**
 
 **Native:**
 ```bash
-uv run dni.py --url https://example.com/custom-dni-list.csv
+./vmcrawl.sh dni --url https://example.com/custom-dni-list.csv
 ```
 
 **Docker:**
 ```bash
-docker exec vmcrawl uv run dni.py --url https://example.com/custom-dni-list.csv
+docker exec vmcrawl ./vmcrawl.sh dni --url https://example.com/custom-dni-list.csv
 ```
 
 The DNI list is sourced from IFTAS (Independent Federated Trust & Safety) and contains domains that have been identified for various trust and safety concerns. All domains imported from the IFTAS list are tagged with the comment "iftas" in the database.

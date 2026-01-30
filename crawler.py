@@ -8,6 +8,7 @@ from datetime import UTC
 try:
     import argparse
     import atexit
+    import csv
     import gc
     import hashlib
     import ipaddress
@@ -23,6 +24,7 @@ try:
     import unicodedata
     from concurrent.futures import ThreadPoolExecutor, as_completed
     from datetime import datetime, timedelta
+    from io import StringIO
     from typing import Any
     from urllib.parse import urlparse
 
@@ -1736,6 +1738,490 @@ def run_fetch_mode(args):
             continue
 
     vmc_output("Fetching complete!", "bold")
+
+
+# =============================================================================
+# DNI FUNCTIONS - Do Not Interact List Management
+# =============================================================================
+
+DNI_CSV_URL = "https://about.iftas.org/wp-content/uploads/2025/10/iftas-dni-latest.csv"
+
+
+def create_dni_table() -> None:
+    """Create the dni table if it doesn't exist."""
+    with db_pool.connection() as conn, conn.cursor() as cursor:
+        try:
+            _ = cursor.execute(
+                """
+                    CREATE TABLE IF NOT EXISTS dni (
+                        domain TEXT PRIMARY KEY,
+                        comment TEXT,
+                        timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                    )
+                """,
+            )
+            conn.commit()
+            vmc_output("DNI table verified/created", "green")
+        except Exception as e:
+            vmc_output(f"Failed to create DNI table: {e}", "red")
+            conn.rollback()
+            sys.exit(1)
+
+
+def get_existing_dni_domains() -> set[str]:
+    """Get list of domains already in dni table."""
+    with db_pool.connection() as conn, conn.cursor() as cursor:
+        try:
+            _ = cursor.execute("SELECT domain FROM dni")
+            existing_domains: set[str] = {row[0] for row in cursor.fetchall()}
+            return existing_domains
+        except Exception as e:
+            vmc_output(f"Failed to get existing DNI domains: {e}", "orange")
+            conn.rollback()
+            return set()
+
+
+def import_dni_domains(domains: list[str], comment: str = "iftas") -> int:
+    """Import new domains into dni table with comment."""
+    with db_pool.connection() as conn, conn.cursor() as cursor:
+        try:
+            if domains:
+                # Use batch insert for efficiency
+                values: list[tuple[str, str]] = [
+                    (domain.lower(), comment) for domain in domains
+                ]
+                args_str = ",".join(["(%s, %s)" for _ in values])
+                flattened_values: list[str] = [
+                    item for sublist in values for item in sublist
+                ]
+                _ = cursor.execute(
+                    "INSERT INTO dni (domain, comment) VALUES "
+                    + args_str
+                    + " ON CONFLICT (domain) DO NOTHING",
+                    flattened_values,
+                )
+                inserted_count = cursor.rowcount
+                vmc_output(f"Imported {inserted_count} new DNI domains", "green")
+                conn.commit()
+                return inserted_count
+            vmc_output("No new domains to import", "yellow")
+            return 0
+        except Exception as e:
+            vmc_output(f"Failed to import DNI domains: {e}", "orange")
+            conn.rollback()
+            return 0
+
+
+def list_dni_domains() -> None:
+    """Display all domains in the dni table."""
+    with db_pool.connection() as conn, conn.cursor() as cursor:
+        try:
+            _ = cursor.execute(
+                "SELECT domain, comment, timestamp FROM dni ORDER BY domain",
+            )
+            domains = cursor.fetchall()
+
+            if not domains:
+                vmc_output("No domains found in DNI table", "yellow")
+                return
+
+            vmc_output(f"\nDNI Domains ({len(domains)} total):", "cyan")
+            vmc_output("-" * 80, "cyan")
+
+            for domain, comment, timestamp in domains:
+                comment_str = comment if comment else ""
+                print(f"{domain:<40} {comment_str:<15} {timestamp}")
+            print()
+
+        except Exception as e:
+            vmc_output(f"Failed to list DNI domains: {e}", "red")
+            conn.rollback()
+
+
+def count_dni_domains() -> int:
+    """Display count of domains in the dni table."""
+    with db_pool.connection() as conn, conn.cursor() as cursor:
+        try:
+            _ = cursor.execute("SELECT COUNT(*) FROM dni")
+            result = cursor.fetchone()
+            count: int = result[0] if result else 0
+            vmc_output(f"Total DNI domains: {count}", "green")
+            return count
+        except Exception as e:
+            vmc_output(f"Failed to count DNI domains: {e}", "red")
+            conn.rollback()
+            return 0
+
+
+def fetch_dni_csv(url: str) -> str | None:
+    """Fetch the DNI CSV file from the specified URL."""
+    try:
+        vmc_output(f"Fetching DNI list from {url}…", "bold")
+        response = get_httpx(url, http_client)
+
+        if response.status_code != 200:
+            vmc_output(f"Failed to fetch DNI CSV: HTTP {response.status_code}", "red")
+            return None
+
+        vmc_output("DNI CSV fetched successfully", "green")
+        return response.text
+
+    except Exception as e:
+        vmc_output(f"Error fetching DNI CSV: {e}", "red")
+        return None
+
+
+def parse_dni_csv(csv_content: str) -> list[str]:
+    """Parse the DNI CSV content and extract domains.
+
+    The CSV file uses #domain as the header for the domain column.
+    """
+    domains: list[str] = []
+
+    try:
+        reader = csv.DictReader(StringIO(csv_content))
+
+        # Check if #domain column exists
+        if not reader.fieldnames or "#domain" not in reader.fieldnames:
+            vmc_output(
+                f"CSV header '#domain' not found. "
+                f"Available headers: {reader.fieldnames}",
+                "red",
+            )
+            return []
+
+        for row in reader:
+            domain = row.get("#domain", "").strip()
+            if domain and domain != "#domain":  # Skip empty rows and header repeats
+                domains.append(domain.lower())
+
+        vmc_output(f"Parsed {len(domains)} domains from CSV", "green")
+        return domains
+
+    except Exception as e:
+        vmc_output(f"Error parsing DNI CSV: {e}", "red")
+        return []
+
+
+def run_dni_mode(args):
+    """Run the DNI list management mode."""
+    vmc_output(f"{appname} v{appversion} (dni mode)", "bold")
+    if is_running_headless():
+        vmc_output("Running in headless mode", "pink")
+    else:
+        vmc_output("Running in interactive mode", "pink")
+
+    # Ensure table exists
+    create_dni_table()
+
+    # List domains
+    if args.list:
+        list_dni_domains()
+        return
+
+    # Count domains
+    if args.count:
+        _ = count_dni_domains()
+        return
+
+    # Fetch and import DNI list (default behavior)
+    csv_content = fetch_dni_csv(args.url)
+    if not csv_content:
+        vmc_output("Failed to fetch DNI CSV, exiting…", "pink")
+        sys.exit(1)
+
+    domains = parse_dni_csv(csv_content)
+    if not domains:
+        vmc_output("No domains parsed from CSV, exiting…", "pink")
+        sys.exit(1)
+
+    # Get existing domains to avoid duplicates
+    existing_domains = get_existing_dni_domains()
+    new_domains = [d for d in domains if d not in existing_domains]
+
+    vmc_output(
+        f"Found {len(new_domains)} new domains (out of {len(domains)} total)",
+        "cyan",
+    )
+
+    if new_domains:
+        _ = import_dni_domains(new_domains)
+    else:
+        vmc_output("All domains already exist in database", "yellow")
+
+    # Show final count
+    _ = count_dni_domains()
+    vmc_output("DNI import complete!", "bold")
+
+
+# =============================================================================
+# NIGHTLY FUNCTIONS - Nightly Version Management
+# =============================================================================
+
+
+def display_nightly_versions():
+    """Display all current nightly version entries."""
+    try:
+        with db_pool.connection() as conn, conn.cursor() as cur:
+            cur.execute(
+                """
+                    SELECT version, start_date, end_date
+                    FROM nightly_versions
+                    ORDER BY start_date DESC
+                """,
+            )
+            versions = cur.fetchall()
+
+            if not versions:
+                vmc_output("No nightly versions found in database", "yellow")
+                return
+
+            vmc_output("\nCurrent Nightly Versions:", "cyan")
+            vmc_output("-" * 70, "cyan")
+            vmc_output(
+                f"{'Version':<20} {'Start Date':<15} {'End Date':<15}",
+                "bold",
+            )
+            vmc_output("-" * 70, "cyan")
+
+            for version, start_date, end_date in versions:
+                print(f"{version:<20} {start_date} {end_date}")
+            print()
+
+    except Exception as e:
+        vmc_output(f"Error fetching nightly versions: {e}", "red")
+        sys.exit(1)
+
+
+def get_active_nightly_version():
+    """Get the currently active nightly version (end_date = 2099-12-31)."""
+    try:
+        with db_pool.connection() as conn, conn.cursor() as cur:
+            cur.execute(
+                """
+                    SELECT version, start_date, end_date
+                    FROM nightly_versions
+                    WHERE end_date = '2099-12-31'
+                    ORDER BY start_date DESC
+                    LIMIT 1
+                """,
+            )
+            result = cur.fetchone()
+            return result if result else None
+    except Exception as e:
+        vmc_output(f"Error fetching active version: {e}", "red")
+        return None
+
+
+def add_nightly_version(
+    nightly_version,
+    start_date,
+    end_date="2099-12-31",
+    auto_update_previous=True,
+):
+    """Add a new nightly version to the database.
+
+    Args:
+        nightly_version: Version string (e.g., '4.9.0-alpha.7')
+        start_date: Start date in YYYY-MM-DD format
+        end_date: End date in YYYY-MM-DD format (default: 2099-12-31)
+        auto_update_previous: If True, auto-update previous version end_date
+    """
+    try:
+        # Validate dates
+        if not validate_nightly_date(start_date):
+            vmc_output(
+                f"Invalid start_date format: {start_date}. Use YYYY-MM-DD",
+                "red",
+            )
+            return False
+
+        if not validate_nightly_date(end_date):
+            vmc_output(f"Invalid end_date format: {end_date}. Use YYYY-MM-DD", "red")
+            return False
+
+        # Check if version already exists
+        with db_pool.connection() as conn, conn.cursor() as cur:
+            cur.execute(
+                """
+                    SELECT version FROM nightly_versions WHERE version = %s
+                """,
+                (nightly_version,),
+            )
+            if cur.fetchone():
+                vmc_output(
+                    f"Version {nightly_version} already exists in database",
+                    "yellow",
+                )
+                return False
+
+        # If auto-update is enabled, update the previous active version
+        if auto_update_previous:
+            active_version = get_active_nightly_version()
+            if active_version:
+                old_version, old_start, old_end = active_version
+                # Calculate new end date (one day before new start_date)
+                new_end_date = (
+                    datetime.strptime(start_date, "%Y-%m-%d") - timedelta(days=1)
+                ).strftime("%Y-%m-%d")
+
+                vmc_output("\nUpdating previous active version:", "cyan")
+                vmc_output(f"  Version: {old_version}", "cyan")
+                vmc_output(f"  Old end date: {old_end}", "cyan")
+                vmc_output(f"  New end date: {new_end_date}", "cyan")
+
+                with db_pool.connection() as conn, conn.cursor() as cur:
+                    cur.execute(
+                        """
+                            UPDATE nightly_versions
+                            SET end_date = %s
+                            WHERE version = %s
+                        """,
+                        (new_end_date, old_version),
+                    )
+                    conn.commit()
+
+                vmc_output(f"Updated {old_version} end date to {new_end_date}", "green")
+
+        # Insert new version
+        with db_pool.connection() as conn, conn.cursor() as cur:
+            cur.execute(
+                """
+                    INSERT INTO nightly_versions (version, start_date, end_date)
+                    VALUES (%s, %s, %s)
+                """,
+                (nightly_version, start_date, end_date),
+            )
+            conn.commit()
+
+        vmc_output("\nSuccessfully added nightly version:", "green")
+        vmc_output(f"  Version: {nightly_version}", "green")
+        vmc_output(f"  Start date: {start_date}", "green")
+        vmc_output(f"  End date: {end_date}", "green")
+
+        return True
+
+    except Exception as e:
+        vmc_output(f"Error adding nightly version: {e}", "red")
+        return False
+
+
+def update_nightly_end_date(nightly_version, new_end_date):
+    """Update the end_date for a specific version."""
+    try:
+        if not validate_nightly_date(new_end_date):
+            vmc_output(f"Invalid date format: {new_end_date}. Use YYYY-MM-DD", "red")
+            return False
+
+        with db_pool.connection() as conn, conn.cursor() as cur:
+            cur.execute(
+                """
+                    UPDATE nightly_versions
+                    SET end_date = %s
+                    WHERE version = %s
+                """,
+                (new_end_date, nightly_version),
+            )
+
+            if cur.rowcount == 0:
+                vmc_output(f"Version {nightly_version} not found in database", "yellow")
+                return False
+
+            conn.commit()
+
+        vmc_output(f"Updated {nightly_version} end date to {new_end_date}", "green")
+        return True
+
+    except Exception as e:
+        vmc_output(f"Error updating end date: {e}", "red")
+        return False
+
+
+def validate_nightly_date(date_string):
+    """Validate date format (YYYY-MM-DD)."""
+    try:
+        datetime.strptime(date_string, "%Y-%m-%d")
+        return True
+    except ValueError:
+        return False
+
+
+def interactive_add_nightly():
+    """Interactive mode for adding a new nightly version."""
+    vmc_output("\n=== Add New Nightly Version ===", "bold")
+
+    # Show current versions
+    display_nightly_versions()
+
+    # Get version
+    nightly_version = input("Enter version (e.g., 4.9.0-alpha.7): ").strip()
+    if not nightly_version:
+        vmc_output("Version cannot be empty", "red")
+        return
+
+    # Get start date
+    default_start_date = (datetime.now() + timedelta(days=1)).strftime("%Y-%m-%d")
+    start_date_input = input(
+        f"Enter start date (YYYY-MM-DD) [default: {default_start_date}]: ",
+    ).strip()
+    start_date = start_date_input if start_date_input else default_start_date
+
+    # Get end date (optional)
+    end_date = input("Enter end date (YYYY-MM-DD) [default: 2099-12-31]: ").strip()
+    if not end_date:
+        end_date = "2099-12-31"
+
+    # Confirm update of previous version
+    active = get_active_nightly_version()
+    if active and end_date == "2099-12-31":
+        old_version, old_start, old_end = active
+        new_end = (
+            datetime.strptime(start_date, "%Y-%m-%d") - timedelta(days=1)
+        ).strftime("%Y-%m-%d")
+
+        vmc_output("\nThis will update the previous active version:", "yellow")
+        vmc_output(f"  {old_version}: {old_end} -> {new_end}", "yellow")
+
+        confirm = input("Continue? (y/n): ").strip().lower()
+        if confirm != "y":
+            vmc_output("Operation cancelled", "pink")
+            return
+
+    # Add the version
+    add_nightly_version(nightly_version, start_date, end_date)
+
+
+def run_nightly_mode(args):
+    """Run the nightly version management mode."""
+    vmc_output(f"{appname} v{appversion} (nightly mode)", "bold")
+    if is_running_headless():
+        vmc_output("Running in headless mode", "pink")
+    else:
+        vmc_output("Running in interactive mode", "pink")
+
+    # List versions
+    if args.list:
+        display_nightly_versions()
+        return
+
+    # Update end date
+    if args.update_end_date:
+        nightly_version, end_date = args.update_end_date
+        update_nightly_end_date(nightly_version, end_date)
+        return
+
+    # Add version (command line)
+    if args.version and args.start_date:
+        add_nightly_version(
+            args.version,
+            args.start_date,
+            args.end_date,
+            auto_update_previous=not args.no_auto_update,
+        )
+        return
+
+    # Add version (interactive) - default behavior
+    interactive_add_nightly()
 
 
 # =============================================================================
@@ -3932,6 +4418,77 @@ def main():
         help="target only a specific domain and ignore the database (ex: vmst.io)",
     )
 
+    # DNI subcommand
+    dni_parser = subparsers.add_parser(
+        "dni", help="Fetch and manage IFTAS DNI (Do Not Interact) list"
+    )
+    dni_parser.add_argument(
+        "-l",
+        "--list",
+        action="store_true",
+        help="List all domains currently in the DNI table",
+    )
+    dni_parser.add_argument(
+        "-c",
+        "--count",
+        action="store_true",
+        help="Show count of domains in the DNI table",
+    )
+    dni_parser.add_argument(
+        "-u",
+        "--url",
+        type=str,
+        default=DNI_CSV_URL,
+        help=f"Custom URL for DNI CSV file (default: {DNI_CSV_URL})",
+    )
+
+    # Nightly subcommand
+    nightly_parser = subparsers.add_parser(
+        "nightly", help="Manage nightly version entries in the database"
+    )
+    nightly_parser.add_argument(
+        "-l",
+        "--list",
+        action="store_true",
+        help="List all nightly versions",
+    )
+    nightly_parser.add_argument(
+        "-a",
+        "--add",
+        action="store_true",
+        help="Add a new nightly version (interactive)",
+    )
+    nightly_parser.add_argument(
+        "-v",
+        "--version",
+        type=str,
+        help="Version string (e.g., 4.9.0-alpha.7)",
+    )
+    nightly_parser.add_argument(
+        "-s",
+        "--start-date",
+        type=str,
+        help="Start date in YYYY-MM-DD format",
+    )
+    nightly_parser.add_argument(
+        "-e",
+        "--end-date",
+        type=str,
+        default="2099-12-31",
+        help="End date in YYYY-MM-DD format (default: 2099-12-31)",
+    )
+    nightly_parser.add_argument(
+        "--no-auto-update",
+        action="store_true",
+        help="Don't automatically update the previous active version's end date",
+    )
+    nightly_parser.add_argument(
+        "--update-end-date",
+        nargs=2,
+        metavar=("VERSION", "END_DATE"),
+        help="Update end_date for a specific version",
+    )
+
     # Also add crawl arguments to main parser for backwards compatibility
     parser.add_argument(
         "-f",
@@ -3954,6 +4511,22 @@ def main():
 
     args = parser.parse_args()
 
+    # Helper function for cleanup
+    def cleanup_connections():
+        try:
+            conn.close()
+        except Exception:
+            pass
+        try:
+            db_pool.close(timeout=5)
+        except Exception:
+            pass
+        try:
+            http_client.close()
+        except Exception:
+            pass
+        gc.collect()
+
     # Handle fetch subcommand
     if args.command == "fetch":
         try:
@@ -3961,20 +4534,27 @@ def main():
         except KeyboardInterrupt:
             vmc_output(f"\n{appname} interrupted by user", "red")
         finally:
-            # Close connections
-            try:
-                conn.close()
-            except Exception:
-                pass
-            try:
-                db_pool.close(timeout=5)
-            except Exception:
-                pass
-            try:
-                http_client.close()
-            except Exception:
-                pass
-            gc.collect()
+            cleanup_connections()
+        return
+
+    # Handle dni subcommand
+    if args.command == "dni":
+        try:
+            run_dni_mode(args)
+        except KeyboardInterrupt:
+            vmc_output(f"\n{appname} interrupted by user", "red")
+        finally:
+            cleanup_connections()
+        return
+
+    # Handle nightly subcommand
+    if args.command == "nightly":
+        try:
+            run_nightly_mode(args)
+        except KeyboardInterrupt:
+            vmc_output(f"\n{appname} interrupted by user", "red")
+        finally:
+            cleanup_connections()
         return
 
     # Default crawl behavior (no subcommand or 'crawl' subcommand)
@@ -4079,21 +4659,7 @@ def main():
     except KeyboardInterrupt:
         vmc_output(f"\n{appname} interrupted by user", "red")
     finally:
-        # Close single connection and pool
-        try:
-            conn.close()
-        except Exception:
-            pass
-        try:
-            db_pool.close(timeout=5)
-        except Exception:
-            pass
-        try:
-            http_client.close()
-        except Exception:
-            pass
-        # Force final garbage collection
-        gc.collect()
+        cleanup_connections()
 
     if is_running_headless():
         if not (args.file or args.target or args.new):
