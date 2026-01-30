@@ -131,20 +131,23 @@ docker run -d --name vmcrawl --env-file .env vmcrawl
 
 ## Scripts
 
-The project includes four main scripts:
+The project includes three main scripts:
 
 | Script       | Purpose                                                                    |
 | ------------ | -------------------------------------------------------------------------- |
-| `crawler.py` | Main crawling engine that processes domains, collects version/user data, and generates statistics |
-| `fetch.py`   | Fetches new domains from federated instance peer lists                     |
+| `crawler.py` | Main crawling engine that processes domains, collects version/user data, generates statistics, and fetches new domains from federated instance peer lists |
 | `nightly.py` | Manages nightly/development version tracking in the database               |
 | `dni.py`     | Fetches and manages IFTAS DNI (Do Not Interact) list of blocked domains    |
+
+The `crawler.py` script supports two modes:
+- **crawl** (default): Crawls version information from Mastodon instances
+- **fetch**: Fetches new domains from federated instance peer lists
 
 ### Automated Tasks
 
 **Automated Fetching:**
 
-The `vmfetch.timer` systemd timer automatically runs `fetch.py --random` every hour to continuously discover new instances from random servers in your database. This ensures your instance list stays up-to-date without manual intervention. The timer starts one hour after system boot and runs hourly thereafter.
+The `vmfetch.timer` systemd timer automatically runs `crawler.py fetch --random` every hour to continuously discover new instances from random servers in your database. This ensures your instance list stays up-to-date without manual intervention. The timer starts one hour after system boot and runs hourly thereafter.
 
 **Statistics Generation:**
 
@@ -207,7 +210,7 @@ docker exec vmcrawl ./vmfetch.sh --limit 100 --offset 50
 
 You can use `limit` and `offset` together, or individually, but neither option can be combined with the `target` argument.
 
-Unless you specifically target a server, `fetch.py` will only attempt to fetch from instances with over 100 active users.
+Unless you specifically target a server, `crawler.py fetch` will only attempt to fetch from instances with over 100 active users.
 If a server fails to fetch, it will be added to a `no_peers` table and not attempt to fetch new instances from it in the future.
 
 You can also select a random sampling of servers to fetch from, instead of going by user count:

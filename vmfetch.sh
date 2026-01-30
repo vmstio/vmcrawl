@@ -1,6 +1,6 @@
 #!/bin/bash
 # vmfetch startup script
-# This script uses uv to run fetch.py
+# This script uses uv to run crawler.py in fetch mode
 
 set -e
 
@@ -19,5 +19,5 @@ else
     cd "$SCRIPT_DIR"
 fi
 
-# Run the fetcher using uv
-exec uv run fetch.py "$@"
+# Run the fetcher using uv (fetch subcommand of crawler.py)
+exec uv run crawler.py fetch "$@"

@@ -10,6 +10,7 @@ try:
     import atexit
     import gc
     import hashlib
+    import ipaddress
     import json
     import mimetypes
     import os
@@ -1456,6 +1457,285 @@ def get_noapi_domains():
 def get_alias_domains():
     """Get list of domains marked as aliases."""
     return get_domains_by_status("alias")
+
+
+# =============================================================================
+# FETCH FUNCTIONS - Peer Discovery
+# =============================================================================
+
+
+def fetch_exclude_domains():
+    """Fetch domains to exclude from peer fetching."""
+    with db_pool.connection() as conn, conn.cursor() as cursor:
+        try:
+            cursor.execute(
+                "SELECT string_agg('''' || domain || '''', ',') FROM no_peers",
+            )
+            result = cursor.fetchone()
+            if result is None or result[0] is None:
+                return ""
+            exclude_domains_sql = result[0]
+            return exclude_domains_sql if exclude_domains_sql else ""
+        except Exception as e:
+            print(f"Failed to obtain excluded domain list: {e}")
+            conn.rollback()
+            return None
+
+
+def fetch_domain_list(exclude_domains_sql, db_limit, db_offset, randomize=False):
+    """Fetch list of domains to query for peers."""
+    with db_pool.connection() as conn, conn.cursor() as cursor:
+        try:
+            min_active = int(os.getenv("VMCRAWL_FETCH_MIN_ACTIVE", "100"))
+            if exclude_domains_sql:
+                # Using string concatenation for exclude_domains_sql since it's already
+                # a properly formatted SQL list from the database
+                query = (
+                    "SELECT domain FROM mastodon_domains "
+                    "WHERE active_users_monthly > %s "
+                    "AND domain NOT IN (" + exclude_domains_sql + ") "
+                    "ORDER BY active_users_monthly DESC"
+                )
+                cursor.execute(query, (min_active,))
+            else:
+                cursor.execute(
+                    """
+                        SELECT domain FROM mastodon_domains
+                        WHERE active_users_monthly > %s
+                        ORDER BY active_users_monthly DESC
+                        """,
+                    (min_active,),
+                )
+            result = [
+                row[0] for row in cursor.fetchall() if not has_emoji_chars(row[0])
+            ]
+
+            if randomize:
+                random.shuffle(result)
+
+            # Apply offset and limit to the results
+            start = int(db_offset)
+            end = start + int(db_limit)
+            result = result[start:end]
+
+            return result if result else ["vmst.io"]
+        except Exception as e:
+            print(f"Failed to obtain primary domain list: {e}")
+            conn.rollback()
+            return None
+
+
+def get_existing_domains():
+    """Get list of domains already in raw_domains table."""
+    with db_pool.connection() as conn, conn.cursor() as cursor:
+        try:
+            cursor.execute("SELECT domain FROM raw_domains")
+            existing_domains = [row[0] for row in cursor.fetchall()]
+            conn.commit()
+            return existing_domains
+        except Exception as e:
+            vmc_output(f"Failed to get list of existing domains: {e}", "orange")
+            conn.rollback()
+            return None
+
+
+def add_to_no_peers(domain):
+    """Add a domain to the no_peers exclusion list."""
+    with db_pool.connection() as conn, conn.cursor() as cursor:
+        try:
+            cursor.execute(
+                "INSERT INTO no_peers (domain) VALUES (%s) "
+                "ON CONFLICT (domain) DO NOTHING",
+                (domain,),
+            )
+            if cursor.rowcount > 0:
+                vmc_output(f"{domain} added to no_peers table", "red")
+            conn.commit()
+        except Exception as e:
+            vmc_output(f"Failed to add domain to no_peers list: {e}", "orange")
+            conn.rollback()
+            return
+
+
+def import_domains(domains):
+    """Import new domains into raw_domains table."""
+    with db_pool.connection() as conn, conn.cursor() as cursor:
+        try:
+            if domains:
+                values = [(domain.lower(), 0) for domain in domains]
+                args_str = ",".join(["(%s,%s)" for _ in values])
+                flattened_values = [item for sublist in values for item in sublist]
+                cursor.execute(
+                    "INSERT INTO raw_domains (domain, errors) VALUES "
+                    + args_str
+                    + " ON CONFLICT (domain) DO NOTHING",
+                    flattened_values,
+                )
+                vmc_output(f"Imported {len(domains)} domains", "green")
+                conn.commit()
+        except Exception as e:
+            vmc_output(f"Failed to import domain list: {e}", "orange")
+            conn.rollback()
+            return
+
+
+def is_valid_fetch_domain(domain):
+    """Check if a domain string is valid for fetching."""
+    domain_pattern = re.compile(r"^[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$", re.IGNORECASE)
+    return (
+        (domain_pattern.match(domain) or "xn--" in domain)
+        and not is_ip_address(domain)
+        and not detect_vowels(domain)
+    )
+
+
+def is_ip_address(domain):
+    """Check if a string is an IP address."""
+    try:
+        ipaddress.ip_address(domain)
+        return True
+    except ValueError:
+        return False
+
+
+def detect_vowels(domain):
+    """Detect domains with suspicious vowel patterns."""
+    try:
+        pattern = r"\.[aeiou]{4}"
+        matches = re.findall(pattern, domain)
+        return True if len(matches) > 0 else False
+    except Exception as e:
+        vmc_output(f"Error detecting vowels: {e}", "orange")
+        return False
+
+
+def fetch_peer_domains(api_url, domain, domain_endings):
+    """Fetch peer domains from a Mastodon instance API."""
+    keywords = get_junk_keywords() or set()
+    dni = get_dni_domains() or set()
+    bad_tlds = get_bad_tld() or set()
+
+    try:
+        api_response = get_httpx(api_url, http_client)
+        data = api_response.json()
+        filtered_domains = [
+            item
+            for item in data
+            if is_valid_fetch_domain(item)
+            and not has_emoji_chars(item)
+            and not any(keyword in item for keyword in keywords)
+            and not any(dni_domain in item for dni_domain in dni)
+            and not any(item.endswith(f".{tld}") for tld in bad_tlds)
+            and any(
+                item.endswith(f".{domain_ending}") for domain_ending in domain_endings
+            )
+            and item.islower()
+        ]
+        return filtered_domains
+    except json.JSONDecodeError:
+        # JSON decode errors indicate HTML or non-JSON response - mark as no_peers
+        vmc_output(
+            f"{domain}: JSON decode error - likely HTML response (marked as no_peers)",
+            "orange",
+        )
+        add_to_no_peers(domain)
+    except Exception as e:
+        error_str = str(e).lower()
+
+        # Only add to no_peers for persistent issues, not transient errors
+        # Authentication issues: 401, 403, unauthorized, forbidden
+        # 404 errors: endpoint doesn't exist
+        persistent_error_indicators = [
+            "401",
+            "403",
+            "404",
+            "unauthorized",
+            "forbidden",
+            "not authorized",
+        ]
+
+        if any(indicator in error_str for indicator in persistent_error_indicators):
+            vmc_output(f"{domain}: {e} (marked as no_peers)", "orange")
+            add_to_no_peers(domain)
+        else:
+            # Log transient errors but don't mark the domain
+            vmc_output(f"{domain}: {e} (transient error, not marked)", "yellow")
+
+    return []
+
+
+def process_fetch_domain(domain, counter, total, domain_endings):
+    """Process a single domain to fetch its peers."""
+    vmc_output(f"Fetching peers @ {domain} ({counter}/{total})…", "bold")
+
+    api_url = f"https://{domain}/api/v1/instance/peers"
+
+    existing_domains = get_existing_domains()
+    domains = fetch_peer_domains(api_url, domain, domain_endings)
+    unique_domains = [d for d in domains if d not in existing_domains and d.isascii()]
+
+    print(f"Found {len(domains)} domains, {len(unique_domains)} new domains")
+
+    import_domains(unique_domains)
+
+
+def run_fetch_mode(args):
+    """Run the fetch mode to discover new domains from instance peers."""
+    # Validate argument combinations
+    if (args.limit or args.offset) and args.target:
+        vmc_output("You cannot set both limit/offset and target arguments", "pink")
+        sys.exit(1)
+
+    if args.offset and args.random:
+        vmc_output("You cannot set both offset and random arguments", "pink")
+        sys.exit(1)
+
+    # Set defaults from arguments or environment
+    if args.limit is not None:
+        db_limit = args.limit
+    else:
+        db_limit = int(os.getenv("VMCRAWL_FETCH_LIMIT", "10"))
+
+    if args.offset is not None:
+        db_offset = args.offset
+    else:
+        db_offset = int(os.getenv("VMCRAWL_FETCH_OFFSET", "0"))
+
+    vmc_output(f"{appname} v{appversion} (fetch mode)", "bold")
+    if is_running_headless():
+        vmc_output("Running in headless mode", "pink")
+    else:
+        vmc_output("Running in interactive mode", "pink")
+
+    exclude_domains_sql = fetch_exclude_domains()
+    domain_endings = get_domain_endings()
+
+    if exclude_domains_sql is None:
+        vmc_output("Failed to fetch excluded list, exiting…", "pink")
+        sys.exit(1)
+
+    if args.target is not None:
+        domain_list = [args.target]
+    else:
+        domain_list = fetch_domain_list(
+            exclude_domains_sql, db_limit, db_offset, randomize=args.random
+        )
+
+    if not domain_list:
+        vmc_output("No domains fetched, exiting…", "pink")
+        sys.exit(1)
+
+    print(f"Fetching peer data from {len(domain_list)} instances…")
+
+    total = len(domain_list)
+    for counter, domain in enumerate(domain_list, start=1):
+        try:
+            process_fetch_domain(domain, counter, total, domain_endings)
+        except Exception as e:
+            vmc_output(f"Error processing domain {domain}: {e}", "orange")
+            continue
+
+    vmc_output("Fetching complete!", "bold")
 
 
 # =============================================================================
@@ -3592,6 +3872,67 @@ def main():
     parser = argparse.ArgumentParser(
         description="Crawl version information from Mastodon instances.",
     )
+    subparsers = parser.add_subparsers(dest="command", help="Available commands")
+
+    # Fetch subcommand
+    fetch_parser = subparsers.add_parser(
+        "fetch", help="Fetch peer data from Mastodon instances to discover new domains"
+    )
+    fetch_parser.add_argument(
+        "-l",
+        "--limit",
+        type=int,
+        help=(
+            f"limit the number of domains requested from database "
+            f"(default: {int(os.getenv('VMCRAWL_FETCH_LIMIT', '10'))})"
+        ),
+    )
+    fetch_parser.add_argument(
+        "-o",
+        "--offset",
+        type=int,
+        help=(
+            f"offset the top of the domains requested from database "
+            f"(default: {int(os.getenv('VMCRAWL_FETCH_OFFSET', '0'))})"
+        ),
+    )
+    fetch_parser.add_argument(
+        "-r",
+        "--random",
+        action="store_true",
+        help="randomize the order of the domains returned (default: disabled)",
+    )
+    fetch_parser.add_argument(
+        "-t",
+        "--target",
+        type=str,
+        help="target only a specific domain and ignore the database (ex: vmst.io)",
+    )
+
+    # Crawl subcommand (default behavior)
+    crawl_parser = subparsers.add_parser(
+        "crawl", help="Crawl version information from Mastodon instances (default)"
+    )
+    crawl_parser.add_argument(
+        "-f",
+        "--file",
+        type=str,
+        help="bypass database and use a file instead (ex: ~/domains.txt)",
+    )
+    crawl_parser.add_argument(
+        "-r",
+        "--new",
+        action="store_true",
+        help="only process new domains added to the database (same as menu item 0)",
+    )
+    crawl_parser.add_argument(
+        "-t",
+        "--target",
+        type=str,
+        help="target only a specific domain and ignore the database (ex: vmst.io)",
+    )
+
+    # Also add crawl arguments to main parser for backwards compatibility
     parser.add_argument(
         "-f",
         "--file",
@@ -3613,9 +3954,39 @@ def main():
 
     args = parser.parse_args()
 
-    if args.file and args.target:
-        vmc_output("You cannot set both file and target arguments", "red")
-        sys.exit(1)
+    # Handle fetch subcommand
+    if args.command == "fetch":
+        try:
+            run_fetch_mode(args)
+        except KeyboardInterrupt:
+            vmc_output(f"\n{appname} interrupted by user", "red")
+        finally:
+            # Close connections
+            try:
+                conn.close()
+            except Exception:
+                pass
+            try:
+                db_pool.close(timeout=5)
+            except Exception:
+                pass
+            try:
+                http_client.close()
+            except Exception:
+                pass
+            gc.collect()
+        return
+
+    # Default crawl behavior (no subcommand or 'crawl' subcommand)
+    if args.command == "crawl" or args.command is None:
+        if (
+            hasattr(args, "file")
+            and hasattr(args, "target")
+            and args.file
+            and args.target
+        ):
+            vmc_output("You cannot set both file and target arguments", "red")
+            sys.exit(1)
 
     vmc_output(f"{appname} v{appversion} ({current_filename})", "bold")
     if is_running_headless():
@@ -3725,7 +4096,7 @@ def main():
         gc.collect()
 
     if is_running_headless():
-        if not (args.file or args.target or args.new or args.buffer):
+        if not (args.file or args.target or args.new):
             try:
                 os.execv(sys.executable, ["python3"] + sys.argv)
             except Exception as exception:
