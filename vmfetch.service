@@ -10,8 +10,8 @@ User=vmcrawl
 Group=vmcrawl
 WorkingDirectory=/opt/vmcrawl
 
-# Execute the vmfetch script with --random flag
-ExecStart=/opt/vmcrawl/vmfetch.sh --random
+# Execute the vmcrawl script with fetch subcommand and --random flag
+ExecStart=/opt/vmcrawl/vmcrawl.sh fetch --random
 
 # Resource limits
 LimitNOFILE=65536

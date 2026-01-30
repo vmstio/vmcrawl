@@ -86,9 +86,8 @@ On your PostgreSQL server, execute the contents of `creation.sql` to create the 
 #### 5. Install Service Files
 
 ```bash
-# Make the shell scripts executable
+# Make the shell script executable
 chmod +x /opt/vmcrawl/vmcrawl.sh
-chmod +x /opt/vmcrawl/vmfetch.sh
 
 # Copy service files to systemd
 cp /opt/vmcrawl/vmcrawl.service /etc/systemd/system/
@@ -145,7 +144,7 @@ The project includes a single main script with multiple subcommands:
 
 **Automated Fetching:**
 
-The `vmfetch.timer` systemd timer automatically runs `crawler.py fetch --random` every hour to continuously discover new instances from random servers in your database. This ensures your instance list stays up-to-date without manual intervention. The timer starts one hour after system boot and runs hourly thereafter.
+The `vmfetch.timer` systemd timer automatically runs `vmcrawl.sh fetch --random` every hour to continuously discover new instances from random servers in your database. This ensures your instance list stays up-to-date without manual intervention. The timer starts one hour after system boot and runs hourly thereafter.
 
 **Statistics Generation:**
 
@@ -159,12 +158,12 @@ To start using `vmcrawl` you will need to populate your database with instances 
 
 **Native:**
 ```bash
-./vmfetch.sh
+./vmcrawl.sh fetch
 ```
 
 **Docker:**
 ```bash
-docker exec vmcrawl ./vmfetch.sh
+docker exec vmcrawl ./vmcrawl.sh fetch
 ```
 
 The first time this is launched it will default to polling `vmst.io` for instances to crawl.
@@ -172,24 +171,24 @@ If you wish to override this you can target a specific instance:
 
 **Native:**
 ```bash
-./vmfetch.sh --target example.social
+./vmcrawl.sh fetch --target example.social
 ```
 
 **Docker:**
 ```bash
-docker exec vmcrawl ./vmfetch.sh --target example.social
+docker exec vmcrawl ./vmcrawl.sh fetch --target example.social
 ```
 
 Once you have established a set of known good Mastodon instances, you can use them to fetch new federated instances:
 
 **Native:**
 ```bash
-./vmfetch.sh
+./vmcrawl.sh fetch
 ```
 
 **Docker:**
 ```bash
-docker exec vmcrawl ./vmfetch.sh
+docker exec vmcrawl ./vmcrawl.sh fetch
 ```
 
 This will scan the top 10 instances in your database by total users.
@@ -198,29 +197,29 @@ You can change the limits or offset the domain list from the top:
 
 **Native:**
 ```bash
-./vmfetch.sh --limit 100 --offset 50
+./vmcrawl.sh fetch --limit 100 --offset 50
 ```
 
 **Docker:**
 ```bash
-docker exec vmcrawl ./vmfetch.sh --limit 100 --offset 50
+docker exec vmcrawl ./vmcrawl.sh fetch --limit 100 --offset 50
 ```
 
 You can use `limit` and `offset` together, or individually, but neither option can be combined with the `target` argument.
 
-Unless you specifically target a server, `crawler.py fetch` will only attempt to fetch from instances with over 100 active users.
+Unless you specifically target a server, `vmcrawl.sh fetch` will only attempt to fetch from instances with over 100 active users.
 If a server fails to fetch, it will be added to a `no_peers` table and not attempt to fetch new instances from it in the future.
 
 You can also select a random sampling of servers to fetch from, instead of going by user count:
 
 **Native:**
 ```bash
-./vmfetch.sh --random
+./vmcrawl.sh fetch --random
 ```
 
 **Docker:**
 ```bash
-docker exec vmcrawl ./vmfetch.sh --random
+docker exec vmcrawl ./vmcrawl.sh fetch --random
 ```
 
 You can combine `random` with the `limit` command, but not with `target` or `offset`.
@@ -500,6 +499,9 @@ systemctl disable vmfetch.timer
 # Manually trigger a fetch
 systemctl start vmfetch.service
 
+# Or run fetch manually
+./vmcrawl.sh fetch --random
+
 # Check when the next fetch will run
 systemctl list-timers vmfetch.timer
 ```
@@ -518,7 +520,7 @@ systemctl list-timers vmfetch.timer
 # Fix ownership
 chown -R vmcrawl:vmcrawl /opt/vmcrawl
 
-# Fix script permissions
+# Fix script permission
 chmod +x /opt/vmcrawl/vmcrawl.sh
 ```
 
