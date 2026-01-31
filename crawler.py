@@ -1559,7 +1559,7 @@ def add_to_no_peers(domain):
             return
 
 
-def import_domains(domains):
+def import_domains(domains, use_tqdm=False):
     """Import new domains into raw_domains table."""
     with db_pool.connection() as conn, conn.cursor() as cursor:
         try:
@@ -1573,10 +1573,11 @@ def import_domains(domains):
                     + " ON CONFLICT (domain) DO NOTHING",
                     flattened_values,
                 )
-                vmc_output(f"Imported {len(domains)} domains", "green")
                 conn.commit()
         except Exception as e:
-            vmc_output(f"Failed to import domain list: {e}", "orange")
+            vmc_output(
+                f"Failed to import domain list: {e}", "orange", use_tqdm=use_tqdm
+            )
             conn.rollback()
             return
 
@@ -1637,8 +1638,9 @@ def fetch_peer_domains(api_url, domain, domain_endings):
     except json.JSONDecodeError:
         # JSON decode errors indicate HTML or non-JSON response - mark as no_peers
         vmc_output(
-            f"{domain}: JSON decode error - likely HTML response (marked as no_peers)",
+            f"{domain}: JSON error (marked as no_peers)",
             "orange",
+            use_tqdm=True,
         )
         add_to_no_peers(domain)
     except Exception as e:
@@ -1657,18 +1659,29 @@ def fetch_peer_domains(api_url, domain, domain_endings):
         ]
 
         if any(indicator in error_str for indicator in persistent_error_indicators):
-            vmc_output(f"{domain}: {e} (marked as no_peers)", "orange")
+            vmc_output(f"{domain}: {e} (marked as no_peers)", "orange", use_tqdm=True)
             add_to_no_peers(domain)
         else:
             # Log transient errors but don't mark the domain
-            vmc_output(f"{domain}: {e} (transient error, not marked)", "yellow")
+            vmc_output(f"{domain}: {e} (transient error)", "yellow", use_tqdm=True)
 
     return []
 
 
-def process_fetch_domain(domain, counter, total, domain_endings):
-    """Process a single domain to fetch its peers."""
-    vmc_output(f"Fetching peers @ {domain} ({counter}/{total})…", "bold")
+def process_fetch_domain(domain, domain_endings, pbar):
+    """Process a single domain to fetch its peers.
+
+    Args:
+        domain: Domain to fetch peers from
+        domain_endings: Set of valid TLDs
+        pbar: tqdm progress bar instance for status updates
+
+    Returns:
+        tuple: (domain, unique_domains list, status message)
+    """
+    # Use fixed-width display to prevent bar from jumping (truncate long domains)
+    domain_display = domain[:25].ljust(25)
+    pbar.set_postfix_str(domain_display)
 
     api_url = f"https://{domain}/api/v1/instance/peers"
 
@@ -1676,9 +1689,15 @@ def process_fetch_domain(domain, counter, total, domain_endings):
     domains = fetch_peer_domains(api_url, domain, domain_endings)
     unique_domains = [d for d in domains if d not in existing_domains and d.isascii()]
 
-    print(f"Found {len(domains)} domains, {len(unique_domains)} new domains")
+    if unique_domains:
+        status = f"{colors['green']}{len(unique_domains)} new{colors['reset']}"
+        import_domains(unique_domains, use_tqdm=True)
+    elif domains:
+        status = f"0 new ({len(domains)} known)"
+    else:
+        status = f"{colors['yellow']}No peers{colors['reset']}"
 
-    import_domains(unique_domains)
+    return (domain, unique_domains, status)
 
 
 def run_fetch_mode(args):
@@ -1729,15 +1748,120 @@ def run_fetch_mode(args):
 
     print(f"Fetching peer data from {len(domain_list)} instances…")
 
-    total = len(domain_list)
-    for counter, domain in enumerate(domain_list, start=1):
+    # Collect all newly discovered domains (thread-safe)
+    all_new_domains = []
+    domains_lock = threading.Lock()
+    max_workers = int(os.getenv("VMCRAWL_MAX_THREADS", "2"))
+    shutdown_event = threading.Event()
+
+    # Create progress bar
+    pbar = tqdm(total=len(domain_list), desc="Fetching", unit="d")
+
+    def fetch_single_domain(domain):
+        """Fetch peers from a single domain (runs in thread)."""
+        if shutdown_event.is_set():
+            return None
+
         try:
-            process_fetch_domain(domain, counter, total, domain_endings)
+            result = process_fetch_domain(domain, domain_endings, pbar)
+            domain_name, new_domains, status = result
+
+            if new_domains:
+                with domains_lock:
+                    all_new_domains.extend(new_domains)
+
+            # Write the status line after completion
+            tqdm.write(f"{domain_name}: {status}")
+            return result
         except Exception as e:
-            vmc_output(f"Error processing domain {domain}: {e}", "orange")
-            continue
+            if not shutdown_event.is_set():
+                tqdm.write(f"{domain}: {colors['red']}Error: {e}{colors['reset']}")
+            return (domain, [], None)
+
+    executor = ThreadPoolExecutor(max_workers=max_workers)
+    try:
+        futures = {
+            executor.submit(fetch_single_domain, domain): domain
+            for domain in domain_list
+        }
+
+        try:
+            for future in as_completed(futures):
+                try:
+                    future.result()
+                    pbar.update(1)
+                except Exception:
+                    if not shutdown_event.is_set():
+                        domain = futures[future]
+                        tqdm.write(f"{domain}: {colors['red']}Failed{colors['reset']}")
+                    pbar.update(1)
+        except KeyboardInterrupt:
+            shutdown_event.set()
+            pbar.close()
+            vmc_output(f"\n{appname} interrupted by user", "red")
+            for future in futures:
+                future.cancel()
+            executor.shutdown(wait=False, cancel_futures=True)
+            return
+    finally:
+        pbar.close()
+        if not shutdown_event.is_set():
+            executor.shutdown(wait=True)
 
     vmc_output("Fetching complete!", "bold")
+
+    # If we found new domains, crawl them
+    if all_new_domains:
+        # Deduplicate while preserving order
+        seen = set()
+        unique_new_domains = []
+        for d in all_new_domains:
+            if d not in seen:
+                seen.add(d)
+                unique_new_domains.append(d)
+
+        vmc_output(
+            f"\nProcessing {len(unique_new_domains)} newly discovered domains…",
+            "bold",
+        )
+
+        # Load filter data for crawling
+        junk_domains = get_junk_keywords()
+        dni_domains = get_dni_domains()
+        bad_tlds = get_bad_tld()
+        failed_domains = get_failed_domains()
+        ignored_domains = get_ignored_domains()
+        not_masto_domains = get_not_masto_domains()
+        baddata_domains = get_baddata_domains()
+        nxdomain_domains = get_nxdomain_domains()
+        norobots_domains = get_norobots_domains()
+        noapi_domains = get_noapi_domains()
+        alias_domains = get_alias_domains()
+        nightly_version_ranges = get_nightly_version_ranges()
+
+        # Use "0" as user_choice (new domains mode)
+        check_and_record_domains(
+            unique_new_domains,
+            not_masto_domains,
+            baddata_domains,
+            failed_domains,
+            ignored_domains,
+            "0",  # user_choice for new domains
+            junk_domains,
+            dni_domains,
+            bad_tlds,
+            domain_endings,
+            http_client,
+            nxdomain_domains,
+            norobots_domains,
+            noapi_domains,
+            alias_domains,
+            nightly_version_ranges,
+        )
+
+        vmc_output("Crawling of new domains complete!", "bold")
+    else:
+        vmc_output("No new domains to crawl.", "yellow")
 
 
 # =============================================================================
@@ -3213,9 +3337,16 @@ def check_and_record_domains(
     max_workers = int(os.getenv("VMCRAWL_MAX_THREADS", "2"))
     shutdown_event = threading.Event()
 
+    # Create progress bar
+    pbar = tqdm(total=len(domain_list), desc="Crawling", unit="d")
+
     def process_single_domain(domain):
         if shutdown_event.is_set():
-            return
+            return None
+
+        # Use fixed-width display to prevent bar from jumping (truncate long domains)
+        domain_display = domain[:25].ljust(25)
+        pbar.set_postfix_str(domain_display)
 
         if should_skip_domain(
             domain,
@@ -3229,7 +3360,7 @@ def check_and_record_domains(
             alias_domains,
             user_choice,
         ):
-            return
+            return (domain, "skipped")
 
         if is_junk_or_bad_tld(
             domain,
@@ -3238,12 +3369,13 @@ def check_and_record_domains(
             bad_tlds,
             domain_endings,
         ):
-            return
+            return (domain, "junk")
 
         try:
             process_domain(domain, http_client, nightly_version_ranges, user_choice)
+            return (domain, "success")
         except httpx.CloseError:
-            pass
+            return (domain, "closed")
         except Exception as exception:
             if not shutdown_event.is_set():
                 target = "shutdown"
@@ -3252,6 +3384,7 @@ def check_and_record_domains(
                 handle_tcp_exception(
                     domain, target, exception, preserve_ignore, preserve_nxdomain
                 )
+            return (domain, "error")
 
     executor = ThreadPoolExecutor(max_workers=max_workers)
     try:
@@ -3263,32 +3396,29 @@ def check_and_record_domains(
         }
 
         try:
-            for future in tqdm(
-                as_completed(futures),
-                total=len(domain_list),
-                desc=f"{appname}",
-                unit="d",
-            ):
+            for future in as_completed(futures):
                 try:
-                    future.result()
+                    _ = future.result()
+                    pbar.update(1)
                 except httpx.CloseError:
-                    pass
+                    pbar.update(1)
                 except Exception as exception:
                     if not shutdown_event.is_set():
                         domain = futures[future]
-                        vmc_output(
-                            f"{domain}: Failed to complete processing {exception}",
-                            "red",
-                            use_tqdm=True,
+                        tqdm.write(
+                            f"{domain}: {colors['red']}Failed: {exception}{colors['reset']}"
                         )
+                    pbar.update(1)
         except KeyboardInterrupt:
             shutdown_event.set()
+            pbar.close()
             vmc_output(f"\n{appname} interrupted by user", "red")
             for future in futures:
                 future.cancel()
             executor.shutdown(wait=False, cancel_futures=True)
             return
     finally:
+        pbar.close()
         if not shutdown_event.is_set():
             executor.shutdown(wait=True)
 
