@@ -1,6 +1,6 @@
 [project]
 name = "vmcrawl"
-version = "0.8"
+version = "0.9"
 description = "Mastodon-focused version reporting crawler"
 requires-python = ">=3.13"
 
@@ -19,8 +19,5 @@ dependencies = [
 [tool.setuptools]
 py-modules = [
     "crawler",
-    "fetch",
-    "stats",
-    "nightly",
     "api",
 ]
