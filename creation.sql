@@ -92,6 +92,12 @@ CREATE TABLE
     timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP
   );
 
+CREATE TABLE
+  tld_cache (
+    tld TEXT PRIMARY KEY,
+    last_updated TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+  );
+
 INSERT INTO
   bad_tld (tld)
 VALUES

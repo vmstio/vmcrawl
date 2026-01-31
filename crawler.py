@@ -384,10 +384,37 @@ def get_httpx(url: str, http_client: httpx.Client) -> httpx.Response:
 
 
 def get_domain_endings() -> set[str]:
-    """Fetch and cache the set of valid TLDs from IANA."""
+    """Fetch and cache the set of valid TLDs from IANA.
+
+    Uses database storage with a 7-day cache expiration.
+    Falls back to file cache if database is unavailable.
+    """
+    # Try to get from database first
+    try:
+        last_updated = get_tld_last_updated()
+        max_cache_age_days = 7
+
+        # Check if database cache is valid (less than 7 days old)
+        if last_updated:
+            age = datetime.now(UTC) - last_updated.replace(tzinfo=UTC)
+            if age.days < max_cache_age_days:
+                tlds = get_tlds_from_db()
+                if tlds:
+                    return tlds
+
+        # Database cache is stale or empty, fetch new data
+        tlds = fetch_tlds_from_iana()
+        if tlds:
+            import_tlds(tlds)
+            return tlds
+
+    except Exception as e:
+        vmc_output(f"Database TLD lookup failed, using file cache: {e}", "yellow")
+
+    # Fallback to file-based cache if database fails
     url = "http://data.iana.org/TLD/tlds-alpha-by-domain.txt"
     cache_file_path = get_cache_file_path(url)
-    max_cache_age = 86400  # 1 day in seconds
+    max_cache_age = 604800  # 7 days in seconds
 
     if is_cache_valid(cache_file_path, max_cache_age):
         with open(cache_file_path) as cache_file:
@@ -1865,31 +1892,87 @@ def run_fetch_mode(args):
 
 
 # =============================================================================
+# TLD FUNCTIONS - Top-Level Domain Management
+# =============================================================================
+
+
+def get_tld_last_updated() -> datetime | None:
+    """Get the timestamp of when TLD data was last updated."""
+    with db_pool.connection() as conn, conn.cursor() as cursor:
+        try:
+            _ = cursor.execute(
+                "SELECT MAX(last_updated) FROM tld_cache",
+            )
+            result = cursor.fetchone()
+            return result[0] if result and result[0] else None
+        except Exception:
+            return None
+
+
+def get_tlds_from_db() -> set[str]:
+    """Get list of TLDs from database."""
+    with db_pool.connection() as conn, conn.cursor() as cursor:
+        try:
+            _ = cursor.execute("SELECT tld FROM tld_cache")
+            tlds: set[str] = {row[0] for row in cursor.fetchall()}
+            return tlds
+        except Exception as e:
+            vmc_output(f"Failed to get TLDs from database: {e}", "orange")
+            conn.rollback()
+            return set()
+
+
+def import_tlds(tlds: set[str]) -> int:
+    """Import TLDs into database, replacing all existing data."""
+    with db_pool.connection() as conn, conn.cursor() as cursor:
+        try:
+            # Clear existing TLDs
+            _ = cursor.execute("DELETE FROM tld_cache")
+
+            if tlds:
+                # Use batch insert for efficiency
+                values: list[tuple[str]] = [(tld,) for tld in sorted(tlds)]
+                args_str = ",".join(["(%s)" for _ in values])
+                flattened_values: list[str] = [item[0] for item in values]
+                _ = cursor.execute(
+                    "INSERT INTO tld_cache (tld) VALUES " + args_str,
+                    flattened_values,
+                )
+                inserted_count = cursor.rowcount
+                conn.commit()
+                return inserted_count
+            return 0
+        except Exception as e:
+            vmc_output(f"Failed to import TLDs: {e}", "orange")
+            conn.rollback()
+            return 0
+
+
+def fetch_tlds_from_iana() -> set[str]:
+    """Fetch TLDs from IANA."""
+    url = "http://data.iana.org/TLD/tlds-alpha-by-domain.txt"
+
+    try:
+        domain_endings_response = get_httpx(url, http_client)
+        if domain_endings_response.status_code == 200:
+            # Use set for O(1) lookup
+            domain_endings = {
+                line.strip().lower()
+                for line in domain_endings_response.text.splitlines()
+                if line.strip() and not line.startswith("#")
+            }
+            return domain_endings
+    except Exception as e:
+        vmc_output(f"Failed to fetch TLDs from IANA: {e}", "red")
+
+    return set()
+
+
+# =============================================================================
 # DNI FUNCTIONS - Do Not Interact List Management
 # =============================================================================
 
 DNI_CSV_URL = "https://about.iftas.org/wp-content/uploads/2025/10/iftas-dni-latest.csv"
-
-
-def create_dni_table() -> None:
-    """Create the dni table if it doesn't exist."""
-    with db_pool.connection() as conn, conn.cursor() as cursor:
-        try:
-            _ = cursor.execute(
-                """
-                    CREATE TABLE IF NOT EXISTS dni (
-                        domain TEXT PRIMARY KEY,
-                        comment TEXT,
-                        timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-                    )
-                """,
-            )
-            conn.commit()
-            vmc_output("DNI table verified/created", "green")
-        except Exception as e:
-            vmc_output(f"Failed to create DNI table: {e}", "red")
-            conn.rollback()
-            sys.exit(1)
 
 
 def get_existing_dni_domains() -> set[str]:
@@ -2034,9 +2117,6 @@ def run_dni_mode(args):
         vmc_output("Running in headless mode", "pink")
     else:
         vmc_output("Running in interactive mode", "pink")
-
-    # Ensure table exists
-    create_dni_table()
 
     # List domains
     if args.list:
