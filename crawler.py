@@ -1736,12 +1736,17 @@ def detect_vowels(domain):
         return False
 
 
-async def fetch_peer_domains(api_url, domain, domain_endings):
-    """Fetch peer domains from a Mastodon instance API."""
-    keywords = await asyncio.to_thread(get_junk_keywords) or set()
-    dni = await asyncio.to_thread(get_dni_domains) or set()
-    bad_tlds = await asyncio.to_thread(get_bad_tld) or set()
+async def fetch_peer_domains(api_url, domain, domain_endings, keywords, dni, bad_tlds):
+    """Fetch peer domains from a Mastodon instance API.
 
+    Args:
+        api_url: The API URL to fetch peers from
+        domain: The domain being queried
+        domain_endings: Set of valid TLDs
+        keywords: Set of junk keywords to filter out
+        dni: Set of DNI domains to filter out
+        bad_tlds: Set of bad TLDs to filter out
+    """
     try:
         api_response = await get_httpx(api_url)
         data = api_response.json()
@@ -1792,13 +1797,19 @@ async def fetch_peer_domains(api_url, domain, domain_endings):
     return []
 
 
-async def process_fetch_domain(domain, domain_endings, pbar):
+async def process_fetch_domain(
+    domain, domain_endings, pbar, keywords, dni, bad_tlds, existing_domains
+):
     """Process a single domain to fetch its peers.
 
     Args:
         domain: Domain to fetch peers from
         domain_endings: Set of valid TLDs
         pbar: tqdm progress bar instance for status updates
+        keywords: Set of junk keywords to filter out
+        dni: Set of DNI domains to filter out
+        bad_tlds: Set of bad TLDs to filter out
+        existing_domains: Set of domains already in database
 
     Returns:
         tuple: (domain, unique_domains list, status message)
@@ -1809,8 +1820,9 @@ async def process_fetch_domain(domain, domain_endings, pbar):
 
     api_url = f"https://{domain}/api/v1/instance/peers"
 
-    existing_domains = await asyncio.to_thread(get_existing_domains)
-    domains = await fetch_peer_domains(api_url, domain, domain_endings)
+    domains = await fetch_peer_domains(
+        api_url, domain, domain_endings, keywords, dni, bad_tlds
+    )
     unique_domains = [d for d in domains if d not in existing_domains and d.isascii()]
 
     if unique_domains:
@@ -1872,6 +1884,12 @@ async def run_fetch_mode(args):
 
     print(f"Fetching peer data from {len(domain_list)} instances…")
 
+    # Pre-fetch filter lists once before concurrent processing
+    keywords = get_junk_keywords() or set()
+    dni = get_dni_domains() or set()
+    bad_tlds = get_bad_tld() or set()
+    existing_domains = set(get_existing_domains() or [])
+
     # Collect all newly discovered domains
     all_new_domains = []
     max_workers = int(os.getenv("VMCRAWL_MAX_THREADS", "2"))
@@ -1891,7 +1909,15 @@ async def run_fetch_mode(args):
                 return None
 
             try:
-                result = await process_fetch_domain(domain, domain_endings, pbar)
+                result = await process_fetch_domain(
+                    domain,
+                    domain_endings,
+                    pbar,
+                    keywords,
+                    dni,
+                    bad_tlds,
+                    existing_domains,
+                )
                 domain_name, new_domains, status = result
 
                 if new_domains:
