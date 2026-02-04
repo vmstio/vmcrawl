@@ -1738,9 +1738,9 @@ def detect_vowels(domain):
 
 async def fetch_peer_domains(api_url, domain, domain_endings):
     """Fetch peer domains from a Mastodon instance API."""
-    keywords = get_junk_keywords() or set()
-    dni = get_dni_domains() or set()
-    bad_tlds = get_bad_tld() or set()
+    keywords = await asyncio.to_thread(get_junk_keywords) or set()
+    dni = await asyncio.to_thread(get_dni_domains) or set()
+    bad_tlds = await asyncio.to_thread(get_bad_tld) or set()
 
     try:
         api_response = await get_httpx(api_url)
@@ -1766,7 +1766,7 @@ async def fetch_peer_domains(api_url, domain, domain_endings):
             "orange",
             use_tqdm=True,
         )
-        add_to_no_peers(domain)
+        await asyncio.to_thread(add_to_no_peers, domain)
     except Exception as e:
         error_str = str(e).lower()
 
@@ -1784,7 +1784,7 @@ async def fetch_peer_domains(api_url, domain, domain_endings):
 
         if any(indicator in error_str for indicator in persistent_error_indicators):
             vmc_output(f"{domain}: {e} (marked as no_peers)", "orange", use_tqdm=True)
-            add_to_no_peers(domain)
+            await asyncio.to_thread(add_to_no_peers, domain)
         else:
             # Log transient errors but don't mark the domain
             vmc_output(f"{domain}: {e} (transient error)", "yellow", use_tqdm=True)
@@ -1809,13 +1809,13 @@ async def process_fetch_domain(domain, domain_endings, pbar):
 
     api_url = f"https://{domain}/api/v1/instance/peers"
 
-    existing_domains = get_existing_domains()
+    existing_domains = await asyncio.to_thread(get_existing_domains)
     domains = await fetch_peer_domains(api_url, domain, domain_endings)
     unique_domains = [d for d in domains if d not in existing_domains and d.isascii()]
 
     if unique_domains:
         status = f"{colors['green']}{len(unique_domains)} new{colors['reset']}"
-        import_domains(unique_domains, use_tqdm=True)
+        await asyncio.to_thread(import_domains, unique_domains, True)
     elif domains:
         status = f"0 new ({len(domains)} known)"
     else:
