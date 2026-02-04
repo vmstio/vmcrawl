@@ -153,9 +153,23 @@ except psycopg.Error as exception:
 # DNS CACHING
 # =============================================================================
 
+# Type alias for DNS cache key and value
+# Key: (host, port, family, type, proto, flags)
+# Value: list of 5-tuples from getaddrinfo (varies by address family)
+_DNSCacheKey = tuple[str, int | str | None, int, int, int, int]
+_DNSCacheValue = list[
+    tuple[
+        socket.AddressFamily,
+        socket.SocketKind,
+        int,
+        str,
+        tuple[str, int] | tuple[str, int, int, int] | tuple[int, bytes],
+    ]
+]
+
 # Thread-safe DNS cache to reduce redundant lookups
 # TTL of 300 seconds (5 minutes), max 10000 entries
-_dns_cache: TTLCache = TTLCache(maxsize=10000, ttl=300)
+_dns_cache: TTLCache[_DNSCacheKey, _DNSCacheValue] = TTLCache(maxsize=10000, ttl=300)
 _dns_cache_lock = threading.Lock()
 
 # Store original getaddrinfo before monkey-patching
@@ -169,9 +183,9 @@ def _cached_getaddrinfo(
     type: int = 0,
     proto: int = 0,
     flags: int = 0,
-) -> list:
+) -> _DNSCacheValue:
     """Thread-safe cached DNS resolution."""
-    cache_key = (host, port, family, type, proto, flags)
+    cache_key: _DNSCacheKey = (host, port, family, type, proto, flags)
 
     # Check cache first (with lock for thread safety)
     with _dns_cache_lock:
@@ -179,7 +193,9 @@ def _cached_getaddrinfo(
             return _dns_cache[cache_key]
 
     # Perform actual DNS lookup (outside lock to allow concurrent lookups)
-    result = _original_getaddrinfo(host, port, family, type, proto, flags)
+    result: _DNSCacheValue = _original_getaddrinfo(
+        host, port, family, type, proto, flags
+    )  # type: ignore[assignment]
 
     # Cache the result
     with _dns_cache_lock:
@@ -738,7 +754,7 @@ def clean_version_wrongpatch(software_version: str) -> str:
             )
         else:
             a, b, c = (0, 0, 0)
-        m = int(version_main_branch.split(".")[1])
+        m = int(version_main_branch.split(".")[1]) if version_main_branch else 0
         x, y, z = int(match.group(1)), int(match.group(2)), int(match.group(3))
         additional_data = match.group(4)
 
@@ -789,7 +805,11 @@ def clean_version_nightly(
 
 def clean_version_main_missing_prerelease(software_version: str) -> str:
     """Add missing prerelease suffix to main branch versions."""
-    if software_version.startswith(version_main_branch) and "-" not in software_version:
+    if (
+        version_main_branch
+        and software_version.startswith(version_main_branch)
+        and "-" not in software_version
+    ):
         software_version = f"{software_version}-alpha.1"
     return software_version
 
@@ -839,8 +859,9 @@ def update_patch_versions():
 
     with conn.cursor() as cur:
         n_level = 0
+        backport_releases = version_backport_releases or []
         for n_level, (version, branch) in enumerate(
-            zip(version_backport_releases, backport_branches),
+            zip(backport_releases, backport_branches),
         ):
             cur.execute(
                 """
@@ -3307,9 +3328,9 @@ def process_mastodon_instance(
 
     active_month_users = users["activeMonth"]
 
-    if version.parse(software_version.split("-")[0]) > version.parse(
-        version_main_branch,
-    ):
+    if version_main_branch and version.parse(
+        software_version.split("-")[0]
+    ) > version.parse(version_main_branch):
         error_to_print = "Mastodon version invalid"
         vmc_output(f"{db_domain}: {error_to_print}", "yellow", use_tqdm=True)
         log_error(domain, error_to_print)
@@ -4427,12 +4448,13 @@ def load_from_database(user_choice):
         query = query_map.get(user_choice)
 
         if user_choice == "50":
-            params = {"versions": all_patched_versions}
+            patched_versions = all_patched_versions or []
+            params = {"versions": patched_versions}
             vmc_output("Excluding versions:", "pink")
-            for version in params["versions"]:
-                vmc_output(f" - {version}", "pink")
+            for ver in patched_versions:
+                vmc_output(f" - {ver}", "pink")
         elif user_choice == "51":
-            params = [f"{version_main_branch}%"]
+            params = [f"{version_main_branch or ''}%"]
 
     if not query:
         vmc_output(f"Choice {user_choice} is invalid, using default query", "pink")
