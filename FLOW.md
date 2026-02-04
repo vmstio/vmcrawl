@@ -21,42 +21,19 @@
                   NO│                        │YES
                     │                        │
                     ▼                        ▼
-            ┌──────────────┐    ┌────────────────────────┐
-            │  STOP/RETURN │    │  check_host_meta()     │
-            │  (norobots)  │    │  Try XML discovery     │
-            └──────────────┘    └───────────┬────────────┘
-                                            │
-                                ┌───────────▼────────────┐
-                                │ Backend domain found?  │
-                                └───────────┬────────────┘
-                                            │
-                                ┌───────────┴────────────┐
-                                │                        │
-                             YES│                        │NO
-                                │                        │
-                                ▼                        ▼
-                    ┌─────────────────────┐  ┌────────────────────────┐
-                    │ Use host-meta       │  │  check_webfinger()     │
-                    │ backend_domain      │  │  Try JSON discovery    │
-                    │ (skip webfinger)    │  └───────────┬────────────┘
-                    └──────────┬──────────┘              │
-                               │             ┌───────────▼────────────┐
-                               │             │ Backend domain found?  │
-                               │             └───────────┬────────────┘
-                               │                         │
-                               │             ┌───────────┴────────────┐
-                               │             │                        │
-                               │          YES│                        │NO
-                               │             │                        │
-                               │             ▼                        ▼
-                               │  ┌────────────────────┐  ┌────────────────────┐
-                               │  │ Use webfinger      │  │ Use original       │
-                               │  │ backend_domain     │  │ domain as fallback │
-                               │  │ (from aliases)     │  │ (last resort)      │
-                               │  └──────────┬─────────┘  └──────────┬─────────┘
-                               │             │                       │
-                               └─────────────┴───────────┬───────────┘
-                                                         │
+            ┌──────────────┐    ┌────────────────────────────────────┐
+            │  STOP/RETURN │    │  discover_backend_domain_parallel()│
+            │  (norobots)  │    │  Run host-meta & webfinger in      │
+            └──────────────┘    │  parallel via asyncio.gather()     │
+                                └───────────────────┬────────────────┘
+                                                    │
+                                        ┌───────────▼────────────┐
+                                        │ Priority resolution:   │
+                                        │ 1. host-meta result    │
+                                        │ 2. webfinger result    │
+                                        │ 3. original domain     │
+                                        └───────────┬────────────┘
+                                                    │
                                              ┌───────────▼────────────┐
                                              │ check_nodeinfo()       │
                                              │ at backend_domain      │
@@ -168,30 +145,33 @@ YES│        │NO                             │
                         └───────────────┘
 ```
 
-## Discovery Methods (Priority Order)
+## Discovery Methods (Parallel Execution)
 
-### 1. **host-meta** (Preferred - Fast)
+Backend domain discovery runs **host-meta** and **webfinger** in parallel using `asyncio.gather()`. The first successful result is used based on priority order.
+
+### 1. **host-meta** (Highest Priority)
 - **URL**: `https://domain/.well-known/host-meta`
 - **Format**: XML
 - **Returns**: Backend domain from webfinger template
 - **Example**: vivaldi.net → social.vivaldi.net
-- **On Failure**: Falls back to webfinger
 
-### 2. **webfinger** (Fallback - Standard)
+### 2. **webfinger** (Second Priority)
 - **URL**: `https://domain/.well-known/webfinger?resource=acct:domain@domain`
 - **Format**: JSON
 - **Returns**: Backend domain from aliases array
 - **Example**: mastodon.social → mastodon.social (same)
-- **On Failure**: Uses original domain
 
-### 3. **nodeinfo** (Required - Platform Identification)
+### 3. **Fallback**
+- If both methods fail, the original domain is used
+
+### 4. **nodeinfo** (Required - Platform Identification)
 - **URL**: `https://backend_domain/.well-known/nodeinfo`
 - **Format**: JSON
 - **Returns**: NodeInfo 2.0 URL
 - **Then fetches**: NodeInfo data with software.name
 - **Purpose**: Identify if Mastodon or other platform
 
-### 4. **instance API** (Required for Mastodon - Domain Validation)
+### 5. **instance API** (Required for Mastodon - Domain Validation)
 - **Primary URL**: `https://backend_domain/api/v2/instance`
 - **Fallback URL**: `https://backend_domain/api/v1/instance`
 - **Format**: JSON
@@ -205,8 +185,8 @@ YES│        │NO                             │
 
 ## Key Decision Points
 
-1. **Host-meta Success**: Skip webfinger entirely (optimization)
-2. **Webfinger Failure**: Use original domain (graceful degradation)
+1. **Parallel Discovery**: Host-meta and webfinger run concurrently; host-meta result takes priority if available
+2. **Discovery Failure**: If both methods fail, original domain is used (graceful degradation)
 3. **NodeInfo Result**: Determines Mastodon vs non-Mastodon handling
 4. **Software Name**: Final classification (mastodon, lemmy, pixelfed, etc.)
 5. **Software Data Timing**: 
@@ -277,7 +257,7 @@ Domains marked with certain flags are skipped during processing:
 
 ### Why Silent Failures?
 
-Host-meta and webfinger are **discovery mechanisms** - their failure doesn't mean the domain is broken, just that we need to try another method. Only when **all** methods fail (nodeinfo returns nothing) do we log it as an actual error.
+Host-meta and webfinger are **discovery mechanisms** that run in parallel - their individual failures don't mean the domain is broken. The parallel execution via `asyncio.gather()` collects both results, and priority resolution picks the best available. Only when **all** methods fail (nodeinfo returns nothing) do we log it as an actual error.
 
 ### Software Data Storage
 

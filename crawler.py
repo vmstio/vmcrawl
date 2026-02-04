@@ -350,7 +350,7 @@ def is_alias_domain(domain: str, backend_domain: str) -> bool:
     return domain != backend_domain
 
 
-def parse_json_with_fallback(
+async def parse_json_with_fallback(
     response: httpx.Response,
     domain: str,
     target: str,
@@ -377,8 +377,13 @@ def parse_json_with_fallback(
             data, _ = decoder.raw_decode(response.text, 0)
             return data
         except json.JSONDecodeError as exception:
-            handle_json_exception(
-                domain, target, exception, preserve_ignore, preserve_nxdomain
+            await asyncio.to_thread(
+                handle_json_exception,
+                domain,
+                target,
+                exception,
+                preserve_ignore,
+                preserve_nxdomain,
             )
             return False
 
@@ -1113,6 +1118,31 @@ def clear_domain_error(domain: str) -> None:
         except Exception as exception:
             vmc_output(
                 f"{domain}: Failed to clear domain errors {exception}",
+                "red",
+                use_tqdm=True,
+            )
+            conn.rollback()
+
+
+def _save_matrix_nodeinfo(domain: str) -> None:
+    """Save nodeinfo as 'matrix' for Matrix servers."""
+    with db_pool.connection() as conn, conn.cursor() as cursor:
+        try:
+            cursor.execute(
+                """
+                    INSERT INTO raw_domains (domain, nodeinfo, errors, reason)
+                    VALUES (%s, %s, %s, %s)
+                    ON CONFLICT(domain) DO UPDATE SET
+                    nodeinfo = excluded.nodeinfo,
+                    errors = excluded.errors,
+                    reason = excluded.reason
+                """,
+                (domain.lower(), "matrix", None, None),
+            )
+            conn.commit()
+        except Exception as exception:
+            vmc_output(
+                f"{domain}: Failed to save Matrix nodeinfo {exception}",
                 "red",
                 use_tqdm=True,
             )
@@ -2749,8 +2779,12 @@ async def check_robots_txt(domain, preserve_ignore=False, preserve_nxdomain=Fals
                 content_type in mimetypes.types_map.values()
                 and not content_type.startswith("text/")
             ):
-                handle_incorrect_file_type(
-                    domain, target, content_type, preserve_ignore
+                await asyncio.to_thread(
+                    handle_incorrect_file_type,
+                    domain,
+                    target,
+                    content_type,
+                    preserve_ignore,
                 )
                 return False
             robots_txt = response.text
@@ -2770,20 +2804,30 @@ async def check_robots_txt(domain, preserve_ignore=False, preserve_nxdomain=Fals
                             "orange",
                             use_tqdm=True,
                         )
-                        mark_norobots_domain(domain)
-                        delete_domain_if_known(domain)
+                        await asyncio.to_thread(mark_norobots_domain, domain)
+                        await asyncio.to_thread(delete_domain_if_known, domain)
                         return False
         elif response.status_code in http_codes_to_hardfail:
-            handle_http_failed(domain, target, response)
+            await asyncio.to_thread(handle_http_failed, domain, target, response)
             return False
         else:
-            handle_http_status_code(
-                domain, target, response, preserve_ignore, preserve_nxdomain
+            await asyncio.to_thread(
+                handle_http_status_code,
+                domain,
+                target,
+                response,
+                preserve_ignore,
+                preserve_nxdomain,
             )
             return False
     except httpx.RequestError as exception:
-        handle_tcp_exception(
-            domain, target, exception, preserve_ignore, preserve_nxdomain
+        await asyncio.to_thread(
+            handle_tcp_exception,
+            domain,
+            target,
+            exception,
+            preserve_ignore,
+            preserve_nxdomain,
         )
         return False
     return True
@@ -2863,7 +2907,7 @@ async def check_webfinger(domain):
                 return None
 
             # Parse and validate JSON structure
-            data = parse_json_with_fallback(response, domain, target)
+            data = await parse_json_with_fallback(response, domain, target)
             if not data or not isinstance(data, dict):
                 return None
 
@@ -2990,17 +3034,26 @@ async def check_nodeinfo(
         if response.status_code == 200:
             content_type = response.headers.get("Content-Type", "")
             if "json" not in content_type:
-                handle_incorrect_file_type(
-                    domain, target, content_type, preserve_ignore
+                await asyncio.to_thread(
+                    handle_incorrect_file_type,
+                    domain,
+                    target,
+                    content_type,
+                    preserve_ignore,
                 )
                 return False
             if not response.content:
                 exception = "reply is empty"
-                handle_json_exception(
-                    domain, target, exception, preserve_ignore, preserve_nxdomain
+                await asyncio.to_thread(
+                    handle_json_exception,
+                    domain,
+                    target,
+                    exception,
+                    preserve_ignore,
+                    preserve_nxdomain,
                 )
                 return False
-            data = parse_json_with_fallback(
+            data = await parse_json_with_fallback(
                 response, domain, target, preserve_ignore, preserve_nxdomain
             )
             if data is False:
@@ -3012,29 +3065,9 @@ async def check_nodeinfo(
             if "m.server" in data:
                 vmc_output(f"{domain}: Matrix", "cyan", use_tqdm=True)
                 # Save nodeinfo as "matrix" and mark as non-Mastodon
-                with db_pool.connection() as conn, conn.cursor() as cursor:
-                    try:
-                        cursor.execute(
-                            """
-                                INSERT INTO raw_domains (domain, nodeinfo, errors, reason)
-                                VALUES (%s, %s, %s, %s)
-                                ON CONFLICT(domain) DO UPDATE SET
-                                nodeinfo = excluded.nodeinfo,
-                                errors = excluded.errors,
-                                reason = excluded.reason
-                            """,
-                            (domain.lower(), "matrix", None, None),
-                        )
-                        conn.commit()
-                    except Exception as exception:
-                        vmc_output(
-                            f"{domain}: Failed to save Matrix nodeinfo {exception}",
-                            "red",
-                            use_tqdm=True,
-                        )
-                        conn.rollback()
-                clear_domain_error(domain)
-                delete_domain_if_known(domain)
+                await asyncio.to_thread(_save_matrix_nodeinfo, domain)
+                await asyncio.to_thread(clear_domain_error, domain)
+                await asyncio.to_thread(delete_domain_if_known, domain)
                 return False
 
             # Check if this is actually nodeinfo data returned directly
@@ -3069,8 +3102,13 @@ async def check_nodeinfo(
 
             if links is not None and len(links) == 0:
                 exception = "empty links array in reply"
-                handle_json_exception(
-                    domain, target, exception, preserve_ignore, preserve_nxdomain
+                await asyncio.to_thread(
+                    handle_json_exception,
+                    domain,
+                    target,
+                    exception,
+                    preserve_ignore,
+                    preserve_nxdomain,
                 )
                 return False
             if links:
@@ -3106,23 +3144,43 @@ async def check_nodeinfo(
                     return {"nodeinfo_20_url": nodeinfo_20_url}
 
             exception = "no links in reply"
-            handle_json_exception(
-                domain, target, exception, preserve_ignore, preserve_nxdomain
+            await asyncio.to_thread(
+                handle_json_exception,
+                domain,
+                target,
+                exception,
+                preserve_ignore,
+                preserve_nxdomain,
             )
             return False
         if response.status_code in http_codes_to_hardfail:
-            handle_http_failed(domain, target, response)
+            await asyncio.to_thread(handle_http_failed, domain, target, response)
             return False
-        handle_http_status_code(
-            domain, target, response, preserve_ignore, preserve_nxdomain
+        await asyncio.to_thread(
+            handle_http_status_code,
+            domain,
+            target,
+            response,
+            preserve_ignore,
+            preserve_nxdomain,
         )
     except httpx.RequestError as exception:
-        handle_tcp_exception(
-            domain, target, exception, preserve_ignore, preserve_nxdomain
+        await asyncio.to_thread(
+            handle_tcp_exception,
+            domain,
+            target,
+            exception,
+            preserve_ignore,
+            preserve_nxdomain,
         )
     except json.JSONDecodeError as exception:
-        handle_json_exception(
-            domain, target, exception, preserve_ignore, preserve_nxdomain
+        await asyncio.to_thread(
+            handle_json_exception,
+            domain,
+            target,
+            exception,
+            preserve_ignore,
+            preserve_nxdomain,
         )
     return None
 
@@ -3141,36 +3199,61 @@ async def check_nodeinfo_20(
         if response.status_code == 200:
             content_type = response.headers.get("Content-Type", "")
             if "json" not in content_type:
-                handle_incorrect_file_type(
-                    domain, target, content_type, preserve_ignore, preserve_nxdomain
+                await asyncio.to_thread(
+                    handle_incorrect_file_type,
+                    domain,
+                    target,
+                    content_type,
+                    preserve_ignore,
+                    preserve_nxdomain,
                 )
                 return False
             if not response.content:
                 exception = "reply empty"
-                handle_json_exception(
-                    domain, target, exception, preserve_ignore, preserve_nxdomain
+                await asyncio.to_thread(
+                    handle_json_exception,
+                    domain,
+                    target,
+                    exception,
+                    preserve_ignore,
+                    preserve_nxdomain,
                 )
                 return False
-            nodeinfo_20_result = parse_json_with_fallback(
+            nodeinfo_20_result = await parse_json_with_fallback(
                 response, domain, target, preserve_ignore, preserve_nxdomain
             )
             if nodeinfo_20_result is False:
                 return False
             return nodeinfo_20_result
         if response.status_code in http_codes_to_hardfail:
-            handle_http_failed(domain, target, response)
+            await asyncio.to_thread(handle_http_failed, domain, target, response)
             return False
-        handle_http_status_code(
-            domain, target, response, preserve_ignore, preserve_nxdomain
+        await asyncio.to_thread(
+            handle_http_status_code,
+            domain,
+            target,
+            response,
+            preserve_ignore,
+            preserve_nxdomain,
         )
     except httpx.RequestError as exception:
-        handle_tcp_exception(
-            domain, target, exception, preserve_ignore, preserve_nxdomain
+        await asyncio.to_thread(
+            handle_tcp_exception,
+            domain,
+            target,
+            exception,
+            preserve_ignore,
+            preserve_nxdomain,
         )
         return False
     except json.JSONDecodeError as exception:
-        handle_json_exception(
-            domain, target, exception, preserve_ignore, preserve_nxdomain
+        await asyncio.to_thread(
+            handle_json_exception,
+            domain,
+            target,
+            exception,
+            preserve_ignore,
+            preserve_nxdomain,
         )
         return False
     return None
@@ -3229,7 +3312,7 @@ async def get_instance_uri(backend_domain: str) -> tuple[str | None, bool]:
         if response.status_code == 200:
             content_type = response.headers.get("Content-Type", "")
             if "json" in content_type and response.content:
-                instance_data = parse_json_with_fallback(
+                instance_data = await parse_json_with_fallback(
                     response, backend_domain, target_v2
                 )
                 if instance_data and isinstance(instance_data, dict):
@@ -3255,7 +3338,7 @@ async def get_instance_uri(backend_domain: str) -> tuple[str | None, bool]:
             if not response.content:
                 return (None, False)
 
-            instance_data = parse_json_with_fallback(
+            instance_data = await parse_json_with_fallback(
                 response, backend_domain, target_v1
             )
             if instance_data is False or not instance_data:
@@ -3425,17 +3508,23 @@ async def process_domain(domain, nightly_version_ranges, user_choice=None):
             # Instance API requires authentication (401 Unauthorized)
             error_to_print = "Instance API requires authentication"
             vmc_output(f"{domain}: {error_to_print}", "orange", use_tqdm=True)
-            log_error(domain, error_to_print)
-            mark_noapi_domain(domain)
-            delete_domain_if_known(domain)
+            await asyncio.to_thread(log_error, domain, error_to_print)
+            await asyncio.to_thread(mark_noapi_domain, domain)
+            await asyncio.to_thread(delete_domain_if_known, domain)
             return
 
         if instance_uri is None:
             # Instance API endpoint is required for Mastodon instances
             error_to_print = "could not retrieve instance URI"
             vmc_output(f"{domain}: {error_to_print}", "yellow", use_tqdm=True)
-            log_error(domain, error_to_print)
-            increment_domain_error(domain, "API", preserve_ignore, preserve_nxdomain)
+            await asyncio.to_thread(log_error, domain, error_to_print)
+            await asyncio.to_thread(
+                increment_domain_error,
+                domain,
+                "API",
+                preserve_ignore,
+                preserve_nxdomain,
+            )
             return
 
         # Check if this is an alias (redirect to another instance)
@@ -3447,31 +3536,34 @@ async def process_domain(domain, nightly_version_ranges, user_choice=None):
                 "cyan",
                 use_tqdm=True,
             )
-            mark_alias_domain(domain)
-            delete_domain_if_known(domain)
+            await asyncio.to_thread(mark_alias_domain, domain)
+            await asyncio.to_thread(delete_domain_if_known, domain)
             return
 
         # Save software information from nodeinfo to database
         # Only save for validated Mastodon instances that aren't aliases
         software_data = nodeinfo_20_result.get("software")
         if software_data and isinstance(software_data, dict):
-            save_nodeinfo_software(domain, software_data)
+            await asyncio.to_thread(save_nodeinfo_software, domain, software_data)
 
-        process_mastodon_instance(
+        await asyncio.to_thread(
+            process_mastodon_instance,
             domain,
             nodeinfo_20_result,
             nightly_version_ranges,
-            actual_domain=instance_uri,
-            preserve_ignore=preserve_ignore,
-            preserve_nxdomain=preserve_nxdomain,
+            instance_uri,
+            preserve_ignore,
+            preserve_nxdomain,
         )
     else:
         # Save software information for non-Mastodon platforms unconditionally
         software_data = nodeinfo_20_result.get("software")
         if software_data and isinstance(software_data, dict):
-            save_nodeinfo_software(domain, software_data)
+            await asyncio.to_thread(save_nodeinfo_software, domain, software_data)
 
-        mark_as_non_mastodon(domain, nodeinfo_20_result["software"]["name"])
+        await asyncio.to_thread(
+            mark_as_non_mastodon, domain, nodeinfo_20_result["software"]["name"]
+        )
 
 
 # =============================================================================

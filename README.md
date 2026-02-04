@@ -448,6 +448,20 @@ Example:
 VMCRAWL_BACKPORTS="4.5,4.4,4.3,4.2"
 ```
 
+### Concurrency
+
+You can configure the number of concurrent domain processing tasks via the `VMCRAWL_MAX_THREADS` environment variable (default: 2):
+
+```bash
+VMCRAWL_MAX_THREADS="4"
+```
+
+The crawler uses Python's `asyncio` for concurrent I/O operations, with an `asyncio.Semaphore` limiting concurrent domain processing to the configured value.
+
+### DNS Caching
+
+DNS resolution results are cached in-memory for 5 minutes (300 seconds) to reduce repeated DNS lookups when crawling domains. The cache holds up to 10,000 entries and is automatically managed.
+
 ## Service Management
 
 For production installations using systemd:
