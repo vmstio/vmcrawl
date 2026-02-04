@@ -17,6 +17,7 @@ try:
     import os
     import random
     import re
+    import socket
     import ssl
     import sys
     import threading
@@ -31,6 +32,7 @@ try:
     import httpx
     import psycopg
     import toml
+    from cachetools import TTLCache
     from dotenv import load_dotenv
     from packaging import version
     from psycopg_pool import ConnectionPool
@@ -146,6 +148,48 @@ try:
 except psycopg.Error as exception:
     print(f"Error connecting to PostgreSQL database: {exception}")
     sys.exit(1)
+
+# =============================================================================
+# DNS CACHING
+# =============================================================================
+
+# Thread-safe DNS cache to reduce redundant lookups
+# TTL of 300 seconds (5 minutes), max 10000 entries
+_dns_cache: TTLCache = TTLCache(maxsize=10000, ttl=300)
+_dns_cache_lock = threading.Lock()
+
+# Store original getaddrinfo before monkey-patching
+_original_getaddrinfo = socket.getaddrinfo
+
+
+def _cached_getaddrinfo(
+    host: str,
+    port: int | str | None,
+    family: int = 0,
+    type: int = 0,
+    proto: int = 0,
+    flags: int = 0,
+) -> list:
+    """Thread-safe cached DNS resolution."""
+    cache_key = (host, port, family, type, proto, flags)
+
+    # Check cache first (with lock for thread safety)
+    with _dns_cache_lock:
+        if cache_key in _dns_cache:
+            return _dns_cache[cache_key]
+
+    # Perform actual DNS lookup (outside lock to allow concurrent lookups)
+    result = _original_getaddrinfo(host, port, family, type, proto, flags)
+
+    # Cache the result
+    with _dns_cache_lock:
+        _dns_cache[cache_key] = result
+
+    return result
+
+
+# Monkey-patch socket.getaddrinfo with cached version
+socket.getaddrinfo = _cached_getaddrinfo  # type: ignore[assignment]
 
 # =============================================================================
 # HTTP CLIENT CONFIGURATION

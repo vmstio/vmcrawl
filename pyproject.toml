@@ -14,10 +14,16 @@ dependencies = [
     "tqdm",
     "fastapi",
     "uvicorn[standard]",
+    "cachetools",
 ]
 
 [tool.setuptools]
 py-modules = [
     "crawler",
     "api",
+]
+
+[dependency-groups]
+dev = [
+    "types-cachetools>=6.2.0.20251022",
 ]
