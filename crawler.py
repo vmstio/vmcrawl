@@ -2889,6 +2889,54 @@ def check_webfinger(domain, http_client):
         return None
 
 
+def discover_backend_domain_parallel(domain: str, http_client) -> tuple[str, str]:
+    """Discover backend domain by running host-meta and webfinger checks in parallel.
+
+    Launches both checks simultaneously and returns the first successful result.
+    This reduces latency compared to sequential fallback when host-meta fails.
+
+    Args:
+        domain: The domain to check
+        http_client: The HTTP client to use
+
+    Returns:
+        Tuple of (backend_domain, discovery_method) where:
+        - backend_domain: The discovered backend domain, or original domain if both fail
+        - discovery_method: "host-meta", "webfinger", or "fallback"
+    """
+    from concurrent.futures import ThreadPoolExecutor, as_completed
+
+    def run_host_meta():
+        result = check_host_meta(domain, http_client)
+        return ("host-meta", result) if result else None
+
+    def run_webfinger():
+        result = check_webfinger(domain, http_client)
+        if result:
+            return ("webfinger", result["backend_domain"])
+        return None
+
+    # Run both checks in parallel with a small thread pool
+    with ThreadPoolExecutor(max_workers=2) as executor:
+        futures = [
+            executor.submit(run_host_meta),
+            executor.submit(run_webfinger),
+        ]
+
+        # Return first successful result
+        for future in as_completed(futures):
+            result = future.result()
+            if result:
+                method, backend = result
+                # Cancel remaining futures (best effort, may already be running)
+                for f in futures:
+                    f.cancel()
+                return (backend, method)
+
+    # Both failed, use original domain as fallback
+    return (domain, "fallback")
+
+
 def sanitize_nodeinfo_url(url: str) -> str:
     """Fix malformed nodeinfo URLs.
 
@@ -3320,30 +3368,24 @@ def process_domain(domain, http_client, nightly_version_ranges, user_choice=None
     if not check_robots_txt(domain, http_client, preserve_ignore, preserve_nxdomain):
         return
 
-    # Try to discover backend domain via host-meta first
-    backend_domain = check_host_meta(domain, http_client)
+    # Discover backend domain via parallel host-meta and webfinger checks
+    backend_domain, discovery_method = discover_backend_domain_parallel(
+        domain, http_client
+    )
 
-    if backend_domain:
-        # host-meta succeeded, skip webfinger
+    if discovery_method == "fallback":
         vmc_output(
-            f"{domain}: Found backend via host-meta: {backend_domain}",
+            f"{domain}: Both host-meta and webfinger failed, "
+            "trying nodeinfo at original domain",
             "white",
             use_tqdm=True,
         )
     else:
-        # host-meta failed, try webfinger
-        webfinger_result = check_webfinger(domain, http_client)
-        if not webfinger_result:
-            # webfinger failed, try nodeinfo with original domain as fallback
-            backend_domain = domain
-            vmc_output(
-                f"{domain}: Both host-meta and webfinger failed, "
-                "trying nodeinfo at original domain",
-                "white",
-                use_tqdm=True,
-            )
-        else:
-            backend_domain = webfinger_result["backend_domain"]
+        vmc_output(
+            f"{domain}: Found backend via {discovery_method}: {backend_domain}",
+            "white",
+            use_tqdm=True,
+        )
 
     # Check nodeinfo at the discovered backend domain
     nodeinfo_result = check_nodeinfo(
