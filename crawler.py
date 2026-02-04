@@ -1665,7 +1665,7 @@ def get_existing_domains():
             return None
 
 
-def add_to_no_peers(domain):
+def add_to_no_peers(domain, use_tqdm=False):
     """Add a domain to the no_peers exclusion list."""
     with db_pool.connection() as conn, conn.cursor() as cursor:
         try:
@@ -1675,10 +1675,16 @@ def add_to_no_peers(domain):
                 (domain,),
             )
             if cursor.rowcount > 0:
-                vmc_output(f"{domain} added to no_peers table", "red")
+                vmc_output(
+                    f"{domain} added to no_peers table", "red", use_tqdm=use_tqdm
+                )
             conn.commit()
         except Exception as e:
-            vmc_output(f"Failed to add domain to no_peers list: {e}", "orange")
+            vmc_output(
+                f"Failed to add domain to no_peers list: {e}",
+                "orange",
+                use_tqdm=use_tqdm,
+            )
             conn.rollback()
             return
 
@@ -1746,6 +1752,10 @@ async def fetch_peer_domains(api_url, domain, domain_endings, keywords, dni, bad
         keywords: Set of junk keywords to filter out
         dni: Set of DNI domains to filter out
         bad_tlds: Set of bad TLDs to filter out
+
+    Returns:
+        tuple: (list of filtered domains, error_type or None)
+            error_type can be: None (success), "no_peers", "transient"
     """
     try:
         api_response = await get_httpx(api_url)
@@ -1763,15 +1773,11 @@ async def fetch_peer_domains(api_url, domain, domain_endings, keywords, dni, bad
             )
             and item.islower()
         ]
-        return filtered_domains
+        return (filtered_domains, None)
     except json.JSONDecodeError:
         # JSON decode errors indicate HTML or non-JSON response - mark as no_peers
-        vmc_output(
-            f"{domain}: JSON error (marked as no_peers)",
-            "orange",
-            use_tqdm=True,
-        )
-        await asyncio.to_thread(add_to_no_peers, domain)
+        await asyncio.to_thread(add_to_no_peers, domain, True)
+        return ([], "no_peers")
     except Exception as e:
         error_str = str(e).lower()
 
@@ -1788,13 +1794,11 @@ async def fetch_peer_domains(api_url, domain, domain_endings, keywords, dni, bad
         ]
 
         if any(indicator in error_str for indicator in persistent_error_indicators):
-            vmc_output(f"{domain}: {e} (marked as no_peers)", "orange", use_tqdm=True)
-            await asyncio.to_thread(add_to_no_peers, domain)
+            await asyncio.to_thread(add_to_no_peers, domain, True)
+            return ([], "no_peers")
         else:
-            # Log transient errors but don't mark the domain
-            vmc_output(f"{domain}: {e} (transient error)", "yellow", use_tqdm=True)
-
-    return []
+            # Transient errors - don't mark the domain
+            return ([], "transient")
 
 
 async def process_fetch_domain(
@@ -1820,7 +1824,7 @@ async def process_fetch_domain(
 
     api_url = f"https://{domain}/api/v1/instance/peers"
 
-    domains = await fetch_peer_domains(
+    domains, error_type = await fetch_peer_domains(
         api_url, domain, domain_endings, keywords, dni, bad_tlds
     )
     unique_domains = [d for d in domains if d not in existing_domains and d.isascii()]
@@ -1830,6 +1834,10 @@ async def process_fetch_domain(
         await asyncio.to_thread(import_domains, unique_domains, True)
     elif domains:
         status = f"0 new ({len(domains)} known)"
+    elif error_type == "no_peers":
+        status = f"{colors['orange']}No peers{colors['reset']}"
+    elif error_type == "transient":
+        status = f"{colors['yellow']}Error (transient){colors['reset']}"
     else:
         status = f"{colors['yellow']}No peers{colors['reset']}"
 
