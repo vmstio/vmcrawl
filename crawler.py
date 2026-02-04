@@ -7,6 +7,7 @@ from datetime import UTC
 
 try:
     import argparse
+    import asyncio
     import atexit
     import csv
     import gc
@@ -23,7 +24,6 @@ try:
     import threading
     import time
     import unicodedata
-    from concurrent.futures import ThreadPoolExecutor, as_completed
     from datetime import datetime, timedelta
     from io import StringIO
     from typing import Any
@@ -221,15 +221,34 @@ ssl_context.minimum_version = ssl.TLSVersion.TLSv1_2
 # Disable MLKEM post-quantum key exchange (SSL_OP_NO_MLKEM)
 ssl_context.options |= 0x800000
 
-http_client = httpx.Client(
-    http2=False,
-    follow_redirects=True,
-    headers=http_custom_headers,
-    timeout=http_timeout,
-    limits=limits,
-    max_redirects=http_redirect,
-    verify=ssl_context,
-)
+# Async HTTP client - initialized lazily to work with asyncio event loop
+# Use get_http_client() to access
+_http_client: httpx.AsyncClient | None = None
+
+
+def get_http_client() -> httpx.AsyncClient:
+    """Get or create the async HTTP client (lazy initialization)."""
+    global _http_client
+    if _http_client is None:
+        _http_client = httpx.AsyncClient(
+            http2=False,
+            follow_redirects=True,
+            headers=http_custom_headers,
+            timeout=http_timeout,
+            limits=limits,
+            max_redirects=http_redirect,
+            verify=ssl_context,
+        )
+    return _http_client
+
+
+async def close_http_client() -> None:
+    """Close the async HTTP client."""
+    global _http_client
+    if _http_client is not None:
+        await _http_client.aclose()
+        _http_client = None
+
 
 # =============================================================================
 # UTILITY FUNCTIONS - Output and Environment
@@ -371,63 +390,46 @@ def has_emoji_chars(domain: str) -> bool:
 # =============================================================================
 
 
-def get_httpx(url: str, http_client: httpx.Client) -> httpx.Response:
-    """Make HTTP GET request with size limits."""
+async def get_httpx(url: str) -> httpx.Response:
+    """Make async HTTP GET request with size limits."""
+    client = get_http_client()
 
-    def stream_with_size_limit(client: httpx.Client, url: str) -> httpx.Response:
-        """Stream response and enforce size limit during download."""
-        # Get the stream context manager and enter it manually
-        stream_ctx = client.stream("GET", url)
-        response = stream_ctx.__enter__()
+    async with client.stream("GET", url) as response:
+        # Check Content-Length header first if available
+        content_length = response.headers.get("Content-Length")
+        if content_length and int(content_length) > max_response_size:
+            msg = (
+                f"Response too large: {content_length} bytes (max: {max_response_size})"
+            )
+            raise ValueError(msg)
 
-        try:
-            # Check Content-Length header first if available
-            content_length = response.headers.get("Content-Length")
-            if content_length and int(content_length) > max_response_size:
-                _ = stream_ctx.__exit__(None, None, None)
+        # Stream the response and check size as we download
+        chunks = []
+        total_size = 0
+
+        async for chunk in response.aiter_bytes(chunk_size=8192):
+            chunks.append(chunk)
+            total_size += len(chunk)
+
+            if total_size > max_response_size:
                 msg = (
-                    f"Response too large: {content_length} bytes "
-                    f"(max: {max_response_size})"
+                    f"Response too large: {total_size} bytes (max: {max_response_size})"
                 )
                 raise ValueError(msg)
 
-            # Stream the response and check size as we download
-            chunks = []
-            total_size = 0
+        # All data received within size limit - construct final response
+        final_response = httpx.Response(
+            status_code=response.status_code,
+            headers=response.headers,
+            request=response.request,
+        )
+        # Directly set the content to bypass decompression
+        final_response._content = b"".join(chunks)
 
-            for chunk in response.iter_bytes(chunk_size=8192):
-                chunks.append(chunk)
-                total_size += len(chunk)
-
-                if total_size > max_response_size:
-                    _ = stream_ctx.__exit__(None, None, None)
-                    msg = (
-                        f"Response too large: {total_size} bytes "
-                        f"(max: {max_response_size})"
-                    )
-                    raise ValueError(msg)
-
-            # All data received within size limit - construct final response
-            # We need to manually build a Response object with our collected data
-            final_response = httpx.Response(
-                status_code=response.status_code,
-                headers=response.headers,
-                request=response.request,
-            )
-            # Directly set the content to bypass decompression
-            final_response._content = b"".join(chunks)
-
-            _ = stream_ctx.__exit__(None, None, None)
-            return final_response
-
-        except Exception:
-            _ = stream_ctx.__exit__(None, None, None)
-            raise
-
-    return stream_with_size_limit(http_client, url)
+        return final_response
 
 
-def get_domain_endings() -> set[str]:
+async def get_domain_endings() -> set[str]:
     """Fetch and cache the set of valid TLDs from IANA.
 
     Uses database storage with a 7-day cache expiration.
@@ -447,7 +449,7 @@ def get_domain_endings() -> set[str]:
                     return tlds
 
         # Database cache is stale or empty, fetch new data
-        tlds = fetch_tlds_from_iana()
+        tlds = await fetch_tlds_from_iana()
         if tlds:
             import_tlds(tlds)
             return tlds
@@ -465,7 +467,7 @@ def get_domain_endings() -> set[str]:
             # Use set for O(1) lookup
             return {line.strip().lower() for line in cache_file if line.strip()}
 
-    domain_endings_response = get_httpx(url, http_client)
+    domain_endings_response = await get_httpx(url)
     if domain_endings_response.status_code in [200]:
         # Use set for O(1) lookup
         domain_endings = {
@@ -489,11 +491,11 @@ def get_domain_endings() -> set[str]:
 # =============================================================================
 
 
-def read_main_version_info(url: str) -> dict[str, str] | None:
+async def read_main_version_info(url: str) -> dict[str, str] | None:
     """Parse Mastodon version.rb file to extract version information."""
     version_info: dict[str, str] = {}
     try:
-        response = get_httpx(url, http_client)
+        response = await get_httpx(url)
         _ = response.raise_for_status()
         lines = response.text.splitlines()
 
@@ -512,12 +514,12 @@ def read_main_version_info(url: str) -> dict[str, str] | None:
     return version_info
 
 
-def get_highest_mastodon_version() -> str | None:
+async def get_highest_mastodon_version() -> str | None:
     """Get the highest stable Mastodon release version from GitHub."""
     highest_version: str | None = None
     try:
         release_url = "https://api.github.com/repos/mastodon/mastodon/releases"
-        response = get_httpx(release_url, http_client)
+        response = await get_httpx(release_url)
         if response.status_code == 200:
             releases = response.json()
             highest_version = None
@@ -536,13 +538,13 @@ def get_highest_mastodon_version() -> str | None:
     return highest_version
 
 
-def get_backport_mastodon_versions():
+async def get_backport_mastodon_versions():
     """Get the latest version for each backport branch from GitHub."""
     url = "https://api.github.com/repos/mastodon/mastodon/releases"
 
     backport_versions = dict.fromkeys(backport_branches, "")
 
-    response = get_httpx(url, http_client)
+    response = await get_httpx(url)
     _ = response.raise_for_status()
     releases = response.json()
 
@@ -565,10 +567,10 @@ def get_backport_mastodon_versions():
     return list(backport_versions.values())
 
 
-def get_main_version_release():
+async def get_main_version_release():
     """Get the current main branch version string."""
     url = "https://raw.githubusercontent.com/mastodon/mastodon/refs/heads/main/lib/mastodon/version.rb"
-    version_info = read_main_version_info(url)
+    version_info = await read_main_version_info(url)
     if not version_info:
         return "0.0.0-alpha.0"
 
@@ -581,10 +583,10 @@ def get_main_version_release():
     return obtained_main_version
 
 
-def get_main_version_branch():
+async def get_main_version_branch():
     """Get the current main branch number (e.g., '4.3')."""
     url = "https://raw.githubusercontent.com/mastodon/mastodon/refs/heads/main/lib/mastodon/version.rb"
-    version_info = read_main_version_info(url)
+    version_info = await read_main_version_info(url)
     if not version_info:
         return "0.0"
 
@@ -1683,14 +1685,14 @@ def detect_vowels(domain):
         return False
 
 
-def fetch_peer_domains(api_url, domain, domain_endings):
+async def fetch_peer_domains(api_url, domain, domain_endings):
     """Fetch peer domains from a Mastodon instance API."""
     keywords = get_junk_keywords() or set()
     dni = get_dni_domains() or set()
     bad_tlds = get_bad_tld() or set()
 
     try:
-        api_response = get_httpx(api_url, http_client)
+        api_response = await get_httpx(api_url)
         data = api_response.json()
         filtered_domains = [
             item
@@ -1739,7 +1741,7 @@ def fetch_peer_domains(api_url, domain, domain_endings):
     return []
 
 
-def process_fetch_domain(domain, domain_endings, pbar):
+async def process_fetch_domain(domain, domain_endings, pbar):
     """Process a single domain to fetch its peers.
 
     Args:
@@ -1757,7 +1759,7 @@ def process_fetch_domain(domain, domain_endings, pbar):
     api_url = f"https://{domain}/api/v1/instance/peers"
 
     existing_domains = get_existing_domains()
-    domains = fetch_peer_domains(api_url, domain, domain_endings)
+    domains = await fetch_peer_domains(api_url, domain, domain_endings)
     unique_domains = [d for d in domains if d not in existing_domains and d.isascii()]
 
     if unique_domains:
@@ -1771,7 +1773,7 @@ def process_fetch_domain(domain, domain_endings, pbar):
     return (domain, unique_domains, status)
 
 
-def run_fetch_mode(args):
+async def run_fetch_mode(args):
     """Run the fetch mode to discover new domains from instance peers."""
     # Validate argument combinations
     if (args.limit or args.offset) and args.target:
@@ -1800,7 +1802,7 @@ def run_fetch_mode(args):
         vmc_output("Running in interactive mode", "pink")
 
     exclude_domains_sql = fetch_exclude_domains()
-    domain_endings = get_domain_endings()
+    domain_endings = await get_domain_endings()
 
     if exclude_domains_sql is None:
         vmc_output("Failed to fetch excluded list, exiting…", "pink")
@@ -1819,65 +1821,63 @@ def run_fetch_mode(args):
 
     print(f"Fetching peer data from {len(domain_list)} instances…")
 
-    # Collect all newly discovered domains (thread-safe)
+    # Collect all newly discovered domains
     all_new_domains = []
-    domains_lock = threading.Lock()
     max_workers = int(os.getenv("VMCRAWL_MAX_THREADS", "2"))
-    shutdown_event = threading.Event()
+    semaphore = asyncio.Semaphore(max_workers)
+    shutdown_event = asyncio.Event()
 
     # Create progress bar
     pbar = tqdm(total=len(domain_list), desc="Fetching", unit="d")
 
-    def fetch_single_domain(domain):
-        """Fetch peers from a single domain (runs in thread)."""
+    async def fetch_single_domain(domain):
+        """Fetch peers from a single domain."""
         if shutdown_event.is_set():
             return None
 
-        try:
-            result = process_fetch_domain(domain, domain_endings, pbar)
-            domain_name, new_domains, status = result
+        async with semaphore:
+            if shutdown_event.is_set():
+                return None
 
-            if new_domains:
-                with domains_lock:
+            try:
+                result = await process_fetch_domain(domain, domain_endings, pbar)
+                domain_name, new_domains, status = result
+
+                if new_domains:
                     all_new_domains.extend(new_domains)
 
-            # Write the status line after completion
-            tqdm.write(f"{domain_name}: {status}")
-            return result
-        except Exception as e:
-            if not shutdown_event.is_set():
-                tqdm.write(f"{domain}: {colors['red']}Error: {e}{colors['reset']}")
-            return (domain, [], None)
+                # Write the status line after completion
+                tqdm.write(f"{domain_name}: {status}")
+                pbar.update(1)
+                return result
+            except Exception as e:
+                if not shutdown_event.is_set():
+                    tqdm.write(f"{domain}: {colors['red']}Error: {e}{colors['reset']}")
+                pbar.update(1)
+                return (domain, [], None)
 
-    executor = ThreadPoolExecutor(max_workers=max_workers)
     try:
-        futures = {
-            executor.submit(fetch_single_domain, domain): domain
-            for domain in domain_list
-        }
+        # Create tasks for all domains
+        tasks = [
+            asyncio.create_task(fetch_single_domain(domain)) for domain in domain_list
+        ]
 
         try:
-            for future in as_completed(futures):
-                try:
-                    future.result()
-                    pbar.update(1)
-                except Exception:
-                    if not shutdown_event.is_set():
-                        domain = futures[future]
-                        tqdm.write(f"{domain}: {colors['red']}Failed{colors['reset']}")
-                    pbar.update(1)
-        except KeyboardInterrupt:
+            await asyncio.gather(*tasks, return_exceptions=True)
+        except asyncio.CancelledError:
             shutdown_event.set()
             pbar.close()
             vmc_output(f"\n{appname} interrupted by user", "red")
-            for future in futures:
-                future.cancel()
-            executor.shutdown(wait=False, cancel_futures=True)
+            for task in tasks:
+                task.cancel()
             return
+    except KeyboardInterrupt:
+        shutdown_event.set()
+        pbar.close()
+        vmc_output(f"\n{appname} interrupted by user", "red")
+        return
     finally:
         pbar.close()
-        if not shutdown_event.is_set():
-            executor.shutdown(wait=True)
 
     vmc_output("Fetching complete!", "bold")
 
@@ -1911,7 +1911,7 @@ def run_fetch_mode(args):
         nightly_version_ranges = get_nightly_version_ranges()
 
         # Use "0" as user_choice (new domains mode)
-        check_and_record_domains(
+        await check_and_record_domains(
             unique_new_domains,
             not_masto_domains,
             baddata_domains,
@@ -1922,7 +1922,6 @@ def run_fetch_mode(args):
             dni_domains,
             bad_tlds,
             domain_endings,
-            http_client,
             nxdomain_domains,
             norobots_domains,
             noapi_domains,
@@ -1992,12 +1991,12 @@ def import_tlds(tlds: set[str]) -> int:
             return 0
 
 
-def fetch_tlds_from_iana() -> set[str]:
+async def fetch_tlds_from_iana() -> set[str]:
     """Fetch TLDs from IANA."""
     url = "http://data.iana.org/TLD/tlds-alpha-by-domain.txt"
 
     try:
-        domain_endings_response = get_httpx(url, http_client)
+        domain_endings_response = await get_httpx(url)
         if domain_endings_response.status_code == 200:
             # Use set for O(1) lookup
             domain_endings = {
@@ -2104,11 +2103,11 @@ def count_dni_domains() -> int:
             return 0
 
 
-def fetch_dni_csv(url: str) -> str | None:
+async def fetch_dni_csv(url: str) -> str | None:
     """Fetch the DNI CSV file from the specified URL."""
     try:
         vmc_output(f"Fetching DNI list from {url}…", "bold")
-        response = get_httpx(url, http_client)
+        response = await get_httpx(url)
 
         if response.status_code != 200:
             vmc_output(f"Failed to fetch DNI CSV: HTTP {response.status_code}", "red")
@@ -2154,7 +2153,7 @@ def parse_dni_csv(csv_content: str) -> list[str]:
         return []
 
 
-def run_dni_mode(args):
+async def run_dni_mode(args):
     """Run the DNI list management mode."""
     vmc_output(f"{appname} v{appversion} (dni mode)", "bold")
     if is_running_headless():
@@ -2173,7 +2172,7 @@ def run_dni_mode(args):
         return
 
     # Fetch and import DNI list (default behavior)
-    csv_content = fetch_dni_csv(args.url)
+    csv_content = await fetch_dni_csv(args.url)
     if not csv_content:
         vmc_output("Failed to fetch DNI CSV, exiting…", "pink")
         sys.exit(1)
@@ -2717,14 +2716,12 @@ def is_junk_or_bad_tld(domain, junk_domains, dni_domains, bad_tlds, domain_endin
 # =============================================================================
 
 
-def check_robots_txt(
-    domain, http_client, preserve_ignore=False, preserve_nxdomain=False
-):
+async def check_robots_txt(domain, preserve_ignore=False, preserve_nxdomain=False):
     """Check robots.txt to ensure crawling is allowed."""
     target = "robots_txt"
     url = f"https://{domain}/robots.txt"
     try:
-        response = get_httpx(url, http_client)
+        response = await get_httpx(url)
         if response.status_code == 200:
             content_type = response.headers.get("Content-Type", "")
             if (
@@ -2771,14 +2768,14 @@ def check_robots_txt(
     return True
 
 
-def check_host_meta(domain, http_client):
+async def check_host_meta(domain):
     """Check host-meta endpoint to discover backend domain.
 
     Returns the backend domain if found, or None if not available.
     """
     url = f"https://{domain}/.well-known/host-meta"
     try:
-        response = get_httpx(url, http_client)
+        response = await get_httpx(url)
         if response.status_code == 200:
             # host-meta is typically XML
             if not response.content:
@@ -2822,7 +2819,7 @@ def check_host_meta(domain, http_client):
         return None
 
 
-def check_webfinger(domain, http_client):
+async def check_webfinger(domain):
     """Check WebFinger endpoint for backend domain discovery.
 
     Returns {"backend_domain": domain} on success, None on failure.
@@ -2831,7 +2828,7 @@ def check_webfinger(domain, http_client):
     target = "webfinger"
     url = f"https://{domain}/.well-known/webfinger?resource=acct:{domain}@{domain}"
     try:
-        response = get_httpx(url, http_client)
+        response = await get_httpx(url)
         content_type = response.headers.get("Content-Type", "")
         content_length = response.headers.get("Content-Length", "")
 
@@ -2889,7 +2886,7 @@ def check_webfinger(domain, http_client):
         return None
 
 
-def discover_backend_domain_parallel(domain: str, http_client) -> tuple[str, str]:
+async def discover_backend_domain_parallel(domain: str) -> tuple[str, str]:
     """Discover backend domain by running host-meta and webfinger checks in parallel.
 
     Launches both checks simultaneously and returns the first successful result.
@@ -2897,41 +2894,31 @@ def discover_backend_domain_parallel(domain: str, http_client) -> tuple[str, str
 
     Args:
         domain: The domain to check
-        http_client: The HTTP client to use
 
     Returns:
         Tuple of (backend_domain, discovery_method) where:
         - backend_domain: The discovered backend domain, or original domain if both fail
         - discovery_method: "host-meta", "webfinger", or "fallback"
     """
-    from concurrent.futures import ThreadPoolExecutor, as_completed
 
-    def run_host_meta():
-        result = check_host_meta(domain, http_client)
+    async def run_host_meta():
+        result = await check_host_meta(domain)
         return ("host-meta", result) if result else None
 
-    def run_webfinger():
-        result = check_webfinger(domain, http_client)
+    async def run_webfinger():
+        result = await check_webfinger(domain)
         if result:
             return ("webfinger", result["backend_domain"])
         return None
 
-    # Run both checks in parallel with a small thread pool
-    with ThreadPoolExecutor(max_workers=2) as executor:
-        futures = [
-            executor.submit(run_host_meta),
-            executor.submit(run_webfinger),
-        ]
+    # Run both checks in parallel with asyncio.gather
+    results = await asyncio.gather(run_host_meta(), run_webfinger())
 
-        # Return first successful result
-        for future in as_completed(futures):
-            result = future.result()
-            if result:
-                method, backend = result
-                # Cancel remaining futures (best effort, may already be running)
-                for f in futures:
-                    f.cancel()
-                return (backend, method)
+    # Return first successful result (prefer host-meta if both succeed)
+    for result in results:
+        if result:
+            method, backend = result
+            return (backend, method)
 
     # Both failed, use original domain as fallback
     return (domain, "fallback")
@@ -2971,14 +2958,14 @@ def sanitize_nodeinfo_url(url: str) -> str:
     return url
 
 
-def check_nodeinfo(
-    domain, backend_domain, http_client, preserve_ignore=False, preserve_nxdomain=False
+async def check_nodeinfo(
+    domain, backend_domain, preserve_ignore=False, preserve_nxdomain=False
 ):
     """Check NodeInfo well-known endpoint for NodeInfo 2.0 URL."""
     target = "nodeinfo"
     url = f"https://{backend_domain}/.well-known/nodeinfo"
     try:
-        response = get_httpx(url, http_client)
+        response = await get_httpx(url)
         if response.status_code == 200:
             content_type = response.headers.get("Content-Type", "")
             if "json" not in content_type:
@@ -3119,10 +3106,9 @@ def check_nodeinfo(
     return None
 
 
-def check_nodeinfo_20(
+async def check_nodeinfo_20(
     domain,
     nodeinfo_20_url,
-    http_client,
     from_cache=False,
     preserve_ignore=False,
     preserve_nxdomain=False,
@@ -3130,7 +3116,7 @@ def check_nodeinfo_20(
     """Fetch and parse NodeInfo 2.0 data."""
     target = "nodeinfo_20" if not from_cache else "nodeinfo_20 (cached)"
     try:
-        response = get_httpx(nodeinfo_20_url, http_client)
+        response = await get_httpx(nodeinfo_20_url)
         if response.status_code == 200:
             content_type = response.headers.get("Content-Type", "")
             if "json" not in content_type:
@@ -3200,9 +3186,7 @@ def mark_as_non_mastodon(domain, other_platform):
     delete_domain_if_known(domain)
 
 
-def get_instance_uri(
-    backend_domain: str, http_client: httpx.Client
-) -> tuple[str | None, bool]:
+async def get_instance_uri(backend_domain: str) -> tuple[str | None, bool]:
     """Fetch the instance API and extract the domain/uri field.
 
     First tries v2 instance API for 'domain' field, then falls back to
@@ -3218,7 +3202,7 @@ def get_instance_uri(
     target_v2 = "instance_api_v2"
 
     try:
-        response = get_httpx(instance_api_v2_url, http_client)
+        response = await get_httpx(instance_api_v2_url)
         if response.status_code == 401:
             return (None, True)
         if response.status_code == 200:
@@ -3240,7 +3224,7 @@ def get_instance_uri(
     target_v1 = "instance_api"
 
     try:
-        response = get_httpx(instance_api_v1_url, http_client)
+        response = await get_httpx(instance_api_v1_url)
         if response.status_code == 401:
             return (None, True)
         if response.status_code == 200:
@@ -3353,25 +3337,22 @@ def process_mastodon_instance(
         delete_domain_if_known(domain)
 
 
-def process_domain(domain, http_client, nightly_version_ranges, user_choice=None):
+async def process_domain(domain, nightly_version_ranges, user_choice=None):
     """Main processing pipeline for a single domain.
 
     Args:
         domain: The domain to process
-        http_client: The HTTP client to use
         nightly_version_ranges: Version ranges for nightly builds
         user_choice: The user's menu choice (used to determine if retrying ignored/nxdomain domains)
     """
     preserve_ignore = user_choice == "11"
     preserve_nxdomain = user_choice == "13"
 
-    if not check_robots_txt(domain, http_client, preserve_ignore, preserve_nxdomain):
+    if not await check_robots_txt(domain, preserve_ignore, preserve_nxdomain):
         return
 
     # Discover backend domain via parallel host-meta and webfinger checks
-    backend_domain, discovery_method = discover_backend_domain_parallel(
-        domain, http_client
-    )
+    backend_domain, discovery_method = await discover_backend_domain_parallel(domain)
 
     if discovery_method == "fallback":
         vmc_output(
@@ -3388,8 +3369,8 @@ def process_domain(domain, http_client, nightly_version_ranges, user_choice=None
         )
 
     # Check nodeinfo at the discovered backend domain
-    nodeinfo_result = check_nodeinfo(
-        domain, backend_domain, http_client, preserve_ignore, preserve_nxdomain
+    nodeinfo_result = await check_nodeinfo(
+        domain, backend_domain, preserve_ignore, preserve_nxdomain
     )
     if nodeinfo_result is False:
         return
@@ -3404,10 +3385,9 @@ def process_domain(domain, http_client, nightly_version_ranges, user_choice=None
         # Normal flow: fetch from the nodeinfo_20_url
         nodeinfo_20_url = nodeinfo_result["nodeinfo_20_url"]
 
-        nodeinfo_20_result = check_nodeinfo_20(
+        nodeinfo_20_result = await check_nodeinfo_20(
             domain,
             nodeinfo_20_url,
-            http_client,
             preserve_ignore=preserve_ignore,
             preserve_nxdomain=preserve_nxdomain,
         )
@@ -3418,7 +3398,7 @@ def process_domain(domain, http_client, nightly_version_ranges, user_choice=None
 
     if is_mastodon_instance(nodeinfo_20_result):
         # Get the actual domain from the instance API
-        instance_uri, is_401 = get_instance_uri(backend_domain, http_client)
+        instance_uri, is_401 = await get_instance_uri(backend_domain)
 
         if is_401:
             # Instance API requires authentication (401 Unauthorized)
@@ -3478,7 +3458,7 @@ def process_domain(domain, http_client, nightly_version_ranges, user_choice=None
 # =============================================================================
 
 
-def check_and_record_domains(
+async def check_and_record_domains(
     domain_list,
     not_masto_domains,
     baddata_domains,
@@ -3489,7 +3469,6 @@ def check_and_record_domains(
     dni_domains,
     bad_tlds,
     domain_endings,
-    http_client,
     nxdomain_domains,
     norobots_domains,
     noapi_domains,
@@ -3498,95 +3477,103 @@ def check_and_record_domains(
 ):
     """Process a list of domains concurrently with progress tracking.
 
-    Uses threading for cross-domain parallelism.
+    Uses asyncio for cross-domain parallelism with semaphore-based concurrency control.
     """
     max_workers = int(os.getenv("VMCRAWL_MAX_THREADS", "2"))
-    shutdown_event = threading.Event()
+    semaphore = asyncio.Semaphore(max_workers)
+    shutdown_event = asyncio.Event()
 
     # Create progress bar
     pbar = tqdm(total=len(domain_list), desc="Crawling", unit="d")
 
-    def process_single_domain(domain):
+    async def process_single_domain(domain):
         if shutdown_event.is_set():
             return None
 
-        # Use fixed-width display to prevent bar from jumping (truncate long domains)
-        domain_display = domain[:25].ljust(25)
-        pbar.set_postfix_str(domain_display)
+        async with semaphore:
+            if shutdown_event.is_set():
+                return None
 
-        if should_skip_domain(
-            domain,
-            not_masto_domains,
-            baddata_domains,
-            failed_domains,
-            ignored_domains,
-            nxdomain_domains,
-            norobots_domains,
-            noapi_domains,
-            alias_domains,
-            user_choice,
-        ):
-            return (domain, "skipped")
+            # Use fixed-width display to prevent bar from jumping (truncate long domains)
+            domain_display = domain[:25].ljust(25)
+            pbar.set_postfix_str(domain_display)
 
-        if is_junk_or_bad_tld(
-            domain,
-            junk_domains,
-            dni_domains,
-            bad_tlds,
-            domain_endings,
-        ):
-            return (domain, "junk")
+            if should_skip_domain(
+                domain,
+                not_masto_domains,
+                baddata_domains,
+                failed_domains,
+                ignored_domains,
+                nxdomain_domains,
+                norobots_domains,
+                noapi_domains,
+                alias_domains,
+                user_choice,
+            ):
+                pbar.update(1)
+                return (domain, "skipped")
 
-        try:
-            process_domain(domain, http_client, nightly_version_ranges, user_choice)
-            return (domain, "success")
-        except httpx.CloseError:
-            return (domain, "closed")
-        except Exception as exception:
-            if not shutdown_event.is_set():
-                target = "shutdown"
-                preserve_ignore = user_choice == "11"
-                preserve_nxdomain = user_choice == "13"
-                handle_tcp_exception(
-                    domain, target, exception, preserve_ignore, preserve_nxdomain
-                )
-            return (domain, "error")
+            if is_junk_or_bad_tld(
+                domain,
+                junk_domains,
+                dni_domains,
+                bad_tlds,
+                domain_endings,
+            ):
+                pbar.update(1)
+                return (domain, "junk")
 
-    executor = ThreadPoolExecutor(max_workers=max_workers)
+            try:
+                await process_domain(domain, nightly_version_ranges, user_choice)
+                pbar.update(1)
+                return (domain, "success")
+            except httpx.CloseError:
+                pbar.update(1)
+                return (domain, "closed")
+            except Exception as exception:
+                if not shutdown_event.is_set():
+                    target = "shutdown"
+                    preserve_ignore = user_choice == "11"
+                    preserve_nxdomain = user_choice == "13"
+                    handle_tcp_exception(
+                        domain, target, exception, preserve_ignore, preserve_nxdomain
+                    )
+                pbar.update(1)
+                return (domain, "error")
+
     try:
-        # Submit all domains at once for maximum parallelism
-        # The thread pool will manage concurrency automatically
-        futures = {
-            executor.submit(process_single_domain, domain): domain
-            for domain in domain_list
-        }
+        # Create tasks for all domains
+        tasks = [
+            asyncio.create_task(process_single_domain(domain)) for domain in domain_list
+        ]
 
         try:
-            for future in as_completed(futures):
-                try:
-                    _ = future.result()
-                    pbar.update(1)
-                except httpx.CloseError:
-                    pbar.update(1)
-                except Exception as exception:
-                    if not shutdown_event.is_set():
-                        domain = futures[future]
-                        tqdm.write(
-                            f"{domain}: {colors['red']}Failed: {exception}{colors['reset']}"
-                        )
-                    pbar.update(1)
-        except KeyboardInterrupt:
+            # Wait for all tasks to complete
+            results = await asyncio.gather(*tasks, return_exceptions=True)
+
+            # Handle any exceptions that were returned
+            for i, result in enumerate(results):
+                if isinstance(result, Exception) and not shutdown_event.is_set():
+                    domain = domain_list[i]
+                    tqdm.write(
+                        f"{domain}: {colors['red']}Failed: {result}{colors['reset']}"
+                    )
+
+        except asyncio.CancelledError:
             shutdown_event.set()
             pbar.close()
             vmc_output(f"\n{appname} interrupted by user", "red")
-            for future in futures:
-                future.cancel()
-            executor.shutdown(wait=False, cancel_futures=True)
+            # Cancel all pending tasks
+            for task in tasks:
+                task.cancel()
             return
+    except KeyboardInterrupt:
+        shutdown_event.set()
+        pbar.close()
+        vmc_output(f"\n{appname} interrupted by user", "red")
+        return
     finally:
         pbar.close()
-        if not shutdown_event.is_set():
-            executor.shutdown(wait=True)
 
 
 # =============================================================================
@@ -4632,16 +4619,36 @@ def get_user_choice() -> str:
 # MODULE-LEVEL INITIALIZATION
 # =============================================================================
 
-# Version information (fetched at module load)
-version_main_branch = get_main_version_branch()
-version_main_release = get_main_version_release()
-version_latest_release = get_highest_mastodon_version()
-version_backport_releases = get_backport_mastodon_versions()
-all_patched_versions = [version_main_release] + version_backport_releases
+# Version information (initialized lazily in async context)
+version_main_branch: str | None = None
+version_main_release: str | None = None
+version_latest_release: str | None = None
+version_backport_releases: list[str] | None = None
+all_patched_versions: list[str] | None = None
 
-# Update database with current version information
-update_patch_versions()
-delete_old_patch_versions()
+
+async def initialize_versions():
+    """Initialize version information asynchronously."""
+    global version_main_branch, version_main_release, version_latest_release
+    global version_backport_releases, all_patched_versions
+
+    # Fetch all version info in parallel
+    results = await asyncio.gather(
+        get_main_version_branch(),
+        get_main_version_release(),
+        get_highest_mastodon_version(),
+        get_backport_mastodon_versions(),
+    )
+
+    version_main_branch = results[0]
+    version_main_release = results[1]
+    version_latest_release = results[2]
+    version_backport_releases = results[3]
+    all_patched_versions = [version_main_release] + version_backport_releases
+
+    # Update database with current version information
+    update_patch_versions()
+    delete_old_patch_versions()
 
 
 # =============================================================================
@@ -4649,7 +4656,7 @@ delete_old_patch_versions()
 # =============================================================================
 
 
-def main():
+async def async_main():
     """Main entry point for the crawler."""
     parser = argparse.ArgumentParser(
         description="Crawl version information from Mastodon instances.",
@@ -4808,7 +4815,11 @@ def main():
     args = parser.parse_args()
 
     # Helper function for cleanup
-    def cleanup_connections():
+    async def cleanup_connections():
+        try:
+            await close_http_client()
+        except Exception:
+            pass
         try:
             conn.close()
         except Exception:
@@ -4817,40 +4828,39 @@ def main():
             db_pool.close(timeout=5)
         except Exception:
             pass
-        try:
-            http_client.close()
-        except Exception:
-            pass
         gc.collect()
+
+    # Initialize version information
+    await initialize_versions()
 
     # Handle fetch subcommand
     if args.command == "fetch":
         try:
-            run_fetch_mode(args)
+            await run_fetch_mode(args)
         except KeyboardInterrupt:
             vmc_output(f"\n{appname} interrupted by user", "red")
         finally:
-            cleanup_connections()
+            await cleanup_connections()
         return
 
     # Handle dni subcommand
     if args.command == "dni":
         try:
-            run_dni_mode(args)
+            await run_dni_mode(args)
         except KeyboardInterrupt:
             vmc_output(f"\n{appname} interrupted by user", "red")
         finally:
-            cleanup_connections()
+            await cleanup_connections()
         return
 
-    # Handle nightly subcommand
+    # Handle nightly subcommand (sync - no HTTP calls)
     if args.command == "nightly":
         try:
             run_nightly_mode(args)
         except KeyboardInterrupt:
             vmc_output(f"\n{appname} interrupted by user", "red")
         finally:
-            cleanup_connections()
+            await cleanup_connections()
         return
 
     # Default crawl behavior (no subcommand or 'crawl' subcommand)
@@ -4918,7 +4928,7 @@ def main():
         junk_domains = get_junk_keywords()
         dni_domains = get_dni_domains()
         bad_tlds = get_bad_tld()
-        domain_endings = get_domain_endings()
+        domain_endings = await get_domain_endings()
         failed_domains = get_failed_domains()
         ignored_domains = get_ignored_domains()
         not_masto_domains = get_not_masto_domains()
@@ -4931,7 +4941,7 @@ def main():
 
         cleanup_old_domains()
 
-        check_and_record_domains(
+        await check_and_record_domains(
             domain_list,
             not_masto_domains,
             baddata_domains,
@@ -4942,7 +4952,6 @@ def main():
             dni_domains,
             bad_tlds,
             domain_endings,
-            http_client,
             nxdomain_domains,
             norobots_domains,
             noapi_domains,
@@ -4955,7 +4964,7 @@ def main():
     except KeyboardInterrupt:
         vmc_output(f"\n{appname} interrupted by user", "red")
     finally:
-        cleanup_connections()
+        await cleanup_connections()
 
     if is_running_headless():
         if not (args.file or args.target or args.new):
@@ -4970,6 +4979,12 @@ def main():
 # =============================================================================
 # ENTRY POINT
 # =============================================================================
+
+
+def main():
+    """Sync entry point that runs the async main function."""
+    asyncio.run(async_main())
+
 
 if __name__ == "__main__":
     main()
