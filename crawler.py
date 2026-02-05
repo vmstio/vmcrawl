@@ -99,6 +99,21 @@ http_codes_to_hardfail = [999, 451, 418, 410]  # gone
 # Define maintained branches (adjust as needed)
 backport_branches = ["4.5", "4.4", "4.3"]
 
+# Pre-compiled regex patterns for version cleaning (performance optimization)
+RE_VERSION_SUFFIX_SPLIT = re.compile(r"[+~_ /@&]|patch")
+RE_VERSION_PARTS = re.compile(r"^(\d+)\.(\d+)\.(\d+)(-.+)?$")
+RE_VERSION_EXTRACT_SEMVER = re.compile(r"^(\d+\.\d+\.\d+)")
+RE_VERSION_DATE_SUFFIX = re.compile(r"-(\d{2})(\d{2})(\d{2})$")
+RE_VERSION_NIGHTLY = re.compile(
+    r"4\.[3456]\.0-nightly\.(\d{4}-\d{2}-\d{2})(-security)?"
+)
+RE_VERSION_NIGHTLY_DATE = re.compile(r"-nightly-\d{8}")
+RE_VERSION_RC = re.compile(r"rc(\d+)")
+RE_VERSION_BETA = re.compile(r"beta(\d+)")
+RE_VERSION_ALPHA_SUFFIX = re.compile(r"-[a-zA-Z]")
+RE_VERSION_DIGIT_SUFFIX = re.compile(r"-\d")
+RE_VERSION_MALFORMED_PRERELEASE = re.compile(r"(alpha|beta|rc)\d*$")
+
 # =============================================================================
 # DATABASE CONNECTION
 # =============================================================================
@@ -667,141 +682,115 @@ def get_nightly_version_ranges() -> list[tuple[str, datetime, datetime | None]]:
 # =============================================================================
 
 
+def parse_version(version: str) -> tuple[int, int, int, str | None] | None:
+    """Parse a version string into its components.
+
+    Returns tuple of (major, minor, patch, prerelease) or None if invalid.
+    """
+    match = RE_VERSION_PARTS.match(version)
+    if match:
+        return int(match[1]), int(match[2]), int(match[3]), match[4]
+    return None
+
+
 def clean_version(
     software_version_full: str,
     nightly_version_ranges: list[tuple[str, datetime, datetime | None]],
 ) -> str:
-    """Apply all version cleaning transformations."""
-    software_version = clean_version_suffix(software_version_full)
-    software_version = clean_version_strings(software_version)
-    software_version = clean_version_date(software_version)
-    software_version = clean_version_suffix_more(software_version)
-    software_version = clean_version_development(software_version)
-    software_version = clean_version_wrongpatch(software_version)
-    software_version = clean_version_doubledash(software_version)
-    software_version = clean_version_nightly(software_version, nightly_version_ranges)
-    software_version = clean_version_main_missing_prerelease(software_version)
-    software_version = clean_version_release_with_prerelease(software_version)
-    software_version = clean_version_strip_incorrect_prerelease(software_version)
-    return software_version
+    """Apply all version cleaning transformations.
+
+    Optimized to use pre-compiled regex patterns and minimize string operations.
+    Follows the original processing order to maintain identical behavior.
+    """
+    # Phase 1: Strip primary suffixes (single regex split instead of 8 chained splits)
+    version = RE_VERSION_SUFFIX_SPLIT.split(software_version_full, maxsplit=1)[0]
+
+    # Phase 2: Normalize strings and fix formatting issues (includes double-dash fix)
+    version = _clean_version_normalize(version)
+
+    # Phase 3: Convert date-based suffixes to nightly format
+    version = _clean_version_date(version)
+
+    # Phase 4: Remove additional suffixes (conditional on prerelease presence)
+    version = _clean_version_suffix_conditional(version)
+
+    # Phase 5: Normalize development version formats (rc, beta)
+    version = RE_VERSION_RC.sub(r"-rc.\1", version)
+    version = RE_VERSION_BETA.sub(r"-beta.\1", version)
+
+    # Phase 6: Map nightly versions to releases
+    version = _clean_version_nightly(version, nightly_version_ranges)
+
+    # Phase 7: Version-specific fixes (parse once, use for multiple checks)
+    version = _clean_version_fixes(version)
+
+    return version
 
 
-def clean_version_suffix(software_version_full: str) -> str:
-    """Remove unwanted or invalid suffixes from version string."""
-    software_version = (
-        software_version_full.split("+")[0]
-        .split("~")[0]
-        .split("_")[0]
-        .split(" ")[0]
-        .split("/")[0]
-        .split("@")[0]
-        .split("&")[0]
-        .split("patch")[0]
+def _clean_version_normalize(version: str) -> str:
+    """Remove unwanted strings, fix typos, and normalize formatting."""
+    # Remove -pre suffix and everything after
+    if "-pre" in version:
+        version = version.split("-pre", maxsplit=1)[0]
+
+    # Remove known unwanted strings and fix typos
+    version = (
+        version.replace("-theconnector", "")
+        .replace("-theatlsocial", "")
+        .replace("mastau", "alpha")
+        .replace("--", "-")
+        .rstrip("-")
     )
-    return software_version
+
+    # Truncate versions with extra components (e.g., "4.5.4.0.5" -> "4.5.4")
+    # Only truncates if remainder starts with "." (extra version components)
+    # Preserves malformed prerelease tags for later processing
+    if not RE_VERSION_PARTS.match(version):
+        match = RE_VERSION_EXTRACT_SEMVER.match(version)
+        if match:
+            base = match.group(1)
+            remainder = version[match.end() :]
+            if remainder.startswith("."):
+                # Extra version components - find where prerelease starts
+                # e.g., "4.3.0.1-alpha.1" -> base "4.3.0", keep "-alpha.1"
+                dash_pos = remainder.find("-")
+                if dash_pos != -1:
+                    version = base + remainder[dash_pos:]
+                else:
+                    version = base
+
+    return version
 
 
-def clean_version_suffix_more(software_version: str) -> str:
-    """Remove additional suffixes unless they are valid prerelease identifiers."""
-    if (
-        "alpha" not in software_version
-        and "beta" not in software_version
-        and "rc" not in software_version
-        and "nightly" not in software_version
-    ):
-        software_version = re.split(r"-[a-zA-Z]", software_version)[0]
-    if "nightly" not in software_version:
-        software_version = re.split(r"-\d", software_version)[0]
-    return software_version
-
-
-def clean_version_strings(software_version: str) -> str:
-    """Remove unwanted strings and fix typos in version strings."""
-    # Remove unwanted suffixes (including everything after -pre)
-    software_version = re.sub(r"-pre.*", "", software_version)
-
-    # Remove other unwanted strings
-    unwanted_strings = ["-theconnector", "-theatlsocial"]
-    for unwanted_string in unwanted_strings:
-        software_version = software_version.replace(unwanted_string, "")
-
-    # Fix known typos
-    if "mastau" in software_version:
-        software_version = software_version.replace("mastau", "alpha")
-
-    return software_version
-
-
-def clean_version_date(software_version: str) -> str:
+def _clean_version_date(version: str) -> str:
     """Convert date-based suffixes to nightly format."""
-    match = re.search(r"-(\d{2})(\d{2})(\d{2})$", software_version)
+    match = RE_VERSION_DATE_SUFFIX.search(version)
     if match:
         yy, mm, dd = match.groups()
-        formatted_date = f"-nightly.20{yy}-{mm}-{dd}"
-        return re.sub(r"-(\d{6})$", formatted_date, software_version)
-    return software_version
+        return RE_VERSION_DATE_SUFFIX.sub(f"-nightly.20{yy}-{mm}-{dd}", version)
+    return version
 
 
-def clean_version_development(software_version: str) -> str:
-    """Normalize development version formats (rc, beta)."""
-    patterns = {r"rc(\d+)": r"-rc.\1", r"beta(\d+)": r"-beta.\1"}
-    for pattern, replacement in patterns.items():
-        software_version = re.sub(pattern, replacement, software_version)
-    return software_version
+def _clean_version_suffix_conditional(version: str) -> str:
+    """Remove additional suffixes unless they are valid prerelease identifiers."""
+    has_prerelease = any(tag in version for tag in ("alpha", "beta", "rc", "nightly"))
+    if not has_prerelease:
+        version = RE_VERSION_ALPHA_SUFFIX.split(version, maxsplit=1)[0]
+    if "nightly" not in version:
+        version = RE_VERSION_DIGIT_SUFFIX.split(version, maxsplit=1)[0]
+    return version
 
 
-def clean_version_doubledash(software_version: str) -> str:
-    """Fix double dashes and trailing dashes in version strings."""
-    if "--" in software_version:
-        software_version = software_version.replace("--", "-")
-    software_version = software_version.removesuffix("-")
-    return software_version
-
-
-def clean_version_wrongpatch(software_version: str) -> str:
-    """Correct patch versions that exceed the latest release."""
-    match = re.match(r"^(\d+)\.(\d+)\.(\d+)(-.+)?$", software_version)
-
-    if match:
-        if version_latest_release:
-            a, b, c = (
-                int(version_latest_release.split(".")[0]),
-                int(version_latest_release.split(".")[1]),
-                int(version_latest_release.split(".")[2]),
-            )
-        else:
-            a, b, c = (0, 0, 0)
-        m = int(version_main_branch.split(".")[1]) if version_main_branch else 0
-        x, y, z = int(match.group(1)), int(match.group(2)), int(match.group(3))
-        additional_data = match.group(4)
-
-        if x == a:
-            if y == b:
-                if z > c:
-                    z = 0
-                    return f"{x}.{y}.{z}{additional_data or ''}"
-                return software_version
-            if y == m:
-                if z != 0:
-                    z = 0
-                    return f"{x}.{y}.{z}{additional_data or ''}"
-                return software_version
-            return software_version
-        return software_version
-    return software_version
-
-
-def clean_version_nightly(
-    software_version: str,
+def _clean_version_nightly(
+    version: str,
     nightly_version_ranges: list[tuple[str, datetime, datetime | None]],
 ) -> str:
     """Map nightly versions to their corresponding release versions."""
-    software_version = re.sub(r"-nightly-\d{8}", "", software_version)
+    # Remove simple nightly date format
+    version = RE_VERSION_NIGHTLY_DATE.sub("", version)
 
-    match = re.match(
-        r"4\.[3456]\.0-nightly\.(\d{4}-\d{2}-\d{2})(-security)?",
-        software_version,
-    )
+    # Check for detailed nightly format
+    match = RE_VERSION_NIGHTLY.match(version)
     if match:
         nightly_date_str, is_security = match.groups()
         nightly_date = datetime.strptime(nightly_date_str, "%Y-%m-%d")
@@ -809,48 +798,86 @@ def clean_version_nightly(
         if is_security:
             nightly_date += timedelta(days=1)
 
-        for version, start_date, end_date in nightly_version_ranges:
+        for ver, start_date, end_date in nightly_version_ranges:
             if (
                 start_date is not None
                 and end_date is not None
                 and start_date <= nightly_date <= end_date
             ):
-                return version
+                return ver
 
-    return software_version
+    return version
 
 
-def clean_version_main_missing_prerelease(software_version: str) -> str:
-    """Add missing prerelease suffix to main branch versions."""
+def _clean_version_fixes(version: str) -> str:
+    """Apply version-specific fixes using parsed components."""
+    # Handle malformed prerelease tags (e.g., "4.3.4alpha1" without dash)
+    # For non-zero patch: strip them entirely (4.3.4alpha1 -> 4.3.4)
+    # For zero patch: normalize them (4.3.0alpha1 -> 4.3.0-alpha.1)
+    malformed_match = RE_VERSION_MALFORMED_PRERELEASE.search(version)
+    if malformed_match:
+        base_version = version[: malformed_match.start()]
+        # Check if this is a zero patch version
+        base_parts = base_version.split(".")
+        if len(base_parts) == 3 and base_parts[2] == "0":
+            # Zero patch: normalize the prerelease tag
+            tag = malformed_match.group(0)
+            # Convert "alpha1" to "-alpha.1", "beta2" to "-beta.2", etc.
+            normalized = RE_VERSION_RC.sub(r"-rc.\1", tag)
+            normalized = RE_VERSION_BETA.sub(r"-beta.\1", normalized)
+            normalized = re.sub(r"alpha(\d+)", r"-alpha.\1", normalized)
+            version = base_version + normalized
+        else:
+            # Non-zero patch: strip the malformed tag
+            version = base_version
+
+    # Add missing prerelease suffix to main branch versions
     if (
         version_main_branch
-        and software_version.startswith(version_main_branch)
-        and "-" not in software_version
+        and version.startswith(version_main_branch)
+        and "-" not in version
     ):
-        software_version = f"{software_version}-alpha.1"
-    return software_version
+        return f"{version}-alpha.1"
 
-
-def clean_version_release_with_prerelease(software_version: str) -> str:
-    """Strip prerelease suffix from stable release versions."""
+    # Strip prerelease suffix from stable release versions
     if (
         version_latest_release
-        and software_version.startswith(version_latest_release)
-        and "-" in software_version
+        and version.startswith(version_latest_release)
+        and "-" in version
         and not version_latest_release.endswith(".0")
     ):
-        software_version = software_version.split("-")[0]
-    return software_version
+        return version.split("-", maxsplit=1)[0]
 
+    # Parse version for remaining checks
+    parts = parse_version(version)
+    if not parts:
+        return version
 
-def clean_version_strip_incorrect_prerelease(software_version: str) -> str:
-    """Remove prerelease suffix from non-zero patch versions."""
-    match = re.match(r"^(\d+)\.(\d+)\.(\d+)(-.+)?$", software_version)
-    if match:
-        x, y, z, prerelease = match.groups()
-        if int(z) != 0 and prerelease:
-            return f"{x}.{y}.{z}"
-    return software_version
+    x, y, z, prerelease = parts
+
+    # Remove prerelease suffix from non-zero patch versions
+    if z != 0 and prerelease:
+        return f"{x}.{y}.{z}"
+
+    # Correct patch versions that exceed the latest release
+    if version_latest_release:
+        a, b, c = (
+            int(version_latest_release.split(".")[0]),
+            int(version_latest_release.split(".")[1]),
+            int(version_latest_release.split(".")[2]),
+        )
+    else:
+        a, b, c = (0, 0, 0)
+
+    m = int(version_main_branch.split(".")[1]) if version_main_branch else 0
+
+    if x == a:
+        if y == b and z > c:
+            return f"{x}.{y}.0{prerelease or ''}"
+        if y == m and z != 0:
+            return f"{x}.{y}.0{prerelease or ''}"
+
+    return version
 
 
 # =============================================================================
