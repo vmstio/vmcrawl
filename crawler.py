@@ -355,9 +355,8 @@ def is_alias_domain(domain: str, instance_uri: str, backend_domain: str) -> bool
     # Log a warning but don't mark as alias — too risky to set a terminal state
     # on unverified information.
     vmc_output(
-        f"{domain}: instance_uri={instance_uri} doesn't match "
-        f"backend_domain={backend_domain}, not marking as alias",
-        "yellow",
+        f"{domain}: backend domain for {instance_uri}",
+        "white",
         use_tqdm=True,
     )
     return False
@@ -3599,7 +3598,7 @@ async def process_domain(domain, nightly_version_ranges, user_choice=None):
         # instance_uri is from the API; backend_domain is where we actually reached
         if is_alias_domain(domain, instance_uri, backend_domain):
             vmc_output(
-                f"{domain}: Alias - redirects to {instance_uri}",
+                f"{domain}: alias domain for {instance_uri}",
                 "cyan",
                 use_tqdm=True,
             )
