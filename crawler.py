@@ -320,7 +320,7 @@ def vmc_output(text: str, color: str, use_tqdm: bool = False, **kwargs: Any) -> 
         print(colored_text, **kwargs)
 
 
-def is_running_headless():
+def _is_running_headless():
     """Check if running without a TTY (headless mode)."""
     return not os.isatty(sys.stdout.fileno())
 
@@ -330,7 +330,7 @@ def is_running_headless():
 # =============================================================================
 
 
-def get_cache_file_path(url: str) -> str:
+def _get_cache_file_path(url: str) -> str:
     """Create a unique cache file path based on the URL hash."""
     url_hash = hashlib.md5(url.encode()).hexdigest()
     cache_dir = "/tmp/vmcrawl_cache"
@@ -338,7 +338,7 @@ def get_cache_file_path(url: str) -> str:
     return os.path.join(cache_dir, f"{url_hash}.cache")
 
 
-def is_cache_valid(cache_file_path: str, max_age_seconds: int) -> bool:
+def _is_cache_valid(cache_file_path: str, max_age_seconds: int) -> bool:
     """Check if a cache file exists and is still valid."""
     if not os.path.exists(cache_file_path):
         return False
@@ -351,7 +351,7 @@ def is_cache_valid(cache_file_path: str, max_age_seconds: int) -> bool:
 # =============================================================================
 
 
-def is_alias_domain(domain: str, instance_uri: str, backend_domain: str) -> bool:
+def _is_alias_domain(domain: str, instance_uri: str, backend_domain: str) -> bool:
     """Check if domain is an alias that should not be stored in the database.
 
     The instance API's domain/uri field is the single source of truth for the
@@ -419,7 +419,7 @@ async def parse_json_with_fallback(
             return data
         except json.JSONDecodeError as exception:
             await asyncio.to_thread(
-                handle_json_exception,
+                _handle_json_exception,
                 domain,
                 target,
                 exception,
@@ -430,7 +430,7 @@ async def parse_json_with_fallback(
 
 
 @functools.lru_cache(maxsize=65536)
-def has_emoji_chars(domain: str) -> bool:
+def _has_emoji_chars(domain: str) -> bool:
     """Check if a domain contains emoji or invalid characters.
 
     Results are cached using LRU cache to avoid repeated computation
@@ -526,10 +526,10 @@ async def get_domain_endings() -> set[str]:
 
     # Fallback to file-based cache if database fails
     url = "http://data.iana.org/TLD/tlds-alpha-by-domain.txt"
-    cache_file_path = get_cache_file_path(url)
+    cache_file_path = _get_cache_file_path(url)
     max_cache_age = 604800  # 7 days in seconds
 
-    if is_cache_valid(cache_file_path, max_cache_age):
+    if _is_cache_valid(cache_file_path, max_cache_age):
         with open(cache_file_path) as cache_file:
             # Use set for O(1) lookup
             return {line.strip().lower() for line in cache_file if line.strip()}
@@ -701,7 +701,7 @@ def get_nightly_version_ranges() -> list[tuple[str, datetime, datetime | None]]:
 # =============================================================================
 
 
-def parse_version(version: str) -> tuple[int, int, int, str | None] | None:
+def _parse_version(version: str) -> tuple[int, int, int, str | None] | None:
     """Parse a version string into its components.
 
     Returns tuple of (major, minor, patch, prerelease) or None if invalid.
@@ -880,7 +880,7 @@ def _clean_version_fixes(version: str) -> str:
         return version.split("-", maxsplit=1)[0]
 
     # Parse version for remaining checks
-    parts = parse_version(version)
+    parts = _parse_version(version)
     if not parts:
         return version
 
@@ -1763,7 +1763,7 @@ def fetch_domain_list(exclude_domains_sql, db_limit, db_offset, randomize=False)
                 # For random selection, fetch all and shuffle in Python
                 cursor.execute(base_query, (min_active,))
                 # Stream results through cursor iterator
-                result = [row[0] for row in cursor if not has_emoji_chars(row[0])]
+                result = [row[0] for row in cursor if not _has_emoji_chars(row[0])]
                 random.shuffle(result)
                 # Apply limit after shuffle
                 result = result[: int(db_limit)]
@@ -1774,7 +1774,7 @@ def fetch_domain_list(exclude_domains_sql, db_limit, db_offset, randomize=False)
                 query_with_limit = base_query + sql.SQL(" LIMIT %s")
                 cursor.execute(query_with_limit, (min_active, fetch_limit))
                 # Stream and filter, then apply offset/limit
-                all_domains = [row[0] for row in cursor if not has_emoji_chars(row[0])]
+                all_domains = [row[0] for row in cursor if not _has_emoji_chars(row[0])]
                 start = int(db_offset)
                 end = start + int(db_limit)
                 result = all_domains[start:end]
@@ -1851,16 +1851,16 @@ def import_domains(domains, use_tqdm=False):
             return
 
 
-def is_valid_fetch_domain(domain):
+def _is_valid_fetch_domain(domain):
     """Check if a domain string is valid for fetching."""
     return (
         (RE_DOMAIN_FORMAT.match(domain) or "xn--" in domain)
-        and not is_ip_address(domain)
-        and not detect_vowels(domain)
+        and not _is_ip_address(domain)
+        and not _detect_vowels(domain)
     )
 
 
-def is_ip_address(domain):
+def _is_ip_address(domain):
     """Check if a string is an IP address."""
     try:
         ipaddress.ip_address(domain)
@@ -1869,7 +1869,7 @@ def is_ip_address(domain):
         return False
 
 
-def detect_vowels(domain):
+def _detect_vowels(domain):
     """Detect domains with suspicious vowel patterns."""
     try:
         return bool(RE_VOWEL_PATTERN.search(domain))
@@ -1908,11 +1908,11 @@ async def fetch_peer_domains(
         filtered_domains = []
         for item in data:
             # Skip invalid domains early (most common rejection)
-            if not item.islower() or not is_valid_fetch_domain(item):
+            if not item.islower() or not _is_valid_fetch_domain(item):
                 continue
 
             # Check for emoji characters
-            if has_emoji_chars(item):
+            if _has_emoji_chars(item):
                 continue
 
             # Check against junk keywords (substring match required)
@@ -2033,7 +2033,7 @@ async def run_fetch_mode(args):
         db_offset = int(os.getenv("VMCRAWL_FETCH_OFFSET", "0"))
 
     vmc_output(f"{appname} v{appversion} (fetch mode)", "bold")
-    if is_running_headless():
+    if _is_running_headless():
         vmc_output("Running in headless mode", "pink")
     else:
         vmc_output("Running in interactive mode", "pink")
@@ -2370,7 +2370,7 @@ async def fetch_dni_csv(url: str) -> str | None:
         return None
 
 
-def parse_dni_csv(csv_content: str) -> list[str]:
+def _parse_dni_csv(csv_content: str) -> list[str]:
     """Parse the DNI CSV content and extract domains.
 
     The CSV file uses #domain as the header for the domain column.
@@ -2405,7 +2405,7 @@ def parse_dni_csv(csv_content: str) -> list[str]:
 async def run_dni_mode(args):
     """Run the DNI list management mode."""
     vmc_output(f"{appname} v{appversion} (dni mode)", "bold")
-    if is_running_headless():
+    if _is_running_headless():
         vmc_output("Running in headless mode", "pink")
     else:
         vmc_output("Running in interactive mode", "pink")
@@ -2426,7 +2426,7 @@ async def run_dni_mode(args):
         vmc_output("Failed to fetch DNI CSV, exiting…", "pink")
         sys.exit(1)
 
-    domains = parse_dni_csv(csv_content)
+    domains = _parse_dni_csv(csv_content)
     if not domains:
         vmc_output("No domains parsed from CSV, exiting…", "pink")
         sys.exit(1)
@@ -2525,14 +2525,14 @@ def add_nightly_version(
     """
     try:
         # Validate dates
-        if not validate_nightly_date(start_date):
+        if not _validate_nightly_date(start_date):
             vmc_output(
                 f"Invalid start_date format: {start_date}. Use YYYY-MM-DD",
                 "red",
             )
             return False
 
-        if not validate_nightly_date(end_date):
+        if not _validate_nightly_date(end_date):
             vmc_output(f"Invalid end_date format: {end_date}. Use YYYY-MM-DD", "red")
             return False
 
@@ -2605,7 +2605,7 @@ def add_nightly_version(
 def update_nightly_end_date(nightly_version, new_end_date):
     """Update the end_date for a specific version."""
     try:
-        if not validate_nightly_date(new_end_date):
+        if not _validate_nightly_date(new_end_date):
             vmc_output(f"Invalid date format: {new_end_date}. Use YYYY-MM-DD", "red")
             return False
 
@@ -2633,7 +2633,7 @@ def update_nightly_end_date(nightly_version, new_end_date):
         return False
 
 
-def validate_nightly_date(date_string):
+def _validate_nightly_date(date_string):
     """Validate date format (YYYY-MM-DD)."""
     try:
         datetime.strptime(date_string, "%Y-%m-%d")
@@ -2690,7 +2690,7 @@ def interactive_add_nightly():
 def run_nightly_mode(args):
     """Run the nightly version management mode."""
     vmc_output(f"{appname} v{appversion} (nightly mode)", "bold")
-    if is_running_headless():
+    if _is_running_headless():
         vmc_output("Running in headless mode", "pink")
     else:
         vmc_output("Running in interactive mode", "pink")
@@ -2725,7 +2725,7 @@ def run_nightly_mode(args):
 # =============================================================================
 
 
-def handle_incorrect_file_type(
+def _handle_incorrect_file_type(
     domain, target, content_type, preserve_ignore=False, preserve_nxdomain=False
 ):
     """Handle responses with incorrect content type."""
@@ -2738,7 +2738,7 @@ def handle_incorrect_file_type(
     increment_domain_error(domain, f"TYPE+{target}", preserve_ignore, preserve_nxdomain)
 
 
-def handle_http_status_code(
+def _handle_http_status_code(
     domain, target, response, preserve_ignore=False, preserve_nxdomain=False
 ):
     """Handle non-fatal HTTP status codes."""
@@ -2751,7 +2751,7 @@ def handle_http_status_code(
     )
 
 
-def handle_http_failed(domain, target, response):
+def _handle_http_failed(domain, target, response):
     """Handle HTTP 401/403 on auth endpoints and 410/418 generally."""
     code = response.status_code
     error_message = f"HTTP {code} on {target}"
@@ -2760,7 +2760,7 @@ def handle_http_failed(domain, target, response):
     delete_domain_if_known(domain)
 
 
-def handle_tcp_exception(
+def _handle_tcp_exception(
     domain, target, exception, preserve_ignore=False, preserve_nxdomain=False
 ):
     """Handle TCP/connection exceptions with appropriate categorization."""
@@ -2865,7 +2865,7 @@ def handle_tcp_exception(
         )
 
 
-def handle_json_exception(
+def _handle_json_exception(
     domain, target, exception, preserve_ignore=False, preserve_nxdomain=False
 ):
     """Handle JSON parsing exceptions."""
@@ -2883,7 +2883,7 @@ def handle_json_exception(
 # =============================================================================
 
 
-def should_skip_domain(
+def _should_skip_domain(
     domain,
     not_masto_domains,
     baddata_domains,
@@ -2931,7 +2931,7 @@ def should_skip_domain(
     return False
 
 
-def is_junk_or_bad_tld(
+def _is_junk_or_bad_tld(
     domain, junk_domains, dni_domains, bad_tld_suffixes, domain_ending_suffixes
 ):
     """Check if a domain is junk or has a prohibited TLD.
@@ -2986,7 +2986,7 @@ async def check_robots_txt(domain, preserve_ignore=False, preserve_nxdomain=Fals
                 and not content_type.startswith("text/")
             ):
                 await asyncio.to_thread(
-                    handle_incorrect_file_type,
+                    _handle_incorrect_file_type,
                     domain,
                     target,
                     content_type,
@@ -3024,11 +3024,11 @@ async def check_robots_txt(domain, preserve_ignore=False, preserve_nxdomain=Fals
             await asyncio.to_thread(delete_domain_if_known, domain)
             return False
         elif response.status_code in http_codes_to_hardfail:
-            await asyncio.to_thread(handle_http_failed, domain, target, response)
+            await asyncio.to_thread(_handle_http_failed, domain, target, response)
             return False
         else:
             await asyncio.to_thread(
-                handle_http_status_code,
+                _handle_http_status_code,
                 domain,
                 target,
                 response,
@@ -3038,7 +3038,7 @@ async def check_robots_txt(domain, preserve_ignore=False, preserve_nxdomain=Fals
             return False
     except httpx.RequestError as exception:
         await asyncio.to_thread(
-            handle_tcp_exception,
+            _handle_tcp_exception,
             domain,
             target,
             exception,
@@ -3155,7 +3155,7 @@ async def check_webfinger(domain):
 
         if response.status_code in http_codes_to_hardfail:
             # Hard failures should still be logged
-            handle_http_failed(domain, target, response)
+            _handle_http_failed(domain, target, response)
             return None
         # Other HTTP errors are silent (fallback behavior)
         return None
@@ -3205,7 +3205,7 @@ async def discover_backend_domain_parallel(domain: str) -> tuple[str, str]:
     return (domain, "fallback")
 
 
-def sanitize_nodeinfo_url(url: str) -> str:
+def _sanitize_nodeinfo_url(url: str) -> str:
     """Fix malformed nodeinfo URLs.
 
     Common issues:
@@ -3249,7 +3249,7 @@ async def check_nodeinfo(
             content_type = response.headers.get("Content-Type", "")
             if "json" not in content_type:
                 await asyncio.to_thread(
-                    handle_incorrect_file_type,
+                    _handle_incorrect_file_type,
                     domain,
                     target,
                     content_type,
@@ -3259,7 +3259,7 @@ async def check_nodeinfo(
             if not response.content:
                 exception = "reply is empty"
                 await asyncio.to_thread(
-                    handle_json_exception,
+                    _handle_json_exception,
                     domain,
                     target,
                     exception,
@@ -3317,7 +3317,7 @@ async def check_nodeinfo(
             if links is not None and len(links) == 0:
                 exception = "empty links array in reply"
                 await asyncio.to_thread(
-                    handle_json_exception,
+                    _handle_json_exception,
                     domain,
                     target,
                     exception,
@@ -3354,12 +3354,12 @@ async def check_nodeinfo(
 
                 if nodeinfo_20_url:
                     # Sanitize URL to fix common misconfigurations
-                    nodeinfo_20_url = sanitize_nodeinfo_url(nodeinfo_20_url)
+                    nodeinfo_20_url = _sanitize_nodeinfo_url(nodeinfo_20_url)
                     return {"nodeinfo_20_url": nodeinfo_20_url}
 
             exception = "no links in reply"
             await asyncio.to_thread(
-                handle_json_exception,
+                _handle_json_exception,
                 domain,
                 target,
                 exception,
@@ -3368,10 +3368,10 @@ async def check_nodeinfo(
             )
             return False
         if response.status_code in http_codes_to_hardfail:
-            await asyncio.to_thread(handle_http_failed, domain, target, response)
+            await asyncio.to_thread(_handle_http_failed, domain, target, response)
             return False
         await asyncio.to_thread(
-            handle_http_status_code,
+            _handle_http_status_code,
             domain,
             target,
             response,
@@ -3380,7 +3380,7 @@ async def check_nodeinfo(
         )
     except httpx.RequestError as exception:
         await asyncio.to_thread(
-            handle_tcp_exception,
+            _handle_tcp_exception,
             domain,
             target,
             exception,
@@ -3389,7 +3389,7 @@ async def check_nodeinfo(
         )
     except json.JSONDecodeError as exception:
         await asyncio.to_thread(
-            handle_json_exception,
+            _handle_json_exception,
             domain,
             target,
             exception,
@@ -3414,7 +3414,7 @@ async def check_nodeinfo_20(
             content_type = response.headers.get("Content-Type", "")
             if "json" not in content_type:
                 await asyncio.to_thread(
-                    handle_incorrect_file_type,
+                    _handle_incorrect_file_type,
                     domain,
                     target,
                     content_type,
@@ -3425,7 +3425,7 @@ async def check_nodeinfo_20(
             if not response.content:
                 exception = "reply empty"
                 await asyncio.to_thread(
-                    handle_json_exception,
+                    _handle_json_exception,
                     domain,
                     target,
                     exception,
@@ -3440,10 +3440,10 @@ async def check_nodeinfo_20(
                 return False
             return nodeinfo_20_result
         if response.status_code in http_codes_to_hardfail:
-            await asyncio.to_thread(handle_http_failed, domain, target, response)
+            await asyncio.to_thread(_handle_http_failed, domain, target, response)
             return False
         await asyncio.to_thread(
-            handle_http_status_code,
+            _handle_http_status_code,
             domain,
             target,
             response,
@@ -3452,7 +3452,7 @@ async def check_nodeinfo_20(
         )
     except httpx.RequestError as exception:
         await asyncio.to_thread(
-            handle_tcp_exception,
+            _handle_tcp_exception,
             domain,
             target,
             exception,
@@ -3462,7 +3462,7 @@ async def check_nodeinfo_20(
         return False
     except json.JSONDecodeError as exception:
         await asyncio.to_thread(
-            handle_json_exception,
+            _handle_json_exception,
             domain,
             target,
             exception,
@@ -3478,7 +3478,7 @@ async def check_nodeinfo_20(
 # =============================================================================
 
 
-def is_mastodon_instance(nodeinfo_20_result: dict[str, Any]) -> bool:
+def _is_mastodon_instance(nodeinfo_20_result: dict[str, Any]) -> bool:
     """Check if the NodeInfo response indicates a Mastodon-compatible instance."""
     if not isinstance(nodeinfo_20_result, dict):
         return False
@@ -3737,7 +3737,7 @@ async def process_domain(domain, nightly_version_ranges, user_choice=None):
         if not nodeinfo_20_result:
             return
 
-    if is_mastodon_instance(nodeinfo_20_result):
+    if _is_mastodon_instance(nodeinfo_20_result):
         # Get the actual domain from the instance API
         instance_uri, is_401 = await get_instance_uri(backend_domain)
 
@@ -3766,7 +3766,7 @@ async def process_domain(domain, nightly_version_ranges, user_choice=None):
 
         # Check if this is an alias (redirect to another instance)
         # instance_uri is from the API; backend_domain is where we actually reached
-        if is_alias_domain(domain, instance_uri, backend_domain):
+        if _is_alias_domain(domain, instance_uri, backend_domain):
             vmc_output(
                 f"{domain}: alias domain for {instance_uri}",
                 "cyan",
@@ -3847,7 +3847,7 @@ async def check_and_record_domains(
             domain_display = domain[:25].ljust(25)
             pbar.set_postfix_str(domain_display)
 
-            if should_skip_domain(
+            if _should_skip_domain(
                 domain,
                 not_masto_domains,
                 baddata_domains,
@@ -3862,7 +3862,7 @@ async def check_and_record_domains(
                 pbar.update(1)
                 return (domain, "skipped")
 
-            if is_junk_or_bad_tld(
+            if _is_junk_or_bad_tld(
                 domain,
                 junk_domains,
                 dni_domains,
@@ -3884,7 +3884,7 @@ async def check_and_record_domains(
                     target = "shutdown"
                     preserve_ignore = user_choice == "11"
                     preserve_nxdomain = user_choice == "13"
-                    handle_tcp_exception(
+                    _handle_tcp_exception(
                         domain, target, exception, preserve_ignore, preserve_nxdomain
                     )
                 pbar.update(1)
@@ -4799,7 +4799,7 @@ def load_from_database(user_choice):
             domain_list = [
                 row[0].strip()
                 for row in cursor
-                if row[0] and row[0].strip() and not has_emoji_chars(row[0])
+                if row[0] and row[0].strip() and not _has_emoji_chars(row[0])
             ]
             conn.commit()
         except Exception as exception:
@@ -4820,7 +4820,7 @@ def load_from_file(file_name):
     ):
         for line in file:
             domain = line.strip().lower()
-            if not domain or has_emoji_chars(domain):
+            if not domain or _has_emoji_chars(domain):
                 continue
 
             domain_list.append(domain)
@@ -4900,7 +4900,7 @@ def print_menu(menu_options: dict[str, dict[str, str]] | None = None) -> None:
 
 def interactive_select_menu(menu_options: dict[str, dict[str, str]]) -> str | None:
     """Interactive menu picker using arrow keys (TTY only)."""
-    if is_running_headless():
+    if _is_running_headless():
         return None
 
     try:
@@ -5225,7 +5225,7 @@ async def async_main():
             sys.exit(1)
 
     vmc_output(f"{appname} v{appversion} ({current_filename})", "bold")
-    if is_running_headless():
+    if _is_running_headless():
         vmc_output("Running in headless mode", "pink")
     try:
         domain_list_file = args.file if args.file is not None else None
@@ -5246,7 +5246,7 @@ async def async_main():
             else:
                 if args.new:
                     user_choice = "0"
-                elif is_running_headless():
+                elif _is_running_headless():
                     user_choice = "3"
                 else:
                     menu_options = get_menu_options()
@@ -5311,7 +5311,7 @@ async def async_main():
     finally:
         await cleanup_connections()
 
-    if is_running_headless():
+    if _is_running_headless():
         if not (args.file or args.target or args.new):
             try:
                 os.execv(sys.executable, ["python3"] + sys.argv)
