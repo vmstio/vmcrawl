@@ -1642,6 +1642,56 @@ def get_alias_domains():
     return get_domains_by_status("alias")
 
 
+async def load_domain_filter_data():
+    """Load all domain filter data in parallel for faster startup.
+
+    Returns a dictionary containing all filter sets needed for crawling.
+    Uses asyncio.gather with to_thread to run database queries concurrently.
+    """
+    (
+        junk_domains,
+        dni_domains,
+        bad_tlds,
+        failed_domains,
+        ignored_domains,
+        not_masto_domains,
+        baddata_domains,
+        nxdomain_domains,
+        norobots_domains,
+        noapi_domains,
+        alias_domains,
+        nightly_version_ranges,
+    ) = await asyncio.gather(
+        asyncio.to_thread(get_junk_keywords),
+        asyncio.to_thread(get_dni_domains),
+        asyncio.to_thread(get_bad_tld),
+        asyncio.to_thread(get_failed_domains),
+        asyncio.to_thread(get_ignored_domains),
+        asyncio.to_thread(get_not_masto_domains),
+        asyncio.to_thread(get_baddata_domains),
+        asyncio.to_thread(get_nxdomain_domains),
+        asyncio.to_thread(get_norobots_domains),
+        asyncio.to_thread(get_noapi_domains),
+        asyncio.to_thread(get_alias_domains),
+        asyncio.to_thread(get_nightly_version_ranges),
+    )
+
+    return {
+        "junk_domains": junk_domains,
+        "dni_domains": dni_domains,
+        "bad_tlds": bad_tlds,
+        "failed_domains": failed_domains,
+        "ignored_domains": ignored_domains,
+        "not_masto_domains": not_masto_domains,
+        "baddata_domains": baddata_domains,
+        "nxdomain_domains": nxdomain_domains,
+        "norobots_domains": norobots_domains,
+        "noapi_domains": noapi_domains,
+        "alias_domains": alias_domains,
+        "nightly_version_ranges": nightly_version_ranges,
+    }
+
+
 # =============================================================================
 # FETCH FUNCTIONS - Peer Discovery
 # =============================================================================
@@ -2074,41 +2124,30 @@ async def run_fetch_mode(args):
             "bold",
         )
 
-        # Load filter data for crawling
-        junk_domains = get_junk_keywords()
-        dni_domains = get_dni_domains()
-        bad_tlds = get_bad_tld()
-        failed_domains = get_failed_domains()
-        ignored_domains = get_ignored_domains()
-        not_masto_domains = get_not_masto_domains()
-        baddata_domains = get_baddata_domains()
-        nxdomain_domains = get_nxdomain_domains()
-        norobots_domains = get_norobots_domains()
-        noapi_domains = get_noapi_domains()
-        alias_domains = get_alias_domains()
-        nightly_version_ranges = get_nightly_version_ranges()
+        # Load filter data for crawling in parallel
+        filter_data = await load_domain_filter_data()
 
         # Pre-compute suffix sets for efficient TLD filtering
-        bad_tld_suffixes_crawl = {f".{tld}" for tld in bad_tlds}
+        bad_tld_suffixes_crawl = {f".{tld}" for tld in filter_data["bad_tlds"]}
         domain_ending_suffixes_crawl = {f".{ending}" for ending in domain_endings}
 
         # Use "0" as user_choice (new domains mode)
         await check_and_record_domains(
             unique_new_domains,
-            not_masto_domains,
-            baddata_domains,
-            failed_domains,
-            ignored_domains,
+            filter_data["not_masto_domains"],
+            filter_data["baddata_domains"],
+            filter_data["failed_domains"],
+            filter_data["ignored_domains"],
             "0",  # user_choice for new domains
-            junk_domains,
-            dni_domains,
+            filter_data["junk_domains"],
+            filter_data["dni_domains"],
             bad_tld_suffixes_crawl,
             domain_ending_suffixes_crawl,
-            nxdomain_domains,
-            norobots_domains,
-            noapi_domains,
-            alias_domains,
-            nightly_version_ranges,
+            filter_data["nxdomain_domains"],
+            filter_data["norobots_domains"],
+            filter_data["noapi_domains"],
+            filter_data["alias_domains"],
+            filter_data["nightly_version_ranges"],
         )
 
         vmc_output("Crawling of new domains complete!", "bold")
@@ -5198,40 +5237,32 @@ async def async_main():
             vmc_output(f"Database error: {exception}", "red")
             sys.exit(1)
 
-        junk_domains = get_junk_keywords()
-        dni_domains = get_dni_domains()
-        bad_tlds = get_bad_tld()
-        domain_endings = await get_domain_endings()
-        failed_domains = get_failed_domains()
-        ignored_domains = get_ignored_domains()
-        not_masto_domains = get_not_masto_domains()
-        baddata_domains = get_baddata_domains()
-        nxdomain_domains = get_nxdomain_domains()
-        norobots_domains = get_norobots_domains()
-        noapi_domains = get_noapi_domains()
-        alias_domains = get_alias_domains()
-        nightly_version_ranges = get_nightly_version_ranges()
+        # Load all filter data in parallel for faster startup
+        filter_data, domain_endings = await asyncio.gather(
+            load_domain_filter_data(),
+            get_domain_endings(),
+        )
 
         # Pre-compute suffix sets for efficient TLD filtering
-        bad_tld_suffixes = {f".{tld}" for tld in bad_tlds}
+        bad_tld_suffixes = {f".{tld}" for tld in filter_data["bad_tlds"]}
         domain_ending_suffixes = {f".{ending}" for ending in domain_endings}
 
         await check_and_record_domains(
             domain_list,
-            not_masto_domains,
-            baddata_domains,
-            failed_domains,
-            ignored_domains,
+            filter_data["not_masto_domains"],
+            filter_data["baddata_domains"],
+            filter_data["failed_domains"],
+            filter_data["ignored_domains"],
             user_choice,
-            junk_domains,
-            dni_domains,
+            filter_data["junk_domains"],
+            filter_data["dni_domains"],
             bad_tld_suffixes,
             domain_ending_suffixes,
-            nxdomain_domains,
-            norobots_domains,
-            noapi_domains,
-            alias_domains,
-            nightly_version_ranges,
+            filter_data["nxdomain_domains"],
+            filter_data["norobots_domains"],
+            filter_data["noapi_domains"],
+            filter_data["alias_domains"],
+            filter_data["nightly_version_ranges"],
         )
 
         cleanup_old_domains()
