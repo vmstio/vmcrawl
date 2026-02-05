@@ -1790,16 +1790,23 @@ def detect_vowels(domain):
         return False
 
 
-async def fetch_peer_domains(api_url, domain, domain_endings, keywords, dni, bad_tlds):
+async def fetch_peer_domains(
+    api_url,
+    domain,
+    domain_ending_suffixes,
+    keywords,
+    dni,
+    bad_tld_suffixes,
+):
     """Fetch peer domains from a Mastodon instance API.
 
     Args:
         api_url: The API URL to fetch peers from
         domain: The domain being queried
-        domain_endings: Set of valid TLDs
+        domain_ending_suffixes: Set of valid TLD suffixes (e.g., {".com", ".org"})
         keywords: Set of junk keywords to filter out
         dni: Set of DNI domains to filter out
-        bad_tlds: Set of bad TLDs to filter out
+        bad_tld_suffixes: Set of bad TLD suffixes (e.g., {".xyz", ".top"})
 
     Returns:
         tuple: (list of filtered domains, error_type or None)
@@ -1808,19 +1815,36 @@ async def fetch_peer_domains(api_url, domain, domain_endings, keywords, dni, bad
     try:
         api_response = await get_httpx(api_url)
         data = api_response.json()
-        filtered_domains = [
-            item
-            for item in data
-            if is_valid_fetch_domain(item)
-            and not has_emoji_chars(item)
-            and not any(keyword in item for keyword in keywords)
-            and not any(dni_domain in item for dni_domain in dni)
-            and not any(item.endswith(f".{tld}") for tld in bad_tlds)
-            and any(
-                item.endswith(f".{domain_ending}") for domain_ending in domain_endings
-            )
-            and item.islower()
-        ]
+
+        # Filter domains using pre-computed suffix sets for O(1) lookups
+        filtered_domains = []
+        for item in data:
+            # Skip invalid domains early (most common rejection)
+            if not item.islower() or not is_valid_fetch_domain(item):
+                continue
+
+            # Check for emoji characters
+            if has_emoji_chars(item):
+                continue
+
+            # Check against junk keywords (substring match required)
+            if any(keyword in item for keyword in keywords):
+                continue
+
+            # Check against DNI list (substring match required)
+            if any(dni_domain in item for dni_domain in dni):
+                continue
+
+            # Check bad TLDs using pre-computed suffixes
+            if any(item.endswith(suffix) for suffix in bad_tld_suffixes):
+                continue
+
+            # Check valid domain endings using pre-computed suffixes
+            if not any(item.endswith(suffix) for suffix in domain_ending_suffixes):
+                continue
+
+            filtered_domains.append(item)
+
         return (filtered_domains, None)
     except json.JSONDecodeError:
         # JSON decode errors indicate HTML or non-JSON response - mark as no_peers
@@ -1850,17 +1874,23 @@ async def fetch_peer_domains(api_url, domain, domain_endings, keywords, dni, bad
 
 
 async def process_fetch_domain(
-    domain, domain_endings, pbar, keywords, dni, bad_tlds, existing_domains
+    domain,
+    domain_ending_suffixes,
+    pbar,
+    keywords,
+    dni,
+    bad_tld_suffixes,
+    existing_domains,
 ):
     """Process a single domain to fetch its peers.
 
     Args:
         domain: Domain to fetch peers from
-        domain_endings: Set of valid TLDs
+        domain_ending_suffixes: Set of valid TLD suffixes (e.g., {".com", ".org"})
         pbar: tqdm progress bar instance for status updates
         keywords: Set of junk keywords to filter out
         dni: Set of DNI domains to filter out
-        bad_tlds: Set of bad TLDs to filter out
+        bad_tld_suffixes: Set of bad TLD suffixes (e.g., {".xyz", ".top"})
         existing_domains: Set of domains already in database
 
     Returns:
@@ -1873,7 +1903,7 @@ async def process_fetch_domain(
     api_url = f"https://{domain}/api/v1/instance/peers"
 
     domains, error_type = await fetch_peer_domains(
-        api_url, domain, domain_endings, keywords, dni, bad_tlds
+        api_url, domain, domain_ending_suffixes, keywords, dni, bad_tld_suffixes
     )
     unique_domains = [d for d in domains if d not in existing_domains and d.isascii()]
 
@@ -1946,6 +1976,10 @@ async def run_fetch_mode(args):
     bad_tlds = get_bad_tld() or set()
     existing_domains = set(get_existing_domains() or [])
 
+    # Pre-compute suffix sets for efficient filtering (avoids repeated f-string creation)
+    bad_tld_suffixes = {f".{tld}" for tld in bad_tlds}
+    domain_ending_suffixes = {f".{ending}" for ending in domain_endings}
+
     # Collect all newly discovered domains
     all_new_domains = []
     max_workers = int(os.getenv("VMCRAWL_MAX_THREADS", "2"))
@@ -1967,11 +2001,11 @@ async def run_fetch_mode(args):
             try:
                 result = await process_fetch_domain(
                     domain,
-                    domain_endings,
+                    domain_ending_suffixes,
                     pbar,
                     keywords,
                     dni,
-                    bad_tlds,
+                    bad_tld_suffixes,
                     existing_domains,
                 )
                 domain_name, new_domains, status = result
