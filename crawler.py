@@ -5180,7 +5180,7 @@ async def async_main():
             pass
         gc.collect()
 
-    # Initialize version information
+    # Initialize version information once at startup (outside loop)
     await initialize_versions()
 
     # Handle fetch subcommand
@@ -5224,101 +5224,109 @@ async def async_main():
             vmc_output("You cannot set both file and target arguments", "red")
             sys.exit(1)
 
+    # Main crawl loop - runs continuously in headless mode, once in interactive mode
     vmc_output(f"{appname} v{appversion} ({current_filename})", "bold")
     if _is_running_headless():
         vmc_output("Running in headless mode", "pink")
+
+    # Determine if we should loop (headless without one-shot flags)
+    should_loop = _is_running_headless() and not (args.file or args.target or args.new)
+
     try:
-        domain_list_file = args.file if args.file is not None else None
-        single_domain_target = args.target if args.target is not None else None
-        try:
-            if domain_list_file:
-                user_choice = 1
-                domain_list = load_from_file(domain_list_file)
-                vmc_output("Crawling domains from provided file", "cyan")
-            elif single_domain_target:
-                user_choice = 1
-                domain_list = single_domain_target.replace(" ", "").split(",")
-                domain_word = "s" if len(domain_list) > 1 else ""
-                vmc_output(
-                    f"Crawling domain{domain_word} from target argument",
-                    "cyan",
-                )
-            else:
-                if args.new:
-                    user_choice = "0"
-                elif _is_running_headless():
-                    user_choice = "3"
-                else:
-                    menu_options = get_menu_options()
-                    selection = interactive_select_menu(menu_options)
-                    if selection is None:
-                        print_menu(menu_options)
-                        user_choice = get_user_choice()
+        while True:
+            try:
+                domain_list_file = args.file if args.file is not None else None
+                single_domain_target = args.target if args.target is not None else None
+                try:
+                    if domain_list_file:
+                        user_choice = 1
+                        domain_list = load_from_file(domain_list_file)
+                        vmc_output("Crawling domains from provided file", "cyan")
+                    elif single_domain_target:
+                        user_choice = 1
+                        domain_list = single_domain_target.replace(" ", "").split(",")
+                        domain_word = "s" if len(domain_list) > 1 else ""
+                        vmc_output(
+                            f"Crawling domain{domain_word} from target argument",
+                            "cyan",
+                        )
                     else:
-                        user_choice = selection
+                        if args.new:
+                            user_choice = "0"
+                        elif _is_running_headless():
+                            user_choice = "3"
+                        else:
+                            menu_options = get_menu_options()
+                            selection = interactive_select_menu(menu_options)
+                            if selection is None:
+                                print_menu(menu_options)
+                                user_choice = get_user_choice()
+                            else:
+                                user_choice = selection
 
-                vmc_output(
-                    f"Crawling domains from database choice {user_choice}",
-                    "cyan",
+                        vmc_output(
+                            f"Crawling domains from database choice {user_choice}",
+                            "cyan",
+                        )
+                        domain_list = load_from_database(user_choice)
+
+                    if user_choice == "2":
+                        domain_list.reverse()
+                    elif user_choice == "3":
+                        random.shuffle(domain_list)
+
+                except FileNotFoundError:
+                    vmc_output(f"File not found: {domain_list_file}", "red")
+                    sys.exit(1)
+                except psycopg.Error as exception:
+                    vmc_output(f"Database error: {exception}", "red")
+                    sys.exit(1)
+
+                # Load all filter data in parallel for faster startup
+                filter_data, domain_endings = await asyncio.gather(
+                    load_domain_filter_data(),
+                    get_domain_endings(),
                 )
-                domain_list = load_from_database(user_choice)
 
-            if user_choice == "2":
-                domain_list.reverse()
-            elif user_choice == "3":
-                random.shuffle(domain_list)
+                # Pre-compute suffix sets for efficient TLD filtering
+                bad_tld_suffixes = {f".{tld}" for tld in filter_data["bad_tlds"]}
+                domain_ending_suffixes = {f".{ending}" for ending in domain_endings}
 
-        except FileNotFoundError:
-            vmc_output(f"File not found: {domain_list_file}", "red")
-            sys.exit(1)
-        except psycopg.Error as exception:
-            vmc_output(f"Database error: {exception}", "red")
-            sys.exit(1)
+                await check_and_record_domains(
+                    domain_list,
+                    filter_data["not_masto_domains"],
+                    filter_data["baddata_domains"],
+                    filter_data["failed_domains"],
+                    filter_data["ignored_domains"],
+                    user_choice,
+                    filter_data["junk_domains"],
+                    filter_data["dni_domains"],
+                    bad_tld_suffixes,
+                    domain_ending_suffixes,
+                    filter_data["nxdomain_domains"],
+                    filter_data["norobots_domains"],
+                    filter_data["noapi_domains"],
+                    filter_data["alias_domains"],
+                    filter_data["nightly_version_ranges"],
+                )
 
-        # Load all filter data in parallel for faster startup
-        filter_data, domain_endings = await asyncio.gather(
-            load_domain_filter_data(),
-            get_domain_endings(),
-        )
+                cleanup_old_domains()
+                save_statistics()
 
-        # Pre-compute suffix sets for efficient TLD filtering
-        bad_tld_suffixes = {f".{tld}" for tld in filter_data["bad_tlds"]}
-        domain_ending_suffixes = {f".{ending}" for ending in domain_endings}
+                # Exit loop if not in continuous headless mode
+                if not should_loop:
+                    break
 
-        await check_and_record_domains(
-            domain_list,
-            filter_data["not_masto_domains"],
-            filter_data["baddata_domains"],
-            filter_data["failed_domains"],
-            filter_data["ignored_domains"],
-            user_choice,
-            filter_data["junk_domains"],
-            filter_data["dni_domains"],
-            bad_tld_suffixes,
-            domain_ending_suffixes,
-            filter_data["nxdomain_domains"],
-            filter_data["norobots_domains"],
-            filter_data["noapi_domains"],
-            filter_data["alias_domains"],
-            filter_data["nightly_version_ranges"],
-        )
+                # Brief pause before next cycle to avoid tight loop
+                vmc_output("Restarting crawl cycle...", "pink")
+                await asyncio.sleep(1)
 
-        cleanup_old_domains()
-        save_statistics()
+            except KeyboardInterrupt:
+                vmc_output(f"\n{appname} interrupted by user", "red")
+                break
 
-    except KeyboardInterrupt:
-        vmc_output(f"\n{appname} interrupted by user", "red")
     finally:
         await cleanup_connections()
-
-    if _is_running_headless():
-        if not (args.file or args.target or args.new):
-            try:
-                os.execv(sys.executable, ["python3"] + sys.argv)
-            except Exception as exception:
-                vmc_output(f"Failed to restart {appname}: {exception}", "red")
-    else:
-        sys.exit(0)
 
 
 # =============================================================================
