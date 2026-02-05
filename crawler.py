@@ -321,33 +321,46 @@ def is_cache_valid(cache_file_path: str, max_age_seconds: int) -> bool:
 # =============================================================================
 
 
-def is_alias_domain(domain: str, backend_domain: str) -> bool:
+def is_alias_domain(domain: str, instance_uri: str, backend_domain: str) -> bool:
     """Check if domain is an alias that should not be stored in the database.
 
-    Only the authoritative/canonical domain (from backend_domain or instance API)
-    should be stored. Any domain that differs from the authoritative domain is an alias.
+    The instance API's domain/uri field is the single source of truth for the
+    canonical domain. If domain != instance_uri, it's an alias only if instance_uri
+    matches backend_domain (i.e. we have independent confirmation the instance_uri
+    is reachable). If instance_uri is a third value we've never seen, we don't
+    silently alias — log a warning and treat as authoritative.
 
     Args:
         domain: The original domain being crawled
-        backend_domain: The authoritative domain (from host-meta/webfinger/instance API)
+        instance_uri: The canonical domain from the instance API (v2 domain / v1 uri)
+        backend_domain: The domain we actually reached (from nodeinfo URL or discovery)
 
     Returns:
-        True if domain is different from backend_domain (is an alias)
-        False if domain equals backend_domain (is authoritative)
-
-    Examples:
-        is_alias_domain("example.com", "example.com") -> False (same, not alias)
-        is_alias_domain("example.com", "social.example.com") -> True (different, is alias)
-        is_alias_domain("social.example.com", "example.com") -> True (different, is alias)
-        is_alias_domain("example.com", "other.com") -> True (different, is alias)
+        True if domain is a confirmed alias
+        False if domain is authoritative or the alias can't be confirmed
     """
-    # Normalize domains to lowercase
     domain = domain.lower()
+    instance_uri = instance_uri.lower()
     backend_domain = backend_domain.lower()
 
-    # Only exact match means not an alias
-    # Any difference means this domain is an alias of the authoritative domain
-    return domain != backend_domain
+    # Exact match with instance API — authoritative, not an alias
+    if domain == instance_uri:
+        return False
+
+    # instance_uri matches backend_domain — confirmed alias, the backend is reachable
+    if instance_uri == backend_domain:
+        return True
+
+    # instance_uri is a third value we haven't independently confirmed.
+    # Log a warning but don't mark as alias — too risky to set a terminal state
+    # on unverified information.
+    vmc_output(
+        f"{domain}: instance_uri={instance_uri} doesn't match "
+        f"backend_domain={backend_domain}, not marking as alias",
+        "yellow",
+        use_tqdm=True,
+    )
+    return False
 
 
 async def parse_json_with_fallback(
@@ -3380,10 +3393,13 @@ async def get_instance_uri(backend_domain: str) -> tuple[str | None, bool]:
 
             if isinstance(instance_data, dict):
                 uri = instance_data.get("uri")
-                # Normalize domain to lowercase for consistent comparison
+                # Normalize to bare hostname: some instances return a full URL
+                # (e.g. "https://example.com/") instead of just "example.com"
                 if uri:
-                    return (uri.strip().lower(), False)
-                return (uri, False)
+                    parsed = urlparse(uri if "://" in uri else f"https://{uri}")
+                    hostname = (parsed.hostname or "").strip().lower()
+                    return (hostname or None, False)
+                return (None, False)
             return (None, False)
         return (None, False)
     except httpx.RequestError:
@@ -3489,31 +3505,42 @@ async def process_domain(domain, nightly_version_ranges, user_choice=None):
     if not await check_robots_txt(domain, preserve_ignore, preserve_nxdomain):
         return
 
-    # Discover backend domain via parallel host-meta and webfinger checks
-    backend_domain, discovery_method = await discover_backend_domain_parallel(domain)
-
-    if discovery_method == "fallback":
-        vmc_output(
-            f"{domain}: Both host-meta and webfinger failed, "
-            "trying nodeinfo at original domain",
-            "white",
-            use_tqdm=True,
-        )
-    else:
-        vmc_output(
-            f"{domain}: Found backend via {discovery_method}: {backend_domain}",
-            "white",
-            use_tqdm=True,
-        )
-
-    # Check nodeinfo at the discovered backend domain
+    # Try nodeinfo at the original domain first
+    backend_domain = domain
     nodeinfo_result = await check_nodeinfo(
-        domain, backend_domain, preserve_ignore, preserve_nxdomain
+        domain, domain, preserve_ignore, preserve_nxdomain
     )
     if nodeinfo_result is False:
         return
+
+    # Nodeinfo failed at original domain; discover backend via host-meta/webfinger
     if not nodeinfo_result:
-        return
+        backend_domain, discovery_method = await discover_backend_domain_parallel(
+            domain
+        )
+
+        if discovery_method == "fallback":
+            vmc_output(
+                f"{domain}: Both host-meta and webfinger failed",
+                "white",
+                use_tqdm=True,
+            )
+            return
+        else:
+            vmc_output(
+                f"{domain}: Found backend via {discovery_method}: {backend_domain}",
+                "white",
+                use_tqdm=True,
+            )
+
+        # Retry nodeinfo at the discovered backend domain
+        nodeinfo_result = await check_nodeinfo(
+            domain, backend_domain, preserve_ignore, preserve_nxdomain
+        )
+        if nodeinfo_result is False:
+            return
+        if not nodeinfo_result:
+            return
 
     # Check if nodeinfo data was returned directly from the well-known endpoint
     if "nodeinfo_20_data" in nodeinfo_result:
@@ -3522,6 +3549,13 @@ async def process_domain(domain, nightly_version_ranges, user_choice=None):
     else:
         # Normal flow: fetch from the nodeinfo_20_url
         nodeinfo_20_url = nodeinfo_result["nodeinfo_20_url"]
+
+        # The nodeinfo URL may point to a different backend domain (e.g. vivaldi.net
+        # proxies nodeinfo but the instance API lives on the actual backend).
+        # Extract the backend from the URL so get_instance_uri hits the right host.
+        nodeinfo_host = urlparse(nodeinfo_20_url).hostname
+        if nodeinfo_host and nodeinfo_host != backend_domain:
+            backend_domain = nodeinfo_host
 
         nodeinfo_20_result = await check_nodeinfo_20(
             domain,
@@ -3562,9 +3596,8 @@ async def process_domain(domain, nightly_version_ranges, user_choice=None):
             return
 
         # Check if this is an alias (redirect to another instance)
-        # Use instance_uri (from API) as the authoritative canonical domain
-        # Only domains that match the instance_uri should be stored
-        if is_alias_domain(domain, instance_uri):
+        # instance_uri is from the API; backend_domain is where we actually reached
+        if is_alias_domain(domain, instance_uri, backend_domain):
             vmc_output(
                 f"{domain}: Alias - redirects to {instance_uri}",
                 "cyan",
