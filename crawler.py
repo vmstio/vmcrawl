@@ -736,6 +736,7 @@ def clean_version(
     # Phase 5: Normalize development version formats (rc, beta)
     version = RE_VERSION_RC.sub(r"-rc.\1", version)
     version = RE_VERSION_BETA.sub(r"-beta.\1", version)
+    version = version.replace("--", "-")  # Fix double dashes from Phase 5
 
     # Phase 6: Map nightly versions to releases
     version = _clean_version_nightly(version, nightly_version_ranges)
@@ -846,7 +847,7 @@ def _clean_version_fixes(version: str) -> str:
     # For zero patch: normalize them (4.3.0alpha1 -> 4.3.0-alpha.1)
     malformed_match = RE_VERSION_MALFORMED_PRERELEASE.search(version)
     if malformed_match:
-        base_version = version[: malformed_match.start()]
+        base_version = version[: malformed_match.start()].rstrip("-")
         # Check if this is a zero patch version
         base_parts = base_version.split(".")
         if len(base_parts) == 3 and base_parts[2] == "0":
