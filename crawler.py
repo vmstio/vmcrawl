@@ -3000,7 +3000,10 @@ async def check_robots_txt(domain, preserve_ignore=False, preserve_nxdomain=Fals
                         await asyncio.to_thread(mark_norobots_domain, domain)
                         await asyncio.to_thread(delete_domain_if_known, domain)
                         return False
-        elif response.status_code in http_codes_to_hardfail:
+        elif (
+            response.status_code in http_codes_to_hardfail
+            or response.status_code == 404
+        ):
             await asyncio.to_thread(handle_http_failed, domain, target, response)
             return False
         else:
