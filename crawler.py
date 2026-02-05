@@ -5087,8 +5087,6 @@ async def async_main():
         alias_domains = get_alias_domains()
         nightly_version_ranges = get_nightly_version_ranges()
 
-        cleanup_old_domains()
-
         await check_and_record_domains(
             domain_list,
             not_masto_domains,
@@ -5107,6 +5105,7 @@ async def async_main():
             nightly_version_ranges,
         )
 
+        cleanup_old_domains()
         save_statistics()
 
     except KeyboardInterrupt:
