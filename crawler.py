@@ -36,6 +36,7 @@ try:
     from cachetools import TTLCache
     from dotenv import load_dotenv
     from packaging import version
+    from psycopg import sql
     from psycopg_pool import ConnectionPool
     from tqdm import tqdm
 except ImportError as exception:
@@ -366,10 +367,9 @@ def is_alias_domain(domain: str, instance_uri: str, backend_domain: str) -> bool
     Returns:
         True if domain is a confirmed alias
         False if domain is authoritative or the alias can't be confirmed
+
+    Note: All parameters are expected to be pre-normalized to lowercase by caller.
     """
-    domain = domain.lower()
-    instance_uri = instance_uri.lower()
-    backend_domain = backend_domain.lower()
 
     # Exact match with instance API — authoritative, not an alias
     if domain == instance_uri:
@@ -1009,8 +1009,9 @@ def increment_domain_error(
         error_reason: The error reason string
         preserve_ignore: If True, preserve the ignore flag when recording errors
         preserve_nxdomain: If True, preserve the nxdomain flag when recording errors
+
+    Note: Domain is expected to be pre-normalized to lowercase by caller.
     """
-    domain = domain.lower()
     ERROR_THRESHOLD = int(os.getenv("VMCRAWL_ERROR_BUFFER", "8"))
     TRACKED_ERROR_TYPES = ("DNS", "SSL", "TCP", "TYPE", "FILE", "API", "JSON")
 
@@ -1147,8 +1148,10 @@ def increment_domain_error(
 
 
 def clear_domain_error(domain: str) -> None:
-    """Clear all error flags for a domain."""
-    domain = domain.lower()
+    """Clear all error flags for a domain.
+
+    Note: Domain is expected to be pre-normalized to lowercase by caller.
+    """
     with db_pool.connection() as conn, conn.cursor() as cursor:
         try:
             _ = cursor.execute(
@@ -1179,7 +1182,10 @@ def clear_domain_error(domain: str) -> None:
 
 
 def _save_matrix_nodeinfo(domain: str) -> None:
-    """Save nodeinfo as 'matrix' for Matrix servers."""
+    """Save nodeinfo as 'matrix' for Matrix servers.
+
+    Note: Domain is expected to be pre-normalized to lowercase by caller.
+    """
     with db_pool.connection() as conn, conn.cursor() as cursor:
         try:
             cursor.execute(
@@ -1191,7 +1197,7 @@ def _save_matrix_nodeinfo(domain: str) -> None:
                     errors = excluded.errors,
                     reason = excluded.reason
                 """,
-                (domain.lower(), "matrix", None, None),
+                (domain, "matrix", None, None),
             )
             conn.commit()
         except Exception as exception:
@@ -1215,8 +1221,8 @@ def mark_domain_status(domain: str, status_type: str) -> None:
         domain: The domain to mark
         status_type: One of 'ignore', 'failed', 'nxdomain', 'norobots', 'noapi', 'alias'
 
+    Note: Domain is expected to be pre-normalized to lowercase by caller.
     """
-    domain = domain.lower()
     status_map = {
         "ignore": (None, True, None, None, None, None, None, None, None, "ignored"),
         "failed": (True, None, None, None, None, None, None, None, None, "failed"),
@@ -1369,8 +1375,8 @@ def save_nodeinfo_software(domain: str, software_data: dict[str, Any]) -> None:
         software_data: The 'software' dict from nodeinfo_20_result (contains
             'name')
 
+    Note: Domain is expected to be pre-normalized to lowercase by caller.
     """
-    domain = domain.lower()
     software_name = software_data.get("name", "unknown").lower().replace(" ", "-")
 
     with db_pool.connection() as conn, conn.cursor() as cursor:
@@ -1739,7 +1745,7 @@ def fetch_domain_list(exclude_domains_sql, db_limit, db_offset, randomize=False)
 
             if randomize:
                 # For random selection, fetch all and shuffle in Python
-                cursor.execute(base_query, (min_active,))
+                cursor.execute(sql.SQL(base_query), (min_active,))
                 # Stream results through cursor iterator
                 result = [row[0] for row in cursor if not has_emoji_chars(row[0])]
                 random.shuffle(result)
@@ -1749,7 +1755,7 @@ def fetch_domain_list(exclude_domains_sql, db_limit, db_offset, randomize=False)
                 # For ordered selection, use SQL LIMIT/OFFSET for efficiency
                 # Fetch extra rows to account for emoji filtering
                 fetch_limit = int(db_limit) + int(db_offset) + 100
-                query_with_limit = f"{base_query} LIMIT %s"
+                query_with_limit = sql.SQL(base_query) + sql.SQL(" LIMIT %s")
                 cursor.execute(query_with_limit, (min_active, fetch_limit))
                 # Stream and filter, then apply offset/limit
                 all_domains = [row[0] for row in cursor if not has_emoji_chars(row[0])]
@@ -3632,10 +3638,12 @@ async def process_domain(domain, nightly_version_ranges, user_choice=None):
     """Main processing pipeline for a single domain.
 
     Args:
-        domain: The domain to process
+        domain: The domain to process (will be normalized to lowercase)
         nightly_version_ranges: Version ranges for nightly builds
         user_choice: The user's menu choice (used to determine if retrying ignored/nxdomain domains)
     """
+    # Normalize domain once at entry point - all downstream functions assume lowercase
+    domain = domain.lower()
     preserve_ignore = user_choice == "11"
     preserve_nxdomain = user_choice == "13"
 
