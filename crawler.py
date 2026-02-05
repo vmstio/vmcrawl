@@ -4976,11 +4976,16 @@ version_latest_release: str | None = None
 version_backport_releases: list[str] | None = None
 all_patched_versions: list[str] | None = None
 
+# Track last version refresh time for periodic updates
+_version_last_refresh: float | None = None
+# Refresh interval in seconds (default: 1 hour, configurable via environment)
+VERSION_REFRESH_INTERVAL = int(os.getenv("VMCRAWL_VERSION_REFRESH_INTERVAL", "3600"))
+
 
 async def initialize_versions():
     """Initialize version information asynchronously."""
     global version_main_branch, version_main_release, version_latest_release
-    global version_backport_releases, all_patched_versions
+    global version_backport_releases, all_patched_versions, _version_last_refresh
 
     # Fetch all version info in parallel
     results = await asyncio.gather(
@@ -4999,6 +5004,26 @@ async def initialize_versions():
     # Update database with current version information
     update_patch_versions()
     delete_old_patch_versions()
+
+    # Record refresh timestamp
+    _version_last_refresh = time.time()
+
+
+async def maybe_refresh_versions():
+    """Refresh version info if it's been too long since last refresh.
+
+    Checks if VERSION_REFRESH_INTERVAL seconds have passed since the last
+    refresh and updates version information from GitHub if needed.
+    """
+    global _version_last_refresh
+
+    now = time.time()
+    if (
+        _version_last_refresh is None
+        or (now - _version_last_refresh) >= VERSION_REFRESH_INTERVAL
+    ):
+        vmc_output("Refreshing version information from GitHub...", "cyan")
+        await initialize_versions()
 
 
 # =============================================================================
@@ -5235,6 +5260,9 @@ async def async_main():
     try:
         while True:
             try:
+                # Refresh version info periodically (if needed)
+                await maybe_refresh_versions()
+
                 domain_list_file = args.file if args.file is not None else None
                 single_domain_target = args.target if args.target is not None else None
                 try:
