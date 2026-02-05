@@ -116,6 +116,7 @@ RE_VERSION_ALPHA = re.compile(r"alpha(\d+)")
 RE_VERSION_ALPHA_SUFFIX = re.compile(r"-[a-zA-Z]")
 RE_VERSION_DIGIT_SUFFIX = re.compile(r"-\d")
 RE_VERSION_MALFORMED_PRERELEASE = re.compile(r"(alpha|beta|rc)\d*$")
+RE_VERSION_TRAILING_SUFFIX = re.compile(r"^(\d+\.\d+\.\d+)[a-zA-Z][a-zA-Z0-9]*$")
 
 # Pre-compiled regex patterns for domain validation (high frequency in fetch loops)
 RE_DOMAIN_FORMAT = re.compile(r"^[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$", re.IGNORECASE)
@@ -829,6 +830,17 @@ def _clean_version_nightly(
 
 def _clean_version_fixes(version: str) -> str:
     """Apply version-specific fixes using parsed components."""
+    # Handle arbitrary trailing letter suffixes (e.g., "3.4.6ht", "4.2.10kb10")
+    # These are fork/instance identifiers that should be stripped
+    trailing_match = RE_VERSION_TRAILING_SUFFIX.match(version)
+    if trailing_match:
+        # Check if it's a known prerelease tag that needs special handling
+        suffix_start = len(trailing_match.group(1))
+        suffix = version[suffix_start:]
+        if not RE_VERSION_MALFORMED_PRERELEASE.match(suffix):
+            # Not a prerelease tag, strip the suffix entirely
+            version = trailing_match.group(1)
+
     # Handle malformed prerelease tags (e.g., "4.3.4alpha1" without dash)
     # For non-zero patch: strip them entirely (4.3.4alpha1 -> 4.3.4)
     # For zero patch: normalize them (4.3.0alpha1 -> 4.3.0-alpha.1)
