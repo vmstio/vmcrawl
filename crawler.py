@@ -3016,7 +3016,7 @@ async def check_robots_txt(domain, preserve_ignore=False, preserve_nxdomain=Fals
         elif response.status_code == 404:
             # Treat 404 on robots.txt as crawling prohibited
             vmc_output(
-                f"{domain}: No robots.txt (404) - treating as prohibited",
+                f"{domain}: No robots.txt found, treating as prohibited",
                 "orange",
                 use_tqdm=True,
             )
