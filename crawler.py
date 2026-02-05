@@ -2993,13 +2993,23 @@ async def check_robots_txt(domain, preserve_ignore=False, preserve_nxdomain=Fals
                         disallow_path == "/" or disallow_path == "*"
                     ):
                         vmc_output(
-                            f"{domain}: Crawling Prohibited",
+                            f"{domain}: Crawling is prohibited by robots.txt",
                             "orange",
                             use_tqdm=True,
                         )
                         await asyncio.to_thread(mark_norobots_domain, domain)
                         await asyncio.to_thread(delete_domain_if_known, domain)
                         return False
+        elif response.status_code == 404:
+            # Treat 404 on robots.txt as crawling prohibited
+            vmc_output(
+                f"{domain}: No robots.txt (404) - treating as prohibited",
+                "orange",
+                use_tqdm=True,
+            )
+            await asyncio.to_thread(mark_norobots_domain, domain)
+            await asyncio.to_thread(delete_domain_if_known, domain)
+            return False
         elif response.status_code in http_codes_to_hardfail:
             await asyncio.to_thread(handle_http_failed, domain, target, response)
             return False
