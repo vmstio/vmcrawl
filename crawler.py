@@ -110,9 +110,21 @@ RE_VERSION_NIGHTLY = re.compile(
 RE_VERSION_NIGHTLY_DATE = re.compile(r"-nightly-\d{8}")
 RE_VERSION_RC = re.compile(r"rc(\d+)")
 RE_VERSION_BETA = re.compile(r"beta(\d+)")
+RE_VERSION_ALPHA = re.compile(r"alpha(\d+)")
 RE_VERSION_ALPHA_SUFFIX = re.compile(r"-[a-zA-Z]")
 RE_VERSION_DIGIT_SUFFIX = re.compile(r"-\d")
 RE_VERSION_MALFORMED_PRERELEASE = re.compile(r"(alpha|beta|rc)\d*$")
+
+# Pre-compiled regex patterns for domain validation (high frequency in fetch loops)
+RE_DOMAIN_FORMAT = re.compile(r"^[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$", re.IGNORECASE)
+RE_VOWEL_PATTERN = re.compile(r"\.[aeiou]{4}")
+
+# Pre-compiled regex patterns for URL and error handling
+RE_MULTIPLE_SLASHES = re.compile(r"/+")
+RE_CLEANUP_BRACKETS = re.compile(r"\s*(\[[^\]]*\]|\([^)]*\))")
+RE_CONTENT_TYPE_CHARSET = re.compile(r";.*$")
+RE_FUNCTION_DEF = re.compile(r"def (\w+)")
+RE_QUOTED_STRING = re.compile(r"'[^']+'")
 
 # =============================================================================
 # DATABASE CONNECTION
@@ -548,12 +560,12 @@ async def read_main_version_info(url: str) -> dict[str, str] | None:
         lines = response.text.splitlines()
 
         for i, line in enumerate(lines):
-            match = re.search(r"def (\w+)", line)
+            match = RE_FUNCTION_DEF.search(line)
             if match:
                 key = match.group(1)
                 if key in ["major", "minor", "patch", "default_prerelease"]:
                     value = lines[i + 1].strip()
-                    if value.isnumeric() or re.match(r"'[^']+'", value):
+                    if value.isnumeric() or RE_QUOTED_STRING.match(value):
                         version_info[key] = value.replace("'", "")
     except httpx.HTTPError as exception:
         vmc_output(f"Failed to retrieve Mastodon main version: {exception}", "red")
@@ -825,7 +837,7 @@ def _clean_version_fixes(version: str) -> str:
             # Convert "alpha1" to "-alpha.1", "beta2" to "-beta.2", etc.
             normalized = RE_VERSION_RC.sub(r"-rc.\1", tag)
             normalized = RE_VERSION_BETA.sub(r"-beta.\1", normalized)
-            normalized = re.sub(r"alpha(\d+)", r"-alpha.\1", normalized)
+            normalized = RE_VERSION_ALPHA.sub(r"-alpha.\1", normalized)
             version = base_version + normalized
         else:
             # Non-zero patch: strip the malformed tag
@@ -1753,9 +1765,8 @@ def import_domains(domains, use_tqdm=False):
 
 def is_valid_fetch_domain(domain):
     """Check if a domain string is valid for fetching."""
-    domain_pattern = re.compile(r"^[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$", re.IGNORECASE)
     return (
-        (domain_pattern.match(domain) or "xn--" in domain)
+        (RE_DOMAIN_FORMAT.match(domain) or "xn--" in domain)
         and not is_ip_address(domain)
         and not detect_vowels(domain)
     )
@@ -1773,9 +1784,7 @@ def is_ip_address(domain):
 def detect_vowels(domain):
     """Detect domains with suspicious vowel patterns."""
     try:
-        pattern = r"\.[aeiou]{4}"
-        matches = re.findall(pattern, domain)
-        return True if len(matches) > 0 else False
+        return bool(RE_VOWEL_PATTERN.search(domain))
     except Exception as e:
         vmc_output(f"Error detecting vowels: {e}", "orange")
         return False
@@ -2606,7 +2615,7 @@ def handle_incorrect_file_type(
     """Handle responses with incorrect content type."""
     if content_type == "" or content_type is None:
         content_type = "missing Content-Type"
-    clean_content_type = re.sub(r";.*$", "", content_type).strip()
+    clean_content_type = RE_CONTENT_TYPE_CHARSET.sub("", content_type).strip()
     error_message = f"{target} is {clean_content_type}"
     vmc_output(f"{domain}: {error_message}", "yellow", use_tqdm=True)
     log_error(domain, error_message)
@@ -2676,7 +2685,7 @@ def handle_tcp_exception(
     if any(indicator in error_message_lower for indicator in ssl_indicators):
         error_reason = "SSL"
         cleaned_message = (
-            re.sub(r"\s*(\[[^\]]*\]|\([^)]*\))", "", error_message)
+            RE_CLEANUP_BRACKETS.sub("", error_message)
             .replace(":", "")
             .replace(",", "")
             .split(" for ", 1)[0]
@@ -2704,7 +2713,7 @@ def handle_tcp_exception(
     ):
         error_reason = "DNS"
         cleaned_message = (
-            re.sub(r"\s*(\[[^\]]*\]|\([^)]*\))", "", error_message)
+            RE_CLEANUP_BRACKETS.sub("", error_message)
             .replace(":", "")
             .replace(",", "")
             .split(" for ", 1)[0]
@@ -2723,7 +2732,7 @@ def handle_tcp_exception(
         # All other errors (TCP, HTTP, etc.) categorized as TCP
         error_reason = "TCP"
         cleaned_message = (
-            re.sub(r"\s*(\[[^\]]*\]|\([^)]*\))", "", error_message)
+            RE_CLEANUP_BRACKETS.sub("", error_message)
             .replace(":", "")
             .replace(",", "")
             .split(" for ", 1)[0]
@@ -3086,9 +3095,7 @@ def sanitize_nodeinfo_url(url: str) -> str:
     # Fix double (or more) slashes in path
     if "//" in parsed.path:
         # Replace multiple consecutive slashes with single slash
-        import re
-
-        clean_path = re.sub(r"/+", "/", parsed.path)
+        clean_path = RE_MULTIPLE_SLASHES.sub("/", parsed.path)
         query = f"?{parsed.query}" if parsed.query else ""
         fragment = f"#{parsed.fragment}" if parsed.fragment else ""
         url = f"{parsed.scheme}://{parsed.netloc}{clean_path}{query}{fragment}"
