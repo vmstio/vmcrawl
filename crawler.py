@@ -1716,40 +1716,49 @@ def fetch_exclude_domains():
 
 
 def fetch_domain_list(exclude_domains_sql, db_limit, db_offset, randomize=False):
-    """Fetch list of domains to query for peers."""
+    """Fetch list of domains to query for peers.
+
+    When not randomizing, uses SQL LIMIT/OFFSET for efficiency.
+    When randomizing, fetches all qualifying domains then shuffles in Python.
+    """
     with db_pool.connection() as conn, conn.cursor() as cursor:
         try:
             min_active = int(os.getenv("VMCRAWL_FETCH_MIN_ACTIVE", "100"))
+
+            # Build base query
             if exclude_domains_sql:
-                # Using string concatenation for exclude_domains_sql since it's already
-                # a properly formatted SQL list from the database
-                query = (
+                base_query = (
                     "SELECT domain FROM mastodon_domains "
                     "WHERE active_users_monthly > %s "
                     "AND domain NOT IN (" + exclude_domains_sql + ") "
                     "ORDER BY active_users_monthly DESC"
                 )
-                cursor.execute(query, (min_active,))
             else:
-                cursor.execute(
-                    """
-                        SELECT domain FROM mastodon_domains
-                        WHERE active_users_monthly > %s
-                        ORDER BY active_users_monthly DESC
-                        """,
-                    (min_active,),
+                base_query = (
+                    "SELECT domain FROM mastodon_domains "
+                    "WHERE active_users_monthly > %s "
+                    "ORDER BY active_users_monthly DESC"
                 )
-            result = [
-                row[0] for row in cursor.fetchall() if not has_emoji_chars(row[0])
-            ]
 
             if randomize:
+                # For random selection, fetch all and shuffle in Python
+                cursor.execute(base_query, (min_active,))
+                # Stream results through cursor iterator
+                result = [row[0] for row in cursor if not has_emoji_chars(row[0])]
                 random.shuffle(result)
-
-            # Apply offset and limit to the results
-            start = int(db_offset)
-            end = start + int(db_limit)
-            result = result[start:end]
+                # Apply limit after shuffle
+                result = result[: int(db_limit)]
+            else:
+                # For ordered selection, use SQL LIMIT/OFFSET for efficiency
+                # Fetch extra rows to account for emoji filtering
+                fetch_limit = int(db_limit) + int(db_offset) + 100
+                query_with_limit = f"{base_query} LIMIT %s"
+                cursor.execute(query_with_limit, (min_active, fetch_limit))
+                # Stream and filter, then apply offset/limit
+                all_domains = [row[0] for row in cursor if not has_emoji_chars(row[0])]
+                start = int(db_offset)
+                end = start + int(db_limit)
+                result = all_domains[start:end]
 
             return result if result else ["vmst.io"]
         except Exception as e:
