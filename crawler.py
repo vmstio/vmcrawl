@@ -10,6 +10,7 @@ try:
     import asyncio
     import atexit
     import csv
+    import functools
     import gc
     import hashlib
     import ipaddress
@@ -427,8 +428,13 @@ async def parse_json_with_fallback(
             return False
 
 
+@functools.lru_cache(maxsize=65536)
 def has_emoji_chars(domain: str) -> bool:
-    """Check if a domain contains emoji or invalid characters."""
+    """Check if a domain contains emoji or invalid characters.
+
+    Results are cached using LRU cache to avoid repeated computation
+    for the same domains during filtering operations.
+    """
     if domain.startswith("xn--"):
         try:
             domain = domain.encode("ascii").decode("idna")
