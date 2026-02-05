@@ -1702,12 +1702,17 @@ def fetch_domain_list(exclude_domains_sql, db_limit, db_offset, randomize=False)
             return None
 
 
-def get_existing_domains():
-    """Get list of domains already in raw_domains table."""
+def get_existing_domains() -> set[str] | None:
+    """Get set of domains already in raw_domains table.
+
+    Returns a set directly for O(1) membership testing, avoiding
+    intermediate list allocation.
+    """
     with db_pool.connection() as conn, conn.cursor() as cursor:
         try:
             cursor.execute("SELECT domain FROM raw_domains")
-            existing_domains = [row[0] for row in cursor.fetchall()]
+            # Build set directly from cursor iterator (memory efficient)
+            existing_domains = {row[0] for row in cursor}
             conn.commit()
             return existing_domains
         except Exception as e:
@@ -1974,7 +1979,7 @@ async def run_fetch_mode(args):
     keywords = get_junk_keywords() or set()
     dni = get_dni_domains() or set()
     bad_tlds = get_bad_tld() or set()
-    existing_domains = set(get_existing_domains() or [])
+    existing_domains = get_existing_domains() or set()
 
     # Pre-compute suffix sets for efficient filtering (avoids repeated f-string creation)
     bad_tld_suffixes = {f".{tld}" for tld in bad_tlds}
@@ -2120,11 +2125,12 @@ def get_tld_last_updated() -> datetime | None:
 
 
 def get_tlds_from_db() -> set[str]:
-    """Get list of TLDs from database."""
+    """Get set of TLDs from database."""
     with db_pool.connection() as conn, conn.cursor() as cursor:
         try:
             _ = cursor.execute("SELECT tld FROM tld_cache")
-            tlds: set[str] = {row[0] for row in cursor.fetchall()}
+            # Build set directly from cursor iterator (memory efficient)
+            tlds: set[str] = {row[0] for row in cursor}
             return tlds
         except Exception as e:
             vmc_output(f"Failed to get TLDs from database: {e}", "orange")
@@ -2186,11 +2192,12 @@ DNI_CSV_URL = "https://about.iftas.org/wp-content/uploads/2025/10/iftas-dni-late
 
 
 def get_existing_dni_domains() -> set[str]:
-    """Get list of domains already in dni table."""
+    """Get set of domains already in dni table."""
     with db_pool.connection() as conn, conn.cursor() as cursor:
         try:
             _ = cursor.execute("SELECT domain FROM dni")
-            existing_domains: set[str] = {row[0] for row in cursor.fetchall()}
+            # Build set directly from cursor iterator (memory efficient)
+            existing_domains: set[str] = {row[0] for row in cursor}
             return existing_domains
         except Exception as e:
             vmc_output(f"Failed to get existing DNI domains: {e}", "orange")
