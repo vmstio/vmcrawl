@@ -91,8 +91,6 @@ chmod +x /opt/vmcrawl/vmcrawl.sh
 
 # Copy service files to systemd
 cp /opt/vmcrawl/vmcrawl.service /etc/systemd/system/
-cp /opt/vmcrawl/vmfetch.service /etc/systemd/system/
-cp /opt/vmcrawl/vmfetch.timer /etc/systemd/system/
 
 # Reload systemd
 systemctl daemon-reload
@@ -109,14 +107,6 @@ systemctl start vmcrawl.service
 
 # Check crawler status
 systemctl status vmcrawl.service
-
-# Enable and start the vmfetch timer (runs hourly)
-systemctl enable vmfetch.timer
-systemctl start vmfetch.timer
-
-# Check vmfetch timer status
-systemctl status vmfetch.timer
-systemctl list-timers vmfetch.timer
 ```
 
 ### Docker Installation
@@ -141,10 +131,6 @@ The project includes a single main script with multiple subcommands:
 | `crawler.py nightly` | Manages nightly/development version tracking in the database               |
 
 ### Automated Tasks
-
-**Automated Fetching:**
-
-The `vmfetch.timer` systemd timer automatically runs `vmcrawl.sh fetch --random` every hour to continuously discover new instances from random servers in your database. This ensures your instance list stays up-to-date without manual intervention. The timer starts one hour after system boot and runs hourly thereafter.
 
 **Statistics Generation:**
 
@@ -477,12 +463,6 @@ journalctl -u vmcrawl.service -n 100
 
 # View crawler logs since boot
 journalctl -u vmcrawl.service -b
-
-# Follow vmfetch logs in real-time
-journalctl -u vmfetch.service -f
-
-# View recent vmfetch logs
-journalctl -u vmfetch.service -n 100
 ```
 
 ### Control Services
@@ -497,27 +477,6 @@ systemctl restart vmcrawl.service
 
 # Disable service
 systemctl disable vmcrawl.service
-```
-
-**Fetch Timer:**
-```bash
-# Stop timer
-systemctl stop vmfetch.timer
-
-# Restart timer
-systemctl restart vmfetch.timer
-
-# Disable timer
-systemctl disable vmfetch.timer
-
-# Manually trigger a fetch
-systemctl start vmfetch.service
-
-# Or run fetch manually
-./vmcrawl.sh fetch --random
-
-# Check when the next fetch will run
-systemctl list-timers vmfetch.timer
 ```
 
 ## Troubleshooting
