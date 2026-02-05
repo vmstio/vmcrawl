@@ -1579,8 +1579,10 @@ def get_domains_by_status(status_column):
 
     with db_pool.connection() as conn, conn.cursor() as cursor:
         try:
-            query = f"SELECT domain FROM raw_domains WHERE {status_column} = TRUE"
-            _ = cursor.execute(query)  # pyright: ignore[reportCallIssue,reportArgumentType]
+            query = sql.SQL("SELECT domain FROM raw_domains WHERE {} = TRUE").format(
+                sql.Identifier(status_column)
+            )
+            _ = cursor.execute(query)
             # Use set for O(1) lookup, stream results
             return {row[0].strip() for row in cursor if row[0] and row[0].strip()}
         except Exception as exception:
@@ -1728,16 +1730,17 @@ def fetch_domain_list(exclude_domains_sql, db_limit, db_offset, randomize=False)
         try:
             min_active = int(os.getenv("VMCRAWL_FETCH_MIN_ACTIVE", "100"))
 
-            # Build base query
+            # Build base query using sql.SQL for safe composition
             if exclude_domains_sql:
-                base_query = (
+                # exclude_domains_sql is pre-formatted as 'domain1','domain2',... from string_agg
+                base_query = sql.SQL(
                     "SELECT domain FROM mastodon_domains "
                     "WHERE active_users_monthly > %s "
-                    "AND domain NOT IN (" + exclude_domains_sql + ") "
+                    "AND domain NOT IN ({}) "
                     "ORDER BY active_users_monthly DESC"
-                )
+                ).format(sql.SQL(exclude_domains_sql))
             else:
-                base_query = (
+                base_query = sql.SQL(
                     "SELECT domain FROM mastodon_domains "
                     "WHERE active_users_monthly > %s "
                     "ORDER BY active_users_monthly DESC"
@@ -1745,7 +1748,7 @@ def fetch_domain_list(exclude_domains_sql, db_limit, db_offset, randomize=False)
 
             if randomize:
                 # For random selection, fetch all and shuffle in Python
-                cursor.execute(sql.SQL(base_query), (min_active,))
+                cursor.execute(base_query, (min_active,))
                 # Stream results through cursor iterator
                 result = [row[0] for row in cursor if not has_emoji_chars(row[0])]
                 random.shuffle(result)
@@ -1755,7 +1758,7 @@ def fetch_domain_list(exclude_domains_sql, db_limit, db_offset, randomize=False)
                 # For ordered selection, use SQL LIMIT/OFFSET for efficiency
                 # Fetch extra rows to account for emoji filtering
                 fetch_limit = int(db_limit) + int(db_offset) + 100
-                query_with_limit = sql.SQL(base_query) + sql.SQL(" LIMIT %s")
+                query_with_limit = base_query + sql.SQL(" LIMIT %s")
                 cursor.execute(query_with_limit, (min_active, fetch_limit))
                 # Stream and filter, then apply offset/limit
                 all_domains = [row[0] for row in cursor if not has_emoji_chars(row[0])]
@@ -1819,14 +1822,13 @@ def import_domains(domains, use_tqdm=False):
         try:
             if domains:
                 values = [(domain.lower(), 0) for domain in domains]
-                args_str = ",".join(["(%s,%s)" for _ in values])
+                placeholders = sql.SQL(",").join([sql.SQL("(%s,%s)") for _ in values])
                 flattened_values = [item for sublist in values for item in sublist]
-                cursor.execute(
-                    "INSERT INTO raw_domains (domain, errors) VALUES "
-                    + args_str
-                    + " ON CONFLICT (domain) DO NOTHING",
-                    flattened_values,
-                )
+                query = sql.SQL(
+                    "INSERT INTO raw_domains (domain, errors) VALUES {} "
+                    "ON CONFLICT (domain) DO NOTHING"
+                ).format(placeholders)
+                cursor.execute(query, flattened_values)
                 conn.commit()
         except Exception as e:
             vmc_output(
@@ -2209,12 +2211,12 @@ def import_tlds(tlds: set[str]) -> int:
             if tlds:
                 # Use batch insert for efficiency
                 values: list[tuple[str]] = [(tld,) for tld in sorted(tlds)]
-                args_str = ",".join(["(%s)" for _ in values])
+                placeholders = sql.SQL(",").join([sql.SQL("(%s)") for _ in values])
                 flattened_values: list[str] = [item[0] for item in values]
-                _ = cursor.execute(
-                    "INSERT INTO tld_cache (tld) VALUES " + args_str,
-                    flattened_values,
+                query = sql.SQL("INSERT INTO tld_cache (tld) VALUES {}").format(
+                    placeholders
                 )
+                _ = cursor.execute(query, flattened_values)
                 inserted_count = cursor.rowcount
                 conn.commit()
                 return inserted_count
@@ -2275,16 +2277,15 @@ def import_dni_domains(domains: list[str], comment: str = "iftas") -> int:
                 values: list[tuple[str, str]] = [
                     (domain.lower(), comment) for domain in domains
                 ]
-                args_str = ",".join(["(%s, %s)" for _ in values])
+                placeholders = sql.SQL(",").join([sql.SQL("(%s, %s)") for _ in values])
                 flattened_values: list[str] = [
                     item for sublist in values for item in sublist
                 ]
-                _ = cursor.execute(
-                    "INSERT INTO dni (domain, comment) VALUES "
-                    + args_str
-                    + " ON CONFLICT (domain) DO NOTHING",
-                    flattened_values,
-                )
+                query = sql.SQL(
+                    "INSERT INTO dni (domain, comment) VALUES {} "
+                    "ON CONFLICT (domain) DO NOTHING"
+                ).format(placeholders)
+                _ = cursor.execute(query, flattened_values)
                 inserted_count = cursor.rowcount
                 vmc_output(f"Imported {inserted_count} new DNI domains", "green")
                 conn.commit()
