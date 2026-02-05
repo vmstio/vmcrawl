@@ -2082,6 +2082,10 @@ async def run_fetch_mode(args):
         alias_domains = get_alias_domains()
         nightly_version_ranges = get_nightly_version_ranges()
 
+        # Pre-compute suffix sets for efficient TLD filtering
+        bad_tld_suffixes_crawl = {f".{tld}" for tld in bad_tlds}
+        domain_ending_suffixes_crawl = {f".{ending}" for ending in domain_endings}
+
         # Use "0" as user_choice (new domains mode)
         await check_and_record_domains(
             unique_new_domains,
@@ -2092,8 +2096,8 @@ async def run_fetch_mode(args):
             "0",  # user_choice for new domains
             junk_domains,
             dni_domains,
-            bad_tlds,
-            domain_endings,
+            bad_tld_suffixes_crawl,
+            domain_ending_suffixes_crawl,
             nxdomain_domains,
             norobots_domains,
             noapi_domains,
@@ -2856,8 +2860,18 @@ def should_skip_domain(
     return False
 
 
-def is_junk_or_bad_tld(domain, junk_domains, dni_domains, bad_tlds, domain_endings):
-    """Check if a domain is junk or has a prohibited TLD."""
+def is_junk_or_bad_tld(
+    domain, junk_domains, dni_domains, bad_tld_suffixes, domain_ending_suffixes
+):
+    """Check if a domain is junk or has a prohibited TLD.
+
+    Args:
+        domain: Domain to check
+        junk_domains: Set of junk keywords to filter out
+        dni_domains: Set of DNI domains to filter out
+        bad_tld_suffixes: Pre-computed set of bad TLD suffixes (e.g., {".xyz", ".top"})
+        domain_ending_suffixes: Pre-computed set of valid TLD suffixes (e.g., {".com", ".org"})
+    """
     if any(junk in domain for junk in junk_domains):
         vmc_output(f"{domain}: Purging known junk domain", "cyan", use_tqdm=True)
         delete_domain_if_known(domain)
@@ -2868,15 +2882,13 @@ def is_junk_or_bad_tld(domain, junk_domains, dni_domains, bad_tlds, domain_endin
         delete_domain_if_known(domain)
         delete_domain_from_raw(domain)
         return True
-    if any(domain.endswith(f".{tld}") for tld in bad_tlds):
+    if any(domain.endswith(suffix) for suffix in bad_tld_suffixes):
         vmc_output(f"{domain}: Purging prohibited TLD", "cyan", use_tqdm=True)
         mark_nxdomain_domain(domain)
         delete_domain_if_known(domain)
         delete_domain_from_raw(domain)
         return True
-    if not any(
-        domain.endswith(f".{domain_ending}") for domain_ending in domain_endings
-    ):
+    if not any(domain.endswith(suffix) for suffix in domain_ending_suffixes):
         vmc_output(f"{domain}: Purging unknown TLD", "cyan", use_tqdm=True)
         mark_nxdomain_domain(domain)
         delete_domain_if_known(domain)
@@ -3721,8 +3733,8 @@ async def check_and_record_domains(
     user_choice,
     junk_domains,
     dni_domains,
-    bad_tlds,
-    domain_endings,
+    bad_tld_suffixes,
+    domain_ending_suffixes,
     nxdomain_domains,
     norobots_domains,
     noapi_domains,
@@ -3771,8 +3783,8 @@ async def check_and_record_domains(
                 domain,
                 junk_domains,
                 dni_domains,
-                bad_tlds,
-                domain_endings,
+                bad_tld_suffixes,
+                domain_ending_suffixes,
             ):
                 pbar.update(1)
                 return (domain, "junk")
@@ -5194,6 +5206,10 @@ async def async_main():
         alias_domains = get_alias_domains()
         nightly_version_ranges = get_nightly_version_ranges()
 
+        # Pre-compute suffix sets for efficient TLD filtering
+        bad_tld_suffixes = {f".{tld}" for tld in bad_tlds}
+        domain_ending_suffixes = {f".{ending}" for ending in domain_endings}
+
         await check_and_record_domains(
             domain_list,
             not_masto_domains,
@@ -5203,8 +5219,8 @@ async def async_main():
             user_choice,
             junk_domains,
             dni_domains,
-            bad_tlds,
-            domain_endings,
+            bad_tld_suffixes,
+            domain_ending_suffixes,
             nxdomain_domains,
             norobots_domains,
             noapi_domains,
