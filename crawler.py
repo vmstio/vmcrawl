@@ -1070,18 +1070,18 @@ def increment_domain_error(
 
                 # If domain is already marked with a terminal state, skip entirely
                 # This prevents unnecessary writes and flag overwrites
-                # Regardless of preserve flags, if domain is already in a terminal
-                # state, we should not increment errors or update the reason
-                if current_ignore:
-                    return  # Domain already marked as ignored
-                if current_nxdomain:
-                    return  # Domain already marked as NXDOMAIN
-                if current_failed:
-                    return  # Domain already marked as failed (auth required)
-                if current_norobots:
-                    return  # Domain already marked as norobots (crawling prohibited)
-                if current_noapi:
-                    return  # Domain already marked as noapi (API requires auth)
+                # Terminal states: ignore, nxdomain, failed, norobots, noapi, or non-Mastodon platform
+                if any(
+                    [
+                        current_ignore,
+                        current_nxdomain,
+                        current_failed,
+                        current_norobots,
+                        current_noapi,
+                        nodeinfo and nodeinfo != "mastodon",
+                    ]
+                ):
+                    return
             else:
                 # Row doesn't exist - set defaults
                 current_errors = 0
