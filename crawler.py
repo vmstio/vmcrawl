@@ -351,46 +351,6 @@ def _is_cache_valid(cache_file_path: str, max_age_seconds: int) -> bool:
 # =============================================================================
 
 
-def _is_alias_domain(domain: str, instance_uri: str, backend_domain: str) -> bool:
-    """Check if domain is an alias that should not be stored in the database.
-
-    The instance API's domain/uri field is the single source of truth for the
-    canonical domain. If domain != instance_uri, it's an alias only if instance_uri
-    matches backend_domain (i.e. we have independent confirmation the instance_uri
-    is reachable). If instance_uri is a third value we've never seen, we don't
-    silently alias — log a warning and treat as authoritative.
-
-    Args:
-        domain: The original domain being crawled
-        instance_uri: The canonical domain from the instance API (v2 domain / v1 uri)
-        backend_domain: The domain we actually reached (from nodeinfo URL or discovery)
-
-    Returns:
-        True if domain is a confirmed alias
-        False if domain is authoritative or the alias can't be confirmed
-
-    Note: All parameters are expected to be pre-normalized to lowercase by caller.
-    """
-
-    # Exact match with instance API — authoritative, not an alias
-    if domain == instance_uri:
-        return False
-
-    # instance_uri matches backend_domain — confirmed alias, the backend is reachable
-    if instance_uri == backend_domain:
-        return True
-
-    # instance_uri is a third value we haven't independently confirmed.
-    # Log a warning but don't mark as alias — too risky to set a terminal state
-    # on unverified information.
-    vmc_output(
-        f"{domain}: backend domain for {instance_uri}",
-        "white",
-        use_tqdm=True,
-    )
-    return False
-
-
 async def parse_json_with_fallback(
     response: httpx.Response,
     domain: str,
@@ -1048,7 +1008,7 @@ def increment_domain_error(
             # This avoids unnecessary writes for domains we won't process
             cursor.execute(
                 """
-                SELECT errors, reason, nodeinfo, ignore, nxdomain, failed, norobots, noapi, alias
+                SELECT errors, reason, nodeinfo, ignore, nxdomain, failed, norobots, noapi
                 FROM raw_domains WHERE domain = %s
                 """,
                 (domain,),
@@ -1064,7 +1024,6 @@ def increment_domain_error(
                 current_failed = result[5] or False
                 current_norobots = result[6] or False
                 current_noapi = result[7] or False
-                current_alias = result[8] or False
 
                 # If domain is already marked with a terminal state, skip entirely
                 # This prevents unnecessary writes and flag overwrites
@@ -1078,8 +1037,6 @@ def increment_domain_error(
                     return  # Domain already marked as norobots (crawling prohibited)
                 if current_noapi:
                     return  # Domain already marked as noapi (API requires auth)
-                if current_alias:
-                    return  # Domain already marked as alias (redirects to another instance)
             else:
                 # Row doesn't exist - set defaults
                 current_errors = 0
@@ -1126,8 +1083,8 @@ def increment_domain_error(
             cursor.execute(
                 """
                 INSERT INTO raw_domains
-                (domain, failed, ignore, errors, reason, nxdomain, norobots, noapi, alias)
-                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
+                (domain, failed, ignore, errors, reason, nxdomain, norobots, noapi)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
                 ON CONFLICT(domain) DO UPDATE SET
                     failed = EXCLUDED.failed,
                     ignore = EXCLUDED.ignore,
@@ -1135,8 +1092,7 @@ def increment_domain_error(
                     reason = EXCLUDED.reason,
                     nxdomain = EXCLUDED.nxdomain,
                     norobots = EXCLUDED.norobots,
-                    noapi = EXCLUDED.noapi,
-                    alias = EXCLUDED.alias
+                    noapi = EXCLUDED.noapi
                 """,
                 (
                     domain,
@@ -1145,7 +1101,6 @@ def increment_domain_error(
                     new_errors,
                     error_reason,
                     nxdomain_value,
-                    None,
                     None,
                     None,
                 ),
@@ -1170,8 +1125,8 @@ def clear_domain_error(domain: str) -> None:
             _ = cursor.execute(
                 """
                     INSERT INTO raw_domains
-                    (domain, failed, ignore, errors, reason, nxdomain, norobots, noapi, alias)
-                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
+                    (domain, failed, ignore, errors, reason, nxdomain, norobots, noapi)
+                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
                     ON CONFLICT(domain) DO UPDATE SET
                     failed = excluded.failed,
                     ignore = excluded.ignore,
@@ -1179,10 +1134,9 @@ def clear_domain_error(domain: str) -> None:
                     reason = excluded.reason,
                     nxdomain = excluded.nxdomain,
                     norobots = excluded.norobots,
-                    noapi = excluded.noapi,
-                    alias = excluded.alias
+                    noapi = excluded.noapi
                 """,
-                (domain, None, None, None, None, None, None, None, None),
+                (domain, None, None, None, None, None, None, None),
             )
             conn.commit()
         except Exception as exception:
@@ -1232,17 +1186,16 @@ def mark_domain_status(domain: str, status_type: str) -> None:
 
     Args:
         domain: The domain to mark
-        status_type: One of 'ignore', 'failed', 'nxdomain', 'norobots', 'noapi', 'alias'
+        status_type: One of 'ignore', 'failed', 'nxdomain', 'norobots', 'noapi'
 
     Note: Domain is expected to be pre-normalized to lowercase by caller.
     """
     status_map = {
-        "ignore": (None, True, None, None, None, None, None, None, None, "ignored"),
-        "failed": (True, None, None, None, None, None, None, None, None, "failed"),
-        "nxdomain": (None, None, None, None, True, None, None, None, None, "NXDOMAIN"),
-        "norobots": (None, None, None, None, None, True, None, None, None, "NoRobots"),
-        "noapi": (None, None, None, None, None, None, True, None, None, "NoAPI"),
-        "alias": (None, None, None, None, None, None, None, True, None, "alias"),
+        "ignore": (None, True, None, None, None, None, None, None, "ignored"),
+        "failed": (True, None, None, None, None, None, None, None, "failed"),
+        "nxdomain": (None, None, None, None, True, None, None, None, "NXDOMAIN"),
+        "norobots": (None, None, None, None, None, True, None, None, "NoRobots"),
+        "noapi": (None, None, None, None, None, None, True, None, "NoAPI"),
     }
 
     if status_type not in status_map:
@@ -1257,7 +1210,6 @@ def mark_domain_status(domain: str, status_type: str) -> None:
         nxdomain,
         norobots,
         noapi,
-        alias,
         nodeinfo,
         label,
     ) = status_map[status_type]
@@ -1268,8 +1220,8 @@ def mark_domain_status(domain: str, status_type: str) -> None:
                 """
                     INSERT INTO raw_domains
                     (domain, failed, ignore, errors, reason, nxdomain,
-                     norobots, noapi, alias, nodeinfo)
-                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                     norobots, noapi, nodeinfo)
+                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
                     ON CONFLICT(domain) DO UPDATE SET
                     failed = excluded.failed,
                     ignore = excluded.ignore,
@@ -1278,7 +1230,6 @@ def mark_domain_status(domain: str, status_type: str) -> None:
                     nxdomain = excluded.nxdomain,
                     norobots = excluded.norobots,
                     noapi = excluded.noapi,
-                    alias = excluded.alias,
                     nodeinfo = excluded.nodeinfo
                 """,
                 (
@@ -1290,7 +1241,6 @@ def mark_domain_status(domain: str, status_type: str) -> None:
                     nxdomain,
                     norobots,
                     noapi,
-                    alias,
                     nodeinfo,
                 ),
             )
@@ -1324,11 +1274,6 @@ def mark_norobots_domain(domain: str) -> None:
 def mark_noapi_domain(domain: str) -> None:
     """Mark a domain as noapi (instance API requires authentication)."""
     mark_domain_status(domain, "noapi")
-
-
-def mark_alias_domain(domain: str) -> None:
-    """Mark a domain as an alias (redirect to another instance)."""
-    mark_domain_status(domain, "alias")
 
 
 # =============================================================================
@@ -1572,7 +1517,7 @@ def get_domains_by_status(status_column):
     """Get list of domains filtered by status column.
 
     Args:
-        status_column: One of 'failed', 'ignore', 'baddata', 'nxdomain', 'norobots', 'noapi', 'alias'
+        status_column: One of 'failed', 'ignore', 'baddata', 'nxdomain', 'norobots', 'noapi'
 
     Returns:
         Set of domain strings
@@ -1584,7 +1529,6 @@ def get_domains_by_status(status_column):
         "nxdomain",
         "norobots",
         "noapi",
-        "alias",
     ]
     if status_column not in valid_columns:
         vmc_output(f"Invalid status column: {status_column}", "red")
@@ -1655,11 +1599,6 @@ def get_noapi_domains():
     return get_domains_by_status("noapi")
 
 
-def get_alias_domains():
-    """Get list of domains marked as aliases."""
-    return get_domains_by_status("alias")
-
-
 async def load_domain_filter_data():
     """Load all domain filter data in parallel for faster startup.
 
@@ -1677,7 +1616,6 @@ async def load_domain_filter_data():
         nxdomain_domains,
         norobots_domains,
         noapi_domains,
-        alias_domains,
         nightly_version_ranges,
     ) = await asyncio.gather(
         asyncio.to_thread(get_junk_keywords),
@@ -1690,7 +1628,6 @@ async def load_domain_filter_data():
         asyncio.to_thread(get_nxdomain_domains),
         asyncio.to_thread(get_norobots_domains),
         asyncio.to_thread(get_noapi_domains),
-        asyncio.to_thread(get_alias_domains),
         asyncio.to_thread(get_nightly_version_ranges),
     )
 
@@ -1705,7 +1642,6 @@ async def load_domain_filter_data():
         "nxdomain_domains": nxdomain_domains,
         "norobots_domains": norobots_domains,
         "noapi_domains": noapi_domains,
-        "alias_domains": alias_domains,
         "nightly_version_ranges": nightly_version_ranges,
     }
 
@@ -2173,7 +2109,6 @@ async def run_fetch_mode(args):
             filter_data["nxdomain_domains"],
             filter_data["norobots_domains"],
             filter_data["noapi_domains"],
-            filter_data["alias_domains"],
             filter_data["nightly_version_ranges"],
         )
 
@@ -2892,7 +2827,6 @@ def _should_skip_domain(
     nxdomain_domains,
     norobots_domains,
     noapi_domains,
-    alias_domains,
     user_choice,
 ):
     """Check if a domain should be skipped based on its status."""
@@ -2918,10 +2852,6 @@ def _should_skip_domain(
         return True
     if user_choice != "15" and domain in noapi_domains:
         vmc_output(f"{domain}: API Authentication Required", "cyan", use_tqdm=True)
-        delete_domain_if_known(domain)
-        return True
-    if user_choice != "16" and domain in alias_domains:
-        vmc_output(f"{domain}: Alias Domain", "cyan", use_tqdm=True)
         delete_domain_if_known(domain)
         return True
     if domain in baddata_domains:
@@ -3764,20 +3694,7 @@ async def process_domain(domain, nightly_version_ranges, user_choice=None):
             )
             return
 
-        # Check if this is an alias (redirect to another instance)
-        # instance_uri is from the API; backend_domain is where we actually reached
-        if _is_alias_domain(domain, instance_uri, backend_domain):
-            vmc_output(
-                f"{domain}: alias domain for {instance_uri}",
-                "cyan",
-                use_tqdm=True,
-            )
-            await asyncio.to_thread(mark_alias_domain, domain)
-            await asyncio.to_thread(delete_domain_if_known, domain)
-            return
-
         # Save software information from nodeinfo to database
-        # Only save for validated Mastodon instances that aren't aliases
         software_data = nodeinfo_20_result.get("software")
         if software_data and isinstance(software_data, dict):
             await asyncio.to_thread(save_nodeinfo_software, domain, software_data)
@@ -3821,7 +3738,6 @@ async def check_and_record_domains(
     nxdomain_domains,
     norobots_domains,
     noapi_domains,
-    alias_domains,
     nightly_version_ranges,
 ):
     """Process a list of domains concurrently with progress tracking.
@@ -3856,7 +3772,6 @@ async def check_and_record_domains(
                 nxdomain_domains,
                 norobots_domains,
                 noapi_domains,
-                alias_domains,
                 user_choice,
             ):
                 pbar.update(1)
@@ -4690,7 +4605,6 @@ def load_from_database(user_choice):
             "(norobots IS NULL OR norobots = FALSE) AND "
             "(noapi IS NULL OR noapi = FALSE) AND "
             "(baddata IS NULL OR baddata = FALSE) AND "
-            "(alias IS NULL OR alias = FALSE) AND "
             "(nodeinfo = 'mastodon' OR nodeinfo IS NULL) "
             "ORDER BY domain"
         ),
@@ -4710,7 +4624,6 @@ def load_from_database(user_choice):
         "13": "SELECT domain FROM raw_domains WHERE nxdomain = TRUE ORDER BY domain",
         "14": "SELECT domain FROM raw_domains WHERE norobots = TRUE ORDER BY domain",
         "15": "SELECT domain FROM raw_domains WHERE noapi = TRUE ORDER BY domain",
-        "16": "SELECT domain FROM raw_domains WHERE alias = TRUE ORDER BY domain",
         "20": (
             "SELECT domain FROM raw_domains WHERE reason LIKE 'SSL%' ORDER BY errors"
         ),
@@ -4861,7 +4774,6 @@ def get_menu_options() -> dict[str, dict[str, str]]:
             "13": "NXDOMAIN",
             "14": "Prohibited",
             "15": "NoAPI",
-            "16": "Alias",
         },
         "Retry connection errors": {
             "20": "SSL",
@@ -5334,7 +5246,6 @@ async def async_main():
                     filter_data["nxdomain_domains"],
                     filter_data["norobots_domains"],
                     filter_data["noapi_domains"],
-                    filter_data["alias_domains"],
                     filter_data["nightly_version_ranges"],
                 )
 

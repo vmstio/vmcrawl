@@ -416,7 +416,6 @@ async def get_crawler_health(_api_key: str | None = Depends(get_api_key)):
                 FROM raw_domains rd
                 WHERE rd.nodeinfo = 'mastodon'
                   AND rd.reason LIKE 'TCP%'
-                  AND alias IS NULL
                   AND EXISTS (
                     SELECT 1
                     FROM mastodon_domains md
@@ -522,7 +521,7 @@ async def get_crawler_health(_api_key: str | None = Depends(get_api_key)):
                 """
                 SELECT COUNT(DISTINCT domain) AS unique_domain_count
                 FROM raw_domains
-                WHERE nodeinfo = 'mastodon' AND reason LIKE 'MAU%' AND alias IS NULL
+                WHERE nodeinfo = 'mastodon' AND reason LIKE 'MAU%'
             """
             )
             result = cur.fetchone()
@@ -561,7 +560,7 @@ async def get_domain_stats(_api_key: str | None = Depends(get_api_key)):
                 """
                 SELECT COUNT(DISTINCT domain) AS unique_domain_count
                 FROM raw_domains
-                WHERE (ignore IS NOT NULL OR nxdomain IS NOT NULL OR failed IS NOT NULL OR alias IS NOT NULL)
+                WHERE (ignore IS NOT NULL OR nxdomain IS NOT NULL OR failed IS NOT NULL)
             """
             )
             result = cur.fetchone()
