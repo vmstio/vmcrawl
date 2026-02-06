@@ -1070,9 +1070,11 @@ def increment_domain_error(
 
                 # If domain is already marked with a terminal state, skip entirely
                 # This prevents unnecessary writes and flag overwrites
-                if not preserve_ignore and current_ignore:
+                # Regardless of preserve flags, if domain is already in a terminal
+                # state, we should not increment errors or update the reason
+                if current_ignore:
                     return  # Domain already marked as ignored
-                if not preserve_nxdomain and current_nxdomain:
+                if current_nxdomain:
                     return  # Domain already marked as NXDOMAIN
                 if current_failed:
                     return  # Domain already marked as failed (auth required)
@@ -1233,6 +1235,8 @@ def mark_domain_status(domain: str, status_type: str) -> None:
 
     Note: Domain is expected to be pre-normalized to lowercase by caller.
     """
+    # Clear errors and reason for ignore and nxdomain since these are terminal states
+    # that shouldn't retain error tracking information
     status_map = {
         "ignore": (None, True, None, None, None, None, None, None, "ignored"),
         "failed": (True, None, None, None, None, None, None, None, "failed"),
