@@ -3225,9 +3225,18 @@ def _sanitize_nodeinfo_url(url: str) -> str:
 
 
 async def check_nodeinfo(
-    domain, backend_domain, preserve_ignore=False, preserve_nxdomain=False
+    domain,
+    backend_domain,
+    preserve_ignore=False,
+    preserve_nxdomain=False,
+    suppress_errors=False,
 ):
-    """Check NodeInfo well-known endpoint for NodeInfo 2.0 URL."""
+    """Check NodeInfo well-known endpoint for NodeInfo 2.0 URL.
+
+    When suppress_errors is True, error handlers are not called, preventing
+    error accumulation during probe attempts (e.g., trying nodeinfo at the
+    original domain before backend discovery).
+    """
     target = "nodeinfo"
     url = f"https://{backend_domain}/.well-known/nodeinfo"
     try:
@@ -3235,30 +3244,32 @@ async def check_nodeinfo(
         if response.status_code == 200:
             content_type = response.headers.get("Content-Type", "")
             if "json" not in content_type:
-                await asyncio.to_thread(
-                    _handle_incorrect_file_type,
-                    domain,
-                    target,
-                    content_type,
-                    preserve_ignore,
-                )
-                return False
+                if not suppress_errors:
+                    await asyncio.to_thread(
+                        _handle_incorrect_file_type,
+                        domain,
+                        target,
+                        content_type,
+                        preserve_ignore,
+                    )
+                return None if suppress_errors else False
             if not response.content:
-                exception = "reply is empty"
-                await asyncio.to_thread(
-                    _handle_json_exception,
-                    domain,
-                    target,
-                    exception,
-                    preserve_ignore,
-                    preserve_nxdomain,
-                )
-                return False
+                if not suppress_errors:
+                    exception = "reply is empty"
+                    await asyncio.to_thread(
+                        _handle_json_exception,
+                        domain,
+                        target,
+                        exception,
+                        preserve_ignore,
+                        preserve_nxdomain,
+                    )
+                return None if suppress_errors else False
             data = await parse_json_with_fallback(
                 response, domain, target, preserve_ignore, preserve_nxdomain
             )
             if data is False:
-                return False
+                return None if suppress_errors else False
             if not isinstance(data, dict):
                 return None
 
@@ -3302,16 +3313,17 @@ async def check_nodeinfo(
                 links = [data]
 
             if links is not None and len(links) == 0:
-                exception = "empty links array in reply"
-                await asyncio.to_thread(
-                    _handle_json_exception,
-                    domain,
-                    target,
-                    exception,
-                    preserve_ignore,
-                    preserve_nxdomain,
-                )
-                return False
+                if not suppress_errors:
+                    exception = "empty links array in reply"
+                    await asyncio.to_thread(
+                        _handle_json_exception,
+                        domain,
+                        target,
+                        exception,
+                        preserve_ignore,
+                        preserve_nxdomain,
+                    )
+                return None if suppress_errors else False
             if links:
                 nodeinfo_20_url = None
                 for i, link in enumerate(links):
@@ -3344,7 +3356,41 @@ async def check_nodeinfo(
                     nodeinfo_20_url = _sanitize_nodeinfo_url(nodeinfo_20_url)
                     return {"nodeinfo_20_url": nodeinfo_20_url}
 
-            exception = "no links in reply"
+            if not suppress_errors:
+                exception = "no links in reply"
+                await asyncio.to_thread(
+                    _handle_json_exception,
+                    domain,
+                    target,
+                    exception,
+                    preserve_ignore,
+                    preserve_nxdomain,
+                )
+            return None if suppress_errors else False
+        if response.status_code in http_codes_to_hardfail:
+            await asyncio.to_thread(_handle_http_failed, domain, target, response)
+            return False
+        if not suppress_errors:
+            await asyncio.to_thread(
+                _handle_http_status_code,
+                domain,
+                target,
+                response,
+                preserve_ignore,
+                preserve_nxdomain,
+            )
+    except httpx.RequestError as exception:
+        if not suppress_errors:
+            await asyncio.to_thread(
+                _handle_tcp_exception,
+                domain,
+                target,
+                exception,
+                preserve_ignore,
+                preserve_nxdomain,
+            )
+    except json.JSONDecodeError as exception:
+        if not suppress_errors:
             await asyncio.to_thread(
                 _handle_json_exception,
                 domain,
@@ -3353,36 +3399,6 @@ async def check_nodeinfo(
                 preserve_ignore,
                 preserve_nxdomain,
             )
-            return False
-        if response.status_code in http_codes_to_hardfail:
-            await asyncio.to_thread(_handle_http_failed, domain, target, response)
-            return False
-        await asyncio.to_thread(
-            _handle_http_status_code,
-            domain,
-            target,
-            response,
-            preserve_ignore,
-            preserve_nxdomain,
-        )
-    except httpx.RequestError as exception:
-        await asyncio.to_thread(
-            _handle_tcp_exception,
-            domain,
-            target,
-            exception,
-            preserve_ignore,
-            preserve_nxdomain,
-        )
-    except json.JSONDecodeError as exception:
-        await asyncio.to_thread(
-            _handle_json_exception,
-            domain,
-            target,
-            exception,
-            preserve_ignore,
-            preserve_nxdomain,
-        )
     return None
 
 
@@ -3661,10 +3677,12 @@ async def process_domain(domain, nightly_version_ranges, user_choice=None):
     if not await check_robots_txt(domain, preserve_ignore, preserve_nxdomain):
         return
 
-    # Try nodeinfo at the original domain first
+    # Try nodeinfo at the original domain first (suppress errors since this is a
+    # probe - we'll try backend discovery next if this fails, and don't want to
+    # accumulate errors from the probe attempt)
     backend_domain = domain
     nodeinfo_result = await check_nodeinfo(
-        domain, domain, preserve_ignore, preserve_nxdomain
+        domain, domain, preserve_ignore, preserve_nxdomain, suppress_errors=True
     )
     if nodeinfo_result is False:
         return
