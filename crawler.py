@@ -320,7 +320,7 @@ def get_http_client() -> httpx.AsyncClient:
     global _http_client
     if _http_client is None:
         _http_client = httpx.AsyncClient(
-            http2=True,  # Enable HTTP/2 with ALPN negotiation
+            http2=False,
             follow_redirects=True,
             headers=http_custom_headers,
             timeout=http_timeout,
