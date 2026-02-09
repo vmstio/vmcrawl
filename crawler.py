@@ -64,8 +64,8 @@ except Exception as exception:
 toml_file_path = os.path.join(os.path.dirname(__file__), "pyproject.toml")
 try:
     project_info = toml.load(toml_file_path)
-    appname: str = project_info["project"]["name"]
-    appversion: str = project_info["project"]["version"]
+    appname: str = str(project_info["project"]["name"])
+    appversion: str = str(project_info["project"]["version"])
 except FileNotFoundError:
     print(f"Error: {toml_file_path} not found.")
     sys.exit(1)
@@ -451,7 +451,7 @@ async def get_httpx(url: str) -> httpx.Response:
             request=response.request,
         )
         # Directly set the content to bypass decompression
-        final_response._content = b"".join(chunks)
+        final_response._content = b"".join(chunks)  # pyright: ignore[reportPrivateUsage]
 
         return final_response
 
@@ -478,7 +478,7 @@ async def get_domain_endings() -> set[str]:
         # Database cache is stale or empty, fetch new data
         tlds = await fetch_tlds_from_iana()
         if tlds:
-            import_tlds(tlds)
+            _ = import_tlds(tlds)
             return tlds
 
     except Exception as e:
@@ -580,15 +580,14 @@ async def get_backport_mastodon_versions():
 
         for branch in backport_branches:
             if release_version.startswith(branch):
-                if backport_versions[branch] is None or (
-                    release_version
-                    and version.parse(release_version)
+                if not backport_versions[branch] or (
+                    version.parse(release_version)
                     > version.parse(backport_versions[branch] or "0.0.0")
                 ):
                     backport_versions[branch] = release_version
 
     for branch in backport_versions:
-        if backport_versions[branch] is None:
+        if not backport_versions[branch]:
             backport_versions[branch] = f"{branch}.0"
 
     return list(backport_versions.values())
@@ -779,11 +778,7 @@ def _clean_version_nightly(
             nightly_date += timedelta(days=1)
 
         for ver, start_date, end_date in nightly_version_ranges:
-            if (
-                start_date is not None
-                and end_date is not None
-                and start_date <= nightly_date <= end_date
-            ):
+            if end_date is not None and start_date <= nightly_date <= end_date:
                 return ver
 
     return version
@@ -880,7 +875,7 @@ def update_patch_versions():
     """Update the patch versions in the database."""
     with conn.cursor() as cur:
         n_level = -1
-        cur.execute(
+        _ = cur.execute(
             """
             INSERT INTO patch_versions (software_version, main, n_level, branch)
             VALUES (%s, %s, %s, %s)
@@ -898,7 +893,7 @@ def update_patch_versions():
         for n_level, (version, branch) in enumerate(
             zip(backport_releases, backport_branches),
         ):
-            cur.execute(
+            _ = cur.execute(
                 """
                 INSERT INTO patch_versions (software_version, release, n_level, branch)
                 VALUES (%s, %s, %s, %s)
@@ -915,7 +910,7 @@ def update_patch_versions():
 def delete_old_patch_versions():
     """Delete rows from patch_versions not in current patched versions list."""
     with conn.cursor() as cur:
-        cur.execute(
+        _ = cur.execute(
             """
             DELETE FROM patch_versions
             WHERE software_version != ALL(%s::text[])
@@ -1006,7 +1001,7 @@ def increment_domain_error(
         try:
             # First, check if domain exists and is in terminal state (read-only query)
             # This avoids unnecessary writes for domains we won't process
-            cursor.execute(
+            _ = cursor.execute(
                 """
                 SELECT errors, reason, nodeinfo, ignore, nxdomain, failed, norobots, noapi
                 FROM raw_domains WHERE domain = %s
@@ -1082,7 +1077,7 @@ def increment_domain_error(
                     new_errors = None
 
             # Single atomic upsert to update/insert the error record
-            cursor.execute(
+            _ = cursor.execute(
                 """
                 INSERT INTO raw_domains
                 (domain, failed, ignore, errors, reason, nxdomain, norobots, noapi)
@@ -1157,7 +1152,7 @@ def _save_matrix_nodeinfo(domain: str) -> None:
     """
     with db_pool.connection() as conn, conn.cursor() as cursor:
         try:
-            cursor.execute(
+            _ = cursor.execute(
                 """
                     INSERT INTO raw_domains (domain, nodeinfo, errors, reason)
                     VALUES (%s, %s, %s, %s)
@@ -1439,7 +1434,7 @@ def cleanup_old_domains():
     with db_pool.connection() as conn, conn.cursor() as cursor:
         try:
             # Try to acquire cleanup lock (non-blocking)
-            cursor.execute("SELECT pg_try_advisory_lock(%s)", (CLEANUP_LOCK_ID,))
+            _ = cursor.execute("SELECT pg_try_advisory_lock(%s)", (CLEANUP_LOCK_ID,))
             result = cursor.fetchone()
             lock_acquired = result[0] if result else False
 
@@ -1448,7 +1443,7 @@ def cleanup_old_domains():
                 return
 
             try:
-                cursor.execute(
+                _ = cursor.execute(
                     """
                         DELETE FROM mastodon_domains
                         WHERE timestamp <=
@@ -1467,7 +1462,7 @@ def cleanup_old_domains():
                 conn.commit()
             finally:
                 # Always release the cleanup lock
-                cursor.execute("SELECT pg_advisory_unlock(%s)", (CLEANUP_LOCK_ID,))
+                _ = cursor.execute("SELECT pg_advisory_unlock(%s)", (CLEANUP_LOCK_ID,))
         except Exception as exception:
             vmc_output(f"Failed to clean up old domains: {exception}", "red")
             conn.rollback()
@@ -1482,7 +1477,7 @@ def get_junk_keywords():
     """Get list of junk keywords to filter domains."""
     with db_pool.connection() as conn, conn.cursor() as cursor:
         try:
-            cursor.execute("SELECT keywords FROM junk_words")
+            _ = cursor.execute("SELECT keywords FROM junk_words")
             # Use set for O(1) lookup instead of O(n) list iteration
             return {row[0] for row in cursor}
         except Exception as exception:
@@ -1495,7 +1490,7 @@ def get_dni_domains():
     """Get list of DNI (Do Not Interact) domains to filter domains."""
     with db_pool.connection() as conn, conn.cursor() as cursor:
         try:
-            cursor.execute("SELECT domain FROM dni")
+            _ = cursor.execute("SELECT domain FROM dni")
             # Use set for O(1) lookup instead of O(n) list iteration
             return {row[0] for row in cursor}
         except Exception as exception:
@@ -1508,7 +1503,7 @@ def get_bad_tld():
     """Get list of prohibited TLDs."""
     with db_pool.connection() as conn, conn.cursor() as cursor:
         try:
-            cursor.execute("SELECT tld FROM bad_tld")
+            _ = cursor.execute("SELECT tld FROM bad_tld")
             # Use set for O(1) lookup
             return {row[0] for row in cursor}
         except Exception as exception:
@@ -1659,7 +1654,7 @@ def fetch_exclude_domains():
     """Fetch domains to exclude from peer fetching."""
     with db_pool.connection() as conn, conn.cursor() as cursor:
         try:
-            cursor.execute(
+            _ = cursor.execute(
                 "SELECT string_agg('''' || domain || '''', ',') FROM no_peers",
             )
             result = cursor.fetchone()
@@ -1688,20 +1683,20 @@ def fetch_domain_list(exclude_domains_sql, db_limit, db_offset, randomize=False)
                 # exclude_domains_sql is pre-formatted as 'domain1','domain2',... from string_agg
                 base_query = sql.SQL(
                     "SELECT domain FROM mastodon_domains "
-                    "WHERE active_users_monthly > %s "
-                    "AND domain NOT IN ({}) "
-                    "ORDER BY active_users_monthly DESC"
+                    + "WHERE active_users_monthly > %s "
+                    + "AND domain NOT IN ({}) "
+                    + "ORDER BY active_users_monthly DESC"
                 ).format(sql.SQL(exclude_domains_sql))
             else:
                 base_query = sql.SQL(
                     "SELECT domain FROM mastodon_domains "
-                    "WHERE active_users_monthly > %s "
-                    "ORDER BY active_users_monthly DESC"
+                    + "WHERE active_users_monthly > %s "
+                    + "ORDER BY active_users_monthly DESC"
                 )
 
             if randomize:
                 # For random selection, fetch all and shuffle in Python
-                cursor.execute(base_query, (min_active,))
+                _ = cursor.execute(base_query, (min_active,))
                 # Stream results through cursor iterator
                 result = [row[0] for row in cursor if not _has_emoji_chars(row[0])]
                 random.shuffle(result)
@@ -1712,7 +1707,7 @@ def fetch_domain_list(exclude_domains_sql, db_limit, db_offset, randomize=False)
                 # Fetch extra rows to account for emoji filtering
                 fetch_limit = int(db_limit) + int(db_offset) + 100
                 query_with_limit = base_query + sql.SQL(" LIMIT %s")
-                cursor.execute(query_with_limit, (min_active, fetch_limit))
+                _ = cursor.execute(query_with_limit, (min_active, fetch_limit))
                 # Stream and filter, then apply offset/limit
                 all_domains = [row[0] for row in cursor if not _has_emoji_chars(row[0])]
                 start = int(db_offset)
@@ -1734,7 +1729,7 @@ def get_existing_domains() -> set[str] | None:
     """
     with db_pool.connection() as conn, conn.cursor() as cursor:
         try:
-            cursor.execute("SELECT domain FROM raw_domains")
+            _ = cursor.execute("SELECT domain FROM raw_domains")
             # Build set directly from cursor iterator (memory efficient)
             existing_domains = {row[0] for row in cursor}
             conn.commit()
@@ -1749,9 +1744,9 @@ def add_to_no_peers(domain, use_tqdm=False):
     """Add a domain to the no_peers exclusion list."""
     with db_pool.connection() as conn, conn.cursor() as cursor:
         try:
-            cursor.execute(
+            _ = cursor.execute(
                 "INSERT INTO no_peers (domain) VALUES (%s) "
-                "ON CONFLICT (domain) DO NOTHING",
+                + "ON CONFLICT (domain) DO NOTHING",
                 (domain,),
             )
             if cursor.rowcount > 0:
@@ -1779,9 +1774,9 @@ def import_domains(domains, use_tqdm=False):
                 flattened_values = [item for sublist in values for item in sublist]
                 query = sql.SQL(
                     "INSERT INTO raw_domains (domain, errors) VALUES {} "
-                    "ON CONFLICT (domain) DO NOTHING"
+                    + "ON CONFLICT (domain) DO NOTHING"
                 ).format(placeholders)
-                cursor.execute(query, flattened_values)
+                _ = cursor.execute(query, flattened_values)
                 conn.commit()
         except Exception as e:
             vmc_output(
@@ -1803,7 +1798,7 @@ def _is_valid_fetch_domain(domain):
 def _is_ip_address(domain):
     """Check if a string is an IP address."""
     try:
-        ipaddress.ip_address(domain)
+        _ = ipaddress.ip_address(domain)
         return True
     except ValueError:
         return False
@@ -2043,12 +2038,12 @@ async def run_fetch_mode(args):
 
                 # Write the status line after completion
                 tqdm.write(f"{domain_name}: {status}")
-                pbar.update(1)
+                _ = pbar.update(1)
                 return result
             except Exception as e:
                 if not shutdown_event.is_set():
                     tqdm.write(f"{domain}: {colors['red']}Error: {e}{colors['reset']}")
-                pbar.update(1)
+                _ = pbar.update(1)
                 return (domain, [], None)
 
     try:
@@ -2058,13 +2053,13 @@ async def run_fetch_mode(args):
         ]
 
         try:
-            await asyncio.gather(*tasks, return_exceptions=True)
+            _ = await asyncio.gather(*tasks, return_exceptions=True)
         except asyncio.CancelledError:
             shutdown_event.set()
             pbar.close()
             vmc_output(f"\n{appname} interrupted by user", "red")
             for task in tasks:
-                task.cancel()
+                _ = task.cancel()
             return
     except KeyboardInterrupt:
         shutdown_event.set()
@@ -2235,7 +2230,7 @@ def import_dni_domains(domains: list[str], comment: str = "iftas") -> int:
                 ]
                 query = sql.SQL(
                     "INSERT INTO dni (domain, comment) VALUES {} "
-                    "ON CONFLICT (domain) DO NOTHING"
+                    + "ON CONFLICT (domain) DO NOTHING"
                 ).format(placeholders)
                 _ = cursor.execute(query, flattened_values)
                 inserted_count = cursor.rowcount
@@ -2322,8 +2317,8 @@ def _parse_dni_csv(csv_content: str) -> list[str]:
         # Check if #domain column exists
         if not reader.fieldnames or "#domain" not in reader.fieldnames:
             vmc_output(
-                f"CSV header '#domain' not found. "
-                f"Available headers: {reader.fieldnames}",
+                "CSV header '#domain' not found. "
+                + f"Available headers: {reader.fieldnames}",
                 "red",
             )
             return []
@@ -2398,7 +2393,7 @@ def display_nightly_versions():
     """Display all current nightly version entries."""
     try:
         with db_pool.connection() as conn, conn.cursor() as cur:
-            cur.execute(
+            _ = cur.execute(
                 """
                     SELECT version, start_date, end_date
                     FROM nightly_versions
@@ -2432,7 +2427,7 @@ def get_active_nightly_version():
     """Get the currently active nightly version (end_date = 2099-12-31)."""
     try:
         with db_pool.connection() as conn, conn.cursor() as cur:
-            cur.execute(
+            _ = cur.execute(
                 """
                     SELECT version, start_date, end_date
                     FROM nightly_versions
@@ -2477,7 +2472,7 @@ def add_nightly_version(
 
         # Check if version already exists
         with db_pool.connection() as conn, conn.cursor() as cur:
-            cur.execute(
+            _ = cur.execute(
                 """
                     SELECT version FROM nightly_versions WHERE version = %s
                 """,
@@ -2506,7 +2501,7 @@ def add_nightly_version(
                 vmc_output(f"  New end date: {new_end_date}", "cyan")
 
                 with db_pool.connection() as conn, conn.cursor() as cur:
-                    cur.execute(
+                    _ = cur.execute(
                         """
                             UPDATE nightly_versions
                             SET end_date = %s
@@ -2520,7 +2515,7 @@ def add_nightly_version(
 
         # Insert new version
         with db_pool.connection() as conn, conn.cursor() as cur:
-            cur.execute(
+            _ = cur.execute(
                 """
                     INSERT INTO nightly_versions (version, start_date, end_date)
                     VALUES (%s, %s, %s)
@@ -2549,7 +2544,7 @@ def update_nightly_end_date(nightly_version, new_end_date):
             return False
 
         with db_pool.connection() as conn, conn.cursor() as cur:
-            cur.execute(
+            _ = cur.execute(
                 """
                     UPDATE nightly_versions
                     SET end_date = %s
@@ -2575,7 +2570,7 @@ def update_nightly_end_date(nightly_version, new_end_date):
 def _validate_nightly_date(date_string):
     """Validate date format (YYYY-MM-DD)."""
     try:
-        datetime.strptime(date_string, "%Y-%m-%d")
+        _ = datetime.strptime(date_string, "%Y-%m-%d")
         return True
     except ValueError:
         return False
@@ -2642,7 +2637,7 @@ def run_nightly_mode(args):
     # Update end date
     if args.update_end_date:
         nightly_version, end_date = args.update_end_date
-        update_nightly_end_date(nightly_version, end_date)
+        _ = update_nightly_end_date(nightly_version, end_date)
         return
 
     # Add version (command line)
@@ -3800,7 +3795,7 @@ async def check_and_record_domains(
                 noapi_domains,
                 user_choice,
             ):
-                pbar.update(1)
+                _ = pbar.update(1)
                 return (domain, "skipped")
 
             if _is_junk_or_bad_tld(
@@ -3810,15 +3805,15 @@ async def check_and_record_domains(
                 bad_tld_suffixes,
                 domain_ending_suffixes,
             ):
-                pbar.update(1)
+                _ = pbar.update(1)
                 return (domain, "junk")
 
             try:
                 await process_domain(domain, nightly_version_ranges, user_choice)
-                pbar.update(1)
+                _ = pbar.update(1)
                 return (domain, "success")
             except httpx.CloseError:
-                pbar.update(1)
+                _ = pbar.update(1)
                 return (domain, "closed")
             except Exception as exception:
                 if not shutdown_event.is_set():
@@ -3828,7 +3823,7 @@ async def check_and_record_domains(
                     _handle_tcp_exception(
                         domain, target, exception, preserve_ignore, preserve_nxdomain
                     )
-                pbar.update(1)
+                _ = pbar.update(1)
                 return (domain, "error")
 
     try:
@@ -3855,7 +3850,7 @@ async def check_and_record_domains(
             vmc_output(f"\n{appname} interrupted by user", "red")
             # Cancel all pending tasks
             for task in tasks:
-                task.cancel()
+                _ = task.cancel()
             return
     except KeyboardInterrupt:
         shutdown_event.set()
@@ -3876,7 +3871,7 @@ def get_mastodon_domains():
     cursor = conn.cursor()
     value_to_return = 0
     try:
-        cursor.execute("SELECT COUNT(domain) AS domains FROM mastodon_domains;")
+        _ = cursor.execute("SELECT COUNT(domain) AS domains FROM mastodon_domains;")
         result = cursor.fetchone()
         value_to_return = result[0] if result is not None else 0
         conn.commit()
@@ -3893,9 +3888,9 @@ def get_unique_versions():
     cursor = conn.cursor()
     value_to_return = 0
     try:
-        cursor.execute(
+        _ = cursor.execute(
             "SELECT COUNT(DISTINCT software_version) "
-            "AS unique_software_versions FROM mastodon_domains;",
+            + "AS unique_software_versions FROM mastodon_domains;",
         )
         result = cursor.fetchone()
         value_to_return = result[0] if result is not None else 0
@@ -3918,7 +3913,9 @@ def get_mau():
     cursor = conn.cursor()
     value_to_return = 0
     try:
-        cursor.execute("SELECT SUM(active_users_monthly) AS mau FROM mastodon_domains;")
+        _ = cursor.execute(
+            "SELECT SUM(active_users_monthly) AS mau FROM mastodon_domains;"
+        )
         result = cursor.fetchone()
         value_to_return = result[0] if result is not None else 0
         conn.commit()
@@ -3940,7 +3937,7 @@ def get_main_branch_instances():
     cursor = conn.cursor()
     value_to_return = 0
     try:
-        cursor.execute(
+        _ = cursor.execute(
             """
             SELECT COUNT(DISTINCT domain) as "Main Total"
             FROM mastodon_domains
@@ -3967,7 +3964,7 @@ def get_latest_branch_instances():
     cursor = conn.cursor()
     value_to_return = 0
     try:
-        cursor.execute(
+        _ = cursor.execute(
             """
             SELECT COUNT(DISTINCT domain) as "Latest Total"
             FROM mastodon_domains
@@ -3994,7 +3991,7 @@ def get_previous_branch_instances():
     cursor = conn.cursor()
     value_to_return = 0
     try:
-        cursor.execute(
+        _ = cursor.execute(
             """
             SELECT COUNT(DISTINCT domain) as "Latest Total"
             FROM mastodon_domains
@@ -4021,7 +4018,7 @@ def get_deprecated_branch_instances():
     cursor = conn.cursor()
     value_to_return = 0
     try:
-        cursor.execute(
+        _ = cursor.execute(
             """
             SELECT COUNT(DISTINCT domain) as "Latest Total"
             FROM mastodon_domains
@@ -4050,7 +4047,7 @@ def get_eol_branch_instances():
     cursor = conn.cursor()
     value_to_return = 0
     try:
-        cursor.execute(
+        _ = cursor.execute(
             """
             SELECT COUNT(DISTINCT mastodon_domains.domain) as "Latest Total"
             FROM mastodon_domains
@@ -4083,7 +4080,7 @@ def get_main_patched_instances():
     cursor = conn.cursor()
     value_to_return = 0
     try:
-        cursor.execute(
+        _ = cursor.execute(
             """
             SELECT COUNT(DISTINCT domain) as "Main Patched"
             FROM mastodon_domains
@@ -4110,7 +4107,7 @@ def get_latest_patched_instances():
     cursor = conn.cursor()
     value_to_return = 0
     try:
-        cursor.execute(
+        _ = cursor.execute(
             """
             SELECT COUNT(DISTINCT domain) as "Latest Patched"
             FROM mastodon_domains
@@ -4137,7 +4134,7 @@ def get_previous_patched_instances():
     cursor = conn.cursor()
     value_to_return = 0
     try:
-        cursor.execute(
+        _ = cursor.execute(
             """
             SELECT COUNT(DISTINCT domain) as "Previous Patched"
             FROM mastodon_domains
@@ -4164,7 +4161,7 @@ def get_deprecated_patched_instances():
     cursor = conn.cursor()
     value_to_return = 0
     try:
-        cursor.execute(
+        _ = cursor.execute(
             """
             SELECT COUNT(DISTINCT domain) as "Deprecated Patched"
             FROM mastodon_domains
@@ -4198,7 +4195,7 @@ def get_main_branch_mau():
     cursor = conn.cursor()
     value_to_return = 0
     try:
-        cursor.execute(
+        _ = cursor.execute(
             """
             SELECT SUM(active_users_monthly) as "Main Total"
             FROM mastodon_domains
@@ -4225,7 +4222,7 @@ def get_latest_branch_mau():
     cursor = conn.cursor()
     value_to_return = 0
     try:
-        cursor.execute(
+        _ = cursor.execute(
             """
             SELECT SUM(active_users_monthly) as "Latest Total"
             FROM mastodon_domains
@@ -4252,7 +4249,7 @@ def get_previous_branch_mau():
     cursor = conn.cursor()
     value_to_return = 0
     try:
-        cursor.execute(
+        _ = cursor.execute(
             """
             SELECT SUM(active_users_monthly) as "Latest Total"
             FROM mastodon_domains
@@ -4279,7 +4276,7 @@ def get_deprecated_branch_mau():
     cursor = conn.cursor()
     value_to_return = 0
     try:
-        cursor.execute(
+        _ = cursor.execute(
             """
             SELECT SUM(active_users_monthly) as "Latest Total"
             FROM mastodon_domains
@@ -4308,7 +4305,7 @@ def get_eol_branch_mau():
     cursor = conn.cursor()
     value_to_return = 0
     try:
-        cursor.execute(
+        _ = cursor.execute(
             """
             SELECT SUM(mastodon_domains.active_users_monthly) as "Latest Total"
             FROM mastodon_domains
@@ -4341,7 +4338,7 @@ def get_main_patched_mau():
     cursor = conn.cursor()
     value_to_return = 0
     try:
-        cursor.execute(
+        _ = cursor.execute(
             """
             SELECT SUM(active_users_monthly) as "Main Patched"
             FROM mastodon_domains
@@ -4368,7 +4365,7 @@ def get_latest_patched_mau():
     cursor = conn.cursor()
     value_to_return = 0
     try:
-        cursor.execute(
+        _ = cursor.execute(
             """
             SELECT SUM(active_users_monthly) as "Latest Patched"
             FROM mastodon_domains
@@ -4395,7 +4392,7 @@ def get_previous_patched_mau():
     cursor = conn.cursor()
     value_to_return = 0
     try:
-        cursor.execute(
+        _ = cursor.execute(
             """
             SELECT SUM(active_users_monthly) as "Previous Patched"
             FROM mastodon_domains
@@ -4422,7 +4419,7 @@ def get_deprecated_patched_mau():
     cursor = conn.cursor()
     value_to_return = 0
     try:
-        cursor.execute(
+        _ = cursor.execute(
             """
             SELECT SUM(active_users_monthly) as "Deprecated Patched"
             FROM mastodon_domains
@@ -4564,7 +4561,7 @@ def write_statistics_to_database(stats_values):
     """Write collected statistics to the database."""
     with db_pool.connection() as conn, conn.cursor() as cursor:
         try:
-            cursor.execute(
+            _ = cursor.execute(
                 """
         INSERT INTO statistics (
         date, mau, unique_versions, main_instances,
@@ -4763,7 +4760,7 @@ def load_from_file(file_name):
                 continue
 
             domain_list.append(domain)
-            cursor.execute(
+            _ = cursor.execute(
                 "SELECT COUNT(*) FROM raw_domains WHERE domain = %s",
                 (domain,),
             )
@@ -4771,7 +4768,7 @@ def load_from_file(file_name):
             exists = result is not None and result[0] > 0
 
             if not exists:
-                cursor.execute(
+                _ = cursor.execute(
                     "INSERT INTO raw_domains (domain, errors) VALUES (%s, %s)",
                     (domain, None),
                 )
@@ -4833,7 +4830,7 @@ def print_menu(menu_options: dict[str, dict[str, str]] | None = None) -> None:
         vmc_output(f"{category}: ", "cyan", end="")
         vmc_output(options_str, "")
     vmc_output("Enter your choice (1, 2, 3, etc):", "bold", end=" ")
-    sys.stdout.flush()
+    _ = sys.stdout.flush()
 
 
 def interactive_select_menu(menu_options: dict[str, dict[str, str]]) -> str | None:
@@ -4858,7 +4855,7 @@ def interactive_select_menu(menu_options: dict[str, dict[str, str]]) -> str | No
         return None
 
     def _menu(stdscr):
-        curses.curs_set(0)
+        _ = curses.curs_set(0)
         stdscr.nodelay(False)
         stdscr.keypad(True)
         selected_row_idx = selectable_indices[0]
@@ -4980,7 +4977,7 @@ async def async_main():
     fetch_parser = subparsers.add_parser(
         "fetch", help="Fetch peer data from Mastodon instances to discover new domains"
     )
-    fetch_parser.add_argument(
+    _ = fetch_parser.add_argument(
         "-l",
         "--limit",
         type=int,
@@ -4989,7 +4986,7 @@ async def async_main():
             f"(default: {int(os.getenv('VMCRAWL_FETCH_LIMIT', '10'))})"
         ),
     )
-    fetch_parser.add_argument(
+    _ = fetch_parser.add_argument(
         "-o",
         "--offset",
         type=int,
@@ -4998,13 +4995,13 @@ async def async_main():
             f"(default: {int(os.getenv('VMCRAWL_FETCH_OFFSET', '0'))})"
         ),
     )
-    fetch_parser.add_argument(
+    _ = fetch_parser.add_argument(
         "-r",
         "--random",
         action="store_true",
         help="randomize the order of the domains returned (default: disabled)",
     )
-    fetch_parser.add_argument(
+    _ = fetch_parser.add_argument(
         "-t",
         "--target",
         type=str,
@@ -5015,19 +5012,19 @@ async def async_main():
     crawl_parser = subparsers.add_parser(
         "crawl", help="Crawl version information from Mastodon instances (default)"
     )
-    crawl_parser.add_argument(
+    _ = crawl_parser.add_argument(
         "-f",
         "--file",
         type=str,
         help="bypass database and use a file instead (ex: ~/domains.txt)",
     )
-    crawl_parser.add_argument(
+    _ = crawl_parser.add_argument(
         "-r",
         "--new",
         action="store_true",
         help="only process new domains added to the database (same as menu item 0)",
     )
-    crawl_parser.add_argument(
+    _ = crawl_parser.add_argument(
         "-t",
         "--target",
         type=str,
@@ -5038,19 +5035,19 @@ async def async_main():
     dni_parser = subparsers.add_parser(
         "dni", help="Fetch and manage IFTAS DNI (Do Not Interact) list"
     )
-    dni_parser.add_argument(
+    _ = dni_parser.add_argument(
         "-l",
         "--list",
         action="store_true",
         help="List all domains currently in the DNI table",
     )
-    dni_parser.add_argument(
+    _ = dni_parser.add_argument(
         "-c",
         "--count",
         action="store_true",
         help="Show count of domains in the DNI table",
     )
-    dni_parser.add_argument(
+    _ = dni_parser.add_argument(
         "-u",
         "--url",
         type=str,
@@ -5062,43 +5059,43 @@ async def async_main():
     nightly_parser = subparsers.add_parser(
         "nightly", help="Manage nightly version entries in the database"
     )
-    nightly_parser.add_argument(
+    _ = nightly_parser.add_argument(
         "-l",
         "--list",
         action="store_true",
         help="List all nightly versions",
     )
-    nightly_parser.add_argument(
+    _ = nightly_parser.add_argument(
         "-a",
         "--add",
         action="store_true",
         help="Add a new nightly version (interactive)",
     )
-    nightly_parser.add_argument(
+    _ = nightly_parser.add_argument(
         "-v",
         "--version",
         type=str,
         help="Version string (e.g., 4.9.0-alpha.7)",
     )
-    nightly_parser.add_argument(
+    _ = nightly_parser.add_argument(
         "-s",
         "--start-date",
         type=str,
         help="Start date in YYYY-MM-DD format",
     )
-    nightly_parser.add_argument(
+    _ = nightly_parser.add_argument(
         "-e",
         "--end-date",
         type=str,
         default="2099-12-31",
         help="End date in YYYY-MM-DD format (default: 2099-12-31)",
     )
-    nightly_parser.add_argument(
+    _ = nightly_parser.add_argument(
         "--no-auto-update",
         action="store_true",
         help="Don't automatically update the previous active version's end date",
     )
-    nightly_parser.add_argument(
+    _ = nightly_parser.add_argument(
         "--update-end-date",
         nargs=2,
         metavar=("VERSION", "END_DATE"),
@@ -5106,19 +5103,19 @@ async def async_main():
     )
 
     # Also add crawl arguments to main parser for backwards compatibility
-    parser.add_argument(
+    _ = parser.add_argument(
         "-f",
         "--file",
         type=str,
         help="bypass database and use a file instead (ex: ~/domains.txt)",
     )
-    parser.add_argument(
+    _ = parser.add_argument(
         "-r",
         "--new",
         action="store_true",
         help="only process new domains added to the database (same as menu item 0)",
     )
-    parser.add_argument(
+    _ = parser.add_argument(
         "-t",
         "--target",
         type=str,
@@ -5141,7 +5138,7 @@ async def async_main():
             db_pool.close(timeout=5)
         except Exception:
             pass
-        gc.collect()
+        _ = gc.collect()
 
     # Initialize version information once at startup (outside loop)
     await initialize_versions()
@@ -5237,7 +5234,7 @@ async def async_main():
                         domain_list = load_from_database(user_choice)
 
                     if user_choice == "2":
-                        domain_list.reverse()
+                        _ = domain_list.reverse()
                     elif user_choice == "3":
                         random.shuffle(domain_list)
 
