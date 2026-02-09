@@ -10,7 +10,6 @@ try:
     import asyncio
     import atexit
     import csv
-    import functools
     import gc
     import hashlib
     import ipaddress
@@ -24,13 +23,13 @@ try:
     import sys
     import threading
     import time
-    import unicodedata
     from datetime import datetime, timedelta
     from io import StringIO
     from typing import Any
     from urllib.parse import urlparse
 
     import httpx
+    import idna.core
     import psycopg
     import toml
     from cachetools import TTLCache
@@ -42,6 +41,26 @@ try:
 except ImportError as exception:
     print(f"Error importing module: {exception}")
     sys.exit(1)
+
+# =============================================================================
+# IDNA EMOJI DOMAIN SUPPORT
+# =============================================================================
+# The idna library (IDNA2008) rejects emoji codepoints, which prevents httpx
+# from connecting to emoji domains (e.g. 🍕.ws / xn--vi8h.ws). Patch
+# check_label to allow InvalidCodepoint errors through while preserving all
+# other IDNA validation.
+
+_original_idna_check_label = idna.core.check_label
+
+
+def _permissive_idna_check_label(label: str | bytes | bytearray) -> None:
+    try:
+        _original_idna_check_label(label)
+    except idna.core.InvalidCodepoint:
+        pass
+
+
+idna.core.check_label = _permissive_idna_check_label
 
 # =============================================================================
 # ENVIRONMENT AND CONFIGURATION
@@ -119,7 +138,7 @@ RE_VERSION_MALFORMED_PRERELEASE = re.compile(r"(alpha|beta|rc)\d*$")
 RE_VERSION_TRAILING_SUFFIX = re.compile(r"^(\d+\.\d+\.\d+)[a-zA-Z][a-zA-Z0-9]*$")
 
 # Pre-compiled regex patterns for domain validation (high frequency in fetch loops)
-RE_DOMAIN_FORMAT = re.compile(r"^[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$", re.IGNORECASE)
+RE_DOMAIN_FORMAT = re.compile(r"^[^\s/:@]+\.[^\s/:@]{2,}$")
 RE_VOWEL_PATTERN = re.compile(r"\.[aeiou]{4}")
 
 # Pre-compiled regex patterns for URL and error handling
@@ -387,29 +406,6 @@ async def parse_json_with_fallback(
                 preserve_nxdomain,
             )
             return False
-
-
-@functools.lru_cache(maxsize=65536)
-def _has_emoji_chars(domain: str) -> bool:
-    """Check if a domain contains emoji or invalid characters.
-
-    Results are cached using LRU cache to avoid repeated computation
-    for the same domains during filtering operations.
-    """
-    if domain.startswith("xn--"):
-        try:
-            domain = domain.encode("ascii").decode("idna")
-        except Exception:
-            return True
-    try:
-        for char in domain:
-            if unicodedata.category(char) in ["So", "Cf"] or ord(char) >= 0x1F300:
-                return True
-            if not (char.isalnum() or char in "-_."):
-                return True
-    except Exception:
-        return True
-    return False
 
 
 # =============================================================================
@@ -1698,18 +1694,16 @@ def fetch_domain_list(exclude_domains_sql, db_limit, db_offset, randomize=False)
                 # For random selection, fetch all and shuffle in Python
                 _ = cursor.execute(base_query, (min_active,))
                 # Stream results through cursor iterator
-                result = [row[0] for row in cursor if not _has_emoji_chars(row[0])]
+                result = [row[0] for row in cursor]
                 random.shuffle(result)
                 # Apply limit after shuffle
                 result = result[: int(db_limit)]
             else:
                 # For ordered selection, use SQL LIMIT/OFFSET for efficiency
-                # Fetch extra rows to account for emoji filtering
-                fetch_limit = int(db_limit) + int(db_offset) + 100
+                fetch_limit = int(db_limit) + int(db_offset)
                 query_with_limit = base_query + sql.SQL(" LIMIT %s")
                 _ = cursor.execute(query_with_limit, (min_active, fetch_limit))
-                # Stream and filter, then apply offset/limit
-                all_domains = [row[0] for row in cursor if not _has_emoji_chars(row[0])]
+                all_domains = [row[0] for row in cursor]
                 start = int(db_offset)
                 end = start + int(db_limit)
                 result = all_domains[start:end]
@@ -1789,7 +1783,7 @@ def import_domains(domains, use_tqdm=False):
 def _is_valid_fetch_domain(domain):
     """Check if a domain string is valid for fetching."""
     return (
-        (RE_DOMAIN_FORMAT.match(domain) or "xn--" in domain)
+        RE_DOMAIN_FORMAT.match(domain)
         and not _is_ip_address(domain)
         and not _detect_vowels(domain)
     )
@@ -1844,10 +1838,6 @@ async def fetch_peer_domains(
         for item in data:
             # Skip invalid domains early (most common rejection)
             if not item.islower() or not _is_valid_fetch_domain(item):
-                continue
-
-            # Check for emoji characters
-            if _has_emoji_chars(item):
                 continue
 
             # Check against junk keywords (substring match required)
@@ -1928,7 +1918,7 @@ async def process_fetch_domain(
     domains, error_type = await fetch_peer_domains(
         api_url, domain, domain_ending_suffixes, keywords, dni, bad_tld_suffixes
     )
-    unique_domains = [d for d in domains if d not in existing_domains and d.isascii()]
+    unique_domains = [d for d in domains if d not in existing_domains]
 
     if unique_domains:
         status = f"{colors['green']}{len(unique_domains)} new{colors['reset']}"
@@ -4733,9 +4723,7 @@ def load_from_database(user_choice):
             else:
                 _ = cursor.execute(query)  # pyright: ignore[reportCallIssue,reportArgumentType]
             domain_list = [
-                row[0].strip()
-                for row in cursor
-                if row[0] and row[0].strip() and not _has_emoji_chars(row[0])
+                row[0].strip() for row in cursor if row[0] and row[0].strip()
             ]
             conn.commit()
         except Exception as exception:
@@ -4756,7 +4744,7 @@ def load_from_file(file_name):
     ):
         for line in file:
             domain = line.strip().lower()
-            if not domain or _has_emoji_chars(domain):
+            if not domain:
                 continue
 
             domain_list.append(domain)
