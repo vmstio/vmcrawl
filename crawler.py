@@ -3306,35 +3306,38 @@ async def check_nodeinfo(
         if response.status_code in http_codes_to_hardfail:
             await asyncio.to_thread(_handle_http_failed, domain, target, response)
             return False
-        if not suppress_errors:
-            await asyncio.to_thread(
-                _handle_http_status_code,
-                domain,
-                target,
-                response,
-                preserve_ignore,
-                preserve_nxdomain,
-            )
+        if suppress_errors:
+            return {"suppressed_error": response, "suppressed_error_type": "http"}
+        await asyncio.to_thread(
+            _handle_http_status_code,
+            domain,
+            target,
+            response,
+            preserve_ignore,
+            preserve_nxdomain,
+        )
     except httpx.RequestError as exception:
-        if not suppress_errors:
-            await asyncio.to_thread(
-                _handle_tcp_exception,
-                domain,
-                target,
-                exception,
-                preserve_ignore,
-                preserve_nxdomain,
-            )
+        if suppress_errors:
+            return {"suppressed_error": exception, "suppressed_error_type": "tcp"}
+        await asyncio.to_thread(
+            _handle_tcp_exception,
+            domain,
+            target,
+            exception,
+            preserve_ignore,
+            preserve_nxdomain,
+        )
     except json.JSONDecodeError as exception:
-        if not suppress_errors:
-            await asyncio.to_thread(
-                _handle_json_exception,
-                domain,
-                target,
-                exception,
-                preserve_ignore,
-                preserve_nxdomain,
-            )
+        if suppress_errors:
+            return {"suppressed_error": exception, "suppressed_error_type": "json"}
+        await asyncio.to_thread(
+            _handle_json_exception,
+            domain,
+            target,
+            exception,
+            preserve_ignore,
+            preserve_nxdomain,
+        )
     return None
 
 
@@ -3617,11 +3620,17 @@ async def process_domain(domain, nightly_version_ranges, user_choice=None):
     # probe - we'll try backend discovery next if this fails, and don't want to
     # accumulate errors from the probe attempt)
     backend_domain = domain
+    nodeinfo_probe_error = None
     nodeinfo_result = await check_nodeinfo(
         domain, domain, preserve_ignore, preserve_nxdomain, suppress_errors=True
     )
     if nodeinfo_result is False:
         return
+
+    # Capture suppressed error from the probe for use if backend discovery also fails
+    if isinstance(nodeinfo_result, dict) and "suppressed_error" in nodeinfo_result:
+        nodeinfo_probe_error = nodeinfo_result
+        nodeinfo_result = None
 
     # Nodeinfo failed at original domain; discover backend via host-meta/webfinger
     if not nodeinfo_result:
@@ -3630,11 +3639,53 @@ async def process_domain(domain, nightly_version_ranges, user_choice=None):
         )
 
         if discovery_method == "fallback":
-            vmc_output(
-                f"{domain}: Both host-meta and webfinger failed",
-                "white",
-                use_tqdm=True,
-            )
+            # Both host-meta and webfinger failed; log the original nodeinfo error
+            if nodeinfo_probe_error:
+                error = nodeinfo_probe_error["suppressed_error"]
+                error_type = nodeinfo_probe_error["suppressed_error_type"]
+                target = "nodeinfo"
+                if error_type == "tcp":
+                    await asyncio.to_thread(
+                        _handle_tcp_exception,
+                        domain,
+                        target,
+                        error,
+                        preserve_ignore,
+                        preserve_nxdomain,
+                    )
+                elif error_type == "http":
+                    await asyncio.to_thread(
+                        _handle_http_status_code,
+                        domain,
+                        target,
+                        error,
+                        preserve_ignore,
+                        preserve_nxdomain,
+                    )
+                else:
+                    await asyncio.to_thread(
+                        _handle_json_exception,
+                        domain,
+                        target,
+                        error,
+                        preserve_ignore,
+                        preserve_nxdomain,
+                    )
+            else:
+                error_to_print = "Both host-meta and webfinger failed"
+                vmc_output(
+                    f"{domain}: {error_to_print}",
+                    "yellow",
+                    use_tqdm=True,
+                )
+                await asyncio.to_thread(log_error, domain, error_to_print)
+                await asyncio.to_thread(
+                    increment_domain_error,
+                    domain,
+                    "TCP+nodeinfo",
+                    preserve_ignore,
+                    preserve_nxdomain,
+                )
             return
         else:
             vmc_output(
