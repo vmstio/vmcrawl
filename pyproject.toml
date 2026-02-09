@@ -27,3 +27,7 @@ py-modules = [
 dev = [
     "types-cachetools>=6.2.0.20251022",
 ]
+
+[tool.pyright]
+include = ["*.py"]
+typeCheckingMode = "standard"
