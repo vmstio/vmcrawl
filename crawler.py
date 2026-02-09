@@ -238,49 +238,6 @@ def _cached_getaddrinfo(
 socket.getaddrinfo = _cached_getaddrinfo  # type: ignore[assignment]
 
 # =============================================================================
-# HTTP/2 PROTOCOL CACHING
-# =============================================================================
-
-# Type alias for HTTP/2 cache
-_HTTP2CacheKey = str  # domain string (lowercase)
-_HTTP2CacheValue = str  # "HTTP/2.0", "HTTP/1.1", "HTTP/1.0"
-
-# Thread-safe HTTP/2 protocol cache
-# TTL of 3600 seconds (1 hour) - protocols rarely change during operation
-# Max 50000 entries - supports large federated networks across multiple cycles
-_http2_cache: TTLCache[_HTTP2CacheKey, _HTTP2CacheValue] = TTLCache(
-    maxsize=50000, ttl=3600
-)
-_http2_cache_lock = threading.Lock()
-
-
-def get_cached_http_version(domain: str) -> str | None:
-    """Get cached HTTP version for a domain.
-
-    Args:
-        domain: Domain to lookup (will be normalized to lowercase)
-
-    Returns:
-        HTTP version string ("HTTP/2.0", "HTTP/1.1", etc.) or None if not cached
-    """
-    domain = domain.lower()
-    with _http2_cache_lock:
-        return _http2_cache.get(domain)
-
-
-def cache_http_version(domain: str, http_version: str) -> None:
-    """Cache the HTTP version for a domain.
-
-    Args:
-        domain: Domain to cache (will be normalized to lowercase)
-        http_version: HTTP version string from response.http_version
-    """
-    domain = domain.lower()
-    with _http2_cache_lock:
-        _http2_cache[domain] = http_version
-
-
-# =============================================================================
 # HTTP CLIENT CONFIGURATION
 # =============================================================================
 
@@ -2953,18 +2910,12 @@ def _is_junk_or_bad_tld(
 async def check_robots_txt(domain, preserve_ignore=False, preserve_nxdomain=False):
     """Check robots.txt to ensure crawling is allowed.
 
-    This is the first HTTP request to each domain, so we use it to detect
-    and cache HTTP/2 support for subsequent requests.
+    This is the first HTTP request to each domain.
     """
     target = "robots_txt"
     url = f"https://{domain}/robots.txt"
     try:
         response = await get_httpx(url)
-
-        # Cache HTTP version after successful connection
-        # This optimizes connection reuse for subsequent requests to same domain
-        if response.status_code in [200, 404]:  # Any successful connection
-            cache_http_version(domain, response.http_version)
 
         if response.status_code == 200:
             content_type = response.headers.get("Content-Type", "")
@@ -4659,43 +4610,6 @@ def write_statistics_to_database(stats_values):
         except Exception as e:
             print(f"Failed to insert/update statistics: {e}")
             conn.rollback()
-
-
-# =============================================================================
-# HTTP/2 STATISTICS FUNCTIONS
-# =============================================================================
-
-
-def get_http2_cache_stats() -> dict[str, int]:
-    """Get statistics about HTTP/2 cache usage.
-
-    Returns:
-        Dictionary with cache statistics:
-        - total_entries: Number of cached domains
-        - http2_count: Domains using HTTP/2
-        - http1_count: Domains using HTTP/1.1
-    """
-    with _http2_cache_lock:
-        total = len(_http2_cache)
-        http2 = sum(1 for v in _http2_cache.values() if v.startswith("HTTP/2"))
-        http1 = sum(1 for v in _http2_cache.values() if v.startswith("HTTP/1"))
-
-    return {
-        "total_entries": total,
-        "http2_count": http2,
-        "http1_count": http1,
-    }
-
-
-def print_http2_stats() -> None:
-    """Print HTTP/2 usage statistics (optional, for monitoring)."""
-    stats = get_http2_cache_stats()
-    if stats["total_entries"] > 0:
-        http2_pct = (stats["http2_count"] / stats["total_entries"]) * 100
-        vmc_output("\nHTTP/2 Support:", "cyan")
-        vmc_output(f"  HTTP/2: {stats['http2_count']} ({http2_pct:.1f}%)", "green")
-        vmc_output(f"  HTTP/1.1: {stats['http1_count']}", "white")
-        vmc_output(f"  Total cached: {stats['total_entries']}", "white")
 
 
 # =============================================================================
