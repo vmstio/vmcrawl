@@ -1502,7 +1502,7 @@ def cleanup_old_domains():
                     """
                         DELETE FROM mastodon_domains
                         WHERE timestamp <=
-                            (CURRENT_TIMESTAMP - INTERVAL '1 day') AT TIME ZONE 'UTC'
+                            (CURRENT_TIMESTAMP - INTERVAL '1 week') AT TIME ZONE 'UTC'
                         RETURNING domain
                         """,
                 )
@@ -5108,6 +5108,16 @@ async def async_main():
     if args.command == "dni":
         try:
             await run_dni_mode(args)
+        except KeyboardInterrupt:
+            vmc_output(f"\n{appname} interrupted by user", "red")
+        finally:
+            await cleanup_connections()
+        return
+
+    # Handle fedidb subcommand
+    if args.command == "fedidb":
+        try:
+            await run_fedidb_mode(args)
         except KeyboardInterrupt:
             vmc_output(f"\n{appname} interrupted by user", "red")
         finally:
