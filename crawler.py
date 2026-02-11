@@ -4719,7 +4719,15 @@ def load_from_database(user_choice):
             "ORDER BY domain"
         ),
         "4": (
-            "SELECT domain FROM raw_domains WHERE reason IS NOT NULL ORDER BY domain"
+            "SELECT DISTINCT rd.domain "
+            "FROM raw_domains rd "
+            "WHERE rd.nodeinfo = 'mastodon' "
+            "  AND rd.reason IS NOT NULL "
+            "  AND NOT EXISTS ( "
+            "    SELECT 1 "
+            "    FROM mastodon_domains md "
+            "    WHERE md.domain = rd.domain "
+            "  )"
         ),
         "5": (
             "SELECT DISTINCT rd.domain "
@@ -4888,9 +4896,9 @@ def get_menu_options() -> dict[str, dict[str, str]]:
     return {
         "Process new domains": {"0": "Uncrawled"},
         "Change process direction": {"1": "Standard", "2": "Reverse", "3": "Random"},
-        "Retry any (non-fatal) errors": {
-            "4": "Any",
-            "5": "Known",
+        "Retry known Mastodon": {
+            "4": "Offline",
+            "5": "Issues",
         },
         "Retry fatal errors": {
             "10": "Other Nodeinfo",
