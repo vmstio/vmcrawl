@@ -142,53 +142,29 @@ Statistics are automatically generated and recorded by the main crawler (`crawle
 
 To start using `vmcrawl` you will need to populate your database with instances to crawl. You can fetch a list of fediverse instances from an existing Mastodon instance:
 
-**Native:**
 ```bash
 ./vmcrawl.sh fetch
-```
-
-**Docker:**
-```bash
-docker exec vmcrawl ./vmcrawl.sh fetch
 ```
 
 The first time this is launched it will default to polling `vmst.io` for instances to crawl.
 If you wish to override this you can target a specific instance:
 
-**Native:**
 ```bash
 ./vmcrawl.sh fetch --target example.social
 ```
 
-**Docker:**
-```bash
-docker exec vmcrawl ./vmcrawl.sh fetch --target example.social
-```
-
 Once you have established a set of known good Mastodon instances, you can use them to fetch new federated instances:
 
-**Native:**
 ```bash
 ./vmcrawl.sh fetch
-```
-
-**Docker:**
-```bash
-docker exec vmcrawl ./vmcrawl.sh fetch
 ```
 
 This will scan the top 10 instances in your database by total users.
 
 You can change the limits or offset the domain list from the top:
 
-**Native:**
 ```bash
 ./vmcrawl.sh fetch --limit 100 --offset 50
-```
-
-**Docker:**
-```bash
-docker exec vmcrawl ./vmcrawl.sh fetch --limit 100 --offset 50
 ```
 
 You can use `limit` and `offset` together, or individually, but neither option can be combined with the `target` argument.
@@ -198,14 +174,8 @@ If a server fails to fetch, it will be added to a `no_peers` table and not attem
 
 You can also select a random sampling of servers to fetch from, instead of going by user count:
 
-**Native:**
 ```bash
 ./vmcrawl.sh fetch --random
-```
-
-**Docker:**
-```bash
-docker exec vmcrawl ./vmcrawl.sh fetch --random
 ```
 
 You can combine `random` with the `limit` command, but not with `target` or `offset`.
@@ -214,14 +184,8 @@ You can combine `random` with the `limit` command, but not with `target` or `off
 
 After you have a list of instances to crawl, run the following command:
 
-**Native:**
 ```bash
 ./vmcrawl.sh
-```
-
-**Docker:**
-```bash
-docker exec -it vmcrawl ./vmcrawl.sh
 ```
 
 Selecting `0` from the interactive menu will begin to process all of your fetched domains.
@@ -306,78 +270,42 @@ To limit what is crawled in headless mode, use the following arguments:
 
 You can target a specific domain to fetch or crawl with the `target` option:
 
-**Native:**
 ```bash
 ./vmcrawl.sh --target vmst.io
 ```
 
-**Docker:**
-```bash
-docker exec -it vmcrawl ./vmcrawl.sh --target vmst.io
-```
-
 You can include multiple domains in a comma-separated list:
 
-**Native:**
 ```bash
 ./vmcrawl.sh --target mas.to,infosec.exchange
 ```
 
-**Docker:**
-```bash
-docker exec -it vmcrawl ./vmcrawl.sh --target mas.to,infosec.exchange
-```
-
 You can also process multiple domains using an external file, which contains each domain on a new line:
 
-**Native:**
 ```bash
 ./vmcrawl.sh --file ~/domains.txt
-```
-
-**Docker:**
-```bash
-docker exec -it vmcrawl ./vmcrawl.sh --file /opt/vmcrawl/domains.txt
 ```
 
 ### Nightly Version Management
 
 The `nightly` subcommand manages tracking of development/nightly versions:
 
-**Native:**
 ```bash
 ./vmcrawl.sh nightly
-```
-
-**Docker:**
-```bash
-docker exec -it vmcrawl ./vmcrawl.sh nightly
 ```
 
 This displays current nightly version entries and allows you to add new versions as they are released. Nightly versions are used to identify instances running pre-release software (alpha, beta, rc versions).
 
 **List all nightly versions:**
 
-**Native:**
 ```bash
 ./vmcrawl.sh nightly --list
 ```
 
-**Docker:**
-```bash
-docker exec vmcrawl ./vmcrawl.sh nightly --list
-```
-
 **Add a version via command line:**
 
-**Native:**
 ```bash
 ./vmcrawl.sh nightly --version 4.9.0-alpha.7 --start-date 2025-01-15
-```
-
-**Docker:**
-```bash
-docker exec vmcrawl ./vmcrawl.sh nightly --version 4.9.0-alpha.7 --start-date 2025-01-15
 ```
 
 ### DNI List Management
@@ -386,50 +314,26 @@ The `dni` subcommand fetches and manages the IFTAS DNI (Do Not Interact) list:
 
 **Fetch and import DNI list:**
 
-**Native:**
 ```bash
 ./vmcrawl.sh dni
 ```
 
-**Docker:**
-```bash
-docker exec vmcrawl ./vmcrawl.sh dni
-```
-
 **List all DNI domains:**
 
-**Native:**
 ```bash
 ./vmcrawl.sh dni --list
 ```
 
-**Docker:**
-```bash
-docker exec vmcrawl ./vmcrawl.sh dni --list
-```
-
 **Count DNI domains:**
 
-**Native:**
 ```bash
 ./vmcrawl.sh dni --count
 ```
 
-**Docker:**
-```bash
-docker exec vmcrawl ./vmcrawl.sh dni --count
-```
-
 **Use custom CSV URL:**
 
-**Native:**
 ```bash
 ./vmcrawl.sh dni --url https://example.com/custom-dni-list.csv
-```
-
-**Docker:**
-```bash
-docker exec vmcrawl ./vmcrawl.sh dni --url https://example.com/custom-dni-list.csv
 ```
 
 The DNI list is sourced from IFTAS (Independent Federated Trust & Safety) and contains domains that have been identified for various trust and safety concerns. All domains imported from the IFTAS list are tagged with the comment "iftas" in the database.
