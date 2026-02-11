@@ -1782,15 +1782,11 @@ async def run_fedidb_mode(args: argparse.Namespace) -> None:
             _ = await asyncio.gather(*tasks, return_exceptions=True)
         except asyncio.CancelledError:
             shutdown_event.set()
-            pbar.close()
-            vmc_output(f"\n{appname} interrupted by user", "red")
             for task in tasks:
                 _ = task.cancel()
             raise KeyboardInterrupt
     except KeyboardInterrupt:
         shutdown_event.set()
-        pbar.close()
-        vmc_output(f"\n{appname} interrupted by user", "red")
         raise
     finally:
         pbar.close()
@@ -2204,15 +2200,11 @@ async def run_fetch_mode(args):
             _ = await asyncio.gather(*tasks, return_exceptions=True)
         except asyncio.CancelledError:
             shutdown_event.set()
-            pbar.close()
-            vmc_output(f"\n{appname} interrupted by user", "red")
             for task in tasks:
                 _ = task.cancel()
             raise KeyboardInterrupt
     except KeyboardInterrupt:
         shutdown_event.set()
-        pbar.close()
-        vmc_output(f"\n{appname} interrupted by user", "red")
         raise
     finally:
         pbar.close()
@@ -3956,16 +3948,11 @@ async def check_and_record_domains(
 
         except asyncio.CancelledError:
             shutdown_event.set()
-            pbar.close()
-            vmc_output(f"\n{appname} interrupted by user", "red")
-            # Cancel all pending tasks
             for task in tasks:
                 _ = task.cancel()
             raise KeyboardInterrupt
     except KeyboardInterrupt:
         shutdown_event.set()
-        pbar.close()
-        vmc_output(f"\n{appname} interrupted by user", "red")
         raise
     finally:
         pbar.close()
