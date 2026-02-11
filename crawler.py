@@ -3631,7 +3631,7 @@ def process_mastodon_instance(
         active_month_users,
     )
 
-    clear_domain_error(domain)
+    clear_domain_error(db_domain)
 
     version_info = f"Mastodon v{software_version}"
     if software_version != nodeinfo_20_result["software"]["version"]:
@@ -4684,8 +4684,10 @@ def load_from_database(user_choice):
             "SELECT domain FROM raw_domains WHERE reason IS NOT NULL ORDER BY domain"
         ),
         "5": (
-            "SELECT domain FROM raw_domains WHERE reason IS NOT NULL "
-            "AND nodeinfo = 'mastodon' ORDER BY domain;"
+            "SELECT DISTINCT rd.domain "
+            "FROM raw_domains rd "
+            "INNER JOIN mastodon_domains md ON rd.domain = md.domain "
+            "WHERE rd.reason IS NOT NULL"
         ),
         "10": (
             "SELECT domain FROM raw_domains WHERE nodeinfo != 'mastodon' "
