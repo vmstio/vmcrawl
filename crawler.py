@@ -4706,44 +4706,50 @@ def load_from_database(user_choice):
         "72": "SELECT domain FROM raw_domains WHERE bad_robot = TRUE ORDER BY domain",
         "73": "SELECT domain FROM raw_domains WHERE bad_mau = TRUE ORDER BY domain",
         "20": (
-            "SELECT domain FROM raw_domains WHERE reason LIKE 'SSL%' ORDER BY errors"
-        ),
-        "21": (
-            "SELECT domain FROM raw_domains WHERE reason LIKE 'TCP%' ORDER BY errors"
-        ),
-        "22": (
             "SELECT domain FROM raw_domains WHERE reason LIKE 'DNS%' ORDER BY errors"
         ),
-        "30": (
+        "21": (
+            "SELECT domain FROM raw_domains WHERE reason LIKE 'SSL%' ORDER BY errors"
+        ),
+        "22": (
+            "SELECT domain FROM raw_domains WHERE reason LIKE 'TCP%' ORDER BY errors"
+        ),
+        "23": (
+            "SELECT domain FROM raw_domains WHERE reason LIKE 'TYPE%' ORDER BY errors"
+        ),
+        "24": (
+            "SELECT domain FROM raw_domains WHERE reason LIKE 'FILE%' ORDER BY errors"
+        ),
+        "25": (
+            "SELECT domain FROM raw_domains WHERE reason LIKE 'API%' ORDER BY errors"
+        ),
+        "26": (
+            "SELECT domain FROM raw_domains WHERE reason LIKE 'JSON%' ORDER BY errors"
+        ),
+        "27": (
             "SELECT domain FROM raw_domains WHERE reason ~ '^2[0-9]{2}.*' "
             "ORDER BY errors"
         ),
-        "31": (
+        "28": (
             "SELECT domain FROM raw_domains WHERE reason ~ '^3[0-9]{2}.*' "
             "ORDER BY errors"
         ),
-        "32": (
+        "29": (
             "SELECT domain FROM raw_domains WHERE reason ~ '^4[0-9]{2}.*' "
             "ORDER BY errors"
         ),
-        "33": (
+        "30": (
             "SELECT domain FROM raw_domains WHERE reason ~ '^5[0-9]{2}.*' "
             "ORDER BY errors"
         ),
-        "40": (
-            "SELECT domain FROM raw_domains WHERE reason LIKE 'JSON%' ORDER BY errors"
+        "31": (
+            "SELECT domain FROM raw_domains WHERE reason LIKE 'HARD%' ORDER BY errors"
         ),
-        "41": (
-            "SELECT domain FROM raw_domains WHERE reason LIKE 'FILE%' ORDER BY errors"
+        "32": (
+            "SELECT domain FROM raw_domains WHERE reason LIKE 'ROBOT%' ORDER BY errors"
         ),
-        "42": (
-            "SELECT domain FROM raw_domains WHERE reason LIKE 'TYPE%' ORDER BY errors"
-        ),
-        "43": (
+        "33": (
             "SELECT domain FROM raw_domains WHERE reason LIKE 'MAU%' ORDER BY errors"
-        ),
-        "44": (
-            "SELECT domain FROM raw_domains WHERE reason LIKE 'API%' ORDER BY errors"
         ),
         "50": (
             "SELECT domain FROM mastodon_domains WHERE "
@@ -4847,20 +4853,23 @@ def get_menu_options() -> dict[str, dict[str, str]]:
             "5": "Known",
         },
         "Retry fatal errors": {
-            "10": "Other",
+            "10": "Other Nodeinfo",
         },
-        "Retry connection errors": {
-            "20": "SSL",
-            "21": "TCP",
-            "22": "DNS",
-        },
-        "Retry TCP errors": {"30": "2xx", "31": "3xx", "32": "4xx", "33": "5xx"},
-        "Retry target errors": {
-            "40": "Bad JSON",
-            "41": "Bad Size",
-            "42": "Bad Type",
-            "43": "Bad MAU",
-            "44": "Bad API",
+        "Retry errors by type": {
+            "20": "DNS",
+            "21": "SSL",
+            "22": "TCP",
+            "23": "Type",
+            "24": "File",
+            "25": "API",
+            "26": "JSON",
+            "27": "HTTP 2xx",
+            "28": "HTTP 3xx",
+            "29": "HTTP 4xx",
+            "30": "HTTP 5xx",
+            "31": "Hard Fail",
+            "32": "Robots",
+            "33": "MAU",
         },
         "Retry bad domains": {
             "60": "DNS",
