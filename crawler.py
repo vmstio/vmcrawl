@@ -1734,6 +1734,7 @@ async def run_fedidb_mode(args: argparse.Namespace) -> None:
 
     max_workers = int(os.getenv("VMCRAWL_MAX_THREADS", "2"))
     semaphore = asyncio.Semaphore(max_workers)
+    shutdown_event = asyncio.Event()
     cleared_count = 0
     known_count = 0
     error_count = 0
@@ -1742,7 +1743,13 @@ async def run_fedidb_mode(args: argparse.Namespace) -> None:
 
     async def check_single_domain(domain: str) -> str:
         nonlocal cleared_count, known_count, error_count
+        if shutdown_event.is_set():
+            return "skipped"
+
         async with semaphore:
+            if shutdown_event.is_set():
+                return "skipped"
+
             domain_display = domain[:25].ljust(25)
             pbar.set_postfix_str(domain_display)
 
@@ -1768,16 +1775,23 @@ async def run_fedidb_mode(args: argparse.Namespace) -> None:
                 _ = pbar.update(1)
                 return "error"
 
-    tasks = [asyncio.create_task(check_single_domain(d)) for d in domains]
-
     try:
-        _ = await asyncio.gather(*tasks, return_exceptions=True)
+        tasks = [asyncio.create_task(check_single_domain(d)) for d in domains]
+
+        try:
+            _ = await asyncio.gather(*tasks, return_exceptions=True)
+        except asyncio.CancelledError:
+            shutdown_event.set()
+            pbar.close()
+            vmc_output(f"\n{appname} interrupted by user", "red")
+            for task in tasks:
+                _ = task.cancel()
+            raise KeyboardInterrupt
     except KeyboardInterrupt:
+        shutdown_event.set()
         pbar.close()
         vmc_output(f"\n{appname} interrupted by user", "red")
-        for task in tasks:
-            _ = task.cancel()
-        return
+        raise
     finally:
         pbar.close()
 
@@ -1919,9 +1933,7 @@ def import_domains(domains, use_tqdm=False):
                 _ = cursor.execute(query, flattened_values)
                 conn.commit()
         except Exception as e:
-            vmc_output(
-                f"Failed to import domain list: {e}", "red", use_tqdm=use_tqdm
-            )
+            vmc_output(f"Failed to import domain list: {e}", "red", use_tqdm=use_tqdm)
             conn.rollback()
             return
 
@@ -2196,12 +2208,12 @@ async def run_fetch_mode(args):
             vmc_output(f"\n{appname} interrupted by user", "red")
             for task in tasks:
                 _ = task.cancel()
-            return
+            raise KeyboardInterrupt
     except KeyboardInterrupt:
         shutdown_event.set()
         pbar.close()
         vmc_output(f"\n{appname} interrupted by user", "red")
-        return
+        raise
     finally:
         pbar.close()
 
@@ -3949,12 +3961,12 @@ async def check_and_record_domains(
             # Cancel all pending tasks
             for task in tasks:
                 _ = task.cancel()
-            return
+            raise KeyboardInterrupt
     except KeyboardInterrupt:
         shutdown_event.set()
         pbar.close()
         vmc_output(f"\n{appname} interrupted by user", "red")
-        return
+        raise
     finally:
         pbar.close()
 
