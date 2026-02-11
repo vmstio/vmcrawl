@@ -1660,179 +1660,6 @@ async def load_domain_filter_data():
 
 
 # =============================================================================
-# FEDIDB FUNCTIONS - FediDB Cross-Reference Validation
-# =============================================================================
-
-FEDIDB_API_BASE = "https://api.fedidb.org/v1/server/domain"
-
-
-def get_stale_mastodon_domains() -> list[str]:
-    """Get domains tagged as mastodon in raw_domains that have errors but no
-    corresponding entry in mastodon_domains.
-
-    These are domains that were identified as Mastodon via nodeinfo but failed
-    during crawling and never graduated to mastodon_domains. Cross-referencing
-    against FediDB can identify domains that are no longer valid Mastodon
-    instances so they can be rescanned.
-    """
-    with db_pool.connection() as conn, conn.cursor() as cursor:
-        try:
-            _ = cursor.execute(
-                """
-                SELECT DISTINCT rd.domain
-                FROM raw_domains rd
-                WHERE rd.nodeinfo = 'mastodon'
-                  AND rd.reason IS NOT NULL
-                  AND NOT EXISTS (
-                    SELECT 1
-                    FROM mastodon_domains md
-                    WHERE md.domain = rd.domain
-                  )
-                """
-            )
-            return [row[0] for row in cursor if row[0]]
-        except Exception as exception:
-            vmc_output(f"Failed to obtain stale mastodon domains: {exception}", "red")
-            conn.rollback()
-    return []
-
-
-def clear_nodeinfo_for_domain(domain: str) -> None:
-    """Clear the nodeinfo field and reason for a domain so it will be rescanned."""
-    bad_col_clears = ", ".join(f"{col} = NULL" for col in BAD_COLUMNS)
-    with db_pool.connection() as conn, conn.cursor() as cursor:
-        try:
-            clear_ni_query: Any = (
-                f"UPDATE raw_domains"
-                f" SET nodeinfo = NULL, reason = NULL, errors = 0,"
-                f" {bad_col_clears}"
-                f" WHERE domain = %s"
-            )
-            _ = cursor.execute(clear_ni_query, (domain,))
-            conn.commit()
-        except Exception as exception:
-            vmc_output(
-                f"{domain}: Failed to clear nodeinfo: {exception}",
-                "red",
-            )
-            conn.rollback()
-
-
-async def check_fedidb_domain(domain: str) -> bool | None:
-    """Check a domain against the FediDB API.
-
-    Returns:
-        True if FediDB returns valid data (domain is known to FediDB)
-        False if FediDB returns {"error": "Invalid domain"} (domain is not known)
-        None if the request failed (network error, unexpected response)
-    """
-    url = f"{FEDIDB_API_BASE}/{domain}"
-    client = get_http_client()
-    try:
-        response = await client.get(url, timeout=httpx.Timeout(10.0))
-        if response.status_code == 200:
-            data = response.json()
-            if "data" in data:
-                return True
-            if "error" in data and data["error"] == "Invalid domain":
-                return False
-            return True
-        elif response.status_code == 404:
-            try:
-                data = response.json()
-                if "error" in data and data["error"] == "Invalid domain":
-                    return False
-            except Exception:
-                pass
-            return False
-        else:
-            return None
-    except Exception:
-        return None
-
-
-async def run_fedidb_mode(args: argparse.Namespace) -> None:
-    """Run FediDB cross-reference validation mode.
-
-    Fetches domains tagged as mastodon in raw_domains that have errors but
-    no entry in mastodon_domains, then checks each against FediDB. Domains
-    not known to FediDB have their nodeinfo cleared for rescanning.
-    """
-    vmc_output(f"{appname} v{appversion} (fedidb mode)", "bold")
-
-    domains = await asyncio.to_thread(get_stale_mastodon_domains)
-    if not domains:
-        vmc_output("No stale mastodon domains found to validate", "yellow")
-        return
-
-    vmc_output(f"Found {len(domains)} stale mastodon domains to check", "cyan")
-
-    max_workers = int(os.getenv("VMCRAWL_MAX_THREADS", "2"))
-    semaphore = asyncio.Semaphore(max_workers)
-    shutdown_event = asyncio.Event()
-    cleared_count = 0
-    known_count = 0
-    error_count = 0
-
-    pbar = tqdm(total=len(domains), desc="FediDB check", unit="d")
-
-    async def check_single_domain(domain: str) -> str:
-        nonlocal cleared_count, known_count, error_count
-        if shutdown_event.is_set():
-            return "skipped"
-
-        async with semaphore:
-            if shutdown_event.is_set():
-                return "skipped"
-
-            domain_display = domain[:25].ljust(25)
-            pbar.set_postfix_str(domain_display)
-
-            result = await check_fedidb_domain(domain)
-            if result is True:
-                tqdm.write(
-                    f"{domain}: {colors['green']}Known to FediDB{colors['reset']}"
-                )
-                known_count += 1
-                _ = pbar.update(1)
-                return "known"
-            elif result is False:
-                await asyncio.to_thread(clear_nodeinfo_for_domain, domain)
-                tqdm.write(
-                    f"{domain}: {colors['yellow']}Cleared for rescan{colors['reset']}"
-                )
-                cleared_count += 1
-                _ = pbar.update(1)
-                return "cleared"
-            else:
-                tqdm.write(f"{domain}: {colors['red']}FediDB error{colors['reset']}")
-                error_count += 1
-                _ = pbar.update(1)
-                return "error"
-
-    try:
-        tasks = [asyncio.create_task(check_single_domain(d)) for d in domains]
-
-        try:
-            _ = await asyncio.gather(*tasks, return_exceptions=True)
-        except asyncio.CancelledError:
-            shutdown_event.set()
-            for task in tasks:
-                _ = task.cancel()
-            raise KeyboardInterrupt
-    except KeyboardInterrupt:
-        shutdown_event.set()
-        raise
-    finally:
-        pbar.close()
-
-    vmc_output(
-        f"Results: {cleared_count} cleared, {known_count} known, {error_count} errors",
-        "bold",
-    )
-
-
-# =============================================================================
 # FETCH FUNCTIONS - Peer Discovery
 # =============================================================================
 
@@ -5226,12 +5053,6 @@ async def async_main():
         help="Update end_date for a specific version",
     )
 
-    # FediDB subcommand
-    _ = subparsers.add_parser(
-        "fedidb",
-        help="Cross-reference stale mastodon domains against FediDB API",
-    )
-
     # Also add crawl arguments to main parser for backwards compatibility
     _ = parser.add_argument(
         "-f",
@@ -5287,16 +5108,6 @@ async def async_main():
     if args.command == "dni":
         try:
             await run_dni_mode(args)
-        except KeyboardInterrupt:
-            vmc_output(f"\n{appname} interrupted by user", "red")
-        finally:
-            await cleanup_connections()
-        return
-
-    # Handle fedidb subcommand
-    if args.command == "fedidb":
-        try:
-            await run_fedidb_mode(args)
         except KeyboardInterrupt:
             vmc_output(f"\n{appname} interrupted by user", "red")
         finally:
