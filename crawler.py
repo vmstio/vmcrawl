@@ -491,7 +491,10 @@ async def get_domain_endings() -> set[str]:
 
     Uses database storage with a 7-day cache expiration.
     Falls back to file cache if database is unavailable.
+    Subtracts prohibited TLDs (from bad_tld table) before returning.
     """
+    tlds: set[str] = set()
+
     # Try to get from database first
     try:
         last_updated = get_tld_last_updated()
@@ -503,13 +506,13 @@ async def get_domain_endings() -> set[str]:
             if age.days < max_cache_age_days:
                 tlds = get_tlds_from_db()
                 if tlds:
-                    return tlds
+                    return tlds - get_bad_tld()
 
         # Database cache is stale or empty, fetch new data
         tlds = await fetch_tlds_from_iana()
         if tlds:
             _ = import_tlds(tlds)
-            return tlds
+            return tlds - get_bad_tld()
 
     except Exception as e:
         vmc_output(f"Database TLD lookup failed, using file cache: {e}", "yellow")
@@ -522,7 +525,8 @@ async def get_domain_endings() -> set[str]:
     if _is_cache_valid(cache_file_path, max_cache_age):
         with open(cache_file_path) as cache_file:
             # Use set for O(1) lookup
-            return {line.strip().lower() for line in cache_file if line.strip()}
+            tlds = {line.strip().lower() for line in cache_file if line.strip()}
+            return tlds - get_bad_tld()
 
     domain_endings_response = await get_httpx(url)
     if domain_endings_response.status_code in [200]:
@@ -534,7 +538,7 @@ async def get_domain_endings() -> set[str]:
         }
         with open(cache_file_path, "w") as cache_file:
             _ = cache_file.write("\n".join(sorted(domain_endings)))
-        return domain_endings
+        return domain_endings - get_bad_tld()
 
     msg = (
         f"Failed to fetch domain endings. "
@@ -1474,19 +1478,6 @@ def cleanup_old_domains():
 # =============================================================================
 
 
-def get_junk_keywords():
-    """Get list of junk keywords to filter domains."""
-    with db_pool.connection() as conn, conn.cursor() as cursor:
-        try:
-            _ = cursor.execute("SELECT keywords FROM junk_words")
-            # Use set for O(1) lookup instead of O(n) list iteration
-            return {row[0] for row in cursor}
-        except Exception as exception:
-            vmc_output(f"Failed to obtain junk keywords: {exception}", "red")
-            conn.rollback()
-    return set()
-
-
 def get_dni_domains():
     """Get list of DNI (Do Not Interact) domains to filter domains."""
     with db_pool.connection() as conn, conn.cursor() as cursor:
@@ -1599,25 +1590,19 @@ async def load_domain_filter_data():
     Uses asyncio.gather with to_thread to run database queries concurrently.
     """
     (
-        junk_domains,
         dni_domains,
-        bad_tlds,
         not_masto_domains,
         nightly_version_ranges,
         bad_domain_sets,
     ) = await asyncio.gather(
-        asyncio.to_thread(get_junk_keywords),
         asyncio.to_thread(get_dni_domains),
-        asyncio.to_thread(get_bad_tld),
         asyncio.to_thread(get_not_masto_domains),
         asyncio.to_thread(get_nightly_version_ranges),
         asyncio.to_thread(get_all_bad_domains),
     )
 
     return {
-        "junk_domains": junk_domains,
         "dni_domains": dni_domains,
-        "bad_tlds": bad_tlds,
         "not_masto_domains": not_masto_domains,
         "nightly_version_ranges": nightly_version_ranges,
         "bad_domain_sets": bad_domain_sets,
@@ -1965,9 +1950,7 @@ async def fetch_peer_domains(
     api_url,
     domain,
     domain_ending_suffixes,
-    keywords,
     dni,
-    bad_tld_suffixes,
 ):
     """Fetch peer domains from a Mastodon instance API.
 
@@ -1975,9 +1958,7 @@ async def fetch_peer_domains(
         api_url: The API URL to fetch peers from
         domain: The domain being queried
         domain_ending_suffixes: Set of valid TLD suffixes (e.g., {".com", ".org"})
-        keywords: Set of junk keywords to filter out
         dni: Set of DNI domains to filter out
-        bad_tld_suffixes: Set of bad TLD suffixes (e.g., {".xyz", ".top"})
 
     Returns:
         tuple: (list of filtered domains, error_type or None)
@@ -1994,16 +1975,8 @@ async def fetch_peer_domains(
             if not item.islower() or not _is_valid_fetch_domain(item):
                 continue
 
-            # Check against junk keywords (substring match required)
-            if any(keyword in item for keyword in keywords):
-                continue
-
             # Check against DNI list (substring match required)
             if any(dni_domain in item for dni_domain in dni):
-                continue
-
-            # Check bad TLDs using pre-computed suffixes
-            if any(item.endswith(suffix) for suffix in bad_tld_suffixes):
                 continue
 
             # Check valid domain endings using pre-computed suffixes
@@ -2044,9 +2017,7 @@ async def process_fetch_domain(
     domain,
     domain_ending_suffixes,
     pbar,
-    keywords,
     dni,
-    bad_tld_suffixes,
     existing_domains,
 ):
     """Process a single domain to fetch its peers.
@@ -2055,9 +2026,7 @@ async def process_fetch_domain(
         domain: Domain to fetch peers from
         domain_ending_suffixes: Set of valid TLD suffixes (e.g., {".com", ".org"})
         pbar: tqdm progress bar instance for status updates
-        keywords: Set of junk keywords to filter out
         dni: Set of DNI domains to filter out
-        bad_tld_suffixes: Set of bad TLD suffixes (e.g., {".xyz", ".top"})
         existing_domains: Set of domains already in database
 
     Returns:
@@ -2070,7 +2039,7 @@ async def process_fetch_domain(
     api_url = f"https://{domain}/api/v1/instance/peers"
 
     domains, error_type = await fetch_peer_domains(
-        api_url, domain, domain_ending_suffixes, keywords, dni, bad_tld_suffixes
+        api_url, domain, domain_ending_suffixes, dni
     )
     unique_domains = [d for d in domains if d not in existing_domains]
 
@@ -2138,13 +2107,10 @@ async def run_fetch_mode(args):
     print(f"Fetching peer data from {len(domain_list)} instances…")
 
     # Pre-fetch filter lists once before concurrent processing
-    keywords = get_junk_keywords() or set()
     dni = get_dni_domains() or set()
-    bad_tlds = get_bad_tld() or set()
     existing_domains = get_existing_domains() or set()
 
-    # Pre-compute suffix sets for efficient filtering (avoids repeated f-string creation)
-    bad_tld_suffixes = {f".{tld}" for tld in bad_tlds}
+    # Pre-compute suffix set for efficient filtering (avoids repeated f-string creation)
     domain_ending_suffixes = {f".{ending}" for ending in domain_endings}
 
     # Collect all newly discovered domains
@@ -2170,9 +2136,7 @@ async def run_fetch_mode(args):
                     domain,
                     domain_ending_suffixes,
                     pbar,
-                    keywords,
                     dni,
-                    bad_tld_suffixes,
                     existing_domains,
                 )
                 domain_name, new_domains, status = result
@@ -2229,8 +2193,7 @@ async def run_fetch_mode(args):
         # Load filter data for crawling in parallel
         filter_data = await load_domain_filter_data()
 
-        # Pre-compute suffix sets for efficient TLD filtering
-        bad_tld_suffixes_crawl = {f".{tld}" for tld in filter_data["bad_tlds"]}
+        # Pre-compute suffix set for efficient TLD filtering
         domain_ending_suffixes_crawl = {f".{ending}" for ending in domain_endings}
 
         # Use "0" as user_choice (new domains mode)
@@ -2238,9 +2201,7 @@ async def run_fetch_mode(args):
             unique_new_domains,
             filter_data["not_masto_domains"],
             "0",  # user_choice for new domains
-            filter_data["junk_domains"],
             filter_data["dni_domains"],
-            bad_tld_suffixes_crawl,
             domain_ending_suffixes_crawl,
             filter_data["nightly_version_ranges"],
             filter_data["bad_domain_sets"],
@@ -2952,35 +2913,21 @@ def _should_skip_domain(
     return False
 
 
-def _is_junk_or_bad_tld(
-    domain, junk_domains, dni_domains, bad_tld_suffixes, domain_ending_suffixes
-):
-    """Check if a domain is junk or has a prohibited TLD.
+def _is_dni_or_invalid_tld(domain, dni_domains, domain_ending_suffixes):
+    """Check if a domain is on the DNI list or has an invalid TLD.
 
     Args:
         domain: Domain to check
-        junk_domains: Set of junk keywords to filter out
         dni_domains: Set of DNI domains to filter out
-        bad_tld_suffixes: Pre-computed set of bad TLD suffixes (e.g., {".xyz", ".top"})
         domain_ending_suffixes: Pre-computed set of valid TLD suffixes (e.g., {".com", ".org"})
     """
-    if any(junk in domain for junk in junk_domains):
-        vmc_output(f"{domain}: Purging known junk domain", "cyan", use_tqdm=True)
-        delete_domain_if_known(domain)
-        delete_domain_from_raw(domain)
-        return True
     if any(dni in domain for dni in dni_domains):
         vmc_output(f"{domain}: Purging known dni domain", "cyan", use_tqdm=True)
         delete_domain_if_known(domain)
         delete_domain_from_raw(domain)
         return True
-    if any(domain.endswith(suffix) for suffix in bad_tld_suffixes):
-        vmc_output(f"{domain}: Purging prohibited TLD", "cyan", use_tqdm=True)
-        delete_domain_if_known(domain)
-        delete_domain_from_raw(domain)
-        return True
     if not any(domain.endswith(suffix) for suffix in domain_ending_suffixes):
-        vmc_output(f"{domain}: Purging unknown TLD", "cyan", use_tqdm=True)
+        vmc_output(f"{domain}: Purging invalid TLD", "cyan", use_tqdm=True)
         delete_domain_if_known(domain)
         delete_domain_from_raw(domain)
         return True
@@ -3864,9 +3811,7 @@ async def check_and_record_domains(
     domain_list,
     not_masto_domains,
     user_choice,
-    junk_domains,
     dni_domains,
-    bad_tld_suffixes,
     domain_ending_suffixes,
     nightly_version_ranges,
     bad_domain_sets,
@@ -3903,15 +3848,13 @@ async def check_and_record_domains(
                 _ = pbar.update(1)
                 return (domain, "skipped")
 
-            if _is_junk_or_bad_tld(
+            if _is_dni_or_invalid_tld(
                 domain,
-                junk_domains,
                 dni_domains,
-                bad_tld_suffixes,
                 domain_ending_suffixes,
             ):
                 _ = pbar.update(1)
-                return (domain, "junk")
+                return (domain, "filtered")
 
             try:
                 await process_domain(domain, nightly_version_ranges, user_choice)
@@ -5378,17 +5321,14 @@ async def async_main():
                     get_domain_endings(),
                 )
 
-                # Pre-compute suffix sets for efficient TLD filtering
-                bad_tld_suffixes = {f".{tld}" for tld in filter_data["bad_tlds"]}
+                # Pre-compute suffix set for efficient TLD filtering
                 domain_ending_suffixes = {f".{ending}" for ending in domain_endings}
 
                 await check_and_record_domains(
                     domain_list,
                     filter_data["not_masto_domains"],
                     user_choice,
-                    filter_data["junk_domains"],
                     filter_data["dni_domains"],
-                    bad_tld_suffixes,
                     domain_ending_suffixes,
                     filter_data["nightly_version_ranges"],
                     filter_data["bad_domain_sets"],
