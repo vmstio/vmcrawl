@@ -566,22 +566,12 @@ async def get_domain_stats(_api_key: str | None = Depends(get_api_key)):
                        OR bad_json IS NOT NULL OR bad_http2xx IS NOT NULL
                        OR bad_http3xx IS NOT NULL OR bad_http4xx IS NOT NULL
                        OR bad_http5xx IS NOT NULL
-                       OR bad_hard IS NOT NULL OR bad_robot IS NOT NULL)
+                       OR bad_hard IS NOT NULL OR bad_robot IS NOT NULL
+                       OR bad_mau IS NOT NULL)
             """
             )
             result = cur.fetchone()
             dead_domains = result[0] if result else 0
-
-            # Blocked Domains
-            _ = cur.execute(
-                """
-                SELECT COUNT(DISTINCT domain) AS unique_domain_count
-                FROM raw_domains
-                WHERE (baddata IS NOT NULL)
-            """
-            )
-            result = cur.fetchone()
-            blocked_domains = result[0] if result else 0
 
             # Non-Mastodon Instances
             _ = cur.execute(
@@ -597,7 +587,6 @@ async def get_domain_stats(_api_key: str | None = Depends(get_api_key)):
         return {
             "known_domains": known_domains,
             "dead_domains": dead_domains,
-            "blocked_domains": blocked_domains,
             "non_mastodon_instances": non_mastodon_instances,
         }
     except Exception as e:

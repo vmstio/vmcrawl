@@ -132,6 +132,7 @@ ERROR_TYPE_TO_BAD_COLUMN: dict[str, str] = {
     "HTTP5XX": "bad_http5xx",
     "HARD": "bad_hard",
     "ROBOT": "bad_robot",
+    "MAU": "bad_mau",
 }
 BAD_COLUMNS = tuple(ERROR_TYPE_TO_BAD_COLUMN.values())
 
@@ -150,6 +151,7 @@ MENU_CHOICE_TO_STATUS_COLUMN: dict[str, str] = {
     "70": "bad_http5xx",
     "71": "bad_hard",
     "72": "bad_robot",
+    "73": "bad_mau",
 }
 
 # Define maintained branches (adjust as needed)
@@ -1026,6 +1028,7 @@ def increment_domain_error(
         "JSON",
         "HARD",
         "ROBOT",
+        "MAU",
     )
 
     # Helper function to get error type from reason string
@@ -1514,14 +1517,12 @@ def get_domains_by_status(status_column):
     """Get list of domains filtered by status column.
 
     Args:
-        status_column: One of 'baddata' or any bad_* column name
+        status_column: Any bad_* column name
 
     Returns:
         Set of domain strings
     """
-    valid_columns = [
-        "baddata",
-    ] + list(BAD_COLUMNS)
+    valid_columns = list(BAD_COLUMNS)
     if status_column not in valid_columns:
         vmc_output(f"Invalid status column: {status_column}", "red")
         return set()
@@ -1558,11 +1559,6 @@ def get_not_masto_domains():
             vmc_output(f"Failed to obtain non-mastodon domains: {exception}", "red")
             conn.rollback()
     return set()
-
-
-def get_baddata_domains():
-    """Get list of domains marked as having bad data."""
-    return get_domains_by_status("baddata")
 
 
 def get_all_bad_domains() -> dict[str, set[str]]:
@@ -1607,7 +1603,6 @@ async def load_domain_filter_data():
         dni_domains,
         bad_tlds,
         not_masto_domains,
-        baddata_domains,
         nightly_version_ranges,
         bad_domain_sets,
     ) = await asyncio.gather(
@@ -1615,7 +1610,6 @@ async def load_domain_filter_data():
         asyncio.to_thread(get_dni_domains),
         asyncio.to_thread(get_bad_tld),
         asyncio.to_thread(get_not_masto_domains),
-        asyncio.to_thread(get_baddata_domains),
         asyncio.to_thread(get_nightly_version_ranges),
         asyncio.to_thread(get_all_bad_domains),
     )
@@ -1625,7 +1619,6 @@ async def load_domain_filter_data():
         "dni_domains": dni_domains,
         "bad_tlds": bad_tlds,
         "not_masto_domains": not_masto_domains,
-        "baddata_domains": baddata_domains,
         "nightly_version_ranges": nightly_version_ranges,
         "bad_domain_sets": bad_domain_sets,
     }
@@ -2240,7 +2233,6 @@ async def run_fetch_mode(args):
         await check_and_record_domains(
             unique_new_domains,
             filter_data["not_masto_domains"],
-            filter_data["baddata_domains"],
             "0",  # user_choice for new domains
             filter_data["junk_domains"],
             filter_data["dni_domains"],
@@ -2937,7 +2929,6 @@ def _handle_json_exception(domain, target, exception, preserve_status=None):
 def _should_skip_domain(
     domain,
     not_masto_domains,
-    baddata_domains,
     bad_domain_sets,
     user_choice,
 ):
@@ -2954,10 +2945,6 @@ def _should_skip_domain(
             vmc_output(f"{domain}: {label}", "cyan", use_tqdm=True)
             delete_domain_if_known(domain)
             return True
-    if domain in baddata_domains:
-        vmc_output(f"{domain}: Bad Domain", "cyan", use_tqdm=True)
-        delete_domain_if_known(domain)
-        return True
     return False
 
 
@@ -3872,7 +3859,6 @@ async def process_domain(domain, nightly_version_ranges, user_choice=None):
 async def check_and_record_domains(
     domain_list,
     not_masto_domains,
-    baddata_domains,
     user_choice,
     junk_domains,
     dni_domains,
@@ -3907,7 +3893,6 @@ async def check_and_record_domains(
             if _should_skip_domain(
                 domain,
                 not_masto_domains,
-                baddata_domains,
                 bad_domain_sets,
                 user_choice,
             ):
@@ -4735,7 +4720,6 @@ def load_from_database(user_choice):
         ),
         "1": (
             "SELECT domain FROM raw_domains WHERE "
-            "(baddata IS NULL OR baddata = FALSE) AND "
             + " AND ".join(f"({col} IS NULL OR {col} = FALSE)" for col in BAD_COLUMNS)
             + " AND "
             "(nodeinfo = 'mastodon' OR nodeinfo IS NULL) "
@@ -4765,6 +4749,7 @@ def load_from_database(user_choice):
         "70": "SELECT domain FROM raw_domains WHERE bad_http5xx = TRUE ORDER BY domain",
         "71": "SELECT domain FROM raw_domains WHERE bad_hard = TRUE ORDER BY domain",
         "72": "SELECT domain FROM raw_domains WHERE bad_robot = TRUE ORDER BY domain",
+        "73": "SELECT domain FROM raw_domains WHERE bad_mau = TRUE ORDER BY domain",
         "20": (
             "SELECT domain FROM raw_domains WHERE reason LIKE 'SSL%' ORDER BY errors"
         ),
@@ -4936,6 +4921,7 @@ def get_menu_options() -> dict[str, dict[str, str]]:
             "70": "HTTP 5xx",
             "71": "Hard Fail",
             "72": "Robots",
+            "73": "MAU",
         },
         "Retry known instances": {
             "50": "Unpatched",
@@ -5400,7 +5386,6 @@ async def async_main():
                 await check_and_record_domains(
                     domain_list,
                     filter_data["not_masto_domains"],
-                    filter_data["baddata_domains"],
                     user_choice,
                     filter_data["junk_domains"],
                     filter_data["dni_domains"],
