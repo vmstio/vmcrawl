@@ -132,7 +132,6 @@ ERROR_TYPE_TO_BAD_COLUMN: dict[str, str] = {
     "HTTP5XX": "bad_http5xx",
     "HARD": "bad_hard",
     "ROBOT": "bad_robot",
-    "MAU": "bad_mau",
 }
 BAD_COLUMNS = tuple(ERROR_TYPE_TO_BAD_COLUMN.values())
 
@@ -151,7 +150,6 @@ MENU_CHOICE_TO_STATUS_COLUMN: dict[str, str] = {
     "70": "bad_http5xx",
     "71": "bad_hard",
     "72": "bad_robot",
-    "73": "bad_mau",
 }
 
 # Define maintained branches (adjust as needed)
@@ -1034,7 +1032,6 @@ def increment_domain_error(
         "JSON",
         "HARD",
         "ROBOT",
-        "MAU",
     )
 
     # Helper function to get error type from reason string
@@ -4579,7 +4576,6 @@ def load_from_database(user_choice):
         "70": "SELECT domain FROM raw_domains WHERE bad_http5xx = TRUE ORDER BY domain",
         "71": "SELECT domain FROM raw_domains WHERE bad_hard = TRUE ORDER BY domain",
         "72": "SELECT domain FROM raw_domains WHERE bad_robot = TRUE ORDER BY domain",
-        "73": "SELECT domain FROM raw_domains WHERE bad_mau = TRUE ORDER BY domain",
         "20": (
             "SELECT domain FROM raw_domains WHERE reason LIKE 'DNS%' ORDER BY errors"
         ),
@@ -4622,9 +4618,6 @@ def load_from_database(user_choice):
         ),
         "32": (
             "SELECT domain FROM raw_domains WHERE reason LIKE 'ROBOT%' ORDER BY errors"
-        ),
-        "33": (
-            "SELECT domain FROM raw_domains WHERE reason LIKE 'MAU%' ORDER BY errors"
         ),
         "50": (
             "SELECT domain FROM mastodon_domains WHERE "
@@ -4744,7 +4737,6 @@ def get_menu_options() -> dict[str, dict[str, str]]:
             "30": "HTTP 5xx",
             "31": "Hard Fail",
             "32": "Robots",
-            "33": "MAU",
         },
         "Retry bad domains": {
             "60": "DNS",
@@ -4760,7 +4752,6 @@ def get_menu_options() -> dict[str, dict[str, str]]:
             "70": "HTTP 5xx",
             "71": "Hard Fail",
             "72": "Robots",
-            "73": "MAU",
         },
         "Retry known instances": {
             "50": "Unpatched",
@@ -5108,16 +5099,6 @@ async def async_main():
     if args.command == "dni":
         try:
             await run_dni_mode(args)
-        except KeyboardInterrupt:
-            vmc_output(f"\n{appname} interrupted by user", "red")
-        finally:
-            await cleanup_connections()
-        return
-
-    # Handle fedidb subcommand
-    if args.command == "fedidb":
-        try:
-            await run_fedidb_mode(args)
         except KeyboardInterrupt:
             vmc_output(f"\n{appname} interrupted by user", "red")
         finally:

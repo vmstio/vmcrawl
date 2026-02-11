@@ -566,8 +566,7 @@ async def get_domain_stats(_api_key: str | None = Depends(get_api_key)):
                        OR bad_json IS NOT NULL OR bad_http2xx IS NOT NULL
                        OR bad_http3xx IS NOT NULL OR bad_http4xx IS NOT NULL
                        OR bad_http5xx IS NOT NULL
-                       OR bad_hard IS NOT NULL OR bad_robot IS NOT NULL
-                       OR bad_mau IS NOT NULL)
+                       OR bad_hard IS NOT NULL OR bad_robot IS NOT NULL)
             """
             )
             result = cur.fetchone()

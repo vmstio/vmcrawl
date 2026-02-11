@@ -316,8 +316,8 @@ Domains marked with certain flags are skipped during processing in `_should_skip
 - **Instance API returns 401**: Stop immediately, record `API` error via `increment_domain_error`
 - **Instance API fails**: Stop, record `API` error via `increment_domain_error`
 - **HTTP 410/418/451/999**: Record `HARD` error via `increment_domain_error` (immediately terminal)
-- **Version invalid**: Record `VER` error, delete from known domains
-- **MAU data missing**: Record `MAU` error, delete from known domains
+- **Version invalid**: Record `VER` reason (counter not incremented since nodeinfo is already `mastodon`), delete from known domains
+- **MAU data missing**: Record `MAU` error (counter not incremented since nodeinfo is already `mastodon`), delete from known domains
 - **Alias detected**: Mark as alias via `mark_domain_as_alias()`, delete original from known domains
 
 All errors route through `increment_domain_error`, which tracks consecutive same-type errors and sets the corresponding `bad_*` column after 8 consecutive failures. `ROBOT` and `HARD` error types are immediately terminal on first occurrence.
