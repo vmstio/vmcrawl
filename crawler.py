@@ -1011,6 +1011,7 @@ def increment_domain_error(
 
     After ERROR_THRESHOLD consecutive errors, the domain is marked with the
     corresponding bad_* column (e.g., bad_dns, bad_ssl, bad_tcp, etc.).
+    ROBOT and HARD error types are immediately terminal on first occurrence.
 
     Args:
         domain: The domain to update
@@ -1022,6 +1023,7 @@ def increment_domain_error(
     Note: Domain is expected to be pre-normalized to lowercase by caller.
     """
     ERROR_THRESHOLD = int(os.getenv("VMCRAWL_ERROR_BUFFER", "8"))
+    IMMEDIATE_TERMINAL_TYPES = ("ROBOT", "HARD")
     TRACKED_ERROR_TYPES = (
         "DNS",
         "SSL",
@@ -1108,8 +1110,11 @@ def increment_domain_error(
                     # Same error type - increment
                     new_errors = current_errors + 1
 
-                    # Check if threshold reached
-                    if new_errors >= ERROR_THRESHOLD:
+                    # Check if threshold reached (immediate for ROBOT/HARD)
+                    threshold = (
+                        1 if error_type in IMMEDIATE_TERMINAL_TYPES else ERROR_THRESHOLD
+                    )
+                    if new_errors >= threshold:
                         status = ERROR_TYPE_TO_BAD_COLUMN.get(error_type)
                         if status:
                             mark_domain_status(domain, status)
@@ -1118,6 +1123,14 @@ def increment_domain_error(
                 elif error_type:
                     # Different tracked error type or first occurrence - reset to 1
                     new_errors = 1
+
+                    # Immediate terminal types go bad on first occurrence
+                    if error_type in IMMEDIATE_TERMINAL_TYPES:
+                        status = ERROR_TYPE_TO_BAD_COLUMN.get(error_type)
+                        if status:
+                            mark_domain_status(domain, status)
+                            delete_domain_if_known(domain)
+                            return
                 else:
                     # Non-tracked error types - set count to null
                     new_errors = None

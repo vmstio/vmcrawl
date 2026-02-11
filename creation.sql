@@ -154,47 +154,6 @@ VALUES
   ('1');
 
 INSERT INTO
-  junk_words (keywords, comments)
-VALUES
-  ('activitypub-proxy.cf', NULL),
-  ('activitypub-troll.cf', NULL),
-  ('appspot.com', NULL),
-  ('balena-devices.com', NULL),
-  ('cf-ipfs.com', NULL),
-  ('cloud-xip.com', NULL),
-  ('deno.dev', NULL),
-  ('devtunnels.ms', NULL),
-  ('elestio.app', NULL),
-  ('fly.dev', NULL),
-  ('github.dev', NULL),
-  ('gitpod.io', NULL),
-  ('herokuapp.com', NULL),
-  ('lhr.life', NULL),
-  ('lhrtunnel.link', NULL),
-  ('linodeusercontent.com', NULL),
-  ('localhost.run', NULL),
-  ('loca.lt', NULL),
-  ('myterminus.com', NULL),
-  ('netlify.app', NULL),
-  ('ngrok.app', NULL),
-  ('ngrok.dev', NULL),
-  ('ngrok-free.app', NULL),
-  ('ngrok-free.dev', NULL),
-  ('ngrok.io', NULL),
-  ('nope.rodeo', NULL),
-  ('pages.dev', NULL),
-  ('penginn.net', NULL),
-  ('pikapod.net', NULL),
-  ('serveo.net', NULL),
-  ('spacehost.dev', NULL),
-  ('srv.us', NULL),
-  ('tunnelto.dev', NULL),
-  ('vercel.app', NULL),
-  ('wordpress.com', NULL),
-  ('workers.dev', NULL),
-  ('wpcomstaging.com', NULL);
-
-INSERT INTO
   nightly_versions (version, start_date, end_date)
 VALUES
   ('4.4.0-rc.1', '2025-07-02', '2025-07-02'),
