@@ -1318,6 +1318,43 @@ def delete_domain_if_known(domain: str) -> None:
             conn.rollback()
 
 
+def mark_domain_as_alias(domain: str) -> None:
+    """Mark a domain as an alias in raw_domains and clear all other state.
+
+    When a domain is identified as an alias to another canonical domain,
+    all error tracking, flags, and status information should be cleared
+    since they no longer apply.
+
+    Args:
+        domain: The domain to mark as an alias (should be pre-normalized to lowercase)
+    """
+    # Build list of all state columns to clear
+    state_columns = ["errors", "reason", "nodeinfo"] + list(BAD_COLUMNS)
+
+    # Build SET clause: alias = TRUE, col1 = NULL, col2 = NULL, ...
+    set_clause = sql.SQL("alias = TRUE, ") + sql.SQL(", ").join(
+        sql.SQL("{} = NULL").format(sql.Identifier(col)) for col in state_columns
+    )
+
+    query = sql.SQL("""
+        INSERT INTO raw_domains (domain, alias)
+        VALUES (%s, TRUE)
+        ON CONFLICT(domain) DO UPDATE SET {}
+    """).format(set_clause)
+
+    with db_pool.connection() as conn, conn.cursor() as cursor:
+        try:
+            _ = cursor.execute(query, (domain,))
+            conn.commit()
+        except Exception as exception:
+            vmc_output(
+                f"{domain}: Failed to mark as alias: {exception}",
+                "red",
+                use_tqdm=True,
+            )
+            conn.rollback()
+
+
 def delete_domain_from_raw(domain: str) -> None:
     """Delete a domain from the raw_domains table."""
     with db_pool.connection() as conn, conn.cursor() as cursor:
@@ -3638,8 +3675,9 @@ def process_mastodon_instance(
         version_info = f"{version_info} ({nodeinfo_20_result['software']['version']})"
     vmc_output(f"{db_domain}: {version_info}", "green", use_tqdm=True)
 
-    # If actual_domain is different from domain, delete the old domain entry
+    # If actual_domain is different from domain, mark original as alias and delete from mastodon_domains
     if actual_domain and actual_domain != domain:
+        mark_domain_as_alias(domain)
         delete_domain_if_known(domain)
 
 
