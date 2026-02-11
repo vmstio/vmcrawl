@@ -3,47 +3,86 @@
 -- These indexes are optional but significantly improve query performance
 
 -- =============================================================================
+-- Cleanup: drop indexes for removed columns
+-- =============================================================================
+
+DROP INDEX IF EXISTS idx_raw_domains_ignore;
+DROP INDEX IF EXISTS idx_raw_domains_failed;
+DROP INDEX IF EXISTS idx_raw_domains_nxdomain;
+DROP INDEX IF EXISTS idx_raw_domains_norobots;
+DROP INDEX IF EXISTS idx_raw_domains_noapi;
+
+-- =============================================================================
 -- raw_domains table indexes
 -- =============================================================================
 
--- Index for filtering by terminal status flags (used in crawl mode domain selection)
+-- Partial indexes for bad_* terminal state flags
+-- Used by: get_all_bad_domains() bulk query, menu options 60-72, api.py health endpoint
 -- Partial indexes only include rows where the flag is TRUE (smaller, faster)
-CREATE INDEX IF NOT EXISTS idx_raw_domains_ignore
-    ON raw_domains (domain) WHERE ignore = TRUE;
+CREATE INDEX IF NOT EXISTS idx_raw_domains_bad_dns
+    ON raw_domains (domain) WHERE bad_dns = TRUE;
 
-CREATE INDEX IF NOT EXISTS idx_raw_domains_failed
-    ON raw_domains (domain) WHERE failed = TRUE;
+CREATE INDEX IF NOT EXISTS idx_raw_domains_bad_ssl
+    ON raw_domains (domain) WHERE bad_ssl = TRUE;
 
-CREATE INDEX IF NOT EXISTS idx_raw_domains_nxdomain
-    ON raw_domains (domain) WHERE nxdomain = TRUE;
+CREATE INDEX IF NOT EXISTS idx_raw_domains_bad_tcp
+    ON raw_domains (domain) WHERE bad_tcp = TRUE;
 
-CREATE INDEX IF NOT EXISTS idx_raw_domains_norobots
-    ON raw_domains (domain) WHERE norobots = TRUE;
+CREATE INDEX IF NOT EXISTS idx_raw_domains_bad_type
+    ON raw_domains (domain) WHERE bad_type = TRUE;
 
-CREATE INDEX IF NOT EXISTS idx_raw_domains_noapi
-    ON raw_domains (domain) WHERE noapi = TRUE;
+CREATE INDEX IF NOT EXISTS idx_raw_domains_bad_file
+    ON raw_domains (domain) WHERE bad_file = TRUE;
 
+CREATE INDEX IF NOT EXISTS idx_raw_domains_bad_api
+    ON raw_domains (domain) WHERE bad_api = TRUE;
+
+CREATE INDEX IF NOT EXISTS idx_raw_domains_bad_json
+    ON raw_domains (domain) WHERE bad_json = TRUE;
+
+CREATE INDEX IF NOT EXISTS idx_raw_domains_bad_http2xx
+    ON raw_domains (domain) WHERE bad_http2xx = TRUE;
+
+CREATE INDEX IF NOT EXISTS idx_raw_domains_bad_http3xx
+    ON raw_domains (domain) WHERE bad_http3xx = TRUE;
+
+CREATE INDEX IF NOT EXISTS idx_raw_domains_bad_http4xx
+    ON raw_domains (domain) WHERE bad_http4xx = TRUE;
+
+CREATE INDEX IF NOT EXISTS idx_raw_domains_bad_http5xx
+    ON raw_domains (domain) WHERE bad_http5xx = TRUE;
+
+CREATE INDEX IF NOT EXISTS idx_raw_domains_bad_hard
+    ON raw_domains (domain) WHERE bad_hard = TRUE;
+
+CREATE INDEX IF NOT EXISTS idx_raw_domains_bad_robot
+    ON raw_domains (domain) WHERE bad_robot = TRUE;
+
+-- Index for alias domain filtering
+-- Used by: alias domain skip logic
 CREATE INDEX IF NOT EXISTS idx_raw_domains_alias
     ON raw_domains (domain) WHERE alias = TRUE;
 
--- Index for nodeinfo filtering (used to find Mastodon instances in raw_domains)
+-- Index for nodeinfo filtering (used to find non-Mastodon platforms and Mastodon instances)
+-- Used by: get_not_masto_domains(), menu options 4, 5, 10, 53, api.py health endpoint
 CREATE INDEX IF NOT EXISTS idx_raw_domains_nodeinfo
     ON raw_domains (nodeinfo) WHERE nodeinfo IS NOT NULL;
 
--- Composite index for dashboard queries: reason + nodeinfo filtering
--- Used by: WHERE reason LIKE 'SSL%' AND nodeinfo = 'mastodon'
--- Also covers: WHERE reason LIKE 'DNS%' AND nodeinfo = 'mastodon', etc.
-CREATE INDEX IF NOT EXISTS idx_raw_domains_reason_nodeinfo
-    ON raw_domains (reason, nodeinfo) WHERE reason IS NOT NULL;
-
--- Index for error reason queries (LIKE 'SSL%', 'DNS%', etc.)
+-- Index for error reason queries (LIKE 'SSL%', 'DNS%', regex patterns, etc.)
+-- Used by: menu options 20-32 (retry errors by type)
 -- B-tree indexes support prefix LIKE queries
 CREATE INDEX IF NOT EXISTS idx_raw_domains_reason
     ON raw_domains (reason) WHERE reason IS NOT NULL;
 
 -- Index for error count ordering (used in error report queries)
+-- Used by: menu options 20-32 ORDER BY errors
 CREATE INDEX IF NOT EXISTS idx_raw_domains_errors
     ON raw_domains (errors) WHERE errors IS NOT NULL;
+
+-- Index for uncrawled domain selection (menu option 0)
+-- Used by: SELECT domain FROM raw_domains WHERE errors = 0 ORDER BY LENGTH(DOMAIN)
+CREATE INDEX IF NOT EXISTS idx_raw_domains_uncrawled
+    ON raw_domains ((LENGTH(domain))) WHERE errors = 0;
 
 -- =============================================================================
 -- mastodon_domains table indexes
@@ -51,27 +90,25 @@ CREATE INDEX IF NOT EXISTS idx_raw_domains_errors
 
 -- Index for active_users_monthly ordering (most common sort in API and fetch)
 -- Descending order matches the common ORDER BY active_users_monthly DESC pattern
+-- Used by: fetch mode domain selection, menu options 50-52, API listing endpoints
 CREATE INDEX IF NOT EXISTS idx_mastodon_domains_mau_desc
     ON mastodon_domains (active_users_monthly DESC NULLS LAST);
 
 -- Index for software_version grouping and filtering
--- Used by /stats/versions, /stats/branches, and version-based queries
+-- Used by: API /stats/versions, /stats/branches, branch statistics queries
 CREATE INDEX IF NOT EXISTS idx_mastodon_domains_version
     ON mastodon_domains (software_version);
 
 -- Composite index for version queries with MAU ordering
 -- Covers: WHERE software_version LIKE 'x.x%' ORDER BY active_users_monthly DESC
+-- Used by: menu option 51, API version-specific endpoints
 CREATE INDEX IF NOT EXISTS idx_mastodon_domains_version_mau
     ON mastodon_domains (software_version, active_users_monthly DESC NULLS LAST);
 
--- Index for timestamp-based queries (Last Crawled panel, time-based reports)
+-- Index for timestamp-based cleanup queries
+-- Used by: cleanup_old_domains() DELETE WHERE timestamp <= INTERVAL
 CREATE INDEX IF NOT EXISTS idx_mastodon_domains_timestamp
     ON mastodon_domains (timestamp DESC NULLS LAST);
-
--- Index for version prefix matching (dashboard LIKE queries)
--- Supports: WHERE software_version LIKE '4.5%', '4.4%', etc.
--- B-tree naturally supports prefix LIKE queries
--- Note: software_version index above already covers this, but including for documentation
 
 -- =============================================================================
 -- nightly_versions table indexes
@@ -81,7 +118,7 @@ CREATE INDEX IF NOT EXISTS idx_mastodon_domains_timestamp
 CREATE INDEX IF NOT EXISTS idx_nightly_versions_dates
     ON nightly_versions (start_date DESC, end_date DESC);
 
--- Index for version lookups
+-- Index for version lookups (used in add/update operations)
 CREATE INDEX IF NOT EXISTS idx_nightly_versions_version
     ON nightly_versions (version);
 
@@ -89,50 +126,28 @@ CREATE INDEX IF NOT EXISTS idx_nightly_versions_version
 -- patch_versions table indexes
 -- =============================================================================
 
--- Index for n_level lookups (frequent in branch statistics)
-CREATE INDEX IF NOT EXISTS idx_patch_versions_nlevel
-    ON patch_versions (n_level);
-
--- Index for branch lookups (used in dashboard version matching queries)
--- Supports: SELECT branch || '.%' FROM patch_versions WHERE n_level = X
-CREATE INDEX IF NOT EXISTS idx_patch_versions_branch
-    ON patch_versions (branch);
-
--- =============================================================================
--- eol_versions table indexes
--- =============================================================================
-
--- eol_versions already has PRIMARY KEY on software_version
--- No additional indexes needed - PK provides fast lookups for EXISTS subqueries
-
--- =============================================================================
--- dni table indexes
--- =============================================================================
-
--- Index for domain lookups in DNI checks (already has PK, but explicit for clarity)
--- Note: PRIMARY KEY already creates an index, this is redundant but documents intent
+-- n_level is the PRIMARY KEY, so it already has an index
+-- branch is used in subqueries for statistics (SELECT branch || '.%' WHERE n_level = X)
+-- With only a handful of rows, additional indexes provide no benefit
 
 -- =============================================================================
 -- error_log table indexes
 -- =============================================================================
 
--- Index for timestamp-based log queries
-CREATE INDEX IF NOT EXISTS idx_error_log_timestamp
-    ON error_log (timestamp DESC);
-
 -- Index for domain-based error lookups
 CREATE INDEX IF NOT EXISTS idx_error_log_domain
     ON error_log (domain) WHERE domain IS NOT NULL;
+
+-- Index for timestamp-based log queries
+CREATE INDEX IF NOT EXISTS idx_error_log_timestamp
+    ON error_log (timestamp DESC);
 
 -- =============================================================================
 -- statistics table indexes
 -- =============================================================================
 
--- Index for date-based statistics queries (ORDER BY date DESC LIMIT 1)
--- Note: PRIMARY KEY on date already provides B-tree index
--- For DESC ordering, an explicit DESC index can help:
-CREATE INDEX IF NOT EXISTS idx_statistics_date_desc
-    ON statistics (date DESC);
+-- PRIMARY KEY on date already provides B-tree index
+-- No additional indexes needed - table is write-only for historical snapshots
 
 -- =============================================================================
 -- Analyze tables after creating indexes
