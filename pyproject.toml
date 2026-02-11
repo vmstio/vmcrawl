@@ -15,6 +15,7 @@ dependencies = [
     "fastapi",
     "uvicorn[standard]",
     "cachetools",
+    "paramiko",
 ]
 
 [tool.setuptools]

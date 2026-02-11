@@ -30,6 +30,7 @@ try:
 
     import httpx
     import idna.core
+    import paramiko
     import psycopg
     import toml
     from cachetools import TTLCache
@@ -187,11 +188,116 @@ RE_QUOTED_STRING = re.compile(r"'[^']+'")
 # DATABASE CONNECTION
 # =============================================================================
 
+# Optional SSH tunnel for remote database access
+# Set VMCRAWL_SSH_HOST to enable tunneling through an SSH server
+_ssh_transport: paramiko.Transport | None = None
+_ssh_tunnel_port: int | None = None
+_ssh_host = os.getenv("VMCRAWL_SSH_HOST")
+
+if _ssh_host:
+    _db_host = os.getenv("VMCRAWL_POSTGRES_HOST", "localhost")
+    _db_port = int(os.getenv("VMCRAWL_POSTGRES_PORT", "5432"))
+    try:
+        _ssh_transport = paramiko.Transport(
+            (_ssh_host, int(os.getenv("VMCRAWL_SSH_PORT", "22")))
+        )
+        _ssh_key_path = os.path.expanduser(
+            os.getenv("VMCRAWL_SSH_KEY", "~/.ssh/id_rsa")
+        )
+        _ssh_key_pass = os.getenv("VMCRAWL_SSH_KEY_PASS")
+        _ssh_pkey: paramiko.PKey | None = None
+        for _key_class in (paramiko.Ed25519Key, paramiko.ECDSAKey, paramiko.RSAKey):
+            try:
+                _ssh_pkey = _key_class.from_private_key_file(
+                    _ssh_key_path, password=_ssh_key_pass
+                )
+                break
+            except (paramiko.SSHException, ValueError):
+                continue
+        if _ssh_pkey is None:
+            raise paramiko.SSHException(f"Unable to load SSH key: {_ssh_key_path}")
+        _ssh_transport.connect(
+            username=os.getenv("VMCRAWL_SSH_USER", os.getlogin()), pkey=_ssh_pkey
+        )
+
+        # Bind a local listening socket for the tunnel
+        _tunnel_sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        _tunnel_sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+        _tunnel_sock.bind(("127.0.0.1", 0))
+        _ssh_tunnel_port = _tunnel_sock.getsockname()[1]
+        _tunnel_sock.listen(20)
+
+        def _ssh_tunnel_accept_loop() -> None:
+            """Accept local connections and forward them through the SSH tunnel."""
+            while _ssh_transport and _ssh_transport.is_active():
+                try:
+                    _tunnel_sock.settimeout(1.0)
+                    client_sock, _ = _tunnel_sock.accept()
+                except socket.timeout:
+                    continue
+                except OSError:
+                    break
+                try:
+                    channel = _ssh_transport.open_channel(
+                        "direct-tcpip",
+                        (_db_host, _db_port),
+                        client_sock.getpeername(),
+                    )
+                except Exception:
+                    client_sock.close()
+                    continue
+
+                def _forward(src: Any, dst: Any) -> None:
+                    try:
+                        while True:
+                            data = src.recv(65536)
+                            if not data:
+                                break
+                            dst.sendall(data)
+                    except Exception:
+                        pass
+                    finally:
+                        try:
+                            src.close()
+                        except Exception:
+                            pass
+                        try:
+                            dst.close()
+                        except Exception:
+                            pass
+
+                threading.Thread(
+                    target=_forward, args=(client_sock, channel), daemon=True
+                ).start()
+                threading.Thread(
+                    target=_forward, args=(channel, client_sock), daemon=True
+                ).start()
+
+        _tunnel_thread = threading.Thread(target=_ssh_tunnel_accept_loop, daemon=True)
+        _tunnel_thread.start()
+
+        print(
+            f"SSH tunnel established: 127.0.0.1:{_ssh_tunnel_port}"
+            f" -> {_db_host}:{_db_port} via {_ssh_host}"
+        )
+    except Exception as exception:
+        print(f"Error establishing SSH tunnel: {exception}")
+        sys.exit(1)
+
+_db_connect_host = (
+    "127.0.0.1" if _ssh_tunnel_port else os.getenv("VMCRAWL_POSTGRES_HOST", "localhost")
+)
+_db_connect_port = (
+    str(_ssh_tunnel_port)
+    if _ssh_tunnel_port
+    else os.getenv("VMCRAWL_POSTGRES_PORT", "5432")
+)
+
 conn_string = (
     f"postgresql://{os.getenv('VMCRAWL_POSTGRES_USER')}:"
     f"{os.getenv('VMCRAWL_POSTGRES_PASS')}@"
-    f"{os.getenv('VMCRAWL_POSTGRES_HOST', 'localhost')}:"
-    f"{os.getenv('VMCRAWL_POSTGRES_PORT', '5432')}/"
+    f"{_db_connect_host}:"
+    f"{_db_connect_port}/"
     f"{os.getenv('VMCRAWL_POSTGRES_DATA')}"
 )
 
@@ -227,6 +333,11 @@ try:
             db_pool.close(timeout=5)
         except Exception:
             pass
+        if _ssh_transport is not None:
+            try:
+                _ssh_transport.close()
+            except Exception:
+                pass
 
     _ = atexit.register(cleanup_db_connections)
 except psycopg.Error as exception:
@@ -5080,6 +5191,11 @@ async def async_main():
             db_pool.close(timeout=5)
         except Exception:
             pass
+        if _ssh_transport is not None:
+            try:
+                _ssh_transport.close()
+            except Exception:
+                pass
         _ = gc.collect()
 
     # Initialize version information once at startup (outside loop)
