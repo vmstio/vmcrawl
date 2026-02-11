@@ -560,7 +560,13 @@ async def get_domain_stats(_api_key: str | None = Depends(get_api_key)):
                 """
                 SELECT COUNT(DISTINCT domain) AS unique_domain_count
                 FROM raw_domains
-                WHERE (ignore IS NOT NULL OR nxdomain IS NOT NULL OR failed IS NOT NULL)
+                WHERE (bad_dns IS NOT NULL OR bad_ssl IS NOT NULL
+                       OR bad_tcp IS NOT NULL OR bad_type IS NOT NULL
+                       OR bad_file IS NOT NULL OR bad_api IS NOT NULL
+                       OR bad_json IS NOT NULL OR bad_http2xx IS NOT NULL
+                       OR bad_http3xx IS NOT NULL OR bad_http4xx IS NOT NULL
+                       OR bad_http5xx IS NOT NULL
+                       OR bad_hard IS NOT NULL OR bad_robot IS NOT NULL)
             """
             )
             result = cur.fetchone()
@@ -571,7 +577,7 @@ async def get_domain_stats(_api_key: str | None = Depends(get_api_key)):
                 """
                 SELECT COUNT(DISTINCT domain) AS unique_domain_count
                 FROM raw_domains
-                WHERE (noapi IS NOT NULL OR norobots IS NOT NULL OR baddata IS NOT NULL)
+                WHERE (baddata IS NOT NULL)
             """
             )
             result = cur.fetchone()
