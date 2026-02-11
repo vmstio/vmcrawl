@@ -1875,7 +1875,7 @@ def get_existing_domains() -> set[str] | None:
             conn.commit()
             return existing_domains
         except Exception as e:
-            vmc_output(f"Failed to get list of existing domains: {e}", "orange")
+            vmc_output(f"Failed to get list of existing domains: {e}", "red")
             conn.rollback()
             return None
 
@@ -1920,7 +1920,7 @@ def import_domains(domains, use_tqdm=False):
                 conn.commit()
         except Exception as e:
             vmc_output(
-                f"Failed to import domain list: {e}", "orange", use_tqdm=use_tqdm
+                f"Failed to import domain list: {e}", "red", use_tqdm=use_tqdm
             )
             conn.rollback()
             return
@@ -1949,7 +1949,7 @@ def _detect_vowels(domain):
     try:
         return bool(RE_VOWEL_PATTERN.search(domain))
     except Exception as e:
-        vmc_output(f"Error detecting vowels: {e}", "orange")
+        vmc_output(f"Error detecting vowels: {e}", "red")
         return False
 
 
@@ -2274,7 +2274,7 @@ def get_tlds_from_db() -> set[str]:
             tlds: set[str] = {row[0] for row in cursor}
             return tlds
         except Exception as e:
-            vmc_output(f"Failed to get TLDs from database: {e}", "orange")
+            vmc_output(f"Failed to get TLDs from database: {e}", "red")
             conn.rollback()
             return set()
 
@@ -2300,7 +2300,7 @@ def import_tlds(tlds: set[str]) -> int:
                 return inserted_count
             return 0
         except Exception as e:
-            vmc_output(f"Failed to import TLDs: {e}", "orange")
+            vmc_output(f"Failed to import TLDs: {e}", "red")
             conn.rollback()
             return 0
 
@@ -2341,7 +2341,7 @@ def get_existing_dni_domains() -> set[str]:
             existing_domains: set[str] = {row[0] for row in cursor}
             return existing_domains
         except Exception as e:
-            vmc_output(f"Failed to get existing DNI domains: {e}", "orange")
+            vmc_output(f"Failed to get existing DNI domains: {e}", "red")
             conn.rollback()
             return set()
 
@@ -2371,7 +2371,7 @@ def import_dni_domains(domains: list[str], comment: str = "iftas") -> int:
             vmc_output("No new domains to import", "yellow")
             return 0
         except Exception as e:
-            vmc_output(f"Failed to import DNI domains: {e}", "orange")
+            vmc_output(f"Failed to import DNI domains: {e}", "red")
             conn.rollback()
             return 0
 
@@ -2814,7 +2814,7 @@ def _handle_http_failed(domain, target, response, preserve_status=None):
     """Handle HTTP 410/418/451/999 hard-fail codes via error counting."""
     code = response.status_code
     error_message = f"HTTP {code} on {target}"
-    vmc_output(f"{domain}: {error_message}", "orange", use_tqdm=True)
+    vmc_output(f"{domain}: {error_message}", "yellow", use_tqdm=True)
     log_error(domain, error_message)
     increment_domain_error(domain, f"HARD+{target}", preserve_status)
 
@@ -3026,7 +3026,7 @@ async def check_robots_txt(domain, preserve_status=None):
                     ):
                         vmc_output(
                             f"{domain}: Crawling is prohibited by robots.txt",
-                            "orange",
+                            "yellow",
                             use_tqdm=True,
                         )
                         await asyncio.to_thread(
@@ -3807,7 +3807,7 @@ async def process_domain(domain, nightly_version_ranges, user_choice=None):
         if is_401:
             # Instance API requires authentication (401 Unauthorized)
             error_to_print = "Instance API requires authentication"
-            vmc_output(f"{domain}: {error_to_print}", "orange", use_tqdm=True)
+            vmc_output(f"{domain}: {error_to_print}", "yellow", use_tqdm=True)
             await asyncio.to_thread(log_error, domain, error_to_print)
             await asyncio.to_thread(
                 increment_domain_error, domain, "API+instance_api", preserve_status
