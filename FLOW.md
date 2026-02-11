@@ -23,7 +23,7 @@
                     ▼                        ▼
             ┌──────────────┐    ┌────────────────────────────────────┐
             │  STOP/RETURN │    │  discover_backend_domain_parallel()│
-            │  (norobots)  │    │  Run host-meta & webfinger in      │
+            │  (bad_robot) │    │  Run host-meta & webfinger in      │
             └──────────────┘    │  parallel via asyncio.gather()     │
                                 └───────────────────┬────────────────┘
                                                     │
@@ -93,9 +93,9 @@
        ▼                      ▼             │
 ┌────────────────┐  ┌──────────────────┐   │
 │ STOP/RETURN    │  │ Instance URI     │   │
-│ (noapi)        │  │ found?           │   │
-│ Mark domain as │  └──────────┬───────┘   │
-│ noapi, delete  │             │           │
+│ (bad_api)      │  │ found?           │   │
+│ Record API     │  └──────────┬───────┘   │
+│ error, delete  │             │           │
 │ from known     │  ┌──────────┴───────┐   │
 │ domains        │  │                  │   │
 └────────────────┘  │               YES│NO │
@@ -180,8 +180,8 @@ Backend domain discovery runs **host-meta** and **webfinger** in parallel using 
   - v1 API: `uri` field (authoritative domain URI)
 - **Purpose**: Get canonical domain and detect aliases
 - **Special Handling**: 
-  - **401 Unauthorized**: Domain marked as `noapi = TRUE`, processing stops
-  - **Other errors**: Domain marked with error reason, error counter incremented
+  - **401 Unauthorized**: `API` error recorded via `increment_domain_error`, processing stops
+  - **Other errors**: Error recorded via `increment_domain_error`, counter incremented
 
 ## Key Decision Points
 
@@ -228,32 +228,28 @@ Domains marked with certain flags are skipped during processing:
 
 **Alias domains**:
 - Loaded at startup via `get_alias_domains()`
-- Checked in `should_skip_domain()`
+- Checked in `_should_skip_domain()`
 - Skipped unless user selects option "16" (Retry Alias)
 - Log message: `"{domain}: Alias Domain"` (cyan)
 
-**NoAPI domains** (Instance API requires authentication):
-- Loaded at startup via `get_noapi_domains()`
-- Checked in `should_skip_domain()`
-- Skipped unless user selects option "15" (Retry NoAPI)
-- Log message: `"{domain}: API Authentication Required"` (cyan)
-- Reason: Instance has restricted their API endpoints with authentication requirements
-
-**NoRobots domains** (Crawling prohibited):
-- Loaded at startup via `get_norobots_domains()`
-- Checked in `should_skip_domain()`
-- Skipped unless user selects option "14" (Retry Prohibited)
-- Log message: `"{domain}: Crawling Prohibited"` (cyan)
+**Bad domains** (terminal error states):
+- Loaded at startup via `get_all_bad_domains()` which returns a dict of `{column: set_of_domains}` for all `bad_*` columns
+- Checked in `_should_skip_domain()` by iterating `bad_domain_sets`
+- Skipped unless user selects the corresponding retry option (menu choices 60-73)
+- Log message: `"{domain}: Bad Domain ({column})"` (cyan)
 
 ## Error Handling
 
-- **robots.txt blocks**: Stop immediately, mark as norobots using `mark_domain_status(domain, "norobots")`
+- **robots.txt blocks**: Stop immediately, record `ROBOT` error via `increment_domain_error`
 - **Host-meta fails**: Continue to webfinger (silent, no logging)
 - **Webfinger fails**: Continue to nodeinfo with original domain (silent, no logging)
 - **NodeInfo fails**: Stop, log error, increment error counter (ONLY logged failure)
 - **Non-Mastodon detected**: Save software name to `nodeinfo` column, mark and skip (not an error)
-- **Instance API returns 401**: Stop immediately, mark as noapi using `mark_domain_status(domain, "noapi")`, delete from known domains
+- **Instance API returns 401**: Stop immediately, record `API` error via `increment_domain_error`, delete from known domains
+- **HTTP 410/418/451/999**: Record `HARD` error via `increment_domain_error`
 - **Alias detected**: Stop, mark as alias using `mark_domain_status(domain, "alias")`, skip in future runs
+
+All errors route through `increment_domain_error`, which tracks consecutive same-type errors and sets the corresponding `bad_*` column after 8 consecutive failures.
 
 ### Why Silent Failures?
 

@@ -232,55 +232,67 @@ You can customize the crawling process with the following options:
 
 **Process new domains:**
 
-- `0` Recently Fetched
+- `0` Uncrawled (recently fetched domains)
 
 **Change process direction:**
 
-- `1` Standard Alphabetical List
-- `2` Reverse Alphabetical List
-- `3` Random Order (this is the default option for headless runs)
+- `1` Standard (alphabetical)
+- `2` Reverse (reverse alphabetical)
+- `3` Random (default for headless runs)
+
+**Retry any (non-fatal) errors:**
+
+- `4` Any (all domains with errors)
+- `5` Known (known Mastodon instances with errors)
 
 **Retry fatal errors:**
 
-- `6` Other Platforms (non-Mastodon instances)
-- `7` Rejected (HTTP 410/418 errors)
-- `8` Failed (NXDOMAIN/emoji domains)
-- `9` Crawling Prohibited (robots.txt blocks)
+- `10` Other (non-Mastodon platforms)
 
 **Retry connection errors:**
 
-- `10` SSL (certificate errors)
-- `11` HTTP (general HTTP errors)
-- `12` TCP (timeouts, connection issues)
-- `13` MAX (maximum redirects exceeded)
-- `14` DNS (name resolution failures)
+- `20` SSL (certificate errors)
+- `21` TCP (timeouts, connection issues)
+- `22` DNS (name resolution failures)
 
-**Retry HTTP errors:**
+**Retry TCP errors:**
 
-- `20` 2xx status codes
-- `21` 3xx status codes
-- `22` 4xx status codes
-- `23` 5xx status codes
+- `30` 2xx status codes
+- `31` 3xx status codes
+- `32` 4xx status codes
+- `33` 5xx status codes
 
-**Retry specific errors:**
+**Retry target errors:**
 
-- `30` JSON parsing errors
-- `31` TXT/plain text response errors
-- `32` API errors
+- `40` Bad JSON (JSON parsing errors)
+- `41` Bad Size (response size errors)
+- `42` Bad Type (content type errors)
+- `43` Bad MAU (MAU validation errors)
+- `44` Bad API (API errors)
 
 **Retry known instances:**
 
-- `40` Unpatched (instances not running latest patches)
-- `41` Main (instances on development/main branch)
-- `42` Development (instances running alpha, beta, or rc versions)
-- `43` Inactive (0 active monthly users)
-- `44` All Good (all known instances)
-- `45` Misreporting (instances with invalid version data)
+- `50` Unpatched (instances not running latest patches)
+- `51` Main (instances on development/main branch)
+- `52` Active (instances with active monthly users)
+- `53` All (all known instances)
 
-**Retry general errors:**
+**Retry bad domains** (terminal states):
 
-- `50` Domains with >14 Errors
-- `51` Domains with 7-14 Errors
+- `60` DNS
+- `61` SSL
+- `62` TCP
+- `63` Type
+- `64` File
+- `65` API
+- `66` JSON
+- `67` HTTP 2xx
+- `68` HTTP 3xx
+- `69` HTTP 4xx
+- `70` HTTP 5xx
+- `71` Hard Fail (HTTP 410/418/451/999)
+- `72` Robots (robots.txt prohibited)
+- `73` MAU (MAU validation failures)
 
 #### Headless Crawling
 
