@@ -2913,7 +2913,7 @@ def _is_dni_or_invalid_tld(domain, dni_domains, domain_ending_suffixes):
         domain_ending_suffixes: Pre-computed set of valid TLD suffixes (e.g., {".com", ".org"})
     """
     if any(dni in domain for dni in dni_domains):
-        vmc_output(f"{domain}: Purging known dni domain", "cyan", use_tqdm=True)
+        vmc_output(f"{domain}: Purging known DNI domain", "cyan", use_tqdm=True)
         delete_domain_if_known(domain)
         delete_domain_from_raw(domain)
         return True
@@ -3573,7 +3573,6 @@ def process_mastodon_instance(
         vmc_output(f"{db_domain}: {error_to_print}", "yellow", use_tqdm=True)
         log_error(domain, error_to_print)
         increment_domain_error(domain, "MAU", preserve_status)
-        delete_domain_if_known(domain)
         return
 
     required_fields = [
@@ -3586,7 +3585,6 @@ def process_mastodon_instance(
             vmc_output(f"{db_domain}: {error_msg}", "yellow", use_tqdm=True)
             log_error(domain, error_msg)
             increment_domain_error(domain, "MAU", preserve_status)
-            delete_domain_if_known(domain)
             return
 
     active_month_users = users["activeMonth"]
@@ -3598,7 +3596,6 @@ def process_mastodon_instance(
         vmc_output(f"{db_domain}: {error_to_print}", "yellow", use_tqdm=True)
         log_error(domain, error_to_print)
         increment_domain_error(domain, "VER", preserve_status)
-        delete_domain_if_known(domain)
         return
 
     # Use db_domain (actual_domain if available) for database updates
