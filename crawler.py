@@ -1165,7 +1165,7 @@ def increment_domain_error(
             # This avoids unnecessary writes for domains we won't process
             bad_col_list = ", ".join(BAD_COLUMNS)
             select_query: Any = (
-                f"SELECT errors, reason, nodeinfo, {bad_col_list}"
+                f"SELECT errors, reason, nodeinfo, alias, {bad_col_list}"
                 f" FROM raw_domains WHERE domain = %s"
             )
             _ = cursor.execute(select_query, (domain,))
@@ -1175,9 +1175,15 @@ def increment_domain_error(
                 current_errors = result[0] or 0
                 previous_reason = result[1] or ""
                 nodeinfo = result[2]
-                # bad_* columns start at index 3
+                is_alias = result[3] or False
+
+                # If domain is marked as an alias, skip error tracking entirely
+                if is_alias:
+                    return
+
+                # bad_* columns start at index 4
                 current_bad = {
-                    col: (result[3 + i] or False) for i, col in enumerate(BAD_COLUMNS)
+                    col: (result[4 + i] or False) for i, col in enumerate(BAD_COLUMNS)
                 }
 
                 # If domain is already in a terminal state, skip entirely
@@ -4642,22 +4648,29 @@ def write_statistics_to_database(stats_values):
 
 def load_from_database(user_choice):
     """Load domain list from database based on user menu selection."""
+    # Common filter to exclude alias domains from all raw_domains queries
+    no_alias = "AND (alias IS NULL OR alias = FALSE) "
+
     query_map = {
         "0": (
-            "SELECT domain FROM raw_domains WHERE errors = 0 ORDER BY LENGTH(DOMAIN)"
+            "SELECT domain FROM raw_domains WHERE errors = 0 "
+            + no_alias
+            + "ORDER BY LENGTH(DOMAIN)"
         ),
         "1": (
             "SELECT domain FROM raw_domains WHERE "
             + " AND ".join(f"({col} IS NULL OR {col} = FALSE)" for col in BAD_COLUMNS)
             + " AND "
             "(nodeinfo = 'mastodon' OR nodeinfo IS NULL) "
-            "ORDER BY domain"
+            + no_alias
+            + "ORDER BY domain"
         ),
         "4": (
             "SELECT DISTINCT rd.domain "
             "FROM raw_domains rd "
             "WHERE rd.nodeinfo = 'mastodon' "
             "  AND rd.reason IS NOT NULL "
+            "  AND (rd.alias IS NULL OR rd.alias = FALSE) "
             "  AND NOT EXISTS ( "
             "    SELECT 1 "
             "    FROM mastodon_domains md "
@@ -4668,67 +4681,91 @@ def load_from_database(user_choice):
             "SELECT DISTINCT rd.domain "
             "FROM raw_domains rd "
             "INNER JOIN mastodon_domains md ON rd.domain = md.domain "
-            "WHERE rd.reason IS NOT NULL"
+            "WHERE rd.reason IS NOT NULL "
+            "AND (rd.alias IS NULL OR rd.alias = FALSE)"
         ),
         "10": (
             "SELECT domain FROM raw_domains WHERE nodeinfo != 'mastodon' "
-            "ORDER BY domain"
+            + no_alias
+            + "ORDER BY domain"
         ),
-        "60": "SELECT domain FROM raw_domains WHERE bad_dns = TRUE ORDER BY domain",
-        "61": "SELECT domain FROM raw_domains WHERE bad_ssl = TRUE ORDER BY domain",
-        "62": "SELECT domain FROM raw_domains WHERE bad_tcp = TRUE ORDER BY domain",
-        "63": "SELECT domain FROM raw_domains WHERE bad_type = TRUE ORDER BY domain",
-        "64": "SELECT domain FROM raw_domains WHERE bad_file = TRUE ORDER BY domain",
-        "65": "SELECT domain FROM raw_domains WHERE bad_api = TRUE ORDER BY domain",
-        "66": "SELECT domain FROM raw_domains WHERE bad_json = TRUE ORDER BY domain",
-        "67": "SELECT domain FROM raw_domains WHERE bad_http2xx = TRUE ORDER BY domain",
-        "68": "SELECT domain FROM raw_domains WHERE bad_http3xx = TRUE ORDER BY domain",
-        "69": "SELECT domain FROM raw_domains WHERE bad_http4xx = TRUE ORDER BY domain",
-        "70": "SELECT domain FROM raw_domains WHERE bad_http5xx = TRUE ORDER BY domain",
-        "71": "SELECT domain FROM raw_domains WHERE bad_hard = TRUE ORDER BY domain",
-        "72": "SELECT domain FROM raw_domains WHERE bad_robot = TRUE ORDER BY domain",
+        "60": f"SELECT domain FROM raw_domains WHERE bad_dns = TRUE {no_alias}ORDER BY domain",
+        "61": f"SELECT domain FROM raw_domains WHERE bad_ssl = TRUE {no_alias}ORDER BY domain",
+        "62": f"SELECT domain FROM raw_domains WHERE bad_tcp = TRUE {no_alias}ORDER BY domain",
+        "63": f"SELECT domain FROM raw_domains WHERE bad_type = TRUE {no_alias}ORDER BY domain",
+        "64": f"SELECT domain FROM raw_domains WHERE bad_file = TRUE {no_alias}ORDER BY domain",
+        "65": f"SELECT domain FROM raw_domains WHERE bad_api = TRUE {no_alias}ORDER BY domain",
+        "66": f"SELECT domain FROM raw_domains WHERE bad_json = TRUE {no_alias}ORDER BY domain",
+        "67": f"SELECT domain FROM raw_domains WHERE bad_http2xx = TRUE {no_alias}ORDER BY domain",
+        "68": f"SELECT domain FROM raw_domains WHERE bad_http3xx = TRUE {no_alias}ORDER BY domain",
+        "69": f"SELECT domain FROM raw_domains WHERE bad_http4xx = TRUE {no_alias}ORDER BY domain",
+        "70": f"SELECT domain FROM raw_domains WHERE bad_http5xx = TRUE {no_alias}ORDER BY domain",
+        "71": f"SELECT domain FROM raw_domains WHERE bad_hard = TRUE {no_alias}ORDER BY domain",
+        "72": f"SELECT domain FROM raw_domains WHERE bad_robot = TRUE {no_alias}ORDER BY domain",
         "20": (
-            "SELECT domain FROM raw_domains WHERE reason LIKE 'DNS%' ORDER BY errors"
+            "SELECT domain FROM raw_domains WHERE reason LIKE 'DNS%' "
+            + no_alias
+            + "ORDER BY errors"
         ),
         "21": (
-            "SELECT domain FROM raw_domains WHERE reason LIKE 'SSL%' ORDER BY errors"
+            "SELECT domain FROM raw_domains WHERE reason LIKE 'SSL%' "
+            + no_alias
+            + "ORDER BY errors"
         ),
         "22": (
-            "SELECT domain FROM raw_domains WHERE reason LIKE 'TCP%' ORDER BY errors"
+            "SELECT domain FROM raw_domains WHERE reason LIKE 'TCP%' "
+            + no_alias
+            + "ORDER BY errors"
         ),
         "23": (
-            "SELECT domain FROM raw_domains WHERE reason LIKE 'TYPE%' ORDER BY errors"
+            "SELECT domain FROM raw_domains WHERE reason LIKE 'TYPE%' "
+            + no_alias
+            + "ORDER BY errors"
         ),
         "24": (
-            "SELECT domain FROM raw_domains WHERE reason LIKE 'FILE%' ORDER BY errors"
+            "SELECT domain FROM raw_domains WHERE reason LIKE 'FILE%' "
+            + no_alias
+            + "ORDER BY errors"
         ),
         "25": (
-            "SELECT domain FROM raw_domains WHERE reason LIKE 'API%' ORDER BY errors"
+            "SELECT domain FROM raw_domains WHERE reason LIKE 'API%' "
+            + no_alias
+            + "ORDER BY errors"
         ),
         "26": (
-            "SELECT domain FROM raw_domains WHERE reason LIKE 'JSON%' ORDER BY errors"
+            "SELECT domain FROM raw_domains WHERE reason LIKE 'JSON%' "
+            + no_alias
+            + "ORDER BY errors"
         ),
         "27": (
             "SELECT domain FROM raw_domains WHERE reason ~ '^2[0-9]{2}.*' "
-            "ORDER BY errors"
+            + no_alias
+            + "ORDER BY errors"
         ),
         "28": (
             "SELECT domain FROM raw_domains WHERE reason ~ '^3[0-9]{2}.*' "
-            "ORDER BY errors"
+            + no_alias
+            + "ORDER BY errors"
         ),
         "29": (
             "SELECT domain FROM raw_domains WHERE reason ~ '^4[0-9]{2}.*' "
-            "ORDER BY errors"
+            + no_alias
+            + "ORDER BY errors"
         ),
         "30": (
             "SELECT domain FROM raw_domains WHERE reason ~ '^5[0-9]{2}.*' "
-            "ORDER BY errors"
+            + no_alias
+            + "ORDER BY errors"
         ),
         "31": (
-            "SELECT domain FROM raw_domains WHERE reason LIKE 'HARD%' ORDER BY errors"
+            "SELECT domain FROM raw_domains WHERE reason LIKE 'HARD%' "
+            + no_alias
+            + "ORDER BY errors"
         ),
         "32": (
-            "SELECT domain FROM raw_domains WHERE reason LIKE 'ROBOT%' ORDER BY errors"
+            "SELECT domain FROM raw_domains WHERE reason LIKE 'ROBOT%' "
+            + no_alias
+            + "ORDER BY errors"
         ),
         "50": (
             "SELECT domain FROM mastodon_domains WHERE "
@@ -4743,7 +4780,9 @@ def load_from_database(user_choice):
             "SELECT domain FROM mastodon_domains ORDER BY active_users_monthly DESC"
         ),
         "53": (
-            "SELECT domain FROM raw_domains WHERE nodeinfo = 'mastodon' ORDER BY domain"
+            "SELECT domain FROM raw_domains WHERE nodeinfo = 'mastodon' "
+            + no_alias
+            + "ORDER BY domain"
         ),
     }
 
