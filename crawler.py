@@ -2074,8 +2074,6 @@ async def run_fetch_mode(args):
     vmc_output(f"{appname} v{appversion} (fetch mode)", "bold")
     if _is_running_headless():
         vmc_output("Running in headless mode", "pink")
-    else:
-        vmc_output("Running in interactive mode", "pink")
 
     exclude_domains_sql = fetch_exclude_domains()
     domain_endings = await get_domain_endings()
@@ -2428,8 +2426,6 @@ async def run_dni_mode(args):
     vmc_output(f"{appname} v{appversion} (dni mode)", "bold")
     if _is_running_headless():
         vmc_output("Running in headless mode", "pink")
-    else:
-        vmc_output("Running in interactive mode", "pink")
 
     # List domains
     if args.list:
@@ -2713,8 +2709,6 @@ def run_nightly_mode(args):
     vmc_output(f"{appname} v{appversion} (nightly mode)", "bold")
     if _is_running_headless():
         vmc_output("Running in headless mode", "pink")
-    else:
-        vmc_output("Running in interactive mode", "pink")
 
     # List versions
     if args.list:
@@ -2964,11 +2958,13 @@ async def check_robots_txt(domain, preserve_status=None):
                     if user_agent in ["*", appname.lower()] and (
                         disallow_path == "/" or disallow_path == "*"
                     ):
+                        error_to_print = "Crawling is prohibited by robots.txt"
                         vmc_output(
-                            f"{domain}: Crawling is prohibited by robots.txt",
+                            f"{domain}: {error_to_print}",
                             "yellow",
                             use_tqdm=True,
                         )
+                        await asyncio.to_thread(log_error, domain, error_to_print)
                         await asyncio.to_thread(
                             increment_domain_error,
                             domain,
