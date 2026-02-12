@@ -2497,7 +2497,7 @@ async def run_dni_mode(args):
             vmc_output("No domains parsed from Abandoned/Unmanaged CSV", "yellow")
 
     # Show final count and summary
-    vmc_output(f"\n=== Import Summary ===", "bold")
+    vmc_output("\n=== Import Summary ===", "bold")
     vmc_output(f"Total new domains imported: {total_imported}", "green")
     _ = count_dni_domains()
     vmc_output("DNI import complete!", "bold")
