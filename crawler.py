@@ -3557,11 +3557,7 @@ def process_mastodon_instance(
     # Use actual_domain for database operations if provided,
     # otherwise fall back to domain
     db_domain = actual_domain if actual_domain else domain
-    
-    # If actual_domain is different from domain, mark original as alias and delete from mastodon_domains
-    if actual_domain and actual_domain != domain:
-        mark_domain_as_alias(domain)
-        delete_domain_if_known(domain)
+
 
     software_version_full = nodeinfo_20_result["software"]["version"]
     software_version = clean_version(
@@ -3609,6 +3605,11 @@ def process_mastodon_instance(
     )
 
     clear_domain_error(db_domain)
+    
+    # If actual_domain is different from domain, mark original as alias and delete from mastodon_domains
+    if actual_domain and actual_domain != domain:
+        mark_domain_as_alias(domain)
+        delete_domain_if_known(domain)
 
     version_info = f"Mastodon v{software_version}"
     if software_version != nodeinfo_20_result["software"]["version"]:
