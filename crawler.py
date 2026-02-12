@@ -1120,7 +1120,8 @@ def increment_domain_error(
 
     After ERROR_THRESHOLD consecutive errors, the domain is marked with the
     corresponding bad_* column (e.g., bad_dns, bad_ssl, bad_tcp, etc.).
-    ROBOT and HARD error types are immediately terminal on first occurrence.
+    ROBOT and HARD error types are immediately terminal on first occurrence,
+    bypassing the Mastodon nodeinfo check.
 
     Args:
         domain: The domain to update
@@ -1211,24 +1212,38 @@ def increment_domain_error(
                 for col in BAD_COLUMNS
             }
 
+            # Determine error type first to check for immediate terminal types
+            error_type = get_error_type(error_reason)
+            previous_type = get_error_type(previous_reason)
+
+            # Immediate terminal types (ROBOT/HARD) bypass the Mastodon nodeinfo check
+            # and mark the domain as bad if error count is 1 or higher
+            if error_type in IMMEDIATE_TERMINAL_TYPES:
+                # Calculate new error count
+                if error_type == previous_type:
+                    new_errors = current_errors + 1
+                else:
+                    new_errors = 1
+
+                # Mark as bad if 1 or higher
+                if new_errors >= 1:
+                    status = ERROR_TYPE_TO_BAD_COLUMN.get(error_type)
+                    if status:
+                        mark_domain_status(domain, status)
+                        delete_domain_if_known(domain)
+                        return
             # Skip error counting if nodeinfo is set to 'mastodon'
             # For Mastodon instances, we still record the reason but clear the counter
-            if nodeinfo == "mastodon":
+            elif nodeinfo == "mastodon":
                 new_errors = None
             else:
-                # Determine error type and calculate new error count
-                error_type = get_error_type(error_reason)
-                previous_type = get_error_type(previous_reason)
-
+                # Calculate new error count for non-Mastodon, non-immediate-terminal errors
                 if error_type and error_type == previous_type:
                     # Same error type - increment
                     new_errors = current_errors + 1
 
-                    # Check if threshold reached (immediate for ROBOT/HARD)
-                    threshold = (
-                        1 if error_type in IMMEDIATE_TERMINAL_TYPES else ERROR_THRESHOLD
-                    )
-                    if new_errors >= threshold:
+                    # Check if threshold reached
+                    if new_errors >= ERROR_THRESHOLD:
                         status = ERROR_TYPE_TO_BAD_COLUMN.get(error_type)
                         if status:
                             mark_domain_status(domain, status)
@@ -1237,14 +1252,6 @@ def increment_domain_error(
                 elif error_type:
                     # Different tracked error type or first occurrence - reset to 1
                     new_errors = 1
-
-                    # Immediate terminal types go bad on first occurrence
-                    if error_type in IMMEDIATE_TERMINAL_TYPES:
-                        status = ERROR_TYPE_TO_BAD_COLUMN.get(error_type)
-                        if status:
-                            mark_domain_status(domain, status)
-                            delete_domain_if_known(domain)
-                            return
                 else:
                     # Non-tracked error types - set count to null
                     new_errors = None
@@ -3554,7 +3561,6 @@ def process_mastodon_instance(
     # otherwise fall back to domain
     db_domain = actual_domain if actual_domain else domain
 
-
     software_version_full = nodeinfo_20_result["software"]["version"]
     software_version = clean_version(
         nodeinfo_20_result["software"]["version"],
@@ -3601,7 +3607,7 @@ def process_mastodon_instance(
     )
 
     clear_domain_error(db_domain)
-    
+
     # If actual_domain is different from domain, mark original as alias and delete from mastodon_domains
     if actual_domain and actual_domain != domain:
         mark_domain_as_alias(domain)
