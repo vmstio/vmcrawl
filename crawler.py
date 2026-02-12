@@ -2291,6 +2291,7 @@ async def fetch_tlds_from_iana() -> set[str]:
 # =============================================================================
 
 DNI_CSV_URL = "https://about.iftas.org/wp-content/uploads/2025/10/iftas-dni-latest.csv"
+ABANDONED_CSV_URL = "https://about.iftas.org/wp-content/uploads/2025/10/iftas-abandoned-unmanaged-latest.csv"
 
 
 def get_existing_dni_domains() -> set[str]:
@@ -2444,32 +2445,60 @@ async def run_dni_mode(args):
         _ = count_dni_domains()
         return
 
+    # Get existing domains once to avoid duplicates across both lists
+    existing_domains = get_existing_dni_domains()
+    total_imported = 0
+
     # Fetch and import DNI list (default behavior)
+    vmc_output("\n=== Fetching IFTAS DNI List ===", "bold")
     csv_content = await fetch_dni_csv(args.url)
     if not csv_content:
-        vmc_output("Failed to fetch DNI CSV, exiting…", "pink")
-        sys.exit(1)
-
-    domains = _parse_dni_csv(csv_content)
-    if not domains:
-        vmc_output("No domains parsed from CSV, exiting…", "pink")
-        sys.exit(1)
-
-    # Get existing domains to avoid duplicates
-    existing_domains = get_existing_dni_domains()
-    new_domains = [d for d in domains if d not in existing_domains]
-
-    vmc_output(
-        f"Found {len(new_domains)} new domains (out of {len(domains)} total)",
-        "cyan",
-    )
-
-    if new_domains:
-        _ = import_dni_domains(new_domains)
+        vmc_output("Failed to fetch DNI CSV", "red")
     else:
-        vmc_output("All domains already exist in database", "yellow")
+        domains = _parse_dni_csv(csv_content)
+        if domains:
+            new_domains = [d for d in domains if d not in existing_domains]
+            vmc_output(
+                f"Found {len(new_domains)} new DNI domains (out of {len(domains)} total)",
+                "cyan",
+            )
+            if new_domains:
+                imported = import_dni_domains(new_domains, comment="iftas-dni")
+                total_imported += imported
+                # Update existing_domains set for next list
+                existing_domains.update(new_domains)
+            else:
+                vmc_output("All DNI domains already exist in database", "yellow")
+        else:
+            vmc_output("No domains parsed from DNI CSV", "yellow")
 
-    # Show final count
+    # Fetch and import Abandoned/Unmanaged list
+    vmc_output("\n=== Fetching IFTAS Abandoned/Unmanaged List ===", "bold")
+    abandoned_content = await fetch_dni_csv(ABANDONED_CSV_URL)
+    if not abandoned_content:
+        vmc_output("Failed to fetch Abandoned/Unmanaged CSV", "red")
+    else:
+        abandoned_domains = _parse_dni_csv(abandoned_content)
+        if abandoned_domains:
+            new_abandoned = [d for d in abandoned_domains if d not in existing_domains]
+            vmc_output(
+                f"Found {len(new_abandoned)} new abandoned/unmanaged domains (out of {len(abandoned_domains)} total)",
+                "cyan",
+            )
+            if new_abandoned:
+                imported = import_dni_domains(new_abandoned, comment="iftas-abandoned")
+                total_imported += imported
+            else:
+                vmc_output(
+                    "All abandoned/unmanaged domains already exist in database",
+                    "yellow",
+                )
+        else:
+            vmc_output("No domains parsed from Abandoned/Unmanaged CSV", "yellow")
+
+    # Show final count and summary
+    vmc_output(f"\n=== Import Summary ===", "bold")
+    vmc_output(f"Total new domains imported: {total_imported}", "green")
     _ = count_dni_domains()
     vmc_output("DNI import complete!", "bold")
 
