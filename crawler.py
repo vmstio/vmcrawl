@@ -2891,7 +2891,6 @@ def _should_skip_domain(
     """Check if a domain should be skipped based on its status."""
     if user_choice != "10" and domain in not_masto_domains:
         vmc_output(f"{domain}: Other Platform", "cyan", use_tqdm=True)
-        delete_domain_if_known(domain)
         return True
     # Check bad_* terminal states
     preserve_col = MENU_CHOICE_TO_STATUS_COLUMN.get(user_choice or "")
@@ -2899,7 +2898,6 @@ def _should_skip_domain(
         if domain in domain_set and preserve_col != col_name:
             label = col_name.replace("_", " ").title()
             vmc_output(f"{domain}: {label}", "cyan", use_tqdm=True)
-            delete_domain_if_known(domain)
             return True
     return False
 
@@ -3245,7 +3243,6 @@ async def check_nodeinfo(
                 # Save nodeinfo as "matrix" and mark as non-Mastodon
                 await asyncio.to_thread(_save_matrix_nodeinfo, domain)
                 await asyncio.to_thread(clear_domain_error, domain)
-                await asyncio.to_thread(delete_domain_if_known, domain)
                 return False
 
             # Check if this is actually nodeinfo data returned directly
