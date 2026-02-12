@@ -2962,6 +2962,8 @@ async def check_robots_txt(domain, preserve_status=None):
     """Check robots.txt to ensure crawling is allowed.
 
     This is the first HTTP request to each domain.
+    If robots.txt is missing (404 or other non-200 status), allows crawling to continue.
+    Only blocks crawling if robots.txt explicitly disallows it (status 200 with disallow rules).
     """
     target = "robots_txt"
     url = f"https://{domain}/robots.txt"
@@ -3013,15 +3015,7 @@ async def check_robots_txt(domain, preserve_status=None):
                 _handle_http_failed, domain, target, response, preserve_status
             )
             return False
-        else:
-            await asyncio.to_thread(
-                _handle_http_status_code,
-                domain,
-                target,
-                response,
-                preserve_status,
-            )
-            return False
+        # Missing robots.txt (404 or other non-200 status) - allow crawling
     except httpx.RequestError as exception:
         await asyncio.to_thread(
             _handle_tcp_exception,
