@@ -3560,6 +3560,11 @@ def process_mastodon_instance(
     # Use actual_domain for database operations if provided,
     # otherwise fall back to domain
     db_domain = actual_domain if actual_domain else domain
+    
+    # If actual_domain is different from domain, mark original as alias and delete from mastodon_domains
+    if actual_domain and actual_domain != domain:
+        mark_domain_as_alias(domain)
+        delete_domain_if_known(domain)
 
     software_version_full = nodeinfo_20_result["software"]["version"]
     software_version = clean_version(
@@ -3612,11 +3617,6 @@ def process_mastodon_instance(
     if software_version != nodeinfo_20_result["software"]["version"]:
         version_info = f"{version_info} ({nodeinfo_20_result['software']['version']})"
     vmc_output(f"{db_domain}: {version_info}", "green", use_tqdm=True)
-
-    # If actual_domain is different from domain, mark original as alias and delete from mastodon_domains
-    if actual_domain and actual_domain != domain:
-        mark_domain_as_alias(domain)
-        delete_domain_if_known(domain)
 
 
 async def process_domain(domain, nightly_version_ranges, user_choice=None):
