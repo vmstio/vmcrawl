@@ -406,7 +406,7 @@ socket.getaddrinfo = _cached_getaddrinfo  # type: ignore[assignment]
 # HTTP CLIENT CONFIGURATION
 # =============================================================================
 
-http_timeout = int(os.getenv("VMCRAWL_HTTP_TIMEOUT", "30"))
+http_timeout = int(os.getenv("VMCRAWL_HTTP_TIMEOUT", "5"))
 http_redirect = int(os.getenv("VMCRAWL_HTTP_REDIRECT", "2"))
 http_custom_user_agent = f"{appname}/{appversion} (https://docs.vmst.io/{appname})"
 http_custom_headers = {"User-Agent": http_custom_user_agent}
@@ -1755,7 +1755,7 @@ def get_all_bad_domains() -> dict[str, set[str]]:
 
 
 async def load_domain_filter_data():
-    """Load all domain filter data in parallel for faster startup.
+    """Load all domain filter data in parallel.
 
     Returns a dictionary containing all filter sets needed for crawling.
     Uses asyncio.gather with to_thread to run database queries concurrently.
@@ -1947,7 +1947,7 @@ def _detect_vowels(domain):
 async def fetch_peer_domains(
     api_url,
     domain,
-    domain_ending_suffixes,
+    domain_endings,
     dni,
 ):
     """Fetch peer domains from a Mastodon instance API.
@@ -1955,7 +1955,7 @@ async def fetch_peer_domains(
     Args:
         api_url: The API URL to fetch peers from
         domain: The domain being queried
-        domain_ending_suffixes: Set of valid TLD suffixes (e.g., {".com", ".org"})
+        domain_endings: Set of valid TLDs (e.g., {"com", "org"})
         dni: Set of DNI domains to filter out
 
     Returns:
@@ -1966,7 +1966,7 @@ async def fetch_peer_domains(
         api_response = await get_httpx(api_url)
         data = api_response.json()
 
-        # Filter domains using pre-computed suffix sets for O(1) lookups
+        # Filter domains using O(1) TLD membership checks
         filtered_domains = []
         for item in data:
             # Skip invalid domains early (most common rejection)
@@ -1977,8 +1977,8 @@ async def fetch_peer_domains(
             if any(dni_domain in item for dni_domain in dni):
                 continue
 
-            # Check valid domain endings using pre-computed suffixes
-            if not any(item.endswith(suffix) for suffix in domain_ending_suffixes):
+            # Check valid TLD using direct O(1) set membership
+            if not _has_valid_tld(item, domain_endings):
                 continue
 
             filtered_domains.append(item)
@@ -2013,7 +2013,7 @@ async def fetch_peer_domains(
 
 async def process_fetch_domain(
     domain,
-    domain_ending_suffixes,
+    domain_endings,
     pbar,
     dni,
     existing_domains,
@@ -2022,7 +2022,7 @@ async def process_fetch_domain(
 
     Args:
         domain: Domain to fetch peers from
-        domain_ending_suffixes: Set of valid TLD suffixes (e.g., {".com", ".org"})
+        domain_endings: Set of valid TLDs (e.g., {"com", "org"})
         pbar: tqdm progress bar instance for status updates
         dni: Set of DNI domains to filter out
         existing_domains: Set of domains already in database
@@ -2036,9 +2036,7 @@ async def process_fetch_domain(
 
     api_url = f"https://{domain}/api/v1/instance/peers"
 
-    domains, error_type = await fetch_peer_domains(
-        api_url, domain, domain_ending_suffixes, dni
-    )
+    domains, error_type = await fetch_peer_domains(api_url, domain, domain_endings, dni)
     unique_domains = [d for d in domains if d not in existing_domains]
 
     if unique_domains:
@@ -2106,31 +2104,30 @@ async def run_fetch_mode(args):
     dni = get_dni_domains() or set()
     existing_domains = get_existing_domains() or set()
 
-    # Pre-compute suffix set for efficient filtering (avoids repeated f-string creation)
-    domain_ending_suffixes = {f".{ending}" for ending in domain_endings}
-
     # Collect all newly discovered domains
     all_new_domains = []
     max_workers = int(os.getenv("VMCRAWL_MAX_THREADS", "2"))
-    semaphore = asyncio.Semaphore(max_workers)
     shutdown_event = asyncio.Event()
+    queue: asyncio.Queue[str | None] = asyncio.Queue()
 
     # Create progress bar
     pbar = tqdm(total=len(domain_list), desc="Fetching", unit="d")
 
-    async def fetch_single_domain(domain):
-        """Fetch peers from a single domain."""
-        if shutdown_event.is_set():
-            return None
-
-        async with semaphore:
-            if shutdown_event.is_set():
-                return None
+    async def fetch_worker():
+        """Process domains from queue with bounded task count."""
+        while True:
+            domain = await queue.get()
+            if domain is None:
+                queue.task_done()
+                break
 
             try:
+                if shutdown_event.is_set():
+                    continue
+
                 result = await process_fetch_domain(
                     domain,
-                    domain_ending_suffixes,
+                    domain_endings,
                     pbar,
                     dni,
                     existing_domains,
@@ -2140,28 +2137,29 @@ async def run_fetch_mode(args):
                 if new_domains:
                     all_new_domains.extend(new_domains)
 
-                # Write the status line after completion
                 tqdm.write(f"{domain_name}: {status}")
                 _ = pbar.update(1)
-                return result
             except Exception as e:
                 if not shutdown_event.is_set():
                     tqdm.write(f"{domain}: {colors['red']}Error: {e}{colors['reset']}")
                 _ = pbar.update(1)
-                return (domain, [], None)
+            finally:
+                queue.task_done()
 
     try:
-        # Create tasks for all domains
-        tasks = [
-            asyncio.create_task(fetch_single_domain(domain)) for domain in domain_list
-        ]
+        worker_count = max(1, min(max_workers, len(domain_list)))
+        workers = [asyncio.create_task(fetch_worker()) for _ in range(worker_count)]
+        for domain in domain_list:
+            queue.put_nowait(domain)
+        for _ in range(worker_count):
+            queue.put_nowait(None)
 
         try:
-            _ = await asyncio.gather(*tasks, return_exceptions=True)
+            _ = await asyncio.gather(*workers, return_exceptions=True)
         except asyncio.CancelledError:
             shutdown_event.set()
-            for task in tasks:
-                _ = task.cancel()
+            for worker in workers:
+                _ = worker.cancel()
             raise KeyboardInterrupt
     except KeyboardInterrupt:
         shutdown_event.set()
@@ -2189,16 +2187,13 @@ async def run_fetch_mode(args):
         # Load filter data for crawling in parallel
         filter_data = await load_domain_filter_data()
 
-        # Pre-compute suffix set for efficient TLD filtering
-        domain_ending_suffixes_crawl = {f".{ending}" for ending in domain_endings}
-
         # Use "0" as user_choice (new domains mode)
         await check_and_record_domains(
             unique_new_domains,
             filter_data["not_masto_domains"],
             "0",  # user_choice for new domains
             filter_data["dni_domains"],
-            domain_ending_suffixes_crawl,
+            domain_endings,
             filter_data["nightly_version_ranges"],
             filter_data["bad_domain_sets"],
         )
@@ -2932,20 +2927,28 @@ def _should_skip_domain(
     return False
 
 
-def _is_dni_or_invalid_tld(domain, dni_domains, domain_ending_suffixes):
+def _has_valid_tld(domain: str, domain_endings: set[str]) -> bool:
+    """Check TLD validity in O(1) time using direct set membership."""
+    domain_parts = domain.rsplit(".", 1)
+    if len(domain_parts) != 2:
+        return False
+    return domain_parts[1] in domain_endings
+
+
+def _is_dni_or_invalid_tld(domain, dni_domains, domain_endings):
     """Check if a domain is on the DNI list or has an invalid TLD.
 
     Args:
         domain: Domain to check
         dni_domains: Set of DNI domains to filter out
-        domain_ending_suffixes: Pre-computed set of valid TLD suffixes (e.g., {".com", ".org"})
+        domain_endings: Set of valid TLDs (e.g., {"com", "org"})
     """
     if any(dni in domain for dni in dni_domains):
         vmc_output(f"{domain}: Purging known DNI domain", "cyan", use_tqdm=True)
         delete_domain_if_known(domain)
         delete_domain_from_raw(domain)
         return True
-    if not any(domain.endswith(suffix) for suffix in domain_ending_suffixes):
+    if not _has_valid_tld(domain, domain_endings):
         vmc_output(f"{domain}: Purging invalid TLD", "cyan", use_tqdm=True)
         delete_domain_if_known(domain)
         delete_domain_from_raw(domain)
@@ -3824,87 +3827,90 @@ async def check_and_record_domains(
     not_masto_domains,
     user_choice,
     dni_domains,
-    domain_ending_suffixes,
+    domain_endings,
     nightly_version_ranges,
     bad_domain_sets,
 ):
     """Process a list of domains concurrently with progress tracking.
 
-    Uses asyncio for cross-domain parallelism with semaphore-based concurrency control.
+    Uses asyncio worker queues for bounded cross-domain concurrency.
     """
     max_workers = int(os.getenv("VMCRAWL_MAX_THREADS", "2"))
-    semaphore = asyncio.Semaphore(max_workers)
     shutdown_event = asyncio.Event()
+    queue: asyncio.Queue[str | None] = asyncio.Queue()
 
     # Create progress bar
     pbar = tqdm(total=len(domain_list), desc="Crawling", unit="d")
 
-    async def process_single_domain(domain):
-        if shutdown_event.is_set():
-            return None
-
-        async with semaphore:
-            if shutdown_event.is_set():
-                return None
-
-            # Use fixed-width display to prevent bar from jumping (truncate long domains)
-            domain_display = domain[:25].ljust(25)
-            pbar.set_postfix_str(domain_display)
-
-            if _should_skip_domain(
-                domain,
-                not_masto_domains,
-                bad_domain_sets,
-                user_choice,
-            ):
-                _ = pbar.update(1)
-                return (domain, "skipped")
-
-            if _is_dni_or_invalid_tld(
-                domain,
-                dni_domains,
-                domain_ending_suffixes,
-            ):
-                _ = pbar.update(1)
-                return (domain, "filtered")
+    async def process_worker():
+        while True:
+            domain = await queue.get()
+            if domain is None:
+                queue.task_done()
+                break
 
             try:
-                await process_domain(domain, nightly_version_ranges, user_choice)
-                _ = pbar.update(1)
-                return (domain, "success")
-            except httpx.CloseError:
-                _ = pbar.update(1)
-                return (domain, "closed")
-            except Exception as exception:
-                if not shutdown_event.is_set():
-                    target = "shutdown"
-                    preserve_status = _get_preserve_status(user_choice)
-                    _handle_tcp_exception(domain, target, exception, preserve_status)
-                _ = pbar.update(1)
-                return (domain, "error")
+                if shutdown_event.is_set():
+                    continue
+
+                # Use fixed-width display to prevent bar from jumping (truncate long domains)
+                domain_display = domain[:25].ljust(25)
+                pbar.set_postfix_str(domain_display)
+
+                if _should_skip_domain(
+                    domain,
+                    not_masto_domains,
+                    bad_domain_sets,
+                    user_choice,
+                ):
+                    _ = pbar.update(1)
+                    continue
+
+                if _is_dni_or_invalid_tld(
+                    domain,
+                    dni_domains,
+                    domain_endings,
+                ):
+                    _ = pbar.update(1)
+                    continue
+
+                try:
+                    await process_domain(domain, nightly_version_ranges, user_choice)
+                    _ = pbar.update(1)
+                except httpx.CloseError:
+                    _ = pbar.update(1)
+                except Exception as exception:
+                    if not shutdown_event.is_set():
+                        target = "shutdown"
+                        preserve_status = _get_preserve_status(user_choice)
+                        _handle_tcp_exception(
+                            domain, target, exception, preserve_status
+                        )
+                    _ = pbar.update(1)
+            finally:
+                queue.task_done()
 
     try:
-        # Create tasks for all domains
-        tasks = [
-            asyncio.create_task(process_single_domain(domain)) for domain in domain_list
-        ]
+        worker_count = max(1, min(max_workers, len(domain_list)))
+        workers = [asyncio.create_task(process_worker()) for _ in range(worker_count)]
+        for domain in domain_list:
+            queue.put_nowait(domain)
+        for _ in range(worker_count):
+            queue.put_nowait(None)
 
         try:
-            # Wait for all tasks to complete
-            results = await asyncio.gather(*tasks, return_exceptions=True)
-
-            # Handle any exceptions that were returned
-            for i, result in enumerate(results):
+            # Wait for all workers to complete
+            results = await asyncio.gather(*workers, return_exceptions=True)
+            for result in results:
                 if isinstance(result, Exception) and not shutdown_event.is_set():
-                    domain = domain_list[i]
                     tqdm.write(
-                        f"{domain}: {colors['red']}Failed: {result}{colors['reset']}"
+                        f"{colors['red']}Worker failed: {result}{colors['reset']}"
                     )
 
         except asyncio.CancelledError:
             shutdown_event.set()
-            for task in tasks:
-                _ = task.cancel()
+            for worker in workers:
+                _ = worker.cancel()
             raise KeyboardInterrupt
     except KeyboardInterrupt:
         shutdown_event.set()
@@ -5308,6 +5314,9 @@ async def async_main():
 
     # Determine if we should loop (headless without one-shot flags)
     should_loop = _is_running_headless() and not (args.file or args.target or args.new)
+    filter_cache_ttl = int(os.getenv("VMCRAWL_FILTER_CACHE_SECONDS", "300"))
+    filter_data_cache: dict[str, Any] | None = None
+    filter_data_loaded_at = 0.0
 
     try:
         while True:
@@ -5362,21 +5371,22 @@ async def async_main():
                     vmc_output(f"Database error: {exception}", "red")
                     sys.exit(1)
 
-                # Load all filter data in parallel for faster startup
-                filter_data, domain_endings = await asyncio.gather(
-                    load_domain_filter_data(),
-                    get_domain_endings(),
-                )
-
-                # Pre-compute suffix set for efficient TLD filtering
-                domain_ending_suffixes = {f".{ending}" for ending in domain_endings}
+                now = time.monotonic()
+                if (
+                    filter_data_cache is None
+                    or (now - filter_data_loaded_at) >= filter_cache_ttl
+                ):
+                    filter_data_cache = await load_domain_filter_data()
+                    filter_data_loaded_at = now
+                filter_data = filter_data_cache
+                domain_endings = await get_domain_endings()
 
                 await check_and_record_domains(
                     domain_list,
                     filter_data["not_masto_domains"],
                     user_choice,
                     filter_data["dni_domains"],
-                    domain_ending_suffixes,
+                    domain_endings,
                     filter_data["nightly_version_ranges"],
                     filter_data["bad_domain_sets"],
                 )
