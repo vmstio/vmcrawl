@@ -1132,7 +1132,7 @@ def increment_domain_error(
 
     Note: Domain is expected to be pre-normalized to lowercase by caller.
     """
-    ERROR_THRESHOLD = int(os.getenv("VMCRAWL_ERROR_BUFFER", "8"))
+    ERROR_THRESHOLD = int(os.getenv("VMCRAWL_ERROR_BUFFER", "24"))
     IMMEDIATE_TERMINAL_TYPES = ("ROBOT", "HARD")
     TRACKED_ERROR_TYPES = (
         "DNS",
