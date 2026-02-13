@@ -2107,24 +2107,49 @@ async def run_fetch_mode(args):
     # Collect all newly discovered domains
     all_new_domains = []
     max_workers = int(os.getenv("VMCRAWL_MAX_THREADS", "2"))
+    heartbeat_seconds = int(os.getenv("VMCRAWL_PROGRESS_HEARTBEAT_SECONDS", "5"))
+    slow_domain_seconds = float(os.getenv("VMCRAWL_SLOW_DOMAIN_SECONDS", "8"))
     shutdown_event = asyncio.Event()
     queue: asyncio.Queue[str | None] = asyncio.Queue()
+    active_domains: set[str] = set()
+    completed_domains = 0
 
     # Create progress bar
     pbar = tqdm(total=len(domain_list), desc="Fetching", unit="d")
 
+    def _refresh_progress_postfix() -> None:
+        active_count = len(active_domains)
+        remaining = max(0, len(domain_list) - completed_domains)
+        pbar.set_postfix_str(
+            f"inflight={active_count} done={completed_domains}/{len(domain_list)} left={remaining}",
+        )
+        pbar.refresh()
+
+    async def progress_heartbeat() -> None:
+        if heartbeat_seconds <= 0:
+            return
+        while not shutdown_event.is_set():
+            await asyncio.sleep(heartbeat_seconds)
+            if shutdown_event.is_set():
+                break
+            _refresh_progress_postfix()
+
     async def fetch_worker():
         """Process domains from queue with bounded task count."""
+        nonlocal completed_domains
         while True:
             domain = await queue.get()
             if domain is None:
                 queue.task_done()
                 break
 
+            started_at = time.monotonic()
             try:
                 if shutdown_event.is_set():
                     continue
 
+                active_domains.add(domain)
+                _refresh_progress_postfix()
                 result = await process_fetch_domain(
                     domain,
                     domain_endings,
@@ -2137,18 +2162,32 @@ async def run_fetch_mode(args):
                 if new_domains:
                     all_new_domains.extend(new_domains)
 
-                tqdm.write(f"{domain_name}: {status}")
-                _ = pbar.update(1)
+                elapsed_seconds = time.monotonic() - started_at
+                slow_label = (
+                    f" {colors['orange']}[slow]{colors['reset']}"
+                    if elapsed_seconds >= slow_domain_seconds
+                    else ""
+                )
+                tqdm.write(
+                    f"{domain_name}: {status} ({elapsed_seconds:.2f}s){slow_label}"
+                )
             except Exception as e:
                 if not shutdown_event.is_set():
-                    tqdm.write(f"{domain}: {colors['red']}Error: {e}{colors['reset']}")
-                _ = pbar.update(1)
+                    elapsed_seconds = time.monotonic() - started_at
+                    tqdm.write(
+                        f"{domain}: {colors['red']}Error: {e} ({elapsed_seconds:.2f}s){colors['reset']}"
+                    )
             finally:
+                active_domains.discard(domain)
+                completed_domains += 1
+                _ = pbar.update(1)
+                _refresh_progress_postfix()
                 queue.task_done()
 
     try:
         worker_count = max(1, min(max_workers, len(domain_list)))
         workers = [asyncio.create_task(fetch_worker()) for _ in range(worker_count)]
+        heartbeat_task = asyncio.create_task(progress_heartbeat())
         for domain in domain_list:
             queue.put_nowait(domain)
         for _ in range(worker_count):
@@ -2161,6 +2200,10 @@ async def run_fetch_mode(args):
             for worker in workers:
                 _ = worker.cancel()
             raise KeyboardInterrupt
+        finally:
+            shutdown_event.set()
+            _ = heartbeat_task.cancel()
+            _ = await asyncio.gather(heartbeat_task, return_exceptions=True)
     except KeyboardInterrupt:
         shutdown_event.set()
         raise
@@ -3836,26 +3879,56 @@ async def check_and_record_domains(
     Uses asyncio worker queues for bounded cross-domain concurrency.
     """
     max_workers = int(os.getenv("VMCRAWL_MAX_THREADS", "2"))
+    heartbeat_seconds = int(os.getenv("VMCRAWL_PROGRESS_HEARTBEAT_SECONDS", "5"))
+    slow_domain_seconds = float(os.getenv("VMCRAWL_SLOW_DOMAIN_SECONDS", "8"))
+    log_all_domain_timings = os.getenv(
+        "VMCRAWL_LOG_ALL_DOMAIN_TIMINGS", "false"
+    ).strip().lower() in {"1", "true", "yes", "on"}
     shutdown_event = asyncio.Event()
     queue: asyncio.Queue[str | None] = asyncio.Queue()
+    active_domains: set[str] = set()
+    completed_domains = 0
 
     # Create progress bar
     pbar = tqdm(total=len(domain_list), desc="Crawling", unit="d")
 
+    def _refresh_progress_postfix() -> None:
+        active_count = len(active_domains)
+        remaining = max(0, len(domain_list) - completed_domains)
+        pbar.set_postfix_str(
+            f"inflight={active_count} done={completed_domains}/{len(domain_list)} left={remaining}",
+        )
+        pbar.refresh()
+
+    async def progress_heartbeat() -> None:
+        if heartbeat_seconds <= 0:
+            return
+        while not shutdown_event.is_set():
+            await asyncio.sleep(heartbeat_seconds)
+            if shutdown_event.is_set():
+                break
+            _refresh_progress_postfix()
+
     async def process_worker():
+        nonlocal completed_domains
         while True:
             domain = await queue.get()
             if domain is None:
                 queue.task_done()
                 break
 
+            started_at = time.monotonic()
             try:
                 if shutdown_event.is_set():
                     continue
 
+                active_domains.add(domain)
+                _refresh_progress_postfix()
+
                 # Use fixed-width display to prevent bar from jumping (truncate long domains)
                 domain_display = domain[:25].ljust(25)
                 pbar.set_postfix_str(domain_display)
+                pbar.refresh()
 
                 if _should_skip_domain(
                     domain,
@@ -3863,7 +3936,6 @@ async def check_and_record_domains(
                     bad_domain_sets,
                     user_choice,
                 ):
-                    _ = pbar.update(1)
                     continue
 
                 if _is_dni_or_invalid_tld(
@@ -3871,14 +3943,12 @@ async def check_and_record_domains(
                     dni_domains,
                     domain_endings,
                 ):
-                    _ = pbar.update(1)
                     continue
 
                 try:
                     await process_domain(domain, nightly_version_ranges, user_choice)
-                    _ = pbar.update(1)
                 except httpx.CloseError:
-                    _ = pbar.update(1)
+                    pass
                 except Exception as exception:
                     if not shutdown_event.is_set():
                         target = "shutdown"
@@ -3886,13 +3956,22 @@ async def check_and_record_domains(
                         _handle_tcp_exception(
                             domain, target, exception, preserve_status
                         )
-                    _ = pbar.update(1)
             finally:
+                active_domains.discard(domain)
+                completed_domains += 1
+                _ = pbar.update(1)
+                _refresh_progress_postfix()
+                elapsed_seconds = time.monotonic() - started_at
+                if log_all_domain_timings or elapsed_seconds >= slow_domain_seconds:
+                    tqdm.write(
+                        f"{domain}: {colors['orange']}Elapsed {elapsed_seconds:.2f}s{colors['reset']}"
+                    )
                 queue.task_done()
 
     try:
         worker_count = max(1, min(max_workers, len(domain_list)))
         workers = [asyncio.create_task(process_worker()) for _ in range(worker_count)]
+        heartbeat_task = asyncio.create_task(progress_heartbeat())
         for domain in domain_list:
             queue.put_nowait(domain)
         for _ in range(worker_count):
@@ -3912,6 +3991,10 @@ async def check_and_record_domains(
             for worker in workers:
                 _ = worker.cancel()
             raise KeyboardInterrupt
+        finally:
+            shutdown_event.set()
+            _ = heartbeat_task.cancel()
+            _ = await asyncio.gather(heartbeat_task, return_exceptions=True)
     except KeyboardInterrupt:
         shutdown_event.set()
         raise
