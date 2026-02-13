@@ -114,6 +114,30 @@ colors = {
     "yellow": "\033[93m",
     "white": "\033[0m",
 }
+ANSI_WHITE_TEXT = "\033[97m"
+
+# Track per-domain processing start times so error output can include elapsed time
+_domain_start_times: dict[str, float] = {}
+_domain_start_times_lock = threading.Lock()
+
+
+def _set_domain_start_time(domain: str) -> None:
+    with _domain_start_times_lock:
+        _domain_start_times[domain] = time.monotonic()
+
+
+def _clear_domain_start_time(domain: str) -> None:
+    with _domain_start_times_lock:
+        _domain_start_times.pop(domain, None)
+
+
+def _get_domain_elapsed_seconds(domain: str) -> float | None:
+    with _domain_start_times_lock:
+        started_at = _domain_start_times.get(domain)
+    if started_at is None:
+        return None
+    return max(0.0, time.monotonic() - started_at)
+
 
 # HTTP status codes for special handling
 http_codes_to_hardfail = [999, 451, 418, 410]  # gone
@@ -473,6 +497,13 @@ def vmc_output(text: str, color: str, use_tqdm: bool = False, **kwargs: Any) -> 
 
     if ":" in text:
         before_colon, after_colon = text.split(":", 1)
+        if color in {"yellow", "red", "green", "cyan"}:
+            elapsed_seconds = _get_domain_elapsed_seconds(before_colon.strip())
+            if elapsed_seconds is not None:
+                after_colon = (
+                    f"{after_colon} {ANSI_WHITE_TEXT}[{elapsed_seconds:.2f}s]"
+                    f"{colors.get(color, '')}"
+                )
         colored_text = (
             f"{before_colon}:{colors.get(color, '')}{after_colon}{colors['reset']}"
         )
@@ -2149,6 +2180,7 @@ async def run_fetch_mode(args):
                     continue
 
                 active_domains.add(domain)
+                _set_domain_start_time(domain)
                 _refresh_progress_postfix()
                 result = await process_fetch_domain(
                     domain,
@@ -2169,16 +2201,17 @@ async def run_fetch_mode(args):
                     else ""
                 )
                 tqdm.write(
-                    f"{domain_name}: {status} ({elapsed_seconds:.2f}s){slow_label}"
+                    f"{domain_name}: {status} {ANSI_WHITE_TEXT}[{elapsed_seconds:.2f}s]{colors['reset']}{slow_label}"
                 )
             except Exception as e:
                 if not shutdown_event.is_set():
                     elapsed_seconds = time.monotonic() - started_at
                     tqdm.write(
-                        f"{domain}: {colors['red']}Error: {e} ({elapsed_seconds:.2f}s){colors['reset']}"
+                        f"{domain}: {colors['red']}Error: {e} {ANSI_WHITE_TEXT}[{elapsed_seconds:.2f}s]{colors['reset']}"
                     )
             finally:
                 active_domains.discard(domain)
+                _clear_domain_start_time(domain)
                 completed_domains += 1
                 _ = pbar.update(1)
                 _refresh_progress_postfix()
@@ -3880,7 +3913,6 @@ async def check_and_record_domains(
     """
     max_workers = int(os.getenv("VMCRAWL_MAX_THREADS", "2"))
     heartbeat_seconds = int(os.getenv("VMCRAWL_PROGRESS_HEARTBEAT_SECONDS", "5"))
-    slow_domain_seconds = float(os.getenv("VMCRAWL_SLOW_DOMAIN_SECONDS", "8"))
     log_all_domain_timings = os.getenv(
         "VMCRAWL_LOG_ALL_DOMAIN_TIMINGS", "false"
     ).strip().lower() in {"1", "true", "yes", "on"}
@@ -3923,6 +3955,7 @@ async def check_and_record_domains(
                     continue
 
                 active_domains.add(domain)
+                _set_domain_start_time(domain)
                 _refresh_progress_postfix()
 
                 # Use fixed-width display to prevent bar from jumping (truncate long domains)
@@ -3958,11 +3991,12 @@ async def check_and_record_domains(
                         )
             finally:
                 active_domains.discard(domain)
+                _clear_domain_start_time(domain)
                 completed_domains += 1
                 _ = pbar.update(1)
                 _refresh_progress_postfix()
                 elapsed_seconds = time.monotonic() - started_at
-                if log_all_domain_timings or elapsed_seconds >= slow_domain_seconds:
+                if log_all_domain_timings:
                     tqdm.write(
                         f"{domain}: {colors['orange']}Elapsed {elapsed_seconds:.2f}s{colors['reset']}"
                     )
