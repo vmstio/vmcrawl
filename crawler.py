@@ -406,8 +406,8 @@ socket.getaddrinfo = _cached_getaddrinfo  # type: ignore[assignment]
 # HTTP CLIENT CONFIGURATION
 # =============================================================================
 
-http_timeout = int(os.getenv("VMCRAWL_HTTP_TIMEOUT", "5"))
-http_redirect = int(os.getenv("VMCRAWL_HTTP_REDIRECT", "1"))
+http_timeout = int(os.getenv("VMCRAWL_HTTP_TIMEOUT", "30"))
+http_redirect = int(os.getenv("VMCRAWL_HTTP_REDIRECT", "2"))
 http_custom_user_agent = f"{appname}/{appversion} (https://docs.vmst.io/{appname})"
 http_custom_headers = {"User-Agent": http_custom_user_agent}
 
