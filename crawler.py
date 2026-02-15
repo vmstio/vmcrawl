@@ -114,7 +114,7 @@ colors = {
     "yellow": "\033[93m",
     "white": "\033[0m",
 }
-ANSI_WHITE_TEXT = "\033[97m"
+ANSI_WHITE_TEXT = "\033[0m"
 
 # Track per-domain processing start times so error output can include elapsed time
 _domain_start_times: dict[str, float] = {}
