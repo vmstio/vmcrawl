@@ -114,7 +114,7 @@ colors = {
     "yellow": "\033[93m",
     "white": "\033[0m",
 }
-ANSI_WHITE_TEXT = "\033[0m"
+TIME_TEXT = "\033[90m"
 
 # Track per-domain processing start times so error output can include elapsed time
 _domain_start_times: dict[str, float] = {}
@@ -521,7 +521,7 @@ def vmc_output(text: str, color: str, use_tqdm: bool = False, **kwargs: Any) -> 
             elapsed_seconds = _get_domain_elapsed_seconds(before_colon.strip())
             if elapsed_seconds is not None:
                 after_colon = (
-                    f"{after_colon} {ANSI_WHITE_TEXT}[{elapsed_seconds:.2f}s]"
+                    f"{after_colon} {TIME_TEXT}[{elapsed_seconds:.2f}s]"
                     f"{colors.get(color, '')}"
                 )
         colored_text = (
@@ -2227,13 +2227,13 @@ async def run_fetch_mode(args):
                     else ""
                 )
                 tqdm.write(
-                    f"{domain_name}: {status} {ANSI_WHITE_TEXT}[{elapsed_seconds:.2f}s]{colors['reset']}{slow_label}"
+                    f"{domain_name}: {status} {TIME_TEXT}[{elapsed_seconds:.2f}s]{colors['reset']}{slow_label}"
                 )
             except Exception as e:
                 if not shutdown_event.is_set():
                     elapsed_seconds = time.monotonic() - started_at
                     tqdm.write(
-                        f"{domain}: {colors['red']}Error: {e} {ANSI_WHITE_TEXT}[{elapsed_seconds:.2f}s]{colors['reset']}"
+                        f"{domain}: {colors['red']}Error: {e} {TIME_TEXT}[{elapsed_seconds:.2f}s]{colors['reset']}"
                     )
             finally:
                 active_domains.discard(domain)
