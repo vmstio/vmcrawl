@@ -432,12 +432,6 @@ socket.getaddrinfo = _cached_getaddrinfo  # type: ignore[assignment]
 
 http_timeout = int(os.getenv("VMCRAWL_HTTP_TIMEOUT", "5"))
 http_redirect = int(os.getenv("VMCRAWL_HTTP_REDIRECT", "2"))
-http_use_http2 = os.getenv("VMCRAWL_USE_HTTP2", "false").strip().lower() in {
-    "1",
-    "true",
-    "yes",
-    "on",
-}
 http_custom_user_agent = f"{appname}/{appversion} (https://docs.vmst.io/{appname})"
 http_custom_headers = {"User-Agent": http_custom_user_agent}
 
@@ -465,6 +459,7 @@ ssl_context.options |= 0x800000
 # Async HTTP client - initialized lazily to work with asyncio event loop
 # Use get_http_client() to access
 _http_client: httpx.AsyncClient | None = None
+_http1_client: httpx.AsyncClient | None = None
 
 
 def get_http_client() -> httpx.AsyncClient:
@@ -472,7 +467,7 @@ def get_http_client() -> httpx.AsyncClient:
     global _http_client
     if _http_client is None:
         _http_client = httpx.AsyncClient(
-            http2=http_use_http2,
+            http2=True,
             follow_redirects=True,
             headers=http_custom_headers,
             timeout=http_timeout,
@@ -483,12 +478,31 @@ def get_http_client() -> httpx.AsyncClient:
     return _http_client
 
 
+def get_http1_client() -> httpx.AsyncClient:
+    """Get or create an HTTP/1.1-only fallback client."""
+    global _http1_client
+    if _http1_client is None:
+        _http1_client = httpx.AsyncClient(
+            http2=False,
+            follow_redirects=True,
+            headers=http_custom_headers,
+            timeout=http_timeout,
+            limits=limits,
+            max_redirects=http_redirect,
+            verify=ssl_context,
+        )
+    return _http1_client
+
+
 async def close_http_client() -> None:
-    """Close the async HTTP client."""
-    global _http_client
+    """Close the async HTTP clients."""
+    global _http_client, _http1_client
     if _http_client is not None:
         await _http_client.aclose()
         _http_client = None
+    if _http1_client is not None:
+        await _http1_client.aclose()
+        _http1_client = None
 
 
 # =============================================================================
@@ -595,41 +609,44 @@ async def parse_json_with_fallback(
 
 async def get_httpx(url: str) -> httpx.Response:
     """Make async HTTP GET request with size limits."""
-    client = get_http_client()
 
-    async with client.stream("GET", url) as response:
-        # Check Content-Length header first if available
-        content_length = response.headers.get("Content-Length")
-        if content_length and int(content_length) > max_response_size:
-            msg = (
-                f"Response too large: {content_length} bytes (max: {max_response_size})"
-            )
-            raise ValueError(msg)
-
-        # Stream the response and check size as we download
-        chunks = []
-        total_size = 0
-
-        async for chunk in response.aiter_bytes(chunk_size=8192):
-            chunks.append(chunk)
-            total_size += len(chunk)
-
-            if total_size > max_response_size:
-                msg = (
-                    f"Response too large: {total_size} bytes (max: {max_response_size})"
-                )
+    async def _stream_get_with_size_limit(client: httpx.AsyncClient) -> httpx.Response:
+        async with client.stream("GET", url) as response:
+            # Check Content-Length header first if available
+            content_length = response.headers.get("Content-Length")
+            if content_length and int(content_length) > max_response_size:
+                msg = f"Response too large: {content_length} bytes (max: {max_response_size})"
                 raise ValueError(msg)
 
-        # All data received within size limit - construct final response
-        final_response = httpx.Response(
-            status_code=response.status_code,
-            headers=response.headers,
-            request=response.request,
-        )
-        # Directly set the content to bypass decompression
-        final_response._content = b"".join(chunks)  # pyright: ignore[reportPrivateUsage]
+            # Stream the response and check size as we download
+            chunks = []
+            total_size = 0
 
-        return final_response
+            async for chunk in response.aiter_bytes(chunk_size=8192):
+                chunks.append(chunk)
+                total_size += len(chunk)
+
+                if total_size > max_response_size:
+                    msg = f"Response too large: {total_size} bytes (max: {max_response_size})"
+                    raise ValueError(msg)
+
+            # All data received within size limit - construct final response
+            final_response = httpx.Response(
+                status_code=response.status_code,
+                headers=response.headers,
+                request=response.request,
+            )
+            # Directly set the content to bypass decompression
+            final_response._content = b"".join(chunks)  # pyright: ignore[reportPrivateUsage]
+
+            return final_response
+
+    try:
+        return await _stream_get_with_size_limit(get_http_client())
+    except httpx.RemoteProtocolError:
+        # Some servers advertise HTTP/2 but terminate h2 sessions.
+        # Retry once with HTTP/1.1 for this request.
+        return await _stream_get_with_size_limit(get_http1_client())
 
 
 async def get_domain_endings() -> set[str]:
