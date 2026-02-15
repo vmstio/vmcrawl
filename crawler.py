@@ -105,6 +105,7 @@ colors = {
     "bold": "\033[1m",
     "reset": "\033[0m",
     "cyan": "\033[96m",
+    "gray": "\033[90m",
     "green": "\033[92m",
     "magenta": "\033[95m",
     "orange": "\033[38;5;208m",
@@ -114,7 +115,7 @@ colors = {
     "yellow": "\033[93m",
     "white": "\033[0m",
 }
-TIME_TEXT = "\033[90m"
+TIME_TEXT = colors["gray"]
 
 # Track per-domain processing start times so error output can include elapsed time
 _domain_start_times: dict[str, float] = {}
