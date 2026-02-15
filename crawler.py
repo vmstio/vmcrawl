@@ -3038,9 +3038,7 @@ def _has_valid_tld(domain: str, domain_endings: set[str]) -> bool:
 
 
 def _is_dni_domain(domain: str, dni_domains: set[str]) -> bool:
-    """Check if domain matches configured DNI entries or built-in blocked substrings."""
-    if "ngrok" in domain:
-        return True
+    """Check if domain matches configured DNI entries."""
     return any(dni in domain for dni in dni_domains)
 
 
