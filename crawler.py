@@ -2014,7 +2014,7 @@ async def fetch_peer_domains(
                 continue
 
             # Check against DNI list (substring match required)
-            if any(dni_domain in item for dni_domain in dni):
+            if _is_dni_domain(item, dni):
                 continue
 
             # Check valid TLD using direct O(1) set membership
@@ -3020,6 +3020,13 @@ def _has_valid_tld(domain: str, domain_endings: set[str]) -> bool:
     return domain_parts[1] in domain_endings
 
 
+def _is_dni_domain(domain: str, dni_domains: set[str]) -> bool:
+    """Check if domain matches configured DNI entries or built-in blocked substrings."""
+    if "ngrok" in domain:
+        return True
+    return any(dni in domain for dni in dni_domains)
+
+
 def _is_dni_or_invalid_tld(domain, dni_domains, domain_endings):
     """Check if a domain is on the DNI list or has an invalid TLD.
 
@@ -3028,7 +3035,7 @@ def _is_dni_or_invalid_tld(domain, dni_domains, domain_endings):
         dni_domains: Set of DNI domains to filter out
         domain_endings: Set of valid TLDs (e.g., {"com", "org"})
     """
-    if any(dni in domain for dni in dni_domains):
+    if _is_dni_domain(domain, dni_domains):
         vmc_output(f"{domain}: Purging known DNI domain", "cyan", use_tqdm=True)
         delete_domain_if_known(domain)
         delete_domain_from_raw(domain)
