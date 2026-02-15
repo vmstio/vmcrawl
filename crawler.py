@@ -208,6 +208,8 @@ RE_CLEANUP_BRACKETS = re.compile(r"\s*(\[[^\]]*\]|\([^)]*\))")
 RE_CONTENT_TYPE_CHARSET = re.compile(r";.*$")
 RE_FUNCTION_DEF = re.compile(r"def (\w+)")
 RE_QUOTED_STRING = re.compile(r"'[^']+'")
+RE_JSON_TRAILING_COMMA = re.compile(r",(\s*[}\]])")
+RE_JSON_DOUBLE_QUOTED_VALUE = re.compile(r':\s*""([^"\r\n]*)""')
 
 # =============================================================================
 # DATABASE CONNECTION
@@ -585,22 +587,37 @@ async def parse_json_with_fallback(
     Returns:
         Parsed JSON data or False on error
     """
+
+    def _normalize_common_json_issues(raw_text: str) -> str:
+        """Normalize common non-standard JSON output seen on some instances."""
+        text = raw_text.lstrip("\ufeff")
+        # Fix JSON-with-trailing-commas (common in hand-written emitters).
+        text = RE_JSON_TRAILING_COMMA.sub(r"\1", text)
+        # Fix values emitted as: ""text"" (invalid JSON), e.g. nodeDescription.
+        text = RE_JSON_DOUBLE_QUOTED_VALUE.sub(r': "\1"', text)
+        return text
+
     try:
         return response.json()
     except json.JSONDecodeError:
+        decoder = json.JSONDecoder()
         try:
-            decoder = json.JSONDecoder()
             data, _ = decoder.raw_decode(response.text, 0)
             return data
-        except json.JSONDecodeError as exception:
-            await asyncio.to_thread(
-                _handle_json_exception,
-                domain,
-                target,
-                exception,
-                preserve_status,
-            )
-            return False
+        except json.JSONDecodeError:
+            try:
+                normalized_text = _normalize_common_json_issues(response.text)
+                data, _ = decoder.raw_decode(normalized_text, 0)
+                return data
+            except json.JSONDecodeError as exception:
+                await asyncio.to_thread(
+                    _handle_json_exception,
+                    domain,
+                    target,
+                    exception,
+                    preserve_status,
+                )
+                return False
 
 
 # =============================================================================
