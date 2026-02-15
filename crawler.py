@@ -1660,7 +1660,7 @@ def cleanup_old_domains():
                     """
                         DELETE FROM mastodon_domains
                         WHERE timestamp <=
-                            (CURRENT_TIMESTAMP - INTERVAL '1 week') AT TIME ZONE 'UTC'
+                            (CURRENT_TIMESTAMP - INTERVAL '3 days') AT TIME ZONE 'UTC'
                         RETURNING domain
                         """,
                 )
