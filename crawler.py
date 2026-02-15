@@ -5154,7 +5154,7 @@ def interactive_select_menu(menu_options: dict[str, dict[str, str]]) -> str | No
             elif ch in (curses.KEY_ENTER, 10, 13):
                 return rows[selected_row_idx]["key"]
             elif ch in (ord("q"), 27):
-                return None
+                return "__quit__"
 
     try:
         return curses.wrapper(_menu)
@@ -5164,7 +5164,13 @@ def interactive_select_menu(menu_options: dict[str, dict[str, str]]) -> str | No
 
 def get_user_choice() -> str:
     """Read user menu choice from stdin."""
-    return sys.stdin.readline().strip()
+    value = sys.stdin.readline()
+    if value == "":
+        raise KeyboardInterrupt
+    user_choice = value.strip().lower()
+    if user_choice in {"q", "quit", "exit"}:
+        raise KeyboardInterrupt
+    return user_choice
 
 
 # =============================================================================
@@ -5496,6 +5502,8 @@ async def async_main():
                         else:
                             menu_options = get_menu_options()
                             selection = interactive_select_menu(menu_options)
+                            if selection == "__quit__":
+                                raise KeyboardInterrupt
                             if selection is None:
                                 print_menu(menu_options)
                                 user_choice = get_user_choice()
@@ -5566,7 +5574,11 @@ async def async_main():
 
 def main():
     """Sync entry point that runs the async main function."""
-    asyncio.run(async_main())
+    try:
+        asyncio.run(async_main())
+    except KeyboardInterrupt:
+        # Handles interrupts that occur during asyncio shutdown.
+        pass
 
 
 if __name__ == "__main__":
