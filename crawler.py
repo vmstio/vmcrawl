@@ -1637,45 +1637,48 @@ def update_mastodon_domain(
 def cleanup_old_domains():
     """Delete known domains older than 3 days.
 
-    Uses an advisory lock to ensure only one crawler instance performs
-    cleanup at a time, preventing race conditions where multiple instances
-    might delete domains that other instances just updated.
+    Uses a transaction-scoped advisory lock to ensure only one crawler instance
+    performs cleanup at a time, preventing race conditions where multiple
+    instances might delete domains that other instances just updated.
     """
     # Use a fixed advisory lock ID for cleanup operations
     CLEANUP_LOCK_ID = 999999999
 
     with db_pool.connection() as conn, conn.cursor() as cursor:
         try:
-            # Try to acquire cleanup lock (non-blocking)
-            _ = cursor.execute("SELECT pg_try_advisory_lock(%s)", (CLEANUP_LOCK_ID,))
+            # Try to acquire cleanup lock (non-blocking). Transaction-scoped lock
+            # auto-releases on commit/rollback, which is safer with pooled connections.
+            _ = cursor.execute(
+                "SELECT pg_try_advisory_xact_lock(%s)", (CLEANUP_LOCK_ID,)
+            )
             result = cursor.fetchone()
             lock_acquired = result[0] if result else False
 
             if not lock_acquired:
                 # Another instance is already running cleanup, skip
+                vmc_output(
+                    "cleanup_old_domains: skipped (advisory lock held by another session)",
+                    "yellow",
+                )
                 return
 
-            try:
-                _ = cursor.execute(
-                    """
-                        DELETE FROM mastodon_domains
-                        WHERE timestamp <=
-                            (CURRENT_TIMESTAMP - INTERVAL '3 days') AT TIME ZONE 'UTC'
-                        RETURNING domain
-                        """,
-                )
-                deleted_domains = [row[0] for row in cursor.fetchall()]
-                if deleted_domains:
-                    for d in deleted_domains:
-                        vmc_output(
-                            f"{d}: Removed from active instance list",
-                            "pink",
-                            use_tqdm=True,
-                        )
-                conn.commit()
-            finally:
-                # Always release the cleanup lock
-                _ = cursor.execute("SELECT pg_advisory_unlock(%s)", (CLEANUP_LOCK_ID,))
+            _ = cursor.execute(
+                """
+                    DELETE FROM mastodon_domains
+                    WHERE timestamp <=
+                        (CURRENT_TIMESTAMP - INTERVAL '72 hours')::timestamp
+                    RETURNING domain
+                    """,
+            )
+            deleted_domains = [row[0] for row in cursor.fetchall()]
+            if deleted_domains:
+                for d in deleted_domains:
+                    vmc_output(
+                        f"{d}: Removed from active instance list",
+                        "pink",
+                        use_tqdm=True,
+                    )
+            conn.commit()
         except Exception as exception:
             vmc_output(f"Failed to clean up old domains: {exception}", "red")
             conn.rollback()
