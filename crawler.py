@@ -1276,17 +1276,35 @@ def increment_domain_error(
                 nodeinfo = None
                 current_bad = {col: False for col in BAD_COLUMNS}
 
-            # Determine flag values: preserve the specified status column if requested
+            # Determine error type first to check for immediate terminal types
+            error_type = get_error_type(error_reason)
+            previous_type = get_error_type(previous_reason)
+            error_status = (
+                ERROR_TYPE_TO_BAD_COLUMN.get(error_type) if error_type else None
+            )
+
+            # Preserve the retried bad_* flag only when the failure type is unchanged.
+            # If the failure type changed, clear old bad_* flags so state can transition.
+            preserve_current_status = (
+                preserve_status
+                and current_bad.get(preserve_status)
+                and error_status == preserve_status
+            )
+
+            # Determine flag values for upsert
             bad_values = {
                 col: (
-                    True if (preserve_status == col and current_bad.get(col)) else None
+                    True
+                    if (preserve_current_status and preserve_status == col)
+                    else None
                 )
                 for col in BAD_COLUMNS
             }
 
-            # Determine error type first to check for immediate terminal types
-            error_type = get_error_type(error_reason)
-            previous_type = get_error_type(previous_reason)
+            # During explicit bad_* rescans (menu 60-72), do not rewrite
+            # errors/reason when the domain still fails with that same bad_* type.
+            if preserve_current_status:
+                return
 
             # Immediate terminal types (ROBOT/HARD) bypass the Mastodon nodeinfo check
             # and mark the domain as bad if error count is 1 or higher
