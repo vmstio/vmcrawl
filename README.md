@@ -81,7 +81,7 @@ VMCRAWL_POSTGRES_HOST="localhost"
 VMCRAWL_POSTGRES_PORT="5432"
 ```
 
-On your PostgreSQL server, execute the contents of `creation.sql` to create the required tables.
+On your PostgreSQL server, execute the contents of `database.sql` to create tables and indexes.
 
 #### 5. Install Service Files
 
