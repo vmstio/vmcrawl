@@ -256,7 +256,45 @@ You can customize the crawling process with the following options:
 - `70` HTTP 5xx
 - `71` Hard Fail (HTTP 410/418/451/999)
 - `72` Robots (robots.txt prohibited)
-- `73` MAU (MAU validation failures)
+
+### Discovery Flow
+
+The crawler uses a probe-first discovery flow per domain:
+
+1. Check `robots.txt`
+2. Probe `/.well-known/nodeinfo` on the original domain with suppressed errors
+3. If probe fails, run host-meta and webfinger discovery in parallel
+4. Retry nodeinfo on discovered backend domain
+5. Resolve NodeInfo data (direct return or follow NodeInfo 2.0 URL)
+6. Branch to Mastodon or non-Mastodon processing
+
+#### Discovery Methods
+
+- `host-meta` (`/.well-known/host-meta`) and `webfinger` (`/.well-known/webfinger`) run concurrently.
+- host-meta result is preferred when both methods succeed.
+- if both fail, crawler falls back to original domain and replays the suppressed probe error.
+- if fallback occurs without a captured probe-error object, crawler records `TCP+nodeinfo`.
+
+#### NodeInfo and Platform Handling
+
+- Matrix servers (`m.server` in nodeinfo response) are marked as `matrix` and skipped as non-error.
+- Some servers return full NodeInfo directly at the well-known endpoint; this is accepted without another fetch.
+- For Mastodon instances:
+  - instance API is queried (`/api/v2/instance`, fallback `/api/v1/instance`) to obtain canonical domain.
+  - version and MAU are validated before writing to `mastodon_domains`.
+- For non-Mastodon instances:
+  - software name is stored in `raw_domains.nodeinfo`.
+  - errors/reason are cleared because platform mismatch is not an error condition.
+
+#### HTTP Transport Behavior
+
+- Requests use an HTTP/2-enabled `httpx` client by default.
+- On `httpx.RemoteProtocolError` (servers that break HTTP/2 sessions), the request is retried once with an HTTP/1.1-only client.
+
+#### Terminal Retry Behavior (60-72)
+
+- Same terminal failure type: preserve existing `bad_*` state and do not rewrite `errors`/`reason`.
+- Different terminal failure type: clear previously preserved `bad_*` state so status can transition.
 
 #### Headless Crawling
 
