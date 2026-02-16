@@ -441,6 +441,14 @@ http_custom_headers = {"User-Agent": http_custom_user_agent}
 # Memory protection: limit response sizes to prevent memory bombs
 # Max response size: 10MB (should be plenty for any legitimate Mastodon API response)
 max_response_size = int(os.getenv("VMCRAWL_MAX_RESPONSE_SIZE", str(10 * 1024 * 1024)))
+dns_retry_attempts = max(1, int(os.getenv("VMCRAWL_DNS_RETRY_ATTEMPTS", "3")))
+dns_retry_base_delay_ms = max(
+    0, int(os.getenv("VMCRAWL_DNS_RETRY_BASE_DELAY_MS", "80"))
+)
+dns_retry_jitter_ms = max(0, int(os.getenv("VMCRAWL_DNS_RETRY_JITTER_MS", "40")))
+dns_retry_max_total_delay_ms = max(
+    0, int(os.getenv("VMCRAWL_DNS_RETRY_MAX_TOTAL_DELAY_MS", "500"))
+)
 
 # Create limits object for httpx
 # Scale connection limits with number of worker threads
@@ -628,6 +636,47 @@ async def parse_json_with_fallback(
 async def get_httpx(url: str) -> httpx.Response:
     """Make async HTTP GET request with size limits."""
 
+    def _is_retryable_dns_error(exception: httpx.RequestError) -> bool:
+        """Return True for transient DNS/connect failures worth a quick retry."""
+        if isinstance(exception, (httpx.ConnectError, httpx.ConnectTimeout)):
+            return True
+
+        error_text = str(exception).casefold()
+        dns_indicators = (
+            "no address associated with hostname",
+            "temporary failure in name resolution",
+            "nodename nor servname provided",
+            "name or service not known",
+            "getaddrinfo",
+        )
+        if any(indicator in error_text for indicator in dns_indicators):
+            return True
+
+        # Walk chained causes for low-level resolver errors.
+        seen: set[int] = set()
+        cause: BaseException | None = exception
+        while cause is not None and id(cause) not in seen:
+            seen.add(id(cause))
+            if isinstance(cause, socket.gaierror):
+                return True
+            cause = cause.__cause__ or cause.__context__
+
+        return False
+
+    def _compute_retry_delay_seconds(attempt: int, elapsed_backoff: float) -> float:
+        """Calculate bounded exponential backoff with jitter."""
+        if dns_retry_max_total_delay_ms <= 0:
+            return 0.0
+
+        base_delay = (dns_retry_base_delay_ms / 1000.0) * (2**attempt)
+        jitter = random.uniform(
+            -(dns_retry_jitter_ms / 1000.0),
+            dns_retry_jitter_ms / 1000.0,
+        )
+        delay = max(0.0, base_delay + jitter)
+        remaining_budget = max(0.0, (dns_retry_max_total_delay_ms / 1000.0) - elapsed_backoff)
+        return min(delay, remaining_budget)
+
     async def _stream_get_with_size_limit(client: httpx.AsyncClient) -> httpx.Response:
         async with client.stream("GET", url) as response:
             # Check Content-Length header first if available
@@ -659,12 +708,27 @@ async def get_httpx(url: str) -> httpx.Response:
 
             return final_response
 
-    try:
-        return await _stream_get_with_size_limit(get_http_client())
-    except httpx.RemoteProtocolError:
-        # Some servers advertise HTTP/2 but terminate h2 sessions.
-        # Retry once with HTTP/1.1 for this request.
-        return await _stream_get_with_size_limit(get_http1_client())
+    total_backoff = 0.0
+    for attempt in range(dns_retry_attempts):
+        try:
+            try:
+                return await _stream_get_with_size_limit(get_http_client())
+            except httpx.RemoteProtocolError:
+                # Some servers advertise HTTP/2 but terminate h2 sessions.
+                # Retry once with HTTP/1.1 for this request.
+                return await _stream_get_with_size_limit(get_http1_client())
+        except httpx.RequestError as exception:
+            if attempt >= dns_retry_attempts - 1 or not _is_retryable_dns_error(exception):
+                raise
+
+            retry_delay = _compute_retry_delay_seconds(attempt, total_backoff)
+            if retry_delay > 0:
+                await asyncio.sleep(retry_delay)
+                total_backoff += retry_delay
+
+    # Defensive fallback: loop should always return or raise.
+    msg = f"Failed to fetch URL after {dns_retry_attempts} attempts: {url}"
+    raise RuntimeError(msg)
 
 
 async def get_domain_endings() -> set[str]:
