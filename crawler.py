@@ -1811,10 +1811,14 @@ def cleanup_old_domains():
 
 
 def get_dni_domains():
-    """Get list of DNI (Do Not Interact) domains to filter domains."""
+    """Get list of DNI (Do Not Interact) domains to filter domains.
+
+    Only returns domains with force='hard' for enforcement.
+    Domains with force='soft' are stored but not actively enforced.
+    """
     with db_pool.connection() as conn, conn.cursor() as cursor:
         try:
-            _ = cursor.execute("SELECT domain FROM dni")
+            _ = cursor.execute("SELECT domain FROM dni WHERE force = 'hard'")
             # Use set for O(1) lookup instead of O(n) list iteration
             return {row[0] for row in cursor}
         except Exception as exception:
@@ -2492,7 +2496,6 @@ async def fetch_tlds_from_iana() -> set[str]:
 # =============================================================================
 
 DNI_CSV_URL = "https://about.iftas.org/wp-content/uploads/2025/10/iftas-dni-latest.csv"
-ABANDONED_CSV_URL = "https://about.iftas.org/wp-content/uploads/2025/10/iftas-abandoned-unmanaged-latest.csv"
 
 
 def get_existing_dni_domains() -> set[str]:
@@ -2509,26 +2512,40 @@ def get_existing_dni_domains() -> set[str]:
             return set()
 
 
-def import_dni_domains(domains: list[str], comment: str = "iftas") -> int:
-    """Import new domains into dni table with comment."""
+def import_dni_domains(
+    domains: list[str], comment: str = "iftas", force: str = "soft"
+) -> int:
+    """Import new domains into dni table with comment and force level.
+
+    Args:
+        domains: List of domain names to import
+        comment: Comment to associate with the domains (e.g., "iftas", "iftas-abandoned")
+        force: Force level for enforcement - "soft" (default) or "hard"
+               Only domains with force="hard" will be used for DNI enforcement
+    """
     with db_pool.connection() as conn, conn.cursor() as cursor:
         try:
             if domains:
                 # Use batch insert for efficiency
-                values: list[tuple[str, str]] = [
-                    (domain.lower(), comment) for domain in domains
+                values: list[tuple[str, str, str]] = [
+                    (domain.lower(), comment, force) for domain in domains
                 ]
-                placeholders = sql.SQL(",").join([sql.SQL("(%s, %s)") for _ in values])
+                placeholders = sql.SQL(",").join(
+                    [sql.SQL("(%s, %s, %s)") for _ in values]
+                )
                 flattened_values: list[str] = [
                     item for sublist in values for item in sublist
                 ]
                 query = sql.SQL(
-                    "INSERT INTO dni (domain, comment) VALUES {} "
+                    "INSERT INTO dni (domain, comment, force) VALUES {} "
                     + "ON CONFLICT (domain) DO NOTHING"
                 ).format(placeholders)
                 _ = cursor.execute(query, flattened_values)
                 inserted_count = cursor.rowcount
-                vmc_output(f"Imported {inserted_count} new DNI domains", "green")
+                vmc_output(
+                    f"Imported {inserted_count} new DNI domains (force={force})",
+                    "green",
+                )
                 conn.commit()
                 return inserted_count
             vmc_output("No new domains to import", "yellow")
@@ -2544,7 +2561,7 @@ def list_dni_domains() -> None:
     with db_pool.connection() as conn, conn.cursor() as cursor:
         try:
             _ = cursor.execute(
-                "SELECT domain, comment, timestamp FROM dni ORDER BY domain",
+                "SELECT domain, comment, force, timestamp FROM dni ORDER BY domain",
             )
             domains = cursor.fetchall()
 
@@ -2553,11 +2570,12 @@ def list_dni_domains() -> None:
                 return
 
             vmc_output(f"\nDNI Domains ({len(domains)} total):", "cyan")
-            vmc_output("-" * 80, "cyan")
+            vmc_output("-" * 90, "cyan")
 
-            for domain, comment, timestamp in domains:
+            for domain, comment, force, timestamp in domains:
                 comment_str = comment if comment else ""
-                print(f"{domain:<40} {comment_str:<15} {timestamp}")
+                force_str = force if force else "soft"
+                print(f"{domain:<40} {comment_str:<15} {force_str:<6} {timestamp}")
             print()
 
         except Exception as e:
@@ -2646,60 +2664,33 @@ async def run_dni_mode(args):
         _ = count_dni_domains()
         return
 
-    # Get existing domains once to avoid duplicates across both lists
+    # Get existing domains to avoid duplicates
     existing_domains = get_existing_dni_domains()
-    total_imported = 0
 
-    # Fetch and import DNI list (default behavior)
-    vmc_output("\n=== Fetching IFTAS DNI List ===", "bold")
+    # Fetch and import DNI list
+    vmc_output("Fetching IFTAS DNI List…", "bold")
     csv_content = await fetch_dni_csv(args.url)
     if not csv_content:
         vmc_output("Failed to fetch DNI CSV", "red")
-    else:
-        domains = _parse_dni_csv(csv_content)
-        if domains:
-            new_domains = [d for d in domains if d not in existing_domains]
-            vmc_output(
-                f"Found {len(new_domains)} new DNI domains (out of {len(domains)} total)",
-                "cyan",
-            )
-            if new_domains:
-                imported = import_dni_domains(new_domains, comment="iftas-dni")
-                total_imported += imported
-                # Update existing_domains set for next list
-                existing_domains.update(new_domains)
-            else:
-                vmc_output("All DNI domains already exist in database", "yellow")
-        else:
-            vmc_output("No domains parsed from DNI CSV", "yellow")
+        return
 
-    # Fetch and import Abandoned/Unmanaged list
-    vmc_output("\n=== Fetching IFTAS Abandoned/Unmanaged List ===", "bold")
-    abandoned_content = await fetch_dni_csv(ABANDONED_CSV_URL)
-    if not abandoned_content:
-        vmc_output("Failed to fetch Abandoned/Unmanaged CSV", "red")
-    else:
-        abandoned_domains = _parse_dni_csv(abandoned_content)
-        if abandoned_domains:
-            new_abandoned = [d for d in abandoned_domains if d not in existing_domains]
-            vmc_output(
-                f"Found {len(new_abandoned)} new abandoned/unmanaged domains (out of {len(abandoned_domains)} total)",
-                "cyan",
-            )
-            if new_abandoned:
-                imported = import_dni_domains(new_abandoned, comment="iftas-abandoned")
-                total_imported += imported
-            else:
-                vmc_output(
-                    "All abandoned/unmanaged domains already exist in database",
-                    "yellow",
-                )
-        else:
-            vmc_output("No domains parsed from Abandoned/Unmanaged CSV", "yellow")
+    domains = _parse_dni_csv(csv_content)
+    if not domains:
+        vmc_output("No domains parsed from DNI CSV", "yellow")
+        return
 
-    # Show final count and summary
-    vmc_output("\n=== Import Summary ===", "bold")
-    vmc_output(f"Total new domains imported: {total_imported}", "green")
+    new_domains = [d for d in domains if d not in existing_domains]
+    vmc_output(
+        f"Found {len(new_domains)} new DNI domains (out of {len(domains)} total)",
+        "cyan",
+    )
+
+    if new_domains:
+        imported = import_dni_domains(new_domains, comment="iftas-dni")
+        vmc_output(f"Total new domains imported: {imported}", "green")
+    else:
+        vmc_output("All DNI domains already exist in database", "yellow")
+
     _ = count_dni_domains()
     vmc_output("DNI import complete!", "bold")
 

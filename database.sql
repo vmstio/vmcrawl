@@ -95,7 +95,8 @@ CREATE TABLE IF NOT EXISTS
   dni (
     domain TEXT PRIMARY KEY,
     comment TEXT,
-    timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    force TEXT DEFAULT 'soft' CHECK (force IN ('soft', 'hard'))
   );
 
 CREATE TABLE IF NOT EXISTS
