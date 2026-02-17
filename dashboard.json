@@ -3,7 +3,7 @@
   "kind": "DashboardWithAccessInfo",
   "metadata": {
     "name": "aedqo0q7klrswa",
-    "generation": 117,
+    "generation": 120,
     "creationTimestamp": "2025-11-21T19:31:21Z",
     "labels": {},
     "annotations": {}
@@ -609,129 +609,6 @@
                 },
                 "xTickLabelRotation": 0,
                 "xTickLabelSpacing": 0
-              }
-            },
-            "version": "12.4.0-22066786794"
-          }
-        }
-      },
-      "panel-13": {
-        "kind": "Panel",
-        "spec": {
-          "data": {
-            "kind": "QueryGroup",
-            "spec": {
-              "queries": [
-                {
-                  "kind": "PanelQuery",
-                  "spec": {
-                    "hidden": false,
-                    "query": {
-                      "group": "grafana-postgresql-datasource",
-                      "kind": "DataQuery",
-                      "spec": {
-                        "editorMode": "code",
-                        "format": "table",
-                        "rawQuery": true,
-                        "rawSql": "SELECT \n    md.domain AS \"Instance\",\n    md.software_version AS \"Version\",\n    md.active_users_monthly AS \"MAU\"\nFROM mastodon_domains md\nWHERE md.software_version NOT IN (\n    SELECT pv.software_version\n    FROM patch_versions pv\n)\nAND NOT EXISTS (\n    SELECT 1\n    FROM eol_versions ev\n    WHERE md.software_version LIKE ev.software_version || '%'\n)\nAND NOT EXISTS (\n    SELECT 1\n    FROM dni\n    WHERE md.domain LIKE '%' || dni.domain\n)\nORDER BY md.active_users_monthly DESC\nLIMIT 100;",
-                        "sql": {
-                          "columns": [
-                            {
-                              "parameters": [],
-                              "type": "function"
-                            }
-                          ],
-                          "groupBy": [
-                            {
-                              "property": {
-                                "type": "string"
-                              },
-                              "type": "groupBy"
-                            }
-                          ],
-                          "limit": 50
-                        }
-                      },
-                      "version": "v0"
-                    },
-                    "refId": "A"
-                  }
-                }
-              ],
-              "queryOptions": {},
-              "transformations": []
-            }
-          },
-          "description": "",
-          "id": 13,
-          "links": [],
-          "title": "Top 10 Unpatched Instances by MAUs",
-          "vizConfig": {
-            "group": "table",
-            "kind": "VizConfig",
-            "spec": {
-              "fieldConfig": {
-                "defaults": {
-                  "color": {
-                    "mode": "thresholds"
-                  },
-                  "custom": {
-                    "align": "auto",
-                    "cellOptions": {
-                      "type": "auto"
-                    },
-                    "footer": {
-                      "reducers": []
-                    },
-                    "inspect": false,
-                    "wrapText": false
-                  },
-                  "thresholds": {
-                    "mode": "absolute",
-                    "steps": [
-                      {
-                        "color": "green",
-                        "value": 0
-                      },
-                      {
-                        "color": "red",
-                        "value": 80
-                      }
-                    ]
-                  },
-                  "unit": "locale"
-                },
-                "overrides": [
-                  {
-                    "matcher": {
-                      "id": "byName",
-                      "options": "MAU"
-                    },
-                    "properties": [
-                      {
-                        "id": "custom.width",
-                        "value": 120
-                      }
-                    ]
-                  },
-                  {
-                    "matcher": {
-                      "id": "byName",
-                      "options": "Version"
-                    },
-                    "properties": [
-                      {
-                        "id": "custom.width",
-                        "value": 120
-                      }
-                    ]
-                  }
-                ]
-              },
-              "options": {
-                "cellHeight": "sm",
-                "enablePagination": true,
-                "showHeader": true
               }
             },
             "version": "12.4.0-22066786794"
@@ -1677,128 +1554,6 @@
                 "showPercentChange": false,
                 "textMode": "auto",
                 "wideLayout": true
-              }
-            },
-            "version": "12.4.0-22066786794"
-          }
-        }
-      },
-      "panel-47": {
-        "kind": "Panel",
-        "spec": {
-          "data": {
-            "kind": "QueryGroup",
-            "spec": {
-              "queries": [
-                {
-                  "kind": "PanelQuery",
-                  "spec": {
-                    "hidden": false,
-                    "query": {
-                      "group": "grafana-postgresql-datasource",
-                      "kind": "DataQuery",
-                      "spec": {
-                        "editorMode": "code",
-                        "format": "table",
-                        "rawQuery": true,
-                        "rawSql": "SELECT \n    md.domain AS \"Instance\",\n    md.software_version AS \"Version\",\n    md.active_users_monthly AS \"MAU\"\nFROM mastodon_domains md\nWHERE md.software_version NOT IN (\n    SELECT pv.software_version\n    FROM patch_versions pv\n)\nAND EXISTS (\n    SELECT 1\n    FROM eol_versions ev\n    WHERE md.software_version LIKE ev.software_version || '%'\n)\nAND NOT EXISTS (\n    SELECT 1\n    FROM dni\n    WHERE md.domain LIKE '%' || dni.domain\n)\nORDER BY md.active_users_monthly DESC\nLIMIT 100;",
-                        "sql": {
-                          "columns": [
-                            {
-                              "parameters": [],
-                              "type": "function"
-                            }
-                          ],
-                          "groupBy": [
-                            {
-                              "property": {
-                                "type": "string"
-                              },
-                              "type": "groupBy"
-                            }
-                          ],
-                          "limit": 50
-                        }
-                      },
-                      "version": "v0"
-                    },
-                    "refId": "A"
-                  }
-                }
-              ],
-              "queryOptions": {},
-              "transformations": []
-            }
-          },
-          "description": "",
-          "id": 47,
-          "links": [],
-          "title": "Top 10 EOL Instances by MAUs",
-          "vizConfig": {
-            "group": "table",
-            "kind": "VizConfig",
-            "spec": {
-              "fieldConfig": {
-                "defaults": {
-                  "color": {
-                    "mode": "thresholds"
-                  },
-                  "custom": {
-                    "align": "auto",
-                    "cellOptions": {
-                      "type": "auto"
-                    },
-                    "footer": {
-                      "reducers": []
-                    },
-                    "inspect": false
-                  },
-                  "thresholds": {
-                    "mode": "absolute",
-                    "steps": [
-                      {
-                        "color": "green",
-                        "value": 0
-                      },
-                      {
-                        "color": "red",
-                        "value": 80
-                      }
-                    ]
-                  },
-                  "unit": "locale"
-                },
-                "overrides": [
-                  {
-                    "matcher": {
-                      "id": "byName",
-                      "options": "MAU"
-                    },
-                    "properties": [
-                      {
-                        "id": "custom.width",
-                        "value": 120
-                      }
-                    ]
-                  },
-                  {
-                    "matcher": {
-                      "id": "byName",
-                      "options": "Version"
-                    },
-                    "properties": [
-                      {
-                        "id": "custom.width",
-                        "value": 120
-                      }
-                    ]
-                  }
-                ]
-              },
-              "options": {
-                "cellHeight": "sm",
-                "enablePagination": true,
-                "showHeader": true
               }
             },
             "version": "12.4.0-22066786794"
@@ -3101,7 +2856,7 @@
                 ]
               },
               "options": {
-                "cellHeight": "sm",
+                "cellHeight": "md",
                 "enablePagination": true,
                 "showHeader": true,
                 "sortBy": [
@@ -4595,32 +4350,6 @@
                         "x": 12,
                         "y": 0
                       }
-                    },
-                    {
-                      "kind": "GridLayoutItem",
-                      "spec": {
-                        "element": {
-                          "kind": "ElementReference",
-                          "name": "panel-13"
-                        },
-                        "height": 14,
-                        "width": 12,
-                        "x": 0,
-                        "y": 12
-                      }
-                    },
-                    {
-                      "kind": "GridLayoutItem",
-                      "spec": {
-                        "element": {
-                          "kind": "ElementReference",
-                          "name": "panel-47"
-                        },
-                        "height": 14,
-                        "width": 12,
-                        "x": 12,
-                        "y": 12
-                      }
                     }
                   ]
                 }
@@ -4643,7 +4372,7 @@
                           "kind": "ElementReference",
                           "name": "panel-76"
                         },
-                        "height": 28,
+                        "height": 26,
                         "width": 24,
                         "x": 0,
                         "y": 0
