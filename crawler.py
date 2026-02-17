@@ -674,7 +674,9 @@ async def get_httpx(url: str) -> httpx.Response:
             dns_retry_jitter_ms / 1000.0,
         )
         delay = max(0.0, base_delay + jitter)
-        remaining_budget = max(0.0, (dns_retry_max_total_delay_ms / 1000.0) - elapsed_backoff)
+        remaining_budget = max(
+            0.0, (dns_retry_max_total_delay_ms / 1000.0) - elapsed_backoff
+        )
         return min(delay, remaining_budget)
 
     async def _stream_get_with_size_limit(client: httpx.AsyncClient) -> httpx.Response:
@@ -718,7 +720,9 @@ async def get_httpx(url: str) -> httpx.Response:
                 # Retry once with HTTP/1.1 for this request.
                 return await _stream_get_with_size_limit(get_http1_client())
         except httpx.RequestError as exception:
-            if attempt >= dns_retry_attempts - 1 or not _is_retryable_dns_error(exception):
+            if attempt >= dns_retry_attempts - 1 or not _is_retryable_dns_error(
+                exception
+            ):
                 raise
 
             retry_delay = _compute_retry_delay_seconds(attempt, total_backoff)
@@ -3800,12 +3804,17 @@ def process_mastodon_instance(
         nightly_version_ranges,
     )
 
-    users = nodeinfo_20_result.get("usage", {}).get("users", {})
-    if not users:
+    usage = nodeinfo_20_result.get("usage", {})
+    users = usage.get("users")
+    if users is None:
+        # Some implementations use singular "user" instead of "users".
+        users = usage.get("user")
+
+    if not isinstance(users, dict) or not users:
         error_to_print = "No usage data in NodeInfo"
         vmc_output(f"{db_domain}: {error_to_print}", "yellow", use_tqdm=True)
         log_error(domain, error_to_print)
-        increment_domain_error(domain, "MAU", preserve_status)
+        increment_domain_error(domain, "JSON+nodeinfo_20", preserve_status)
         return
 
     required_fields = [
@@ -3814,10 +3823,11 @@ def process_mastodon_instance(
     ]
 
     for field, error_msg in required_fields:
-        if field not in users:
+        # Allow 0 user counts, but reject null values.
+        if field not in users or users[field] is None:
             vmc_output(f"{db_domain}: {error_msg}", "yellow", use_tqdm=True)
             log_error(domain, error_msg)
-            increment_domain_error(domain, "MAU", preserve_status)
+            increment_domain_error(domain, "JSON+nodeinfo_20", preserve_status)
             return
 
     active_month_users = users["activeMonth"]
