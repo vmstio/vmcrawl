@@ -3,7 +3,7 @@
   "kind": "DashboardWithAccessInfo",
   "metadata": {
     "name": "aedqo0q7klrswa",
-    "generation": 95,
+    "generation": 116,
     "creationTimestamp": "2025-11-21T19:31:21Z",
     "labels": {},
     "annotations": {}
@@ -122,121 +122,7 @@
                 "wideLayout": true
               }
             },
-            "version": "12.4.0-21935752455"
-          }
-        }
-      },
-      "panel-10": {
-        "kind": "Panel",
-        "spec": {
-          "data": {
-            "kind": "QueryGroup",
-            "spec": {
-              "queries": [
-                {
-                  "kind": "PanelQuery",
-                  "spec": {
-                    "hidden": false,
-                    "query": {
-                      "group": "grafana-postgresql-datasource",
-                      "kind": "DataQuery",
-                      "spec": {
-                        "editorMode": "code",
-                        "format": "table",
-                        "rawQuery": true,
-                        "rawSql": "SELECT\n  domain || ' (' || software_version || ')' AS \"Instance\"\nFROM mastodon_domains\nORDER BY timestamp DESC\nLIMIT 1;",
-                        "sql": {
-                          "columns": [
-                            {
-                              "parameters": [
-                                {
-                                  "name": "*",
-                                  "type": "functionParameter"
-                                }
-                              ],
-                              "type": "function"
-                            }
-                          ],
-                          "groupBy": [
-                            {
-                              "property": {
-                                "type": "string"
-                              },
-                              "type": "groupBy"
-                            }
-                          ],
-                          "limit": 50
-                        },
-                        "table": "mastodon_domains"
-                      },
-                      "version": "v0"
-                    },
-                    "refId": "A"
-                  }
-                }
-              ],
-              "queryOptions": {},
-              "transformations": []
-            }
-          },
-          "description": "",
-          "id": 10,
-          "links": [],
-          "title": "Last Crawled",
-          "vizConfig": {
-            "group": "stat",
-            "kind": "VizConfig",
-            "spec": {
-              "fieldConfig": {
-                "defaults": {
-                  "color": {
-                    "mode": "thresholds"
-                  },
-                  "thresholds": {
-                    "mode": "absolute",
-                    "steps": [
-                      {
-                        "color": "purple",
-                        "value": 0
-                      }
-                    ]
-                  }
-                },
-                "overrides": [
-                  {
-                    "matcher": {
-                      "id": "byName",
-                      "options": "time"
-                    },
-                    "properties": [
-                      {
-                        "id": "unit",
-                        "value": "dateTimeFromNow"
-                      }
-                    ]
-                  }
-                ]
-              },
-              "options": {
-                "colorMode": "value",
-                "graphMode": "area",
-                "justifyMode": "auto",
-                "orientation": "vertical",
-                "percentChangeColorMode": "standard",
-                "reduceOptions": {
-                  "calcs": [
-                    "lastNotNull"
-                  ],
-                  "fields": "/.*/",
-                  "values": false
-                },
-                "showPercentChange": false,
-                "text": {},
-                "textMode": "value",
-                "wideLayout": true
-              }
-            },
-            "version": "12.4.0-21935752455"
+            "version": "12.4.0-22066786794"
           }
         }
       },
@@ -258,7 +144,7 @@
                         "editorMode": "code",
                         "format": "table",
                         "rawQuery": true,
-                        "rawSql": "WITH version_cases AS (\n  SELECT software_version\n  FROM patch_versions\n),\neol_check AS (\n  SELECT DISTINCT md.software_version\n  FROM mastodon_domains md\n  WHERE EXISTS (\n    SELECT 1\n    FROM eol_versions ev\n    WHERE md.software_version LIKE ev.software_version || '.%'\n       OR md.software_version LIKE ev.software_version || '%'\n  )\n),\nunpatched_or_eol AS (\n  SELECT COUNT(*) AS cnt\n  FROM mastodon_domains md\n  WHERE md.software_version IN (SELECT software_version FROM eol_check)\n     OR md.software_version NOT IN (SELECT software_version FROM version_cases)\n),\ntotals AS (\n  SELECT COUNT(DISTINCT domain) AS total_domains\n  FROM mastodon_domains\n)\nSELECT\n  ((t.total_domains - u.cnt) * 100.0 / t.total_domains) AS patched_percent\nFROM totals t\nCROSS JOIN unpatched_or_eol u;",
+                        "rawSql": "WITH version_cases AS (\n  SELECT software_version\n  FROM patch_versions\n),\neol_check AS (\n  SELECT DISTINCT md.software_version\n  FROM mastodon_domains md\n  WHERE EXISTS (\n    SELECT 1\n    FROM eol_versions ev\n    WHERE md.software_version LIKE ev.software_version || '.%'\n       OR md.software_version LIKE ev.software_version || '%'\n  )\n),\nagg AS (\n  SELECT\n    COUNT(DISTINCT md.domain) AS total_domains,\n    COALESCE(SUM(md.active_users_monthly), 0) AS total_users,\n    COUNT(*) FILTER (\n      WHERE md.software_version IN (SELECT software_version FROM eol_check)\n         OR md.software_version NOT IN (SELECT software_version FROM version_cases)\n    ) AS unpatched_or_eol_domains,\n    COALESCE(SUM(md.active_users_monthly) FILTER (\n      WHERE md.software_version IN (SELECT software_version FROM eol_check)\n         OR md.software_version NOT IN (SELECT software_version FROM version_cases)\n    ), 0) AS unpatched_or_eol_users\n  FROM mastodon_domains md\n)\nSELECT\n  ((total_domains - unpatched_or_eol_domains) * 100.0 / NULLIF(total_domains, 0)) AS \"Instances\",\n  ((total_users   - unpatched_or_eol_users)   * 100.0 / NULLIF(total_users, 0))   AS \"MAU\"\nFROM agg;",
                         "sql": {
                           "columns": [
                             {
@@ -290,7 +176,7 @@
           "description": "Instances running a supported branch with the latest patches applied.",
           "id": 101,
           "links": [],
-          "title": "Instances Patched",
+          "title": "Patch Coverage",
           "vizConfig": {
             "group": "stat",
             "kind": "VizConfig",
@@ -317,7 +203,7 @@
               "options": {
                 "colorMode": "value",
                 "graphMode": "area",
-                "justifyMode": "auto",
+                "justifyMode": "center",
                 "orientation": "auto",
                 "percentChangeColorMode": "standard",
                 "reduceOptions": {
@@ -332,11 +218,11 @@
                 "wideLayout": true
               }
             },
-            "version": "12.4.0-21935752455"
+            "version": "12.4.0-22066786794"
           }
         }
       },
-      "panel-102": {
+      "panel-108": {
         "kind": "Panel",
         "spec": {
           "data": {
@@ -354,7 +240,7 @@
                         "editorMode": "code",
                         "format": "table",
                         "rawQuery": true,
-                        "rawSql": "WITH version_cases AS (\n  SELECT software_version\n  FROM patch_versions\n),\neol_check AS (\n  SELECT DISTINCT md.software_version\n  FROM mastodon_domains md\n  WHERE EXISTS (\n    SELECT 1\n    FROM eol_versions ev\n    WHERE md.software_version LIKE ev.software_version || '.%'\n       OR md.software_version LIKE ev.software_version || '%'\n  )\n),\ntotals AS (\n  SELECT SUM(active_users_monthly) AS total_users\n  FROM mastodon_domains\n),\nunpatched_or_eol AS (\n  SELECT SUM(active_users_monthly) AS cnt\n  FROM mastodon_domains md\n  WHERE md.software_version IN (SELECT software_version FROM eol_check)\n     OR md.software_version NOT IN (SELECT software_version FROM version_cases)\n)\nSELECT\n  ((t.total_users - u.cnt) * 100.0 / t.total_users) AS patched_users_percent\nFROM totals t\nCROSS JOIN unpatched_or_eol u;",
+                        "rawSql": "SELECT\n  COUNT(DISTINCT md.domain) FILTER (\n    WHERE md.\"timestamp\" <= NOW() - INTERVAL '1 hour'\n  ) AS \"1 Hour+\",\n  COUNT(DISTINCT md.domain) FILTER (\n    WHERE md.\"timestamp\" <= NOW() - INTERVAL '24 hours'\n  ) AS \"24 Hours+\",\n  COUNT(DISTINCT md.domain) FILTER (\n    WHERE md.\"timestamp\" <= NOW() - INTERVAL '48 hours'\n  ) AS \"48 Hours+\"\nFROM raw_domains rd\nINNER JOIN mastodon_domains md\n  ON rd.domain = md.domain\nWHERE rd.reason IS NOT NULL;",
                         "sql": {
                           "columns": [
                             {
@@ -383,298 +269,10 @@
               "transformations": []
             }
           },
-          "description": "Users on instances running a supported branch with the latest patches applied.",
-          "id": 102,
+          "description": "Domains that returned an error on their last scan.",
+          "id": 108,
           "links": [],
-          "title": "MAU Patched",
-          "vizConfig": {
-            "group": "stat",
-            "kind": "VizConfig",
-            "spec": {
-              "fieldConfig": {
-                "defaults": {
-                  "color": {
-                    "mode": "thresholds"
-                  },
-                  "decimals": 1,
-                  "thresholds": {
-                    "mode": "absolute",
-                    "steps": [
-                      {
-                        "color": "purple",
-                        "value": 0
-                      }
-                    ]
-                  },
-                  "unit": "percent"
-                },
-                "overrides": []
-              },
-              "options": {
-                "colorMode": "value",
-                "graphMode": "area",
-                "justifyMode": "auto",
-                "orientation": "auto",
-                "percentChangeColorMode": "standard",
-                "reduceOptions": {
-                  "calcs": [
-                    "lastNotNull"
-                  ],
-                  "fields": "",
-                  "values": false
-                },
-                "showPercentChange": false,
-                "textMode": "auto",
-                "wideLayout": true
-              }
-            },
-            "version": "12.4.0-21935752455"
-          }
-        }
-      },
-      "panel-104": {
-        "kind": "Panel",
-        "spec": {
-          "data": {
-            "kind": "QueryGroup",
-            "spec": {
-              "queries": [
-                {
-                  "kind": "PanelQuery",
-                  "spec": {
-                    "hidden": false,
-                    "query": {
-                      "group": "grafana-postgresql-datasource",
-                      "kind": "DataQuery",
-                      "spec": {
-                        "editorMode": "code",
-                        "format": "table",
-                        "rawQuery": true,
-                        "rawSql": "WITH latest_stats AS (\n  SELECT\n    main_instances + latest_instances AS patched_instances\n  FROM statistics\n  ORDER BY date DESC\n  LIMIT 1\n),\ntotal_domains AS (\n  SELECT COUNT(DISTINCT domain) AS total_instances\n  FROM mastodon_domains\n)\nSELECT\n  (latest_stats.patched_instances::numeric / total_domains.total_instances) * 100\n    AS patched_percentage\nFROM latest_stats, total_domains;",
-                        "sql": {
-                          "columns": [
-                            {
-                              "parameters": [],
-                              "type": "function"
-                            }
-                          ],
-                          "groupBy": [
-                            {
-                              "property": {
-                                "type": "string"
-                              },
-                              "type": "groupBy"
-                            }
-                          ],
-                          "limit": 50
-                        }
-                      },
-                      "version": "v0"
-                    },
-                    "refId": "A"
-                  }
-                }
-              ],
-              "queryOptions": {},
-              "transformations": []
-            }
-          },
-          "description": "Instances running either main or latest release branches, regardless of patch status.",
-          "id": 104,
-          "links": [],
-          "title": "Instances on 4.5+",
-          "vizConfig": {
-            "group": "stat",
-            "kind": "VizConfig",
-            "spec": {
-              "fieldConfig": {
-                "defaults": {
-                  "color": {
-                    "mode": "thresholds"
-                  },
-                  "decimals": 1,
-                  "thresholds": {
-                    "mode": "absolute",
-                    "steps": [
-                      {
-                        "color": "purple",
-                        "value": 0
-                      }
-                    ]
-                  },
-                  "unit": "percent"
-                },
-                "overrides": []
-              },
-              "options": {
-                "colorMode": "value",
-                "graphMode": "area",
-                "justifyMode": "auto",
-                "orientation": "auto",
-                "percentChangeColorMode": "standard",
-                "reduceOptions": {
-                  "calcs": [
-                    "lastNotNull"
-                  ],
-                  "fields": "",
-                  "values": false
-                },
-                "showPercentChange": false,
-                "textMode": "auto",
-                "wideLayout": true
-              }
-            },
-            "version": "12.4.0-21935752455"
-          }
-        }
-      },
-      "panel-105": {
-        "kind": "Panel",
-        "spec": {
-          "data": {
-            "kind": "QueryGroup",
-            "spec": {
-              "queries": [
-                {
-                  "kind": "PanelQuery",
-                  "spec": {
-                    "hidden": false,
-                    "query": {
-                      "group": "grafana-postgresql-datasource",
-                      "kind": "DataQuery",
-                      "spec": {
-                        "editorMode": "code",
-                        "format": "table",
-                        "rawQuery": true,
-                        "rawSql": "WITH latest_stats AS (\n  SELECT\n    main_branch_mau + latest_branch_mau AS patched_mau\n  FROM statistics\n  ORDER BY date DESC\n  LIMIT 1\n),\ntotal_mau AS (\n  SELECT COALESCE(SUM(active_users_monthly), 0) AS total_mau\n  FROM mastodon_domains\n)\nSELECT\n  (latest_stats.patched_mau::numeric / NULLIF(total_mau.total_mau, 0)) * 100\n    AS patched_mau_percentage\nFROM latest_stats, total_mau;",
-                        "sql": {
-                          "columns": [
-                            {
-                              "parameters": [],
-                              "type": "function"
-                            }
-                          ],
-                          "groupBy": [
-                            {
-                              "property": {
-                                "type": "string"
-                              },
-                              "type": "groupBy"
-                            }
-                          ],
-                          "limit": 50
-                        }
-                      },
-                      "version": "v0"
-                    },
-                    "refId": "A"
-                  }
-                }
-              ],
-              "queryOptions": {},
-              "transformations": []
-            }
-          },
-          "description": "Users on running either main or latest release branches, regardless of patch status.",
-          "id": 105,
-          "links": [],
-          "title": "MAU on 4.5+",
-          "vizConfig": {
-            "group": "stat",
-            "kind": "VizConfig",
-            "spec": {
-              "fieldConfig": {
-                "defaults": {
-                  "color": {
-                    "mode": "thresholds"
-                  },
-                  "decimals": 1,
-                  "thresholds": {
-                    "mode": "absolute",
-                    "steps": [
-                      {
-                        "color": "purple",
-                        "value": 0
-                      }
-                    ]
-                  },
-                  "unit": "percent"
-                },
-                "overrides": []
-              },
-              "options": {
-                "colorMode": "value",
-                "graphMode": "area",
-                "justifyMode": "auto",
-                "orientation": "auto",
-                "percentChangeColorMode": "standard",
-                "reduceOptions": {
-                  "calcs": [
-                    "lastNotNull"
-                  ],
-                  "fields": "",
-                  "values": false
-                },
-                "showPercentChange": false,
-                "textMode": "auto",
-                "wideLayout": true
-              }
-            },
-            "version": "12.4.0-21935752455"
-          }
-        }
-      },
-      "panel-106": {
-        "kind": "Panel",
-        "spec": {
-          "data": {
-            "kind": "QueryGroup",
-            "spec": {
-              "queries": [
-                {
-                  "kind": "PanelQuery",
-                  "spec": {
-                    "hidden": false,
-                    "query": {
-                      "group": "grafana-postgresql-datasource",
-                      "kind": "DataQuery",
-                      "spec": {
-                        "editorMode": "code",
-                        "format": "table",
-                        "rawQuery": true,
-                        "rawSql": "SELECT COUNT(DISTINCT rd.domain) AS domain_count\nFROM raw_domains rd\nWHERE rd.nodeinfo = 'mastodon'\n  AND rd.reason IS NOT NULL\n  AND NOT EXISTS (\n    SELECT 1\n    FROM mastodon_domains md\n    WHERE md.domain = rd.domain\n  );",
-                        "sql": {
-                          "columns": [
-                            {
-                              "parameters": [],
-                              "type": "function"
-                            }
-                          ],
-                          "groupBy": [
-                            {
-                              "property": {
-                                "type": "string"
-                              },
-                              "type": "groupBy"
-                            }
-                          ],
-                          "limit": 50
-                        }
-                      },
-                      "version": "v0"
-                    },
-                    "refId": "A"
-                  }
-                }
-              ],
-              "queryOptions": {},
-              "transformations": []
-            }
-          },
-          "description": "Domains that have been seen running Mastodon but not accessible within the last week.",
-          "id": 106,
-          "links": [],
-          "title": "Offline",
+          "title": "Instances w/ Stale Data",
           "vizConfig": {
             "group": "stat",
             "kind": "VizConfig",
@@ -688,7 +286,7 @@
                     "mode": "absolute",
                     "steps": [
                       {
-                        "color": "red",
+                        "color": "text",
                         "value": 0
                       }
                     ]
@@ -700,7 +298,7 @@
               "options": {
                 "colorMode": "value",
                 "graphMode": "area",
-                "justifyMode": "auto",
+                "justifyMode": "center",
                 "orientation": "auto",
                 "percentChangeColorMode": "standard",
                 "reduceOptions": {
@@ -715,7 +313,7 @@
                 "wideLayout": true
               }
             },
-            "version": "12.4.0-21490573584.patch3"
+            "version": "12.4.0-22066786794"
           }
         }
       },
@@ -887,7 +485,7 @@
                 "textMode": "value"
               }
             },
-            "version": "12.4.0-21935752455"
+            "version": "12.4.0-22066786794"
           }
         }
       },
@@ -1303,7 +901,7 @@
                 "textMode": "value"
               }
             },
-            "version": "12.4.0-21935752455"
+            "version": "12.4.0-22066786794"
           }
         }
       },
@@ -1470,7 +1068,7 @@
                 "textMode": "value"
               }
             },
-            "version": "12.4.0-21935752455"
+            "version": "12.4.0-22066786794"
           }
         }
       },
@@ -1642,7 +1240,7 @@
                 "textMode": "value"
               }
             },
-            "version": "12.4.0-21935752455"
+            "version": "12.4.0-22066786794"
           }
         }
       },
@@ -1814,7 +1412,7 @@
                 "textMode": "value"
               }
             },
-            "version": "12.4.0-21935752455"
+            "version": "12.4.0-22066786794"
           }
         }
       },
@@ -1986,101 +1584,7 @@
                 "textMode": "value"
               }
             },
-            "version": "12.4.0-21935752455"
-          }
-        }
-      },
-      "panel-4": {
-        "kind": "Panel",
-        "spec": {
-          "data": {
-            "kind": "QueryGroup",
-            "spec": {
-              "queries": [
-                {
-                  "kind": "PanelQuery",
-                  "spec": {
-                    "hidden": false,
-                    "query": {
-                      "group": "grafana-postgresql-datasource",
-                      "kind": "DataQuery",
-                      "spec": {
-                        "editorMode": "code",
-                        "format": "table",
-                        "rawQuery": true,
-                        "rawSql": "SELECT COUNT(DISTINCT software_version) AS unique_software_versions\nFROM mastodon_domains;",
-                        "sql": {
-                          "columns": [
-                            {
-                              "parameters": [],
-                              "type": "function"
-                            }
-                          ],
-                          "groupBy": [
-                            {
-                              "property": {
-                                "type": "string"
-                              },
-                              "type": "groupBy"
-                            }
-                          ],
-                          "limit": 50
-                        }
-                      },
-                      "version": "v0"
-                    },
-                    "refId": "A"
-                  }
-                }
-              ],
-              "queryOptions": {},
-              "transformations": []
-            }
-          },
-          "description": "Count of distinct Mastodon versions, after various fork/meta identifiers are removed and nightly releases are normalized.",
-          "id": 4,
-          "links": [],
-          "title": "Unique Versions Seen",
-          "vizConfig": {
-            "group": "stat",
-            "kind": "VizConfig",
-            "spec": {
-              "fieldConfig": {
-                "defaults": {
-                  "color": {
-                    "mode": "thresholds"
-                  },
-                  "thresholds": {
-                    "mode": "absolute",
-                    "steps": [
-                      {
-                        "color": "purple",
-                        "value": 0
-                      }
-                    ]
-                  }
-                },
-                "overrides": []
-              },
-              "options": {
-                "colorMode": "value",
-                "graphMode": "area",
-                "justifyMode": "auto",
-                "orientation": "auto",
-                "percentChangeColorMode": "standard",
-                "reduceOptions": {
-                  "calcs": [
-                    "lastNotNull"
-                  ],
-                  "fields": "",
-                  "values": false
-                },
-                "showPercentChange": false,
-                "textMode": "auto",
-                "wideLayout": true
-              }
-            },
-            "version": "12.4.0-21935752455"
+            "version": "12.4.0-22066786794"
           }
         }
       },
@@ -2175,7 +1679,7 @@
                 "wideLayout": true
               }
             },
-            "version": "12.4.0-21935752455"
+            "version": "12.4.0-22066786794"
           }
         }
       },
@@ -2557,7 +2061,7 @@
                 }
               }
             },
-            "version": "12.4.0-21935752455"
+            "version": "12.4.0-22066786794"
           }
         }
       },
@@ -2929,7 +2433,7 @@
                 }
               }
             },
-            "version": "12.4.0-21935752455"
+            "version": "12.4.0-22066786794"
           }
         }
       },
@@ -3301,7 +2805,7 @@
                 "textMode": "value"
               }
             },
-            "version": "12.4.0-21935752455"
+            "version": "12.4.0-22066786794"
           }
         }
       },
@@ -3473,7 +2977,7 @@
                 "textMode": "value"
               }
             },
-            "version": "12.4.0-21935752455"
+            "version": "12.4.0-22066786794"
           }
         }
       },
@@ -3609,101 +3113,6 @@
               }
             },
             "version": "12.4.0-21935752455"
-          }
-        }
-      },
-      "panel-81": {
-        "kind": "Panel",
-        "spec": {
-          "data": {
-            "kind": "QueryGroup",
-            "spec": {
-              "queries": [
-                {
-                  "kind": "PanelQuery",
-                  "spec": {
-                    "hidden": false,
-                    "query": {
-                      "group": "grafana-postgresql-datasource",
-                      "kind": "DataQuery",
-                      "spec": {
-                        "editorMode": "code",
-                        "format": "table",
-                        "rawQuery": true,
-                        "rawSql": "SELECT COUNT(DISTINCT rd.domain) AS domain_count\nFROM raw_domains rd\nINNER JOIN mastodon_domains md\n  ON rd.domain = md.domain\nWHERE rd.reason IS NOT NULL;",
-                        "sql": {
-                          "columns": [
-                            {
-                              "parameters": [],
-                              "type": "function"
-                            }
-                          ],
-                          "groupBy": [
-                            {
-                              "property": {
-                                "type": "string"
-                              },
-                              "type": "groupBy"
-                            }
-                          ],
-                          "limit": 50
-                        }
-                      },
-                      "version": "v0"
-                    },
-                    "refId": "A"
-                  }
-                }
-              ],
-              "queryOptions": {},
-              "transformations": []
-            }
-          },
-          "description": "Domains that have been seen running Mastodon within the last week, but on the last crawl returned an error.",
-          "id": 81,
-          "links": [],
-          "title": "Issues",
-          "vizConfig": {
-            "group": "stat",
-            "kind": "VizConfig",
-            "spec": {
-              "fieldConfig": {
-                "defaults": {
-                  "color": {
-                    "mode": "thresholds"
-                  },
-                  "thresholds": {
-                    "mode": "absolute",
-                    "steps": [
-                      {
-                        "color": "yellow",
-                        "value": 0
-                      }
-                    ]
-                  },
-                  "unit": "locale"
-                },
-                "overrides": []
-              },
-              "options": {
-                "colorMode": "value",
-                "graphMode": "area",
-                "justifyMode": "auto",
-                "orientation": "auto",
-                "percentChangeColorMode": "standard",
-                "reduceOptions": {
-                  "calcs": [
-                    "lastNotNull"
-                  ],
-                  "fields": "",
-                  "values": false
-                },
-                "showPercentChange": false,
-                "textMode": "auto",
-                "wideLayout": true
-              }
-            },
-            "version": "12.4.0-21490573584.patch3"
           }
         }
       },
@@ -4348,291 +3757,6 @@
           }
         }
       },
-      "panel-92": {
-        "kind": "Panel",
-        "spec": {
-          "data": {
-            "kind": "QueryGroup",
-            "spec": {
-              "queries": [
-                {
-                  "kind": "PanelQuery",
-                  "spec": {
-                    "hidden": false,
-                    "query": {
-                      "group": "grafana-postgresql-datasource",
-                      "kind": "DataQuery",
-                      "spec": {
-                        "editorMode": "code",
-                        "format": "table",
-                        "rawQuery": true,
-                        "rawSql": "SELECT COUNT(DISTINCT domain) AS unique_domain_count\nFROM raw_domains;",
-                        "sql": {
-                          "columns": [
-                            {
-                              "parameters": [],
-                              "type": "function"
-                            }
-                          ],
-                          "groupBy": [
-                            {
-                              "property": {
-                                "type": "string"
-                              },
-                              "type": "groupBy"
-                            }
-                          ],
-                          "limit": 50
-                        }
-                      },
-                      "version": "v0"
-                    },
-                    "refId": "A"
-                  }
-                }
-              ],
-              "queryOptions": {},
-              "transformations": []
-            }
-          },
-          "description": "",
-          "id": 92,
-          "links": [],
-          "title": "Federated Domains",
-          "vizConfig": {
-            "group": "stat",
-            "kind": "VizConfig",
-            "spec": {
-              "fieldConfig": {
-                "defaults": {
-                  "color": {
-                    "mode": "thresholds"
-                  },
-                  "thresholds": {
-                    "mode": "absolute",
-                    "steps": [
-                      {
-                        "color": "text",
-                        "value": 0
-                      }
-                    ]
-                  },
-                  "unit": "locale"
-                },
-                "overrides": []
-              },
-              "options": {
-                "colorMode": "value",
-                "graphMode": "area",
-                "justifyMode": "auto",
-                "orientation": "auto",
-                "percentChangeColorMode": "standard",
-                "reduceOptions": {
-                  "calcs": [
-                    "lastNotNull"
-                  ],
-                  "fields": "",
-                  "values": false
-                },
-                "showPercentChange": false,
-                "textMode": "auto",
-                "wideLayout": true
-              }
-            },
-            "version": "12.4.0-21490573584.patch3"
-          }
-        }
-      },
-      "panel-93": {
-        "kind": "Panel",
-        "spec": {
-          "data": {
-            "kind": "QueryGroup",
-            "spec": {
-              "queries": [
-                {
-                  "kind": "PanelQuery",
-                  "spec": {
-                    "hidden": false,
-                    "query": {
-                      "group": "grafana-postgresql-datasource",
-                      "kind": "DataQuery",
-                      "spec": {
-                        "editorMode": "code",
-                        "format": "table",
-                        "rawQuery": true,
-                        "rawSql": "SELECT COUNT(DISTINCT rd.domain) AS unique_domain_count\nFROM raw_domains rd\nWHERE rd.alias IS NOT NULL\n   OR EXISTS (\n     SELECT 1\n     FROM jsonb_each(to_jsonb(rd)) AS e(key, value)\n     WHERE e.key LIKE 'bad\\_%' ESCAPE '\\'\n       AND e.value <> 'null'::jsonb\n   );",
-                        "sql": {
-                          "columns": [
-                            {
-                              "parameters": [],
-                              "type": "function"
-                            }
-                          ],
-                          "groupBy": [
-                            {
-                              "property": {
-                                "type": "string"
-                              },
-                              "type": "groupBy"
-                            }
-                          ],
-                          "limit": 50
-                        }
-                      },
-                      "version": "v0"
-                    },
-                    "refId": "A"
-                  }
-                }
-              ],
-              "queryOptions": {},
-              "transformations": []
-            }
-          },
-          "description": "",
-          "id": 93,
-          "links": [],
-          "title": "Inaccessible Domains",
-          "vizConfig": {
-            "group": "stat",
-            "kind": "VizConfig",
-            "spec": {
-              "fieldConfig": {
-                "defaults": {
-                  "color": {
-                    "mode": "thresholds"
-                  },
-                  "thresholds": {
-                    "mode": "absolute",
-                    "steps": [
-                      {
-                        "color": "text",
-                        "value": 0
-                      }
-                    ]
-                  },
-                  "unit": "locale"
-                },
-                "overrides": []
-              },
-              "options": {
-                "colorMode": "value",
-                "graphMode": "area",
-                "justifyMode": "auto",
-                "orientation": "auto",
-                "percentChangeColorMode": "standard",
-                "reduceOptions": {
-                  "calcs": [
-                    "lastNotNull"
-                  ],
-                  "fields": "",
-                  "values": false
-                },
-                "showPercentChange": false,
-                "textMode": "auto",
-                "wideLayout": true
-              }
-            },
-            "version": "12.4.0-21490573584.patch3"
-          }
-        }
-      },
-      "panel-95": {
-        "kind": "Panel",
-        "spec": {
-          "data": {
-            "kind": "QueryGroup",
-            "spec": {
-              "queries": [
-                {
-                  "kind": "PanelQuery",
-                  "spec": {
-                    "hidden": false,
-                    "query": {
-                      "group": "grafana-postgresql-datasource",
-                      "kind": "DataQuery",
-                      "spec": {
-                        "editorMode": "code",
-                        "format": "table",
-                        "rawQuery": true,
-                        "rawSql": "SELECT COUNT(DISTINCT domain) AS unique_domain_count\nFROM raw_domains WHERE \"nodeinfo\"::TEXT NOT ILIKE '%mastodon%';",
-                        "sql": {
-                          "columns": [
-                            {
-                              "parameters": [],
-                              "type": "function"
-                            }
-                          ],
-                          "groupBy": [
-                            {
-                              "property": {
-                                "type": "string"
-                              },
-                              "type": "groupBy"
-                            }
-                          ],
-                          "limit": 50
-                        }
-                      },
-                      "version": "v0"
-                    },
-                    "refId": "A"
-                  }
-                }
-              ],
-              "queryOptions": {},
-              "transformations": []
-            }
-          },
-          "description": "",
-          "id": 95,
-          "links": [],
-          "title": "Non-Mastodon Instances",
-          "vizConfig": {
-            "group": "stat",
-            "kind": "VizConfig",
-            "spec": {
-              "fieldConfig": {
-                "defaults": {
-                  "color": {
-                    "mode": "thresholds"
-                  },
-                  "thresholds": {
-                    "mode": "absolute",
-                    "steps": [
-                      {
-                        "color": "light-blue",
-                        "value": 0
-                      }
-                    ]
-                  },
-                  "unit": "locale"
-                },
-                "overrides": []
-              },
-              "options": {
-                "colorMode": "value",
-                "graphMode": "area",
-                "justifyMode": "auto",
-                "orientation": "auto",
-                "percentChangeColorMode": "standard",
-                "reduceOptions": {
-                  "calcs": [
-                    "lastNotNull"
-                  ],
-                  "fields": "",
-                  "values": false
-                },
-                "showPercentChange": false,
-                "textMode": "auto",
-                "wideLayout": true
-              }
-            },
-            "version": "12.4.0-21490573584.patch3"
-          }
-        }
-      },
       "panel-96": {
         "kind": "Panel",
         "spec": {
@@ -5069,24 +4193,11 @@
                       "spec": {
                         "element": {
                           "kind": "ElementReference",
-                          "name": "panel-10"
-                        },
-                        "height": 4,
-                        "width": 6,
-                        "x": 0,
-                        "y": 0
-                      }
-                    },
-                    {
-                      "kind": "GridLayoutItem",
-                      "spec": {
-                        "element": {
-                          "kind": "ElementReference",
                           "name": "panel-1"
                         },
                         "height": 4,
                         "width": 6,
-                        "x": 6,
+                        "x": 0,
                         "y": 0
                       }
                     },
@@ -5099,20 +4210,7 @@
                         },
                         "height": 4,
                         "width": 6,
-                        "x": 12,
-                        "y": 0
-                      }
-                    },
-                    {
-                      "kind": "GridLayoutItem",
-                      "spec": {
-                        "element": {
-                          "kind": "ElementReference",
-                          "name": "panel-4"
-                        },
-                        "height": 4,
-                        "width": 6,
-                        "x": 18,
+                        "x": 6,
                         "y": 0
                       }
                     },
@@ -5125,34 +4223,8 @@
                         },
                         "height": 4,
                         "width": 6,
-                        "x": 0,
-                        "y": 4
-                      }
-                    },
-                    {
-                      "kind": "GridLayoutItem",
-                      "spec": {
-                        "element": {
-                          "kind": "ElementReference",
-                          "name": "panel-102"
-                        },
-                        "height": 4,
-                        "width": 6,
-                        "x": 6,
-                        "y": 4
-                      }
-                    },
-                    {
-                      "kind": "GridLayoutItem",
-                      "spec": {
-                        "element": {
-                          "kind": "ElementReference",
-                          "name": "panel-104"
-                        },
-                        "height": 4,
-                        "width": 6,
                         "x": 12,
-                        "y": 4
+                        "y": 0
                       }
                     },
                     {
@@ -5160,97 +4232,18 @@
                       "spec": {
                         "element": {
                           "kind": "ElementReference",
-                          "name": "panel-105"
+                          "name": "panel-108"
                         },
                         "height": 4,
                         "width": 6,
                         "x": 18,
-                        "y": 4
+                        "y": 0
                       }
                     }
                   ]
                 }
               },
               "title": "Big Numbers"
-            }
-          },
-          {
-            "kind": "RowsLayoutRow",
-            "spec": {
-              "collapse": true,
-              "layout": {
-                "kind": "GridLayout",
-                "spec": {
-                  "items": [
-                    {
-                      "kind": "GridLayoutItem",
-                      "spec": {
-                        "element": {
-                          "kind": "ElementReference",
-                          "name": "panel-106"
-                        },
-                        "height": 4,
-                        "width": 3,
-                        "x": 0,
-                        "y": 0
-                      }
-                    },
-                    {
-                      "kind": "GridLayoutItem",
-                      "spec": {
-                        "element": {
-                          "kind": "ElementReference",
-                          "name": "panel-81"
-                        },
-                        "height": 4,
-                        "width": 3,
-                        "x": 3,
-                        "y": 0
-                      }
-                    },
-                    {
-                      "kind": "GridLayoutItem",
-                      "spec": {
-                        "element": {
-                          "kind": "ElementReference",
-                          "name": "panel-92"
-                        },
-                        "height": 4,
-                        "width": 6,
-                        "x": 6,
-                        "y": 0
-                      }
-                    },
-                    {
-                      "kind": "GridLayoutItem",
-                      "spec": {
-                        "element": {
-                          "kind": "ElementReference",
-                          "name": "panel-93"
-                        },
-                        "height": 4,
-                        "width": 6,
-                        "x": 12,
-                        "y": 0
-                      }
-                    },
-                    {
-                      "kind": "GridLayoutItem",
-                      "spec": {
-                        "element": {
-                          "kind": "ElementReference",
-                          "name": "panel-95"
-                        },
-                        "height": 4,
-                        "width": 6,
-                        "x": 18,
-                        "y": 0
-                      }
-                    }
-                  ]
-                }
-              },
-              "title": "Crawler Health"
             }
           },
           {
