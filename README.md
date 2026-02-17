@@ -192,6 +192,8 @@ Selecting `0` from the interactive menu will begin to process all of your fetche
 
 #### Menu Options
 
+The crawler provides an interactive curses-based menu with color support and arrow key navigation when run in a terminal (TTY mode). In headless mode, it automatically uses text-based prompts.
+
 You can customize the crawling process with the following options:
 
 **Process new domains:**
@@ -206,33 +208,28 @@ You can customize the crawling process with the following options:
 
 **Retry any (non-fatal) errors:**
 
-- `4` Any (all domains with errors)
-- `5` Known (known Mastodon instances with errors)
+- `4` Offline (all domains with errors)
+- `5` Issues (known Mastodon instances with errors)
 
 **Retry fatal errors:**
 
 - `10` Other (non-Mastodon platforms)
 
-**Retry connection errors:**
+**Retry errors by type:**
 
-- `20` SSL (certificate errors)
-- `21` TCP (timeouts, connection issues)
-- `22` DNS (name resolution failures)
-
-**Retry TCP errors:**
-
-- `30` 2xx status codes
-- `31` 3xx status codes
-- `32` 4xx status codes
-- `33` 5xx status codes
-
-**Retry target errors:**
-
-- `40` Bad JSON (JSON parsing errors)
-- `41` Bad Size (response size errors)
-- `42` Bad Type (content type errors)
-- `43` Bad MAU (MAU validation errors)
-- `44` Bad API (API errors)
+- `20` DNS (name resolution failures)
+- `21` SSL (certificate errors)
+- `22` TCP (connection errors)
+- `23` Type (content type errors)
+- `24` Size (response size errors)
+- `25` API (API errors)
+- `26` JSON (JSON parsing errors)
+- `27` HTTP 2xx status codes
+- `28` HTTP 3xx redirects
+- `29` HTTP 4xx client errors
+- `30` HTTP 5xx server errors
+- `31` Hard Fail (HTTP 410/418/451/999)
+- `32` Robots (robots.txt prohibited)
 
 **Retry known instances:**
 
@@ -241,21 +238,29 @@ You can customize the crawling process with the following options:
 - `52` Active (instances with active monthly users)
 - `53` All (all known instances)
 
-**Retry bad domains** (terminal states):
+**Retry terminal error states:**
 
-- `60` DNS
-- `61` SSL
-- `62` TCP
-- `63` Type
-- `64` File
-- `65` API
-- `66` JSON
-- `67` HTTP 2xx
-- `68` HTTP 3xx
-- `69` HTTP 4xx
-- `70` HTTP 5xx
-- `71` Hard Fail (HTTP 410/418/451/999)
-- `72` Robots (robots.txt prohibited)
+Terminal states are domains that have failed repeatedly and been marked as permanently bad. These options retry them:
+
+- `60` DNS (bad_dns flag)
+- `61` SSL (bad_ssl flag)
+- `62` TCP (bad_tcp flag)
+- `63` Type (bad_type flag)
+- `64` File (bad_file flag)
+- `65` API (bad_api flag)
+- `66` JSON (bad_json flag)
+- `67` HTTP 2xx (bad_http2xx flag)
+- `68` HTTP 3xx (bad_http3xx flag)
+- `69` HTTP 4xx (bad_http4xx flag)
+- `70` HTTP 5xx (bad_http5xx flag)
+- `71` Hard Fail (bad_hard flag - HTTP 410/418/451/999)
+- `72` Robots (bad_robot flag - robots.txt prohibited)
+
+**Menu Navigation (TTY mode):**
+
+- Arrow keys or `j/k` - Navigate options
+- Enter - Select option
+- `q` or Esc - Quit
 
 ### Discovery Flow
 
@@ -340,10 +345,36 @@ This displays current nightly version entries and allows you to add new versions
 ./vmcrawl.sh nightly --list
 ```
 
+**Add a version interactively:**
+
+```bash
+./vmcrawl.sh nightly --add
+```
+
 **Add a version via command line:**
 
 ```bash
 ./vmcrawl.sh nightly --version 4.9.0-alpha.7 --start-date 2025-01-15
+```
+
+**Add with custom end date:**
+
+```bash
+./vmcrawl.sh nightly --version 4.9.0-alpha.7 --start-date 2025-01-15 --end-date 2025-02-01
+```
+
+**Disable automatic end date update:**
+
+By default, adding a new nightly version automatically updates the previous version's end date. To disable this:
+
+```bash
+./vmcrawl.sh nightly --version 4.9.0-alpha.7 --start-date 2025-01-15 --no-auto-update
+```
+
+**Update end date for existing version:**
+
+```bash
+./vmcrawl.sh nightly --update-end-date 4.9.0-alpha.6 2025-01-14
 ```
 
 ### DNI List Management
@@ -374,33 +405,174 @@ The `dni` subcommand fetches and manages the IFTAS DNI (Do Not Interact) list:
 ./vmcrawl.sh dni --url https://example.com/custom-dni-list.csv
 ```
 
-The DNI list is sourced from IFTAS (Independent Federated Trust & Safety) and contains domains that have been identified for various trust and safety concerns. All domains imported from the IFTAS list are tagged with the comment "iftas" in the database.
+The DNI list is sourced from IFTAS (Independent Federated Trust & Safety) and contains domains that have been identified for various trust and safety concerns. The crawler imports both the IFTAS DNI list and the Abandoned/Unmanaged list. All domains are tagged with their source:
+- `iftas-dni` - Domains on the Do Not Interact list
+- `iftas-abandoned` - Abandoned or unmanaged instances
+
+## Advanced Features
+
+### HTTP/2 Support with Automatic Fallback
+
+The crawler uses HTTP/2 by default for all requests, with automatic fallback to HTTP/1.1 for servers that have protocol compatibility issues. The HTTP client is configured with:
+- TLS 1.2+ minimum
+- Certificate verification enabled
+- Connection pooling for improved performance
+- 10MB default response size limit
+
+### DNS Response Caching
+
+DNS lookups are cached in-memory with a 5-minute TTL to reduce repeated DNS queries. The cache:
+- Holds up to 10,000 entries
+- Uses thread-safe monkey-patching of `socket.getaddrinfo`
+- Automatically evicts old entries
+
+### Emoji Domain Support
+
+The crawler supports International Domain Names (IDN) including emoji domains (e.g., 🍕.ws) through IDNA library patching.
+
+### Alias Domain Detection
+
+Domains can be automatically detected as aliases of canonical domains. When a domain is marked as an alias:
+- All error state is cleared
+- Future crawls skip the alias domain
+- The canonical domain is tracked instead
+
+### Terminal State Preservation
+
+When retrying domains with terminal error states (menu options 60-72):
+- If the domain fails again with the **same error type**, the existing error count and state are preserved
+- If the domain fails with a **different error type**, the previous terminal state is cleared to allow the status to transition
+
+### Multi-Instance Safe Operations
+
+The crawler uses PostgreSQL advisory locks to prevent race conditions when multiple crawler instances run concurrently. This ensures safe cleanup operations and prevents duplicate work.
+
+### Progress Tracking
+
+In TTY mode, the crawler displays:
+- Real-time progress with color-coded status
+- Per-domain elapsed time
+- Slow domain highlighting (configurable threshold)
+- Periodic heartbeat updates
 
 ## Configuration
 
-### Backport Branches
+### Required Environment Variables
 
-You will need to maintain the environment variable `VMCRAWL_BACKPORTS` in a comma-separated list with the branches you wish to maintain backport information for.
-
-Example:
+Configure these in your `.env` file:
 
 ```bash
+# Database connection
+VMCRAWL_POSTGRES_DATA="dbname"
+VMCRAWL_POSTGRES_USER="username"
+VMCRAWL_POSTGRES_PASS="password"
+VMCRAWL_POSTGRES_HOST="localhost"
+VMCRAWL_POSTGRES_PORT="5432"
+
+# Backport branches to track (comma-separated)
 VMCRAWL_BACKPORTS="4.5,4.4,4.3,4.2"
 ```
 
-### Concurrency
+### Optional SSH Tunnel Configuration
 
-You can configure the number of concurrent domain processing tasks via the `VMCRAWL_MAX_THREADS` environment variable (default: 2):
+For remote database access via SSH tunnel:
 
 ```bash
+VMCRAWL_SSH_HOST="ssh.example.com"
+VMCRAWL_SSH_PORT="22"
+VMCRAWL_SSH_USER="username"
+VMCRAWL_SSH_KEY="~/.ssh/id_rsa"
+VMCRAWL_SSH_KEY_PASS="passphrase"  # Optional
+```
+
+### Performance & Concurrency Settings
+
+```bash
+# Concurrent domain processing tasks (default: 2)
 VMCRAWL_MAX_THREADS="4"
+
+# HTTP request timeout in seconds (default: 5)
+VMCRAWL_HTTP_TIMEOUT="10"
+
+# Maximum HTTP redirects to follow (default: 2)
+VMCRAWL_HTTP_REDIRECT="5"
+
+# Maximum response size in bytes (default: 10485760 = 10MB)
+VMCRAWL_MAX_RESPONSE_SIZE="20971520"
 ```
 
 The crawler uses Python's `asyncio` for concurrent I/O operations, with an `asyncio.Semaphore` limiting concurrent domain processing to the configured value.
 
-### DNS Caching
+### DNS Configuration
 
 DNS resolution results are cached in-memory for 5 minutes (300 seconds) to reduce repeated DNS lookups when crawling domains. The cache holds up to 10,000 entries and is automatically managed.
+
+Configure DNS retry behavior:
+
+```bash
+# DNS retry attempts (default: 3)
+VMCRAWL_DNS_RETRY_ATTEMPTS="5"
+
+# Base retry delay in milliseconds (default: 80)
+VMCRAWL_DNS_RETRY_BASE_DELAY_MS="100"
+
+# Jitter range in milliseconds (default: 40)
+VMCRAWL_DNS_RETRY_JITTER_MS="50"
+
+# Maximum total backoff delay in milliseconds (default: 500)
+VMCRAWL_DNS_RETRY_MAX_TOTAL_DELAY_MS="1000"
+```
+
+### Error Handling
+
+```bash
+# Error threshold before marking domain as bad (default: 24)
+VMCRAWL_ERROR_BUFFER="30"
+```
+
+### Fetch Mode Settings
+
+```bash
+# Default number of domains to fetch from (default: 10)
+VMCRAWL_FETCH_LIMIT="20"
+
+# Default offset for domain selection (default: 0)
+VMCRAWL_FETCH_OFFSET="5"
+
+# Minimum active users required to fetch peers from instance (default: 100)
+VMCRAWL_FETCH_MIN_ACTIVE="50"
+```
+
+### Progress Display
+
+```bash
+# Progress update frequency in seconds (default: 5)
+VMCRAWL_PROGRESS_HEARTBEAT_SECONDS="10"
+
+# Threshold to mark domain as slow in seconds (default: 8)
+VMCRAWL_SLOW_DOMAIN_SECONDS="15"
+```
+
+### Version Management
+
+```bash
+# Version data refresh interval in seconds (default: 3600)
+VMCRAWL_VERSION_REFRESH_INTERVAL="7200"
+```
+
+### Caching
+
+```bash
+# Filter data cache TTL in seconds (default: 300)
+VMCRAWL_FILTER_CACHE_SECONDS="600"
+```
+
+### API Configuration
+
+```bash
+# API authentication key (optional, disables auth if not set)
+VMCRAWL_API_KEY="your-secret-key-here"
+```
 
 ## Service Management
 
