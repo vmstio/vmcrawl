@@ -3,7 +3,7 @@
   "kind": "DashboardWithAccessInfo",
   "metadata": {
     "name": "aedqo0q7klrswa",
-    "generation": 116,
+    "generation": 117,
     "creationTimestamp": "2025-11-21T19:31:21Z",
     "labels": {},
     "annotations": {}
@@ -611,7 +611,7 @@
                 "xTickLabelSpacing": 0
               }
             },
-            "version": "12.4.0-21935752455"
+            "version": "12.4.0-22066786794"
           }
         }
       },
@@ -633,7 +633,7 @@
                         "editorMode": "code",
                         "format": "table",
                         "rawQuery": true,
-                        "rawSql": "SELECT \n    domain AS \"Instance\",\n    software_version AS \"Version\",\n    active_users_monthly AS \"MAU\"\nFROM mastodon_domains \nWHERE software_version NOT IN (\n    SELECT software_version \n    FROM patch_versions\n)\nAND NOT EXISTS (\n    SELECT 1\n    FROM eol_versions\n    WHERE mastodon_domains.software_version LIKE eol_versions.software_version || '%'\n)\nORDER BY active_users_monthly DESC\nLIMIT 100;\n",
+                        "rawSql": "SELECT \n    md.domain AS \"Instance\",\n    md.software_version AS \"Version\",\n    md.active_users_monthly AS \"MAU\"\nFROM mastodon_domains md\nWHERE md.software_version NOT IN (\n    SELECT pv.software_version\n    FROM patch_versions pv\n)\nAND NOT EXISTS (\n    SELECT 1\n    FROM eol_versions ev\n    WHERE md.software_version LIKE ev.software_version || '%'\n)\nAND NOT EXISTS (\n    SELECT 1\n    FROM dni\n    WHERE md.domain LIKE '%' || dni.domain\n)\nORDER BY md.active_users_monthly DESC\nLIMIT 100;",
                         "sql": {
                           "columns": [
                             {
@@ -734,7 +734,7 @@
                 "showHeader": true
               }
             },
-            "version": "12.4.0-21935752455"
+            "version": "12.4.0-22066786794"
           }
         }
       },
@@ -1701,7 +1701,7 @@
                         "editorMode": "code",
                         "format": "table",
                         "rawQuery": true,
-                        "rawSql": "SELECT \n    domain AS \"Instance\",\n    software_version AS \"Version\",\n    active_users_monthly AS \"MAU\"\nFROM mastodon_domains \nWHERE software_version NOT IN (\n    SELECT software_version \n    FROM patch_versions\n)\nAND EXISTS (\n    SELECT 1\n    FROM eol_versions\n    WHERE mastodon_domains.software_version LIKE eol_versions.software_version || '%'\n)\nORDER BY active_users_monthly DESC\nLIMIT 100;\n",
+                        "rawSql": "SELECT \n    md.domain AS \"Instance\",\n    md.software_version AS \"Version\",\n    md.active_users_monthly AS \"MAU\"\nFROM mastodon_domains md\nWHERE md.software_version NOT IN (\n    SELECT pv.software_version\n    FROM patch_versions pv\n)\nAND EXISTS (\n    SELECT 1\n    FROM eol_versions ev\n    WHERE md.software_version LIKE ev.software_version || '%'\n)\nAND NOT EXISTS (\n    SELECT 1\n    FROM dni\n    WHERE md.domain LIKE '%' || dni.domain\n)\nORDER BY md.active_users_monthly DESC\nLIMIT 100;",
                         "sql": {
                           "columns": [
                             {
@@ -1801,7 +1801,7 @@
                 "showHeader": true
               }
             },
-            "version": "12.4.0-21935752455"
+            "version": "12.4.0-22066786794"
           }
         }
       },
@@ -1927,7 +1927,7 @@
                 "xTickLabelSpacing": 0
               }
             },
-            "version": "12.4.0-21935752455"
+            "version": "12.4.0-22066786794"
           }
         }
       },
@@ -2180,7 +2180,7 @@
                 }
               }
             },
-            "version": "12.4.0-21935752455"
+            "version": "12.4.0-22066786794"
           }
         }
       },
@@ -2299,7 +2299,7 @@
                 }
               }
             },
-            "version": "12.4.0-21935752455"
+            "version": "12.4.0-22066786794"
           }
         }
       },
@@ -2535,7 +2535,7 @@
                 "valueMode": "color"
               }
             },
-            "version": "12.4.0-21935752455"
+            "version": "12.4.0-22066786794"
           }
         }
       },
@@ -2638,7 +2638,7 @@
                 "valueMode": "color"
               }
             },
-            "version": "12.4.0-21935752455"
+            "version": "12.4.0-22066786794"
           }
         }
       },
@@ -2999,7 +2999,7 @@
                         "editorMode": "code",
                         "format": "table",
                         "rawQuery": true,
-                        "rawSql": "SELECT \n    domain AS \"Instances\",\n    software_version AS \"Version\",\n    full_version as \"Raw Version\",\n    active_users_monthly as \"Monthly Active Users\",\n    timestamp as \"Last Crawled\"\nFROM mastodon_domains\nORDER BY active_users_monthly DESC;\n",
+                        "rawSql": "SELECT \n    md.domain AS \"Instances\",\n    md.software_version AS \"Version\",\n    md.full_version AS \"Raw Version\",\n    md.active_users_monthly AS \"Monthly Active Users\",\n    md.\"timestamp\" AS \"Last Crawled\"\nFROM mastodon_domains md\nWHERE NOT EXISTS (\n    SELECT 1\n    FROM dni\n    WHERE md.domain LIKE '%' || dni.domain\n)\nORDER BY md.active_users_monthly DESC;",
                         "sql": {
                           "columns": [
                             {
@@ -3034,7 +3034,7 @@
               "transformations": []
             }
           },
-          "description": "",
+          "description": "Instances which appear on the IFTAS DNI list are not reported on in detail, but may be included in the aggregated results above.",
           "id": 76,
           "links": [],
           "title": "All Instances",
@@ -3112,7 +3112,7 @@
                 ]
               }
             },
-            "version": "12.4.0-21935752455"
+            "version": "12.4.0-22066786794"
           }
         }
       },
@@ -3273,7 +3273,7 @@
                 "xTickLabelSpacing": 0
               }
             },
-            "version": "12.4.0-21935752455"
+            "version": "12.4.0-22066786794"
           }
         }
       },
@@ -3433,7 +3433,7 @@
                 "xTickLabelSpacing": 0
               }
             },
-            "version": "12.4.0-21935752455"
+            "version": "12.4.0-22066786794"
           }
         }
       },
@@ -3593,7 +3593,7 @@
                 "xTickLabelSpacing": 0
               }
             },
-            "version": "12.4.0-21935752455"
+            "version": "12.4.0-22066786794"
           }
         }
       },
@@ -3753,7 +3753,7 @@
                 "xTickLabelSpacing": 0
               }
             },
-            "version": "12.4.0-21935752455"
+            "version": "12.4.0-22066786794"
           }
         }
       },
@@ -3962,7 +3962,7 @@
                 }
               }
             },
-            "version": "12.4.0-21935752455"
+            "version": "12.4.0-22066786794"
           }
         }
       },
@@ -4171,7 +4171,7 @@
                 }
               }
             },
-            "version": "12.4.0-21935752455"
+            "version": "12.4.0-22066786794"
           }
         }
       }
