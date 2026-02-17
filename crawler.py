@@ -5231,6 +5231,16 @@ def interactive_select_menu(menu_options: dict[str, dict[str, str]]) -> str | No
         return None
 
     def _menu(stdscr):
+        if curses.has_colors():
+            curses.start_color()
+            try:
+                curses.use_default_colors()
+            except curses.error:
+                pass
+
+        # Keep the launcher tied to the terminal's default background instead
+        # of painting its own background color.
+        stdscr.bkgd(" ", curses.A_NORMAL)
         _ = curses.curs_set(0)
         stdscr.nodelay(False)
         stdscr.keypad(True)
