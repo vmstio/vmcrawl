@@ -17,11 +17,9 @@ CREATE TABLE IF NOT EXISTS
     software_version TEXT DEFAULT NULL,
     active_users_monthly INTEGER DEFAULT NULL,
     timestamp TIMESTAMP DEFAULT NULL,
-    full_version TEXT DEFAULT NULL
+    full_version TEXT DEFAULT NULL,
+    peers BOOLEAN DEFAULT TRUE
   );
-
-CREATE TABLE IF NOT EXISTS
-  no_peers (domain TEXT PRIMARY KEY);
 
 CREATE TABLE IF NOT EXISTS
   release_versions (

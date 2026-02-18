@@ -168,7 +168,7 @@ You can change the limits or offset the domain list from the top:
 You can use `limit` and `offset` together, or individually, but neither option can be combined with the `target` argument.
 
 Unless you specifically target a server, `vmcrawl.sh fetch` will only attempt to fetch from instances with over 100 active users.
-If a server fails to fetch, it will be added to a `no_peers` table and not attempt to fetch new instances from it in the future.
+If a server fails to fetch with persistent errors, `mastodon_domains.peers` is set to `false` and it will not be polled in future non-targeted fetch runs.
 
 You can also select a random sampling of servers to fetch from, instead of going by user count:
 

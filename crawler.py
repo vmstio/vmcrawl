@@ -2173,20 +2173,23 @@ async def load_domain_filter_data():
 # =============================================================================
 
 
-def fetch_exclude_domains():
-    """Fetch domains to exclude from peer fetching."""
+def ensure_mastodon_peers_column() -> bool:
+    """Ensure mastodon_domains has a peers column used by fetch mode."""
     with db_pool.connection() as conn, conn.cursor() as cursor:
         try:
-            _ = cursor.execute("SELECT domain FROM no_peers")
-            rows = cursor.fetchall()
-            return [row[0] for row in rows] if rows else []
+            _ = cursor.execute(
+                "ALTER TABLE mastodon_domains "
+                "ADD COLUMN IF NOT EXISTS peers BOOLEAN DEFAULT TRUE"
+            )
+            conn.commit()
+            return True
         except Exception as e:
-            print(f"Failed to obtain excluded domain list: {e}")
+            vmc_output(f"Failed to ensure peers column exists: {e}", "red")
             conn.rollback()
-            return None
+            return False
 
 
-def fetch_domain_list(exclude_domains, db_limit, db_offset, randomize=False):
+def fetch_domain_list(db_limit, db_offset, randomize=False):
     """Fetch list of domains to query for peers.
 
     When not randomizing, uses SQL LIMIT/OFFSET for efficiency.
@@ -2196,22 +2199,13 @@ def fetch_domain_list(exclude_domains, db_limit, db_offset, randomize=False):
         try:
             min_active = int(os.getenv("VMCRAWL_FETCH_MIN_ACTIVE", "100"))
 
-            # Build base query using parameterized values for safety
-            if exclude_domains:
-                base_query = sql.SQL(
-                    "SELECT domain FROM mastodon_domains "
-                    "WHERE active_users_monthly > %s "
-                    "AND domain != ALL(%s) "
-                    "ORDER BY active_users_monthly DESC"
-                )
-                base_params: tuple = (min_active, exclude_domains)
-            else:
-                base_query = sql.SQL(
-                    "SELECT domain FROM mastodon_domains "
-                    "WHERE active_users_monthly > %s "
-                    "ORDER BY active_users_monthly DESC"
-                )
-                base_params = (min_active,)
+            base_query = sql.SQL(
+                "SELECT domain FROM mastodon_domains "
+                "WHERE active_users_monthly > %s "
+                "AND (peers IS NULL OR peers = TRUE) "
+                "ORDER BY active_users_monthly DESC"
+            )
+            base_params = (min_active,)
 
             if randomize:
                 # For random selection, fetch all and shuffle in Python
@@ -2257,23 +2251,20 @@ def get_existing_domains() -> set[str] | None:
             return None
 
 
-def add_to_no_peers(domain, use_tqdm=False):
-    """Add a domain to the no_peers exclusion list."""
+def disable_peer_fetch(domain, use_tqdm=False):
+    """Disable peer polling for a domain in mastodon_domains."""
     with db_pool.connection() as conn, conn.cursor() as cursor:
         try:
             _ = cursor.execute(
-                "INSERT INTO no_peers (domain) VALUES (%s) "
-                + "ON CONFLICT (domain) DO NOTHING",
+                "UPDATE mastodon_domains SET peers = FALSE WHERE domain = %s",
                 (domain,),
             )
             if cursor.rowcount > 0:
-                vmc_output(
-                    f"{domain} added to no_peers table", "red", use_tqdm=use_tqdm
-                )
+                vmc_output(f"{domain}: peer polling disabled", "red", use_tqdm=use_tqdm)
             conn.commit()
         except Exception as e:
             vmc_output(
-                f"Failed to add domain to no_peers list: {e}",
+                f"Failed to disable peer polling for {domain}: {e}",
                 "orange",
                 use_tqdm=use_tqdm,
             )
@@ -2369,13 +2360,13 @@ async def fetch_peer_domains(
 
         return (filtered_domains, None)
     except json.JSONDecodeError:
-        # JSON decode errors indicate HTML or non-JSON response - mark as no_peers
-        await asyncio.to_thread(add_to_no_peers, domain, True)
+        # JSON decode errors indicate HTML or non-JSON response - disable polling
+        await asyncio.to_thread(disable_peer_fetch, domain, True)
         return ([], "no_peers")
     except Exception as e:
         error_str = str(e).lower()
 
-        # Only add to no_peers for persistent issues, not transient errors
+        # Only disable polling for persistent issues, not transient errors
         # Authentication issues: 401, 403, unauthorized, forbidden
         # 404 errors: endpoint doesn't exist
         persistent_error_indicators = [
@@ -2388,7 +2379,7 @@ async def fetch_peer_domains(
         ]
 
         if any(indicator in error_str for indicator in persistent_error_indicators):
-            await asyncio.to_thread(add_to_no_peers, domain, True)
+            await asyncio.to_thread(disable_peer_fetch, domain, True)
             return ([], "no_peers")
         else:
             # Transient errors - don't mark the domain
@@ -2464,19 +2455,16 @@ async def run_fetch_mode(args):
     if _is_running_headless():
         vmc_output("Running in headless mode", "pink")
 
-    exclude_domains = fetch_exclude_domains()
-    domain_endings = await get_domain_endings()
-
-    if exclude_domains is None:
-        vmc_output("Failed to fetch excluded list, exiting…", "pink")
+    if not ensure_mastodon_peers_column():
+        vmc_output("Failed to prepare fetch schema, exiting…", "pink")
         sys.exit(1)
+
+    domain_endings = await get_domain_endings()
 
     if args.target is not None:
         domain_list = [args.target]
     else:
-        domain_list = fetch_domain_list(
-            exclude_domains, db_limit, db_offset, randomize=args.random
-        )
+        domain_list = fetch_domain_list(db_limit, db_offset, randomize=args.random)
 
     if not domain_list:
         vmc_output("No domains fetched, exiting…", "pink")
