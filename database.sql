@@ -2,9 +2,6 @@
 -- Generated from creation.sql and indexes.sql
 
 CREATE TABLE IF NOT EXISTS
-  bad_tld (tld TEXT PRIMARY KEY);
-
-CREATE TABLE IF NOT EXISTS
   error_log (
     event SERIAL PRIMARY KEY,
     timestamp TIMESTAMP

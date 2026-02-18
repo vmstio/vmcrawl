@@ -743,7 +743,7 @@ async def get_domain_endings() -> set[str]:
 
     Uses database storage with a 7-day cache expiration.
     Falls back to file cache if database is unavailable.
-    Subtracts prohibited TLDs (from bad_tld table) before returning.
+    Excludes hardcoded unsupported TLDs before returning.
     """
     tlds: set[str] = set()
 
@@ -763,13 +763,13 @@ async def get_domain_endings() -> set[str]:
             if age.days < max_cache_age_days:
                 tlds = get_tlds_from_db()
                 if tlds:
-                    return tlds - get_bad_tld()
+                    return _exclude_tlds(tlds)
 
         # Database cache is stale or empty, fetch new data
         tlds = await fetch_tlds_from_iana()
         if tlds:
             _ = import_tlds(tlds)
-            return tlds - get_bad_tld()
+            return _exclude_tlds(tlds)
 
     except Exception as e:
         vmc_output(f"Database TLD lookup failed, using file cache: {e}", "yellow")
@@ -783,7 +783,7 @@ async def get_domain_endings() -> set[str]:
         with open(cache_file_path) as cache_file:
             # Use set for O(1) lookup
             tlds = {line.strip().lower() for line in cache_file if line.strip()}
-            return tlds - get_bad_tld()
+            return _exclude_tlds(tlds)
 
     domain_endings_response = await get_httpx(url)
     if domain_endings_response.status_code in [200]:
@@ -795,7 +795,7 @@ async def get_domain_endings() -> set[str]:
         }
         with open(cache_file_path, "w") as cache_file:
             _ = cache_file.write("\n".join(sorted(domain_endings)))
-        return domain_endings - get_bad_tld()
+        return _exclude_tlds(domain_endings)
 
     msg = (
         f"Failed to fetch domain endings. "
@@ -2063,19 +2063,6 @@ def get_dni_domains():
     return set()
 
 
-def get_bad_tld():
-    """Get list of prohibited TLDs."""
-    with db_pool.connection() as conn, conn.cursor() as cursor:
-        try:
-            _ = cursor.execute("SELECT tld FROM bad_tld")
-            # Use set for O(1) lookup
-            return {row[0] for row in cursor}
-        except Exception as exception:
-            vmc_output(f"Failed to obtain bad TLDs: {exception}", "red")
-            conn.rollback()
-    return set()
-
-
 def get_domains_by_status(status_column):
     """Get list of domains filtered by status column.
 
@@ -2649,6 +2636,13 @@ async def run_fetch_mode(args):
 # TLD FUNCTIONS - Top-Level Domain Management
 # =============================================================================
 
+EXCLUDED_TLDS: set[str] = {"arpa"}
+
+
+def _exclude_tlds(tlds: set[str]) -> set[str]:
+    """Remove hardcoded unsupported TLDs from a TLD set."""
+    return {tld for tld in tlds if tld not in EXCLUDED_TLDS}
+
 
 def get_tld_last_updated() -> datetime | None:
     """Get the timestamp of when TLD data was last updated."""
@@ -2670,7 +2664,7 @@ def get_tlds_from_db() -> set[str]:
             _ = cursor.execute("SELECT tld FROM tld_cache")
             # Build set directly from cursor iterator (memory efficient)
             tlds: set[str] = {row[0] for row in cursor}
-            return tlds
+            return _exclude_tlds(tlds)
         except Exception as e:
             vmc_output(f"Failed to get TLDs from database: {e}", "red")
             conn.rollback()
@@ -2684,9 +2678,11 @@ def import_tlds(tlds: set[str]) -> int:
             # Clear existing TLDs
             _ = cursor.execute("DELETE FROM tld_cache")
 
-            if tlds:
+            filtered_tlds = _exclude_tlds(tlds)
+
+            if filtered_tlds:
                 # Use batch insert for efficiency
-                values: list[tuple[str]] = [(tld,) for tld in sorted(tlds)]
+                values: list[tuple[str]] = [(tld,) for tld in sorted(filtered_tlds)]
                 placeholders = sql.SQL(",").join([sql.SQL("(%s)") for _ in values])
                 flattened_values: list[str] = [item[0] for item in values]
                 query = sql.SQL("INSERT INTO tld_cache (tld) VALUES {}").format(
