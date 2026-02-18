@@ -122,13 +122,11 @@ docker run -d --name vmcrawl --env-file .env vmcrawl
 
 The project includes a single main script with multiple subcommands:
 
-| Command              | Purpose                                                                    |
-| -------------------- | -------------------------------------------------------------------------- |
-| `crawler.py`         | Default crawl mode - processes domains, collects version/user data, generates statistics |
-| `crawler.py crawl`   | Same as default - crawl version information from Mastodon instances        |
-| `crawler.py fetch`   | Fetches new domains from federated instance peer lists                     |
-| `crawler.py dni`     | Fetches and manages IFTAS DNI (Do Not Interact) list of blocked domains    |
-| `crawler.py nightly` | Manages nightly/development version tracking in the database               |
+| Command             | Purpose                                                                                  |
+| ------------------- | ---------------------------------------------------------------------------------------- |
+| `crawler.py`        | Default crawl mode - processes domains, collects version/user data, generates statistics |
+| `crawler.py fetch`  | Fetches new domains from federated instance peer lists                                   |
+| `crawler.py manage` | Interactive menu for database and version management                                     |
 
 ### Automated Tasks
 
@@ -329,91 +327,160 @@ You can also process multiple domains using an external file, which contains eac
 ./vmcrawl.sh --file ~/domains.txt
 ```
 
-### Nightly Version Management
+### Database and Version Management
 
-The `nightly` subcommand manages tracking of development/nightly versions:
-
-```bash
-./vmcrawl.sh nightly
-```
-
-This displays current nightly version entries and allows you to add new versions as they are released. Nightly versions are used to identify instances running pre-release software (alpha, beta, rc versions).
-
-**List all nightly versions:**
+The crawler provides comprehensive database and version management through an interactive manage menu:
 
 ```bash
-./vmcrawl.sh nightly --list
+./vmcrawl.sh manage
 ```
 
-**Add a version interactively:**
+#### Option 5: DNI List Management
 
-```bash
-./vmcrawl.sh nightly --add
-```
+Manages the IFTAS DNI (Do Not Interact) list - domains identified for trust and safety concerns.
 
-**Add a version via command line:**
+**Submenu Options:**
 
-```bash
-./vmcrawl.sh nightly --version 4.9.0-alpha.7 --start-date 2025-01-15
-```
+**1. Fetch and import DNI list** - Downloads the latest IFTAS DNI and Abandoned/Unmanaged lists from the IFTAS CSV source and imports them into the database
 
-**Add with custom end date:**
+**2. List all DNI domains** - Displays all domains currently in the DNI database with their force levels and sources
 
-```bash
-./vmcrawl.sh nightly --version 4.9.0-alpha.7 --start-date 2025-01-15 --end-date 2025-02-01
-```
+**3. Count DNI domains** - Shows total count of DNI domains and breakdown by source
 
-**Disable automatic end date update:**
+**4. Use custom CSV URL** - Import DNI domains from a custom CSV source URL
 
-By default, adding a new nightly version automatically updates the previous version's end date. To disable this:
+**Force Levels:**
 
-```bash
-./vmcrawl.sh nightly --version 4.9.0-alpha.7 --start-date 2025-01-15 --no-auto-update
-```
+DNI domains are tagged with force levels that indicate the severity of the listing:
+- **Force 0**: Advisory - informational listing
+- **Force 1**: Recommended - suggested block
+- **Force 2**: Required - mandatory block for IFTAS members
 
-**Update end date for existing version:**
+**Sources:**
 
-```bash
-./vmcrawl.sh nightly --update-end-date 4.9.0-alpha.6 2025-01-14
-```
-
-### DNI List Management
-
-The `dni` subcommand fetches and manages the IFTAS DNI (Do Not Interact) list:
-
-**Fetch and import DNI list:**
-
-```bash
-./vmcrawl.sh dni
-```
-
-**List all DNI domains:**
-
-```bash
-./vmcrawl.sh dni --list
-```
-
-**Count DNI domains:**
-
-```bash
-./vmcrawl.sh dni --count
-```
-
-**Use custom CSV URL:**
-
-```bash
-./vmcrawl.sh dni --url https://example.com/custom-dni-list.csv
-```
-
-The DNI list is sourced from IFTAS (Independent Federated Trust & Safety) and contains domains that have been identified for various trust and safety concerns. The crawler imports both the IFTAS DNI list and the Abandoned/Unmanaged list. All domains are tagged with their source:
+All domains are tagged with their source:
 - `iftas-dni` - Domains on the Do Not Interact list
 - `iftas-abandoned` - Abandoned or unmanaged instances
+
+DNI domains are excluded from crawling to respect federation safety standards.
+
+#### Option 6: Nightly Version Management
+
+Manages tracking of development/nightly versions used to identify instances running pre-release software (alpha, beta, rc versions).
+
+**Submenu Options:**
+
+**1. List all nightly versions** - Displays all tracked nightly/development versions with their date ranges
+
+**2. Add new nightly version** - Interactive workflow to add a new pre-release version:
+- Enter version string (e.g., 4.9.0-alpha.7)
+- Enter start date (when version was released)
+- Optionally enter end date (when version was superseded)
+- Choose whether to auto-update the previous version's end date
+
+**3. Update end date** - Modify the end date of an existing nightly version
+
+When a new nightly version is added, the system can automatically set the end date of the previous nightly version to maintain a continuous timeline of development releases.
+
+#### Mastodon Release Version Management (Options 7-11)
+
+The crawler provides a comprehensive version management system for tracking Mastodon releases and their lifecycle from main development branch through release to end-of-life.
+
+**Version Tracking Overview:**
+
+The crawler maintains a unified `release_versions` table that tracks:
+- **Main branch**: Current development version (n_level = -1)
+- **Release branches**: Active stable releases (n_level = 0, 1, 2, ...)
+- **EOL branches**: End-of-life releases no longer receiving updates
+
+Version tracking is **manual-only** - all branch lifecycle management is controlled through the manage menu. The crawler automatically updates the latest version within each tracked branch but does not automatically promote or deprecate branches.
+
+**GitHub CLI Integration:**
+
+The crawler uses the `gh` CLI tool for GitHub API calls when available, providing:
+- Better rate limits for authenticated users
+- More reliable access to release data
+- Fallback to HTTP API if `gh` is not authenticated or available
+
+To authenticate the GitHub CLI:
+```bash
+gh auth login
+```
+
+**Option 7: Update Latest Mastodon Versions**
+
+Updates the `latest` version for all tracked branches (main, release, and EOL) by querying the Mastodon GitHub repository. This should be run periodically to keep version data current.
+
+- Fetches up to 500 releases from GitHub to ensure old EOL versions are updated
+- Updates only the `latest` column for existing branches
+- Does not create new branches or change branch status
+
+**Option 8: Show Current Version Information**
+
+Displays a detailed view of all tracked Mastodon versions:
+```
+Main Development Version:
+  Branch: 4.4    Status: main      n_level: -1    Latest: 4.4.0+nightly-20250215
+
+Active Release Branches:
+  Branch: 4.3    Status: release   n_level: 0     Latest: 4.3.3
+  Branch: 4.2    Status: release   n_level: 1     Latest: 4.2.15
+  Branch: 4.1    Status: release   n_level: 2     Latest: 4.1.22
+
+End-of-Life Branches:
+  Branch: 4.0    Status: eol       n_level: 3     Latest: 4.0.15
+```
+
+**Option 9: Promote Main Branch to Release**
+
+Promotes the current main development branch to a release branch and creates a new main branch for the next version.
+
+Workflow:
+1. Shows current main branch (e.g., 4.4)
+2. Confirms promotion to release status
+3. Shifts all existing release branches down (increases n_level by 1)
+4. Converts main branch to release at n_level = 0
+5. Creates new main branch with incremented version (e.g., 4.5)
+
+This should be used when a new stable version is released.
+
+**Option 10: Mark Branch as End-of-Life**
+
+Marks a release branch as EOL when it no longer receives updates.
+
+Workflow:
+1. Shows list of current release branches
+2. Select branch to mark as EOL
+3. Branch status changes to 'eol' and is moved to the end of the tracking list
+
+EOL branches continue to be tracked for statistics but are not considered "supported" releases.
+
+**Option 11: Reorder Release Branches**
+
+Manually adjusts the ordering (n_level) of release branches. This is useful if you need to reorganize the priority of tracked releases.
+
+Workflow:
+1. Shows current release branches with n_level values
+2. Select branch to reorder
+3. Enter new n_level (must be unique)
+4. Branch is moved to new position
+
+**Version Lifecycle Workflow:**
+
+Typical version management workflow:
+
+1. **New Development Begins**: Main branch tracks next version (e.g., 4.5.0+nightly)
+2. **Regular Updates**: Run Option 7 periodically to update latest versions
+3. **New Release**: Use Option 9 to promote main to release when stable version ships
+4. **EOL Declaration**: Use Option 10 to mark old releases as EOL when support ends
+5. **Monitoring**: Use Option 8 to review current version status
 
 ## Advanced Features
 
 ### HTTP/2 Support with Automatic Fallback
 
 The crawler uses HTTP/2 by default for all requests, with automatic fallback to HTTP/1.1 for servers that have protocol compatibility issues. The HTTP client is configured with:
+
 - TLS 1.2+ minimum
 - Certificate verification enabled
 - Connection pooling for improved performance
@@ -422,6 +489,7 @@ The crawler uses HTTP/2 by default for all requests, with automatic fallback to 
 ### DNS Response Caching
 
 DNS lookups are cached in-memory with a 5-minute TTL to reduce repeated DNS queries. The cache:
+
 - Holds up to 10,000 entries
 - Uses thread-safe monkey-patching of `socket.getaddrinfo`
 - Automatically evicts old entries
@@ -433,6 +501,7 @@ The crawler supports International Domain Names (IDN) including emoji domains (e
 ### Alias Domain Detection
 
 Domains can be automatically detected as aliases of canonical domains. When a domain is marked as an alias:
+
 - All error state is cleared
 - Future crawls skip the alias domain
 - The canonical domain is tracked instead
@@ -440,6 +509,7 @@ Domains can be automatically detected as aliases of canonical domains. When a do
 ### Terminal State Preservation
 
 When retrying domains with terminal error states (menu options 60-72):
+
 - If the domain fails again with the **same error type**, the existing error count and state are preserved
 - If the domain fails with a **different error type**, the previous terminal state is cleared to allow the status to transition
 
@@ -450,6 +520,7 @@ The crawler uses PostgreSQL advisory locks to prevent race conditions when multi
 ### Progress Tracking
 
 In TTY mode, the crawler displays:
+
 - Real-time progress with color-coded status
 - Per-domain elapsed time
 - Slow domain highlighting (configurable threshold)
@@ -468,10 +539,9 @@ VMCRAWL_POSTGRES_USER="username"
 VMCRAWL_POSTGRES_PASS="password"
 VMCRAWL_POSTGRES_HOST="localhost"
 VMCRAWL_POSTGRES_PORT="5432"
-
-# Backport branches to track (comma-separated)
-VMCRAWL_BACKPORTS="4.5,4.4,4.3,4.2"
 ```
+
+**Note:** Version tracking is now managed through the database via the manage menu. The `VMCRAWL_BACKPORTS` environment variable is no longer used.
 
 ### Optional SSH Tunnel Configuration
 
@@ -594,6 +664,7 @@ journalctl -u vmcrawl.service -b
 ### Control Services
 
 **Crawler Service:**
+
 ```bash
 # Stop service
 systemctl stop vmcrawl.service
