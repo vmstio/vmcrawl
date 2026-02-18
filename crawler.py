@@ -1203,6 +1203,63 @@ def delete_old_patch_versions():
         conn.commit()
 
 
+def get_patch_versions_from_db() -> dict[str, Any]:
+    """Load patch version information from the database.
+
+    Returns a dictionary with version information or None if not found.
+    """
+    with db_pool.connection() as conn, conn.cursor() as cur:
+        try:
+            # Get all versions ordered by n_level
+            _ = cur.execute(
+                """
+                SELECT software_version, branch, n_level, main, release
+                FROM patch_versions
+                ORDER BY n_level
+                """,
+            )
+            all_results = cur.fetchall()
+
+            if not all_results:
+                return {}
+
+            result = {}
+            main_version = None
+            main_branch_value = None
+            release_versions = []
+
+            for row in all_results:
+                software_version, branch, n_level, is_main, is_release = row
+
+                # n_level = -1 is the main branch
+                if n_level == -1:
+                    main_version = software_version
+                    main_branch_value = branch
+
+                # n_level >= 0 are release branches
+                if is_release and n_level >= 0:
+                    release_versions.append(software_version)
+
+            if main_version:
+                result["main_release"] = main_version
+                result["main_branch"] = main_branch_value
+
+            if release_versions:
+                result["latest_stable"] = release_versions[0]
+                result["backport_releases"] = release_versions
+
+                # Build all_patched list
+                if main_version:
+                    result["all_patched"] = [main_version] + release_versions
+                else:
+                    result["all_patched"] = release_versions
+
+            return result
+        except Exception as e:
+            vmc_output(f"Failed to load version info from database: {e}", "red")
+            return {}
+
+
 # =============================================================================
 # DATABASE FUNCTIONS - Preserve Status Helper
 # =============================================================================
@@ -2961,6 +3018,176 @@ def run_nightly_mode(args):
 
     # Add version (interactive) - default behavior
     interactive_add_nightly()
+
+
+# =============================================================================
+# MANAGE MODE - Unified Management Interface
+# =============================================================================
+
+
+def print_manage_menu():
+    """Print the management menu options."""
+    print()
+    vmc_output("Management Menu:", "bold")
+    vmc_output("-" * 50, "cyan")
+    print()
+    vmc_output("DNI (Do Not Interact) Management:", "yellow")
+    print("  1. Fetch and import IFTAS DNI list")
+    print("  2. List all DNI domains")
+    print("  3. Count DNI domains")
+    print()
+    vmc_output("Nightly Version Management:", "yellow")
+    print("  4. List all nightly versions")
+    print("  5. Add a new nightly version")
+    print("  6. Update nightly version end date")
+    print()
+    vmc_output("Mastodon Version Management:", "yellow")
+    print("  7. Update latest Mastodon versions")
+    print("  8. Show current version info")
+    print()
+    print("  q. Quit")
+    print()
+
+
+def get_manage_choice():
+    """Get user's menu choice."""
+    choice = input("Enter your choice: ").strip().lower()
+    return choice
+
+
+async def run_manage_mode(args):
+    """Run the unified management mode with menu interface."""
+    vmc_output(f"{appname} v{appversion} (manage mode)", "bold")
+    if _is_running_headless():
+        vmc_output("Running in headless mode", "pink")
+
+    while True:
+        print_manage_menu()
+        choice = get_manage_choice()
+
+        if choice in {"q", "quit", "exit"}:
+            vmc_output("Exiting management mode", "cyan")
+            break
+
+        # DNI Management
+        elif choice == "1":
+            # Fetch and import IFTAS DNI list
+            existing_domains = get_existing_dni_domains()
+            vmc_output("Fetching IFTAS DNI List…", "bold")
+            csv_content = await fetch_dni_csv(DNI_CSV_URL)
+            if not csv_content:
+                vmc_output("Failed to fetch DNI CSV", "red")
+                continue
+
+            domains = _parse_dni_csv(csv_content)
+            if not domains:
+                vmc_output("No domains parsed from DNI CSV", "yellow")
+                continue
+
+            new_domains = [d for d in domains if d not in existing_domains]
+            vmc_output(
+                f"Found {len(new_domains)} new DNI domains (out of {len(domains)} total)",
+                "cyan",
+            )
+
+            if new_domains:
+                imported = import_dni_domains(new_domains, comment="iftas-dni")
+                vmc_output(f"Total new domains imported: {imported}", "green")
+            else:
+                vmc_output("All DNI domains already exist in database", "yellow")
+
+            _ = count_dni_domains()
+            vmc_output("DNI import complete!", "bold")
+            print()
+            input("Press Enter to continue...")
+
+        elif choice == "2":
+            # List all DNI domains
+            list_dni_domains()
+            input("Press Enter to continue...")
+
+        elif choice == "3":
+            # Count DNI domains
+            _ = count_dni_domains()
+            print()
+            input("Press Enter to continue...")
+
+        # Nightly Version Management
+        elif choice == "4":
+            # List all nightly versions
+            display_nightly_versions()
+            input("Press Enter to continue...")
+
+        elif choice == "5":
+            # Add a new nightly version (interactive)
+            interactive_add_nightly()
+            print()
+            input("Press Enter to continue...")
+
+        elif choice == "6":
+            # Update nightly version end date
+            print()
+            version_to_update = input(
+                "Enter the version to update (e.g., 4.9.0-alpha.7): "
+            ).strip()
+            new_end_date = input("Enter the new end date (YYYY-MM-DD): ").strip()
+            if version_to_update and new_end_date:
+                _ = update_nightly_end_date(version_to_update, new_end_date)
+            else:
+                vmc_output("Invalid input, operation cancelled", "red")
+            print()
+            input("Press Enter to continue...")
+
+        # Mastodon Version Management
+        elif choice == "7":
+            # Update latest Mastodon versions
+            vmc_output("Fetching latest Mastodon versions from GitHub…", "bold")
+            await initialize_versions()
+            vmc_output("Version information updated successfully!", "green")
+            vmc_output(f"Main branch: {version_main_branch}", "cyan")
+            vmc_output(f"Main release: {version_main_release}", "cyan")
+            vmc_output(f"Latest stable: {version_latest_release}", "cyan")
+            if version_backport_releases:
+                vmc_output(
+                    f"Backport releases: {', '.join(version_backport_releases)}", "cyan"
+                )
+            print()
+            input("Press Enter to continue...")
+
+        elif choice == "8":
+            # Show current version info (from database)
+            db_versions = get_patch_versions_from_db()
+
+            if not db_versions:
+                vmc_output(
+                    "No version information found in database. Use option 7 to fetch.",
+                    "yellow",
+                )
+            else:
+                print()
+                vmc_output(
+                    "Current Mastodon Version Information (from database):", "bold"
+                )
+                vmc_output("-" * 60, "cyan")
+
+                if "main_branch" in db_versions:
+                    print(f"Main branch:       {db_versions['main_branch']}")
+                if "main_release" in db_versions:
+                    print(f"Main release:      {db_versions['main_release']}")
+                if "latest_stable" in db_versions:
+                    print(f"Latest stable:     {db_versions['latest_stable']}")
+                if "backport_releases" in db_versions:
+                    print(
+                        f"Backport releases: {', '.join(db_versions['backport_releases'])}"
+                    )
+                if "all_patched" in db_versions:
+                    print(f"All patched:       {', '.join(db_versions['all_patched'])}")
+                print()
+
+            input("Press Enter to continue...")
+
+        else:
+            vmc_output("Invalid choice, please try again", "red")
 
 
 # =============================================================================
@@ -5300,8 +5527,30 @@ _version_last_refresh: float | None = None
 VERSION_REFRESH_INTERVAL = int(os.getenv("VMCRAWL_VERSION_REFRESH_INTERVAL", "3600"))
 
 
+def load_versions_from_db():
+    """Load version information from database into global variables.
+
+    Returns True if versions were loaded successfully, False otherwise.
+    """
+    global version_main_branch, version_main_release, version_latest_release
+    global version_backport_releases, all_patched_versions
+
+    db_versions = get_patch_versions_from_db()
+
+    if not db_versions:
+        return False
+
+    version_main_branch = db_versions.get("main_branch")
+    version_main_release = db_versions.get("main_release")
+    version_latest_release = db_versions.get("latest_stable")
+    version_backport_releases = db_versions.get("backport_releases")
+    all_patched_versions = db_versions.get("all_patched")
+
+    return True
+
+
 async def initialize_versions():
-    """Initialize version information asynchronously."""
+    """Initialize version information asynchronously by fetching from GitHub."""
     global version_main_branch, version_main_release, version_latest_release
     global version_backport_releases, all_patched_versions, _version_last_refresh
 
@@ -5332,14 +5581,29 @@ async def maybe_refresh_versions():
 
     Checks if VERSION_REFRESH_INTERVAL seconds have passed since the last
     refresh and updates version information from GitHub if needed.
+    Also initializes versions on first run if not already loaded.
+
+    First attempts to load from database (fast), then falls back to GitHub
+    if database is empty or refresh interval has passed.
     """
     global _version_last_refresh
 
     now = time.time()
-    if (
-        _version_last_refresh is None
-        or (now - _version_last_refresh) >= VERSION_REFRESH_INTERVAL
-    ):
+
+    # First run - try to load from database
+    if _version_last_refresh is None:
+        if load_versions_from_db():
+            # Successfully loaded from database (silent - this is expected)
+            _version_last_refresh = now
+            return
+        else:
+            # Database empty, fetch from GitHub
+            vmc_output("Fetching version information from GitHub...", "cyan")
+            await initialize_versions()
+            return
+
+    # Refresh if interval has passed
+    if (now - _version_last_refresh) >= VERSION_REFRESH_INTERVAL:
         vmc_output("Refreshing version information from GitHub...", "cyan")
         await initialize_versions()
 
@@ -5414,75 +5678,9 @@ async def async_main():
         help="target only a specific domain and ignore the database (ex: vmst.io)",
     )
 
-    # DNI subcommand
-    dni_parser = subparsers.add_parser(
-        "dni", help="Fetch and manage IFTAS DNI (Do Not Interact) list"
-    )
-    _ = dni_parser.add_argument(
-        "-l",
-        "--list",
-        action="store_true",
-        help="List all domains currently in the DNI table",
-    )
-    _ = dni_parser.add_argument(
-        "-c",
-        "--count",
-        action="store_true",
-        help="Show count of domains in the DNI table",
-    )
-    _ = dni_parser.add_argument(
-        "-u",
-        "--url",
-        type=str,
-        default=DNI_CSV_URL,
-        help=f"Custom URL for DNI CSV file (default: {DNI_CSV_URL})",
-    )
-
-    # Nightly subcommand
-    nightly_parser = subparsers.add_parser(
-        "nightly", help="Manage nightly version entries in the database"
-    )
-    _ = nightly_parser.add_argument(
-        "-l",
-        "--list",
-        action="store_true",
-        help="List all nightly versions",
-    )
-    _ = nightly_parser.add_argument(
-        "-a",
-        "--add",
-        action="store_true",
-        help="Add a new nightly version (interactive)",
-    )
-    _ = nightly_parser.add_argument(
-        "-v",
-        "--version",
-        type=str,
-        help="Version string (e.g., 4.9.0-alpha.7)",
-    )
-    _ = nightly_parser.add_argument(
-        "-s",
-        "--start-date",
-        type=str,
-        help="Start date in YYYY-MM-DD format",
-    )
-    _ = nightly_parser.add_argument(
-        "-e",
-        "--end-date",
-        type=str,
-        default="2099-12-31",
-        help="End date in YYYY-MM-DD format (default: 2099-12-31)",
-    )
-    _ = nightly_parser.add_argument(
-        "--no-auto-update",
-        action="store_true",
-        help="Don't automatically update the previous active version's end date",
-    )
-    _ = nightly_parser.add_argument(
-        "--update-end-date",
-        nargs=2,
-        metavar=("VERSION", "END_DATE"),
-        help="Update end_date for a specific version",
+    # Manage subcommand (unified DNI and nightly management)
+    _ = subparsers.add_parser(
+        "manage", help="Manage DNI list and nightly versions (menu-driven interface)"
     )
 
     # Also add crawl arguments to main parser for backwards compatibility
@@ -5528,9 +5726,6 @@ async def async_main():
                 pass
         _ = gc.collect()
 
-    # Initialize version information once at startup (outside loop)
-    await initialize_versions()
-
     # Handle fetch subcommand
     if args.command == "fetch":
         try:
@@ -5541,20 +5736,10 @@ async def async_main():
             await cleanup_connections()
         return
 
-    # Handle dni subcommand
-    if args.command == "dni":
+    # Handle manage subcommand (unified DNI and nightly management)
+    if args.command == "manage":
         try:
-            await run_dni_mode(args)
-        except KeyboardInterrupt:
-            vmc_output(f"\n{appname} interrupted by user", "red")
-        finally:
-            await cleanup_connections()
-        return
-
-    # Handle nightly subcommand (sync - no HTTP calls)
-    if args.command == "nightly":
-        try:
-            run_nightly_mode(args)
+            await run_manage_mode(args)
         except KeyboardInterrupt:
             vmc_output(f"\n{appname} interrupted by user", "red")
         finally:
@@ -5586,8 +5771,14 @@ async def async_main():
     try:
         while True:
             try:
-                # Refresh version info periodically (if needed)
-                await maybe_refresh_versions()
+                # Reload version info from database on each loop iteration
+                # This ensures we pick up changes made by other instances
+                if should_loop and _version_last_refresh is not None:
+                    # In continuous mode, reload from database each cycle
+                    _ = load_versions_from_db()
+                else:
+                    # First run or single-shot mode: use normal refresh logic
+                    await maybe_refresh_versions()
 
                 domain_list_file = args.file if args.file is not None else None
                 single_domain_target = args.target if args.target is not None else None
