@@ -5084,7 +5084,8 @@ def get_deprecated_branch_instances():
             WHERE EXISTS (
                 SELECT 1
                 FROM release_versions
-                WHERE n_level >= 2
+                WHERE status = 'release'
+                  AND n_level >= 2
                   AND mastodon_domains.software_version LIKE
                       release_versions.branch || '.%'
             );
@@ -5228,7 +5229,8 @@ def get_deprecated_patched_instances():
             WHERE EXISTS (
                 SELECT 1
                 FROM release_versions
-                WHERE n_level >= 2
+                WHERE status = 'release'
+                  AND n_level >= 2
                   AND mastodon_domains.software_version LIKE
                       release_versions.latest || '%'
             );
@@ -5343,7 +5345,8 @@ def get_deprecated_branch_mau():
             WHERE EXISTS (
                 SELECT 1
                 FROM release_versions
-                WHERE n_level >= 2
+                WHERE status = 'release'
+                  AND n_level >= 2
                   AND mastodon_domains.software_version LIKE
                       release_versions.branch || '.%'
             );
@@ -5374,7 +5377,7 @@ def get_eol_branch_mau():
                 FROM release_versions
                 WHERE status = 'eol'
                   AND mastodon_domains.software_version LIKE
-                    release_versions.latest || '%'
+                    release_versions.branch || '.%'
             );
         """,
         )
@@ -5487,7 +5490,8 @@ def get_deprecated_patched_mau():
             WHERE EXISTS (
                 SELECT 1
                 FROM release_versions
-                WHERE n_level >= 2
+                WHERE status = 'release'
+                  AND n_level >= 2
                   AND mastodon_domains.software_version LIKE
                       release_versions.latest || '%'
             );

@@ -382,7 +382,8 @@ async def get_branch_stats(_api_key: str | None = Depends(get_api_key)):
                 WHERE EXISTS (
                     SELECT 1
                     FROM release_versions
-                    WHERE n_level >= 2
+                    WHERE status = 'release'
+                      AND n_level >= 2
                       AND mastodon_domains.software_version LIKE release_versions.branch || '.%'
                 )
             """
