@@ -1163,7 +1163,9 @@ def _clean_version_nightly(
     match = RE_VERSION_NIGHTLY.match(version)
     if match:
         nightly_date_str, is_security = match.groups()
-        nightly_date = datetime.strptime(nightly_date_str, "%Y-%m-%d")
+        nightly_date = datetime.strptime(nightly_date_str, "%Y-%m-%d").replace(
+            tzinfo=UTC
+        )
 
         if is_security:
             nightly_date += timedelta(days=1)
@@ -1253,10 +1255,11 @@ def _clean_version_fixes(version: str) -> str:
 
     # Correct patch versions that exceed the latest release
     if version_latest_release:
+        _vlr_parts = version_latest_release.split(".")
         a, b, c = (
-            int(version_latest_release.split(".")[0]),
-            int(version_latest_release.split(".")[1]),
-            int(version_latest_release.split(".")[2]),
+            int(_vlr_parts[0]),
+            int(_vlr_parts[1]),
+            int(_vlr_parts[2].split("-")[0]),
         )
     else:
         a, b, c = (0, 0, 0)
@@ -1365,7 +1368,7 @@ def delete_old_release_versions():
             WHERE status IN ('main', 'release')
             AND latest != ALL(%s::text[])
             """,
-            (all_patched_versions,),
+            (all_patched_versions or [],),
         )
         conn.commit()
 
@@ -4562,7 +4565,7 @@ def process_mastodon_instance(
         error_to_print = "Mastodon version invalid"
         vmc_output(f"{db_domain}: {error_to_print}", "yellow", use_tqdm=True)
         log_error(domain, error_to_print)
-        increment_domain_error(domain, "VER", preserve_status)
+        increment_domain_error(domain, "JSON+nodeinfo_20", preserve_status)
         return
 
     # Use db_domain (actual_domain if available) for database updates
@@ -4854,8 +4857,12 @@ async def check_and_record_domains(
                     if not shutdown_event.is_set():
                         target = "shutdown"
                         preserve_status = _get_preserve_status(user_choice)
-                        _handle_tcp_exception(
-                            domain, target, exception, preserve_status
+                        await asyncio.to_thread(
+                            _handle_tcp_exception,
+                            domain,
+                            target,
+                            exception,
+                            preserve_status,
                         )
             finally:
                 active_domains.discard(domain)
@@ -6305,11 +6312,11 @@ async def async_main():
                 single_domain_target = args.target if args.target is not None else None
                 try:
                     if domain_list_file:
-                        user_choice = 1
+                        user_choice = "1"
                         domain_list = load_from_file(domain_list_file)
                         vmc_output("Crawling domains from provided file", "cyan")
                     elif single_domain_target:
-                        user_choice = 1
+                        user_choice = "1"
                         domain_list = single_domain_target.replace(" ", "").split(",")
                         domain_word = "s" if len(domain_list) > 1 else ""
                         vmc_output(
