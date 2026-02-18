@@ -944,8 +944,44 @@ async def get_all_tracked_mastodon_versions():
 
 async def get_main_version_release():
     """Get the current main branch version string."""
-    url = "https://raw.githubusercontent.com/mastodon/mastodon/refs/heads/main/lib/mastodon/version.rb"
-    version_info = await read_main_version_info(url)
+    version_info = None
+
+    try:
+        # Try using gh CLI first
+        result = subprocess.run(
+            [
+                "gh",
+                "api",
+                "repos/mastodon/mastodon/contents/lib/mastodon/version.rb",
+                "--jq",
+                ".content",
+                "-H",
+                "Accept: application/vnd.github.raw+json",
+            ],
+            capture_output=True,
+            text=True,
+            check=True,
+        )
+        content = result.stdout
+
+        # Parse the version.rb content
+        version_info = {}
+        lines = content.splitlines()
+        for i, line in enumerate(lines):
+            match = RE_FUNCTION_DEF.search(line)
+            if match:
+                key = match.group(1)
+                if key in ["major", "minor", "patch", "default_prerelease"]:
+                    value = lines[i + 1].strip()
+                    if value.isnumeric() or RE_QUOTED_STRING.match(value):
+                        version_info[key] = value.replace("'", "")
+
+    except (subprocess.CalledProcessError, FileNotFoundError):
+        # If gh fails, fall back to HTTP
+        vmc_output("gh CLI failed for main version, falling back to HTTP API", "yellow")
+        url = "https://raw.githubusercontent.com/mastodon/mastodon/refs/heads/main/lib/mastodon/version.rb"
+        version_info = await read_main_version_info(url)
+
     if not version_info:
         return "0.0.0-alpha.0"
 
