@@ -7,6 +7,7 @@ This API provides read-only access to collected Mastodon instance statistics,
 version information, and domain data.
 """
 
+import getpass
 import os
 import socket
 import threading
@@ -64,7 +65,7 @@ if _ssh_host:
         if _ssh_pkey is None:
             raise paramiko.SSHException(f"Unable to load SSH key: {_ssh_key_path}")
         _ssh_transport.connect(
-            username=os.getenv("VMCRAWL_SSH_USER", os.getlogin()), pkey=_ssh_pkey
+            username=os.getenv("VMCRAWL_SSH_USER") or getpass.getuser(), pkey=_ssh_pkey
         )
 
         # Bind a local listening socket for the tunnel
@@ -399,7 +400,7 @@ async def get_branch_stats(_api_key: str | None = Depends(get_api_key)):
                     SELECT 1
                     FROM release_versions
                     WHERE status = 'eol'
-                      AND mastodon_domains.software_version LIKE release_versions.latest || '%'
+                      AND mastodon_domains.software_version LIKE release_versions.branch || '.%'
                 )
             """
             )
@@ -454,8 +455,7 @@ async def get_patch_adoption(_api_key: str | None = Depends(get_api_key)):
                     SELECT 1
                     FROM release_versions rv
                     WHERE rv.status = 'eol'
-                      AND (md.software_version LIKE rv.latest || '.%'
-                       OR md.software_version LIKE rv.latest || '%')
+                      AND md.software_version LIKE rv.branch || '.%'
                   )
                 ),
                 unpatched_or_eol AS (
@@ -469,14 +469,19 @@ async def get_patch_adoption(_api_key: str | None = Depends(get_api_key)):
                   FROM mastodon_domains
                 )
                 SELECT
-                  ((t.total_domains - u.cnt) * 100.0 / t.total_domains) AS patched_percent
+                  (
+                    (t.total_domains - COALESCE(u.cnt, 0)) * 100.0
+                    / NULLIF(t.total_domains, 0)
+                  ) AS patched_percent
                 FROM totals t
                 CROSS JOIN unpatched_or_eol u
             """
             )
             instances_result = cur.fetchone()
             patched_instances_percent = (
-                round(instances_result[0], 2) if instances_result else 0
+                round(instances_result[0], 2)
+                if instances_result and instances_result[0] is not None
+                else 0
             )
 
             # Calculate patched MAU percentage
@@ -493,8 +498,7 @@ async def get_patch_adoption(_api_key: str | None = Depends(get_api_key)):
                     SELECT 1
                     FROM release_versions rv
                     WHERE rv.status = 'eol'
-                      AND (md.software_version LIKE rv.latest || '.%'
-                       OR md.software_version LIKE rv.latest || '%')
+                      AND md.software_version LIKE rv.branch || '.%'
                   )
                 ),
                 totals AS (
@@ -508,13 +512,20 @@ async def get_patch_adoption(_api_key: str | None = Depends(get_api_key)):
                      OR md.software_version NOT IN (SELECT software_version FROM version_cases)
                 )
                 SELECT
-                  ((t.total_users - u.cnt) * 100.0 / t.total_users) AS patched_users_percent
+                  (
+                    (COALESCE(t.total_users, 0) - COALESCE(u.cnt, 0)) * 100.0
+                    / NULLIF(COALESCE(t.total_users, 0), 0)
+                  ) AS patched_users_percent
                 FROM totals t
                 CROSS JOIN unpatched_or_eol u
             """
             )
             mau_result = cur.fetchone()
-            patched_mau_percent = round(mau_result[0], 2) if mau_result else 0
+            patched_mau_percent = (
+                round(mau_result[0], 2)
+                if mau_result and mau_result[0] is not None
+                else 0
+            )
 
         return {
             "instances_patched_percent": patched_instances_percent,
@@ -553,7 +564,7 @@ async def get_crawler_health(_api_key: str | None = Depends(get_api_key)):
                 FROM raw_domains rd
                 WHERE rd.nodeinfo = 'mastodon'
                   AND rd.reason LIKE 'SSL%'
-                  AND ALIAS IS NULL
+                  AND (rd.alias IS NULL OR rd.alias = FALSE)
                   AND EXISTS (
                     SELECT 1
                     FROM mastodon_domains md
@@ -571,7 +582,7 @@ async def get_crawler_health(_api_key: str | None = Depends(get_api_key)):
                 FROM raw_domains rd
                 WHERE rd.nodeinfo = 'mastodon'
                   AND rd.reason LIKE 'DNS%'
-                  AND ALIAS IS NULL
+                  AND (rd.alias IS NULL OR rd.alias = FALSE)
                   AND EXISTS (
                     SELECT 1
                     FROM mastodon_domains md
@@ -589,7 +600,7 @@ async def get_crawler_health(_api_key: str | None = Depends(get_api_key)):
                 FROM raw_domains rd
                 WHERE rd.nodeinfo = 'mastodon'
                   AND rd.reason ~ '^5[0-9]{2}'
-                  AND ALIAS IS NULL
+                  AND (rd.alias IS NULL OR rd.alias = FALSE)
                   AND EXISTS (
                     SELECT 1
                     FROM mastodon_domains md
@@ -607,7 +618,7 @@ async def get_crawler_health(_api_key: str | None = Depends(get_api_key)):
                 FROM raw_domains rd
                 WHERE rd.nodeinfo = 'mastodon'
                   AND rd.reason ~ '^4[0-9]{2}'
-                  AND ALIAS IS NULL
+                  AND (rd.alias IS NULL OR rd.alias = FALSE)
                   AND EXISTS (
                     SELECT 1
                     FROM mastodon_domains md
@@ -625,7 +636,7 @@ async def get_crawler_health(_api_key: str | None = Depends(get_api_key)):
                 FROM raw_domains rd
                 WHERE rd.nodeinfo = 'mastodon'
                   AND (rd.reason LIKE 'FILE%' or rd.reason LIKE 'TYPE%' or rd.reason LIKE 'JSON%')
-                  AND ALIAS IS NULL
+                  AND (rd.alias IS NULL OR rd.alias = FALSE)
                   AND EXISTS (
                     SELECT 1
                     FROM mastodon_domains md
@@ -760,7 +771,7 @@ async def get_most_deployed(_api_key: str | None = Depends(get_api_key)):
                     SUM(active_users_monthly) as total_mau
                 FROM mastodon_domains
                 GROUP BY software_version
-                ORDER BY total_mau DESC
+                ORDER BY total_mau DESC NULLS LAST
                 LIMIT 1
             """
             )
@@ -906,7 +917,7 @@ async def get_instances_by_version(
     limit: int = Query(100, ge=1, le=1000),
     offset: int = Query(0, ge=0),
 ):
-    """Get all instances running a specific Mastodon version."""
+    """Get all instances running an exact Mastodon version."""
     try:
         with db_pool.connection() as conn, conn.cursor() as cur:
             # Get instances
@@ -919,18 +930,18 @@ async def get_instances_by_version(
                     active_users_monthly,
                     timestamp
                 FROM mastodon_domains
-                WHERE software_version LIKE %s
+                WHERE software_version = %s
                 ORDER BY active_users_monthly DESC
                 LIMIT %s OFFSET %s
             """,
-                (f"{version}%", limit, offset),
+                (version, limit, offset),
             )
             results = cur.fetchall()
 
             # Get total count
             _ = cur.execute(
-                "SELECT COUNT(*) FROM mastodon_domains WHERE software_version LIKE %s",
-                (f"{version}%",),
+                "SELECT COUNT(*) FROM mastodon_domains WHERE software_version = %s",
+                (version,),
             )
             result = cur.fetchone()
             total_count = result[0] if result else 0

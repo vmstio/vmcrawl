@@ -11,6 +11,7 @@ try:
     import atexit
     import csv
     import gc
+    import getpass
     import hashlib
     import ipaddress
     import json
@@ -24,7 +25,7 @@ try:
     import sys
     import threading
     import time
-    from datetime import datetime, timedelta
+    from datetime import date, datetime, timedelta
     from io import StringIO
     from typing import Any
     from urllib.parse import urlparse
@@ -242,7 +243,8 @@ if _ssh_host:
         if _ssh_pkey is None:
             raise paramiko.SSHException(f"Unable to load SSH key: {_ssh_key_path}")
         _ssh_transport.connect(
-            username=os.getenv("VMCRAWL_SSH_USER", os.getlogin()), pkey=_ssh_pkey
+            username=os.getenv("VMCRAWL_SSH_USER") or getpass.getuser(),
+            pkey=_ssh_pkey,
         )
 
         # Bind a local listening socket for the tunnel
@@ -820,6 +822,8 @@ async def read_main_version_info(url: str) -> dict[str, str] | None:
             if match:
                 key = match.group(1)
                 if key in ["major", "minor", "patch", "default_prerelease"]:
+                    if i + 1 >= len(lines):
+                        continue
                     value = lines[i + 1].strip()
                     if value.isnumeric() or RE_QUOTED_STRING.match(value):
                         version_info[key] = value.replace("'", "")
@@ -978,6 +982,8 @@ async def get_main_version_release():
             if match:
                 key = match.group(1)
                 if key in ["major", "minor", "patch", "default_prerelease"]:
+                    if i + 1 >= len(lines):
+                        continue
                     value = lines[i + 1].strip()
                     if value.isnumeric() or RE_QUOTED_STRING.match(value):
                         version_info[key] = value.replace("'", "")
@@ -1014,9 +1020,18 @@ async def get_main_version_branch():
     return obtained_main_branch
 
 
-def get_nightly_version_ranges() -> list[tuple[str, datetime, datetime | None]]:
+def get_nightly_version_ranges() -> list[tuple[str, datetime | None, datetime | None]]:
     """Get nightly version ranges from the database."""
-    with conn.cursor() as cur:
+
+    def _to_utc_datetime(value: date | datetime | None) -> datetime | None:
+        """Normalize DATE/TIMESTAMP values from PostgreSQL to aware UTC datetimes."""
+        if value is None:
+            return None
+        if isinstance(value, datetime):
+            return value if value.tzinfo is not None else value.replace(tzinfo=UTC)
+        return datetime.combine(value, datetime.min.time(), tzinfo=UTC)
+
+    with db_pool.connection() as conn, conn.cursor() as cur:
         _ = cur.execute(
             """
             SELECT version, start_date, end_date
@@ -1028,18 +1043,8 @@ def get_nightly_version_ranges() -> list[tuple[str, datetime, datetime | None]]:
         nightly_version_ranges = [
             (
                 version,
-                (
-                    start_date
-                    if isinstance(start_date, datetime)
-                    else datetime.fromisoformat(str(start_date))
-                ),
-                (
-                    end_date
-                    if isinstance(end_date, datetime)
-                    else datetime.fromisoformat(str(end_date))
-                    if end_date
-                    else None
-                ),
+                _to_utc_datetime(start_date),
+                _to_utc_datetime(end_date),
             )
             for version, start_date, end_date in nightly_version_ranges
         ]
@@ -1064,7 +1069,7 @@ def _parse_version(version: str) -> tuple[int, int, int, str | None] | None:
 
 def clean_version(
     software_version_full: str,
-    nightly_version_ranges: list[tuple[str, datetime, datetime | None]],
+    nightly_version_ranges: list[tuple[str, datetime | None, datetime | None]],
 ) -> str:
     """Apply all version cleaning transformations.
 
@@ -1153,7 +1158,7 @@ def _clean_version_suffix_conditional(version: str) -> str:
 
 def _clean_version_nightly(
     version: str,
-    nightly_version_ranges: list[tuple[str, datetime, datetime | None]],
+    nightly_version_ranges: list[tuple[str, datetime | None, datetime | None]],
 ) -> str:
     """Map nightly versions to their corresponding release versions."""
     # Remove simple nightly date format
@@ -1171,7 +1176,11 @@ def _clean_version_nightly(
             nightly_date += timedelta(days=1)
 
         for ver, start_date, end_date in nightly_version_ranges:
-            if end_date is not None and start_date <= nightly_date <= end_date:
+            if (
+                start_date is not None
+                and end_date is not None
+                and start_date <= nightly_date <= end_date
+            ):
                 return ver
 
     return version
@@ -5106,7 +5115,7 @@ def get_eol_branch_instances():
                 FROM release_versions
                 WHERE status = 'eol'
                   AND mastodon_domains.software_version LIKE
-                    release_versions.latest || '%'
+                    release_versions.branch || '.%'
             );
         """,
         )
