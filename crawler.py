@@ -20,6 +20,7 @@ try:
     import re
     import socket
     import ssl
+    import subprocess
     import sys
     import threading
     import time
@@ -177,9 +178,6 @@ MENU_CHOICE_TO_STATUS_COLUMN: dict[str, str] = {
     "71": "bad_hard",
     "72": "bad_robot",
 }
-
-# Define maintained branches (adjust as needed)
-backport_branches = ["4.5", "4.4", "4.3"]
 
 # Pre-compiled regex patterns for version cleaning (performance optimization)
 RE_VERSION_SUFFIX_SPLIT = re.compile(r"[+~_ /@&]|patch")
@@ -852,7 +850,9 @@ async def get_backport_mastodon_versions():
     """Get the latest version for each backport branch from GitHub."""
     url = "https://api.github.com/repos/mastodon/mastodon/releases"
 
-    backport_versions = dict.fromkeys(backport_branches, "")
+    # Get current backport branches from database (release status only)
+    branches = get_backport_branches()
+    backport_versions = dict.fromkeys(branches, "")
 
     response = await get_httpx(url)
     _ = response.raise_for_status()
@@ -861,7 +861,7 @@ async def get_backport_mastodon_versions():
     for release in releases:
         release_version = release["tag_name"].lstrip("v")
 
-        for branch in backport_branches:
+        for branch in branches:
             if release_version.startswith(branch):
                 if not backport_versions[branch] or (
                     version.parse(release_version)
@@ -874,6 +874,72 @@ async def get_backport_mastodon_versions():
             backport_versions[branch] = f"{branch}.0"
 
     return list(backport_versions.values())
+
+
+async def get_all_tracked_mastodon_versions():
+    """Get the latest version for each tracked branch (release + EOL) from GitHub.
+
+    Uses gh CLI to get more releases (authenticated, higher limits).
+    Returns a dict with only branches that have releases found on GitHub.
+    Branches not found in recent releases are excluded (preserving their DB value).
+    """
+    # Get all tracked branches from database (release + EOL)
+    branches = get_all_tracked_branches()
+    tracked_versions = dict.fromkeys(branches, "")
+
+    try:
+        # Use gh CLI to get up to 500 releases (should cover all versions)
+        result = subprocess.run(
+            [
+                "gh",
+                "release",
+                "list",
+                "--repo",
+                "mastodon/mastodon",
+                "--limit",
+                "500",
+                "--json",
+                "tagName",
+            ],
+            capture_output=True,
+            text=True,
+            check=True,
+        )
+        releases = json.loads(result.stdout)
+
+        for release in releases:
+            release_version = release["tagName"].lstrip("v")
+
+            for branch in branches:
+                if release_version.startswith(branch):
+                    if not tracked_versions[branch] or (
+                        version.parse(release_version)
+                        > version.parse(tracked_versions[branch] or "0.0.0")
+                    ):
+                        tracked_versions[branch] = release_version
+
+    except (subprocess.CalledProcessError, FileNotFoundError, json.JSONDecodeError):
+        # If gh fails, fall back to HTTP API
+        vmc_output("gh CLI failed, falling back to HTTP API", "yellow")
+        url = "https://api.github.com/repos/mastodon/mastodon/releases"
+        response = await get_httpx(url)
+        _ = response.raise_for_status()
+        releases = response.json()
+
+        for release in releases:
+            release_version = release["tag_name"].lstrip("v")
+
+            for branch in branches:
+                if release_version.startswith(branch):
+                    if not tracked_versions[branch] or (
+                        version.parse(release_version)
+                        > version.parse(tracked_versions[branch] or "0.0.0")
+                    ):
+                        tracked_versions[branch] = release_version
+
+    # Only return branches that were actually found in GitHub releases
+    # This prevents overwriting old EOL versions with placeholder values
+    return {k: v for k, v in tracked_versions.items() if v}
 
 
 async def get_main_version_release():
@@ -1154,67 +1220,111 @@ def _clean_version_fixes(version: str) -> str:
 # =============================================================================
 
 
-def update_patch_versions():
-    """Update the patch versions in the database."""
+def get_backport_branches() -> list[str]:
+    """Get list of active backport branches from the database.
+
+    Replaces the hardcoded backport_branches list.
+    Returns branches in order by n_level (newest first).
+    """
+    with db_pool.connection() as conn, conn.cursor() as cur:
+        try:
+            _ = cur.execute(
+                """
+                SELECT branch
+                FROM release_versions
+                WHERE status = 'release'
+                ORDER BY n_level
+                """,
+            )
+            return [row[0] for row in cur.fetchall()]
+        except Exception as e:
+            vmc_output(f"Failed to load backport branches from database: {e}", "red")
+            return []
+
+
+def get_all_tracked_branches() -> list[str]:
+    """Get list of all tracked branches (release + EOL) from the database.
+
+    Used for updating version information from GitHub.
+    Returns branches in order by n_level (newest first).
+    """
+    with db_pool.connection() as conn, conn.cursor() as cur:
+        try:
+            _ = cur.execute(
+                """
+                SELECT branch
+                FROM release_versions
+                WHERE status IN ('release', 'eol')
+                ORDER BY n_level
+                """,
+            )
+            return [row[0] for row in cur.fetchall()]
+        except Exception as e:
+            vmc_output(f"Failed to load tracked branches from database: {e}", "red")
+            return []
+
+
+def update_release_versions():
+    """Update the release versions in the database using the new structure."""
     with conn.cursor() as cur:
-        n_level = -1
+        # Insert/update main branch (n_level = -1)
         _ = cur.execute(
             """
-            INSERT INTO patch_versions (software_version, main, n_level, branch)
+            INSERT INTO release_versions (branch, status, n_level, latest)
             VALUES (%s, %s, %s, %s)
             ON CONFLICT (n_level) DO UPDATE
-            SET software_version = EXCLUDED.software_version,
-                branch = EXCLUDED.branch
-        """,
-            (version_main_release, True, n_level, version_main_branch),
+            SET branch = EXCLUDED.branch,
+                latest = EXCLUDED.latest
+            """,
+            (version_main_branch, "main", -1, version_main_release),
         )
         conn.commit()
 
+    # Insert/update active releases (n_level >= 0)
     with conn.cursor() as cur:
-        n_level = 0
         backport_releases = version_backport_releases or []
-        for n_level, (version, branch) in enumerate(
-            zip(backport_releases, backport_branches),
-        ):
+        for n_level, version_str in enumerate(backport_releases):
+            # Extract branch from version (e.g., '4.5.6' -> '4.5')
+            branch = ".".join(version_str.split(".")[:2])
             _ = cur.execute(
                 """
-                INSERT INTO patch_versions (software_version, release, n_level, branch)
+                INSERT INTO release_versions (branch, status, n_level, latest)
                 VALUES (%s, %s, %s, %s)
                 ON CONFLICT (n_level) DO UPDATE
-                SET software_version = EXCLUDED.software_version,
-                    branch = EXCLUDED.branch
-            """,
-                (version, True, n_level, branch),
+                SET branch = EXCLUDED.branch,
+                    latest = EXCLUDED.latest
+                """,
+                (branch, "release", n_level, version_str),
             )
-            n_level += 1
         conn.commit()
 
 
-def delete_old_patch_versions():
-    """Delete rows from patch_versions not in current patched versions list."""
+def delete_old_release_versions():
+    """Delete release rows not in current versions list."""
     with conn.cursor() as cur:
         _ = cur.execute(
             """
-            DELETE FROM patch_versions
-            WHERE software_version != ALL(%s::text[])
-        """,
+            DELETE FROM release_versions
+            WHERE status IN ('main', 'release')
+            AND latest != ALL(%s::text[])
+            """,
             (all_patched_versions,),
         )
         conn.commit()
 
 
-def get_patch_versions_from_db() -> dict[str, Any]:
-    """Load patch version information from the database.
+def get_release_versions_from_db() -> dict[str, Any]:
+    """Load release version information from the database.
 
-    Returns a dictionary with version information or None if not found.
+    Returns a dictionary with version information from the release_versions table.
     """
     with db_pool.connection() as conn, conn.cursor() as cur:
         try:
             # Get all versions ordered by n_level
             _ = cur.execute(
                 """
-                SELECT software_version, branch, n_level, main, release
-                FROM patch_versions
+                SELECT branch, status, n_level, latest
+                FROM release_versions
                 ORDER BY n_level
                 """,
             )
@@ -1229,16 +1339,16 @@ def get_patch_versions_from_db() -> dict[str, Any]:
             release_versions = []
 
             for row in all_results:
-                software_version, branch, n_level, is_main, is_release = row
+                branch, status, n_level, latest = row
 
                 # n_level = -1 is the main branch
                 if n_level == -1:
-                    main_version = software_version
+                    main_version = latest
                     main_branch_value = branch
 
                 # n_level >= 0 are release branches
-                if is_release and n_level >= 0:
-                    release_versions.append(software_version)
+                if status == "release" and n_level >= 0:
+                    release_versions.append(latest)
 
             if main_version:
                 result["main_release"] = main_version
@@ -3044,6 +3154,9 @@ def print_manage_menu():
     vmc_output("Mastodon Version Management:", "yellow")
     print("  7. Update latest Mastodon versions")
     print("  8. Show current version info")
+    print("  9. Promote branch to release")
+    print("  10. Mark branch as EOL")
+    print("  11. Reorder release branches")
     print()
     print("  q. Quit")
     print()
@@ -3140,9 +3253,35 @@ async def run_manage_mode(args):
 
         # Mastodon Version Management
         elif choice == "7":
-            # Update latest Mastodon versions
+            # Update latest Mastodon versions (only existing branches)
             vmc_output("Fetching latest Mastodon versions from GitHub…", "bold")
-            await initialize_versions()
+
+            # Fetch fresh version info from GitHub
+            main_release = await get_main_version_release()
+            tracked_versions = await get_all_tracked_mastodon_versions()
+
+            # Update only the 'latest' column for existing branches
+            with db_pool.connection() as conn, conn.cursor() as cur:
+                # Update main branch (n_level = -1)
+                _ = cur.execute(
+                    "UPDATE release_versions SET latest = %s WHERE n_level = -1",
+                    (main_release,),
+                )
+                print(f"Updated main branch to {main_release}")
+
+                # Update release and EOL branches (tracked_versions is a dict: branch -> version)
+                for branch, version_str in tracked_versions.items():
+                    _ = cur.execute(
+                        "UPDATE release_versions SET latest = %s WHERE branch = %s AND status IN ('release', 'eol')",
+                        (version_str, branch),
+                    )
+                    print(f"Updated {branch} to {version_str}")
+
+                conn.commit()
+
+            # Reload from database to update global variables
+            load_versions_from_db()
+
             vmc_output("Version information updated successfully!", "green")
             vmc_output(f"Main branch: {version_main_branch}", "cyan")
             vmc_output(f"Main release: {version_main_release}", "cyan")
@@ -3156,7 +3295,7 @@ async def run_manage_mode(args):
 
         elif choice == "8":
             # Show current version info (from database)
-            db_versions = get_patch_versions_from_db()
+            db_versions = get_release_versions_from_db()
 
             if not db_versions:
                 vmc_output(
@@ -3184,6 +3323,321 @@ async def run_manage_mode(args):
                     print(f"All patched:       {', '.join(db_versions['all_patched'])}")
                 print()
 
+            input("Press Enter to continue...")
+
+        elif choice == "9":
+            # Promote branch to release
+            print()
+            vmc_output("Promote Branch to Release", "bold")
+            vmc_output("-" * 60, "cyan")
+
+            with db_pool.connection() as conn, conn.cursor() as cur:
+                # Show main branch and any non-release branches that could be promoted
+                _ = cur.execute(
+                    """
+                    SELECT branch, status, n_level, latest
+                    FROM release_versions
+                    WHERE status = 'main'
+                    ORDER BY n_level
+                    """
+                )
+                promotable = cur.fetchall()
+
+                if not promotable:
+                    vmc_output("No branches available to promote", "yellow")
+                    print()
+                    input("Press Enter to continue...")
+                    continue
+
+                print("Branches available to promote:")
+                for branch, status, n_level, latest in promotable:
+                    print(f"  {branch} (status={status}, latest={latest})")
+                print()
+
+                branch = input(
+                    "Enter branch to promote to release (or press Enter to cancel): "
+                ).strip()
+                if not branch:
+                    vmc_output("Operation cancelled", "yellow")
+                    print()
+                    input("Press Enter to continue...")
+                    continue
+
+                # Check if branch exists and can be promoted
+                _ = cur.execute(
+                    "SELECT branch, status, n_level FROM release_versions WHERE branch = %s",
+                    (branch,),
+                )
+                existing = cur.fetchone()
+
+                if not existing:
+                    vmc_output(f"Branch {branch} not found", "red")
+                    print()
+                    input("Press Enter to continue...")
+                    continue
+
+                # If it's already a release or EOL, abort
+                if existing[1] != "main":
+                    vmc_output(
+                        f"Branch {branch} has status '{existing[1]}' and cannot be promoted",
+                        "yellow",
+                    )
+                    print()
+                    input("Press Enter to continue...")
+                    continue
+
+                # When adding a new release branch, it becomes n_level=0 (newest)
+                # and existing releases/EOL get shifted down (incremented)
+                # To avoid primary key conflicts, use a two-step update with large offset
+                # Step 1: Move to high temp values (e.g., 1000+) to avoid conflicts
+                _ = cur.execute(
+                    """
+                    UPDATE release_versions
+                    SET n_level = n_level + 10000
+                    WHERE status IN ('release', 'eol') AND n_level >= 0
+                    """
+                )
+                # Step 2: Move back down, shifted by 1 from original position
+                _ = cur.execute(
+                    """
+                    UPDATE release_versions
+                    SET n_level = n_level - 9999
+                    WHERE status IN ('release', 'eol') AND n_level >= 10000
+                    """
+                )
+
+                new_level = 0
+
+                # Fetch latest version for this branch from GitHub
+                vmc_output(f"Fetching latest version for branch {branch}...", "cyan")
+                url = "https://api.github.com/repos/mastodon/mastodon/releases"
+                response = await get_httpx(url)
+                _ = response.raise_for_status()
+                releases = response.json()
+
+                latest_version = None
+                for release in releases:
+                    release_version = release["tag_name"].lstrip("v")
+                    if release_version.startswith(branch):
+                        latest_version = release_version
+                        break
+
+                if not latest_version:
+                    latest_version = f"{branch}.0"
+                    vmc_output(
+                        f"No releases found for {branch}, using {latest_version}",
+                        "yellow",
+                    )
+
+                # If this is the main branch being promoted, delete and re-insert
+                # (can't UPDATE the primary key n_level if target value already exists)
+                if existing and existing[1] == "main":
+                    # Delete the main branch row
+                    _ = cur.execute(
+                        "DELETE FROM release_versions WHERE branch = %s AND status = 'main'",
+                        (branch,),
+                    )
+                    # Insert as new release branch
+                    _ = cur.execute(
+                        """
+                        INSERT INTO release_versions (branch, status, n_level, latest)
+                        VALUES (%s, %s, %s, %s)
+                        """,
+                        (branch, "release", new_level, latest_version),
+                    )
+                    vmc_output(
+                        f"Promoted main branch {branch} to release (n_level={new_level}, latest={latest_version})",
+                        "green",
+                    )
+
+                    # Now add a new main branch (next version)
+                    # Calculate next version (e.g., 4.6 -> 4.7)
+                    parts = branch.split(".")
+                    new_main_branch = f"{parts[0]}.{int(parts[1]) + 1}"
+                    new_main_version = f"{new_main_branch}.0-alpha.1"
+
+                    _ = cur.execute(
+                        """
+                        INSERT INTO release_versions (branch, status, n_level, latest)
+                        VALUES (%s, %s, %s, %s)
+                        """,
+                        (new_main_branch, "main", -1, new_main_version),
+                    )
+                    vmc_output(
+                        f"Created new main branch {new_main_branch} ({new_main_version})",
+                        "green",
+                    )
+                else:
+                    # Insert new release branch
+                    _ = cur.execute(
+                        """
+                        INSERT INTO release_versions (branch, status, n_level, latest)
+                        VALUES (%s, %s, %s, %s)
+                        """,
+                        (branch, "release", new_level, latest_version),
+                    )
+                    vmc_output(
+                        f"Added branch {branch} as release (n_level={new_level}, latest={latest_version})",
+                        "green",
+                    )
+
+                conn.commit()
+
+                # Reload global variables
+                load_versions_from_db()
+
+            print()
+            input("Press Enter to continue...")
+
+        elif choice == "10":
+            # Mark branch as EOL
+            print()
+            vmc_output("Mark Branch as EOL", "bold")
+            vmc_output("-" * 60, "cyan")
+
+            # Show current release branches
+            with db_pool.connection() as conn, conn.cursor() as cur:
+                _ = cur.execute(
+                    "SELECT branch, n_level, latest FROM release_versions WHERE status = 'release' ORDER BY n_level"
+                )
+                release_branches = cur.fetchall()
+
+            if not release_branches:
+                vmc_output("No release branches found", "yellow")
+                print()
+                input("Press Enter to continue...")
+                continue
+
+            print("Current release branches:")
+            for branch, n_level, latest in release_branches:
+                print(f"  {branch} (n_level={n_level}, latest={latest})")
+            print()
+
+            branch = input(
+                "Enter branch to mark as EOL (or press Enter to cancel): "
+            ).strip()
+            if not branch:
+                vmc_output("Operation cancelled", "yellow")
+                print()
+                input("Press Enter to continue...")
+                continue
+
+            with db_pool.connection() as conn, conn.cursor() as cur:
+                # Check if branch exists and is a release
+                _ = cur.execute(
+                    "SELECT status, n_level FROM release_versions WHERE branch = %s",
+                    (branch,),
+                )
+                result = cur.fetchone()
+
+                if not result:
+                    vmc_output(f"Branch {branch} not found", "red")
+                    print()
+                    input("Press Enter to continue...")
+                    continue
+
+                status, n_level = result
+
+                if status != "release":
+                    vmc_output(
+                        f"Branch {branch} is not a release (status={status})", "yellow"
+                    )
+                    print()
+                    input("Press Enter to continue...")
+                    continue
+
+                # Update status to EOL
+                _ = cur.execute(
+                    "UPDATE release_versions SET status = 'eol' WHERE branch = %s",
+                    (branch,),
+                )
+                conn.commit()
+
+                vmc_output(f"Marked branch {branch} as EOL", "green")
+
+                # Reload global variables
+                load_versions_from_db()
+
+            print()
+            input("Press Enter to continue...")
+
+        elif choice == "11":
+            # Reorder release branches
+            print()
+            vmc_output("Reorder Release Branches", "bold")
+            vmc_output("-" * 60, "cyan")
+
+            # Get current release branches
+            with db_pool.connection() as conn, conn.cursor() as cur:
+                _ = cur.execute(
+                    "SELECT branch, n_level, latest FROM release_versions WHERE status = 'release' ORDER BY n_level"
+                )
+                release_branches = cur.fetchall()
+
+            if not release_branches:
+                vmc_output("No release branches found", "yellow")
+                print()
+                input("Press Enter to continue...")
+                continue
+
+            print("Current order (0 is latest stable):")
+            for branch, n_level, latest in release_branches:
+                print(f"  {n_level}: {branch} ({latest})")
+            print()
+
+            vmc_output(
+                "Enter new order as comma-separated branches (e.g., 4.6,4.5,4.4)",
+                "cyan",
+            )
+            new_order = input("New order: ").strip()
+
+            if not new_order:
+                vmc_output("Operation cancelled", "yellow")
+                print()
+                input("Press Enter to continue...")
+                continue
+
+            new_branches = [b.strip() for b in new_order.split(",")]
+
+            # Validate that all current branches are included
+            current_branches = {b[0] for b in release_branches}
+            new_branches_set = set(new_branches)
+
+            if current_branches != new_branches_set:
+                vmc_output(
+                    "Error: New order must include all current release branches", "red"
+                )
+                vmc_output(f"Expected: {', '.join(sorted(current_branches))}", "yellow")
+                vmc_output(f"Got: {', '.join(new_branches)}", "yellow")
+                print()
+                input("Press Enter to continue...")
+                continue
+
+            # Update n_level for each branch
+            with db_pool.connection() as conn, conn.cursor() as cur:
+                for new_level, branch in enumerate(new_branches):
+                    _ = cur.execute(
+                        "UPDATE release_versions SET n_level = %s WHERE branch = %s AND status = 'release'",
+                        (new_level, branch),
+                    )
+                conn.commit()
+
+                vmc_output("Branch order updated successfully!", "green")
+
+                # Show new order
+                _ = cur.execute(
+                    "SELECT branch, n_level, latest FROM release_versions WHERE status = 'release' ORDER BY n_level"
+                )
+                new_release_branches = cur.fetchall()
+
+                print("\nNew order:")
+                for branch, n_level, latest in new_release_branches:
+                    print(f"  {n_level}: {branch} ({latest})")
+
+                # Reload global variables
+                load_versions_from_db()
+
+            print()
             input("Press Enter to continue...")
 
         else:
@@ -5535,7 +5989,7 @@ def load_versions_from_db():
     global version_main_branch, version_main_release, version_latest_release
     global version_backport_releases, all_patched_versions
 
-    db_versions = get_patch_versions_from_db()
+    db_versions = get_release_versions_from_db()
 
     if not db_versions:
         return False
@@ -5569,8 +6023,8 @@ async def initialize_versions():
     all_patched_versions = [version_main_release] + version_backport_releases
 
     # Update database with current version information
-    update_patch_versions()
-    delete_old_patch_versions()
+    update_release_versions()
+    delete_old_release_versions()
 
     # Record refresh timestamp
     _version_last_refresh = time.time()
