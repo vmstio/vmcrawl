@@ -6042,27 +6042,37 @@ def load_versions_from_db():
 
 
 async def initialize_versions():
-    """Initialize version information asynchronously by fetching from GitHub."""
+    """Initialize version information by fetching latest versions from GitHub.
+
+    Note: Branch management is now done manually through the manage menu.
+    This only updates the 'latest' column for existing branches in the database.
+    """
     global version_main_branch, version_main_release, version_latest_release
     global version_backport_releases, all_patched_versions, _version_last_refresh
 
-    # Fetch all version info in parallel
-    results = await asyncio.gather(
-        get_main_version_branch(),
-        get_main_version_release(),
-        get_highest_mastodon_version(),
-        get_backport_mastodon_versions(),
-    )
+    # Fetch latest versions for all tracked branches
+    main_release = await get_main_version_release()
+    tracked_versions = await get_all_tracked_mastodon_versions()
 
-    version_main_branch = results[0]
-    version_main_release = results[1]
-    version_latest_release = results[2]
-    version_backport_releases = results[3]
-    all_patched_versions = [version_main_release] + version_backport_releases
+    # Update database with latest versions (only updates existing branches)
+    with db_pool.connection() as conn, conn.cursor() as cur:
+        # Update main branch (n_level = -1)
+        _ = cur.execute(
+            "UPDATE release_versions SET latest = %s WHERE n_level = -1",
+            (main_release,),
+        )
 
-    # Update database with current version information
-    update_release_versions()
-    delete_old_release_versions()
+        # Update release and EOL branches (only existing ones)
+        for branch, version_str in tracked_versions.items():
+            _ = cur.execute(
+                "UPDATE release_versions SET latest = %s WHERE branch = %s AND status IN ('release', 'eol')",
+                (version_str, branch),
+            )
+
+        conn.commit()
+
+    # Reload global variables from database
+    load_versions_from_db()
 
     # Record refresh timestamp
     _version_last_refresh = time.time()
