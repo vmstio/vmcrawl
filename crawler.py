@@ -524,21 +524,20 @@ async def close_http_client() -> None:
 def vmc_output(text: str, color: str, use_tqdm: bool = False, **kwargs: Any) -> None:
     """Print colored output, optionally using tqdm.write."""
     text = text.lower()
+    effective_color = color if color else "cyan"
 
     if ":" in text:
         before_colon, after_colon = text.split(":", 1)
-        if color in {"yellow", "orange", "red", "green", "cyan"}:
+        if effective_color in {"yellow", "orange", "red", "green", "cyan"}:
             elapsed_seconds = _get_domain_elapsed_seconds(before_colon.strip())
             if elapsed_seconds is not None:
                 after_colon = (
                     f"{after_colon} {TIME_TEXT}[{elapsed_seconds:.2f}s]"
-                    f"{colors.get(color, '')}"
+                    f"{colors.get(effective_color, '')}"
                 )
-        colored_text = (
-            f"{before_colon}:{colors.get(color, '')}{after_colon}{colors['reset']}"
-        )
+        colored_text = f"{before_colon}:{colors.get(effective_color, '')}{after_colon}{colors['reset']}"
     else:
-        colored_text = f"{colors.get(color, '')}{text}{colors['reset']}"
+        colored_text = f"{colors.get(effective_color, '')}{text}{colors['reset']}"
 
     if use_tqdm:
         tqdm.write(colored_text, **kwargs)
