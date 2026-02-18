@@ -337,7 +337,7 @@ async def get_branch_stats(_api_key: str | None = Depends(get_api_key)):
                     SUM(active_users_monthly) as mau
                 FROM mastodon_domains
                 WHERE software_version LIKE (
-                    SELECT branch || '.%' FROM patch_versions WHERE n_level = -1
+                    SELECT branch || '.%' FROM release_versions WHERE n_level = -1
                 )
             """
             )
@@ -351,7 +351,7 @@ async def get_branch_stats(_api_key: str | None = Depends(get_api_key)):
                     SUM(active_users_monthly) as mau
                 FROM mastodon_domains
                 WHERE software_version LIKE (
-                    SELECT branch || '.%' FROM patch_versions WHERE n_level = 0
+                    SELECT branch || '.%' FROM release_versions WHERE n_level = 0
                 )
             """
             )
@@ -365,7 +365,7 @@ async def get_branch_stats(_api_key: str | None = Depends(get_api_key)):
                     SUM(active_users_monthly) as mau
                 FROM mastodon_domains
                 WHERE software_version LIKE (
-                    SELECT branch || '.%' FROM patch_versions WHERE n_level = 1
+                    SELECT branch || '.%' FROM release_versions WHERE n_level = 1
                 )
             """
             )
@@ -380,9 +380,9 @@ async def get_branch_stats(_api_key: str | None = Depends(get_api_key)):
                 FROM mastodon_domains
                 WHERE EXISTS (
                     SELECT 1
-                    FROM patch_versions
+                    FROM release_versions
                     WHERE n_level >= 2
-                      AND mastodon_domains.software_version LIKE patch_versions.branch || '.%'
+                      AND mastodon_domains.software_version LIKE release_versions.branch || '.%'
                 )
             """
             )
@@ -397,8 +397,9 @@ async def get_branch_stats(_api_key: str | None = Depends(get_api_key)):
                 FROM mastodon_domains
                 WHERE EXISTS (
                     SELECT 1
-                    FROM eol_versions
-                    WHERE mastodon_domains.software_version LIKE eol_versions.software_version || '%'
+                    FROM release_versions
+                    WHERE status = 'eol'
+                      AND mastodon_domains.software_version LIKE release_versions.latest || '%'
                 )
             """
             )
@@ -441,17 +442,18 @@ async def get_patch_adoption(_api_key: str | None = Depends(get_api_key)):
             _ = cur.execute(
                 """
                 WITH version_cases AS (
-                  SELECT software_version
-                  FROM patch_versions
+                  SELECT latest AS software_version
+                  FROM release_versions
                 ),
                 eol_check AS (
                   SELECT DISTINCT md.software_version
                   FROM mastodon_domains md
                   WHERE EXISTS (
                     SELECT 1
-                    FROM eol_versions ev
-                    WHERE md.software_version LIKE ev.software_version || '.%'
-                       OR md.software_version LIKE ev.software_version || '%'
+                    FROM release_versions rv
+                    WHERE rv.status = 'eol'
+                      AND (md.software_version LIKE rv.latest || '.%'
+                       OR md.software_version LIKE rv.latest || '%')
                   )
                 ),
                 unpatched_or_eol AS (
@@ -479,17 +481,18 @@ async def get_patch_adoption(_api_key: str | None = Depends(get_api_key)):
             _ = cur.execute(
                 """
                 WITH version_cases AS (
-                  SELECT software_version
-                  FROM patch_versions
+                  SELECT latest AS software_version
+                  FROM release_versions
                 ),
                 eol_check AS (
                   SELECT DISTINCT md.software_version
                   FROM mastodon_domains md
                   WHERE EXISTS (
                     SELECT 1
-                    FROM eol_versions ev
-                    WHERE md.software_version LIKE ev.software_version || '.%'
-                       OR md.software_version LIKE ev.software_version || '%'
+                    FROM release_versions rv
+                    WHERE rv.status = 'eol'
+                      AND (md.software_version LIKE rv.latest || '.%'
+                       OR md.software_version LIKE rv.latest || '%')
                   )
                 ),
                 totals AS (

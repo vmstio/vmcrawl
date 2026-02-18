@@ -27,16 +27,12 @@ CREATE TABLE IF NOT EXISTS
   no_peers (domain TEXT PRIMARY KEY);
 
 CREATE TABLE IF NOT EXISTS
-  patch_versions (
-    software_version TEXT NULL,
-    main BOOLEAN DEFAULT NULL,
-    release BOOLEAN DEFAULT NULL,
-    n_level INTEGER PRIMARY KEY,
-    branch TEXT DEFAULT NULL
+  release_versions (
+    branch TEXT NOT NULL,
+    status TEXT NOT NULL CHECK (status IN ('main', 'release', 'eol')),
+    n_level INTEGER PRIMARY KEY CHECK (n_level >= -1),
+    latest TEXT NOT NULL
   );
-
-CREATE TABLE IF NOT EXISTS
-  eol_versions (software_version TEXT PRIMARY KEY);
 
 CREATE TABLE IF NOT EXISTS
   raw_domains (
@@ -114,20 +110,15 @@ VALUES
   ('su');
 
 INSERT INTO
-  patch_versions (software_version, main, release, n_level, branch)
+  release_versions (branch, status, n_level, latest)
 VALUES
-  ('4.4.0-alpha.2', TRUE, FALSE, -1, '4.4'),
-  ('4.3.3', FALSE, TRUE, 0, '4.3'),
-  ('4.2.15', FALSE, TRUE, 1, '4.2'),
-  ('4.1.22', FALSE, TRUE, 2, '4.1');
-
-INSERT INTO
-  eol_versions (software_version)
-VALUES
-  ('4.0'),
-  ('3'),
-  ('2'),
-  ('1');
+  ('4.6', 'main', -1, '4.6.0-alpha.4'),
+  ('4.5', 'release', 0, '4.5.6'),
+  ('4.4', 'release', 1, '4.4.13'),
+  ('4.3', 'release', 2, '4.3.19'),
+  ('4.2', 'eol', 3, '4.2.29'),
+  ('4.1', 'eol', 4, '4.1.22'),
+  ('4.0', 'eol', 5, '4.0.15');
 
 INSERT INTO
   nightly_versions (version, start_date, end_date)
@@ -324,11 +315,11 @@ CREATE INDEX IF NOT EXISTS idx_nightly_versions_version
     ON nightly_versions (version);
 
 -- =============================================================================
--- patch_versions table indexes
+-- release_versions table indexes
 -- =============================================================================
 
 -- n_level is the PRIMARY KEY, so it already has an index
--- branch is used in subqueries for statistics (SELECT branch || '.%' WHERE n_level = X)
+-- branch and status are used in subqueries for statistics
 -- With only a handful of rows, additional indexes provide no benefit
 
 -- =============================================================================
@@ -357,7 +348,6 @@ CREATE INDEX IF NOT EXISTS idx_error_log_timestamp
 ANALYZE raw_domains;
 ANALYZE mastodon_domains;
 ANALYZE nightly_versions;
-ANALYZE patch_versions;
-ANALYZE eol_versions;
+ANALYZE release_versions;
 ANALYZE statistics;
 ANALYZE error_log;

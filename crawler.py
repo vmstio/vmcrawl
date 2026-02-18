@@ -4931,7 +4931,7 @@ def get_main_branch_instances():
             FROM mastodon_domains
             WHERE software_version LIKE (
                 SELECT branch || '.%'
-                FROM patch_versions
+                FROM release_versions
                 WHERE n_level = -1
             );
         """,
@@ -4958,7 +4958,7 @@ def get_latest_branch_instances():
             FROM mastodon_domains
             WHERE software_version LIKE (
                 SELECT branch || '.%'
-                FROM patch_versions
+                FROM release_versions
                 WHERE n_level = 0
             );
         """,
@@ -4985,7 +4985,7 @@ def get_previous_branch_instances():
             FROM mastodon_domains
             WHERE software_version LIKE (
                 SELECT branch || '.%'
-                FROM patch_versions
+                FROM release_versions
                 WHERE n_level = 1
             );
         """,
@@ -5012,10 +5012,10 @@ def get_deprecated_branch_instances():
             FROM mastodon_domains
             WHERE EXISTS (
                 SELECT 1
-                FROM patch_versions
+                FROM release_versions
                 WHERE n_level >= 2
                   AND mastodon_domains.software_version LIKE
-                      patch_versions.branch || '.%'
+                      release_versions.branch || '.%'
             );
         """,
         )
@@ -5041,9 +5041,10 @@ def get_eol_branch_instances():
             FROM mastodon_domains
             WHERE EXISTS (
                 SELECT 1
-                FROM eol_versions
-                WHERE mastodon_domains.software_version LIKE
-                    eol_versions.software_version || '%'
+                FROM release_versions
+                WHERE status = 'eol'
+                  AND mastodon_domains.software_version LIKE
+                    release_versions.latest || '%'
             );
         """,
         )
@@ -5073,9 +5074,9 @@ def get_main_patched_instances():
             SELECT COUNT(DISTINCT domain) as "Main Patched"
             FROM mastodon_domains
             WHERE software_version LIKE (
-                SELECT software_version
-                FROM patch_versions
-                WHERE main = True
+                SELECT latest
+                FROM release_versions
+                WHERE status = 'main'
             ) || '%';
         """,
         )
@@ -5100,8 +5101,8 @@ def get_latest_patched_instances():
             SELECT COUNT(DISTINCT domain) as "Latest Patched"
             FROM mastodon_domains
             WHERE software_version LIKE (
-                SELECT software_version
-                FROM patch_versions
+                SELECT latest
+                FROM release_versions
                 WHERE n_level = 0
             ) || '%';
         """,
@@ -5127,8 +5128,8 @@ def get_previous_patched_instances():
             SELECT COUNT(DISTINCT domain) as "Previous Patched"
             FROM mastodon_domains
             WHERE software_version LIKE (
-                SELECT software_version
-                FROM patch_versions
+                SELECT latest
+                FROM release_versions
                 WHERE n_level = 1
             ) || '%';
         """,
@@ -5155,10 +5156,10 @@ def get_deprecated_patched_instances():
             FROM mastodon_domains
             WHERE EXISTS (
                 SELECT 1
-                FROM patch_versions
+                FROM release_versions
                 WHERE n_level >= 2
                   AND mastodon_domains.software_version LIKE
-                      patch_versions.software_version || '%'
+                      release_versions.latest || '%'
             );
         """,
         )
@@ -5189,7 +5190,7 @@ def get_main_branch_mau():
             FROM mastodon_domains
             WHERE software_version LIKE (
                 SELECT branch || '.%'
-                FROM patch_versions
+                FROM release_versions
                 WHERE n_level = -1
             );
         """,
@@ -5216,7 +5217,7 @@ def get_latest_branch_mau():
             FROM mastodon_domains
             WHERE software_version LIKE (
                 SELECT branch || '.%'
-                FROM patch_versions
+                FROM release_versions
                 WHERE n_level = 0
             );
         """,
@@ -5243,7 +5244,7 @@ def get_previous_branch_mau():
             FROM mastodon_domains
             WHERE software_version LIKE (
                 SELECT branch || '.%'
-                FROM patch_versions
+                FROM release_versions
                 WHERE n_level = 1
             );
         """,
@@ -5270,10 +5271,10 @@ def get_deprecated_branch_mau():
             FROM mastodon_domains
             WHERE EXISTS (
                 SELECT 1
-                FROM patch_versions
+                FROM release_versions
                 WHERE n_level >= 2
                   AND mastodon_domains.software_version LIKE
-                      patch_versions.branch || '.%'
+                      release_versions.branch || '.%'
             );
         """,
         )
@@ -5299,9 +5300,10 @@ def get_eol_branch_mau():
             FROM mastodon_domains
             WHERE EXISTS (
                 SELECT 1
-                FROM eol_versions
-                WHERE mastodon_domains.software_version LIKE
-                    eol_versions.software_version || '%'
+                FROM release_versions
+                WHERE status = 'eol'
+                  AND mastodon_domains.software_version LIKE
+                    release_versions.latest || '%'
             );
         """,
         )
@@ -5331,9 +5333,9 @@ def get_main_patched_mau():
             SELECT SUM(active_users_monthly) as "Main Patched"
             FROM mastodon_domains
             WHERE software_version LIKE (
-                SELECT software_version
-                FROM patch_versions
-                WHERE main = True
+                SELECT latest
+                FROM release_versions
+                WHERE status = 'main'
             ) || '%';
         """,
         )
@@ -5358,8 +5360,8 @@ def get_latest_patched_mau():
             SELECT SUM(active_users_monthly) as "Latest Patched"
             FROM mastodon_domains
             WHERE software_version LIKE (
-                SELECT software_version
-                FROM patch_versions
+                SELECT latest
+                FROM release_versions
                 WHERE n_level = 0
             ) || '%';
         """,
@@ -5385,8 +5387,8 @@ def get_previous_patched_mau():
             SELECT SUM(active_users_monthly) as "Previous Patched"
             FROM mastodon_domains
             WHERE software_version LIKE (
-                SELECT software_version
-                FROM patch_versions
+                SELECT latest
+                FROM release_versions
                 WHERE n_level = 1
             ) || '%';
         """,
@@ -5413,10 +5415,10 @@ def get_deprecated_patched_mau():
             FROM mastodon_domains
             WHERE EXISTS (
                 SELECT 1
-                FROM patch_versions
+                FROM release_versions
                 WHERE n_level >= 2
                   AND mastodon_domains.software_version LIKE
-                      patch_versions.software_version || '%'
+                      release_versions.latest || '%'
             );
         """,
         )
