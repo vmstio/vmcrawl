@@ -523,12 +523,11 @@ async def close_http_client() -> None:
 
 def vmc_output(text: str, color: str, use_tqdm: bool = False, **kwargs: Any) -> None:
     """Print colored output, optionally using tqdm.write."""
-    if use_tqdm:
-        text = text.lower()
+    text = text.lower()
 
     if ":" in text:
         before_colon, after_colon = text.split(":", 1)
-        if color in {"yellow", "red", "green", "cyan"}:
+        if color in {"yellow", "orange", "red", "green", "cyan"}:
             elapsed_seconds = _get_domain_elapsed_seconds(before_colon.strip())
             if elapsed_seconds is not None:
                 after_colon = (
@@ -1956,7 +1955,9 @@ def update_mastodon_domain(
     """
     # Validate that domain is not empty
     if not actual_domain or not actual_domain.strip():
-        vmc_output("Attempted to insert empty domain, skipping", "red", use_tqdm=True)
+        vmc_output(
+            "Attempted to insert empty domain, skipping", "yellow", use_tqdm=True
+        )
         return
 
     actual_domain = actual_domain.strip().lower()
@@ -2032,7 +2033,7 @@ def cleanup_old_domains():
                 for d in deleted_domains:
                     vmc_output(
                         f"{d}: Removed from active instance list",
-                        "pink",
+                        "yellow",
                         use_tqdm=True,
                     )
             conn.commit()
@@ -2260,7 +2261,9 @@ def disable_peer_fetch(domain, use_tqdm=False):
                 (domain,),
             )
             if cursor.rowcount > 0:
-                vmc_output(f"{domain}: peer polling disabled", "red", use_tqdm=use_tqdm)
+                vmc_output(
+                    f"{domain}: peer polling disabled", "orange", use_tqdm=use_tqdm
+                )
             conn.commit()
         except Exception as e:
             vmc_output(
@@ -2420,7 +2423,7 @@ async def process_fetch_domain(
     elif domains:
         status = f"0 new ({len(domains)} known)"
     elif error_type == "no_peers":
-        # disable_peer_fetch() already emits a red terminal alert
+        # disable_peer_fetch() already emits an orange terminal alert
         status = None
     elif error_type == "transient":
         status = f"{colors['yellow']}Error (transient){colors['reset']}"
@@ -2434,11 +2437,11 @@ async def run_fetch_mode(args):
     """Run the fetch mode to discover new domains from instance peers."""
     # Validate argument combinations
     if (args.limit or args.offset) and args.target:
-        vmc_output("You cannot set both limit/offset and target arguments", "pink")
+        vmc_output("You cannot set both limit/offset and target arguments", "red")
         sys.exit(1)
 
     if args.offset and args.random:
-        vmc_output("You cannot set both offset and random arguments", "pink")
+        vmc_output("You cannot set both offset and random arguments", "red")
         sys.exit(1)
 
     # Set defaults from arguments or environment
@@ -2454,10 +2457,10 @@ async def run_fetch_mode(args):
 
     vmc_output(f"{appname} v{appversion} (fetch mode)", "bold")
     if _is_running_headless():
-        vmc_output("Running in headless mode", "pink")
+        vmc_output("Running in headless mode", "cyan")
 
     if not ensure_mastodon_peers_column():
-        vmc_output("Failed to prepare fetch schema, exiting…", "pink")
+        vmc_output("Failed to prepare fetch schema, exiting…", "red")
         sys.exit(1)
 
     domain_endings = await get_domain_endings()
@@ -2468,7 +2471,7 @@ async def run_fetch_mode(args):
         domain_list = fetch_domain_list(db_limit, db_offset, randomize=args.random)
 
     if not domain_list:
-        vmc_output("No domains fetched, exiting…", "pink")
+        vmc_output("No domains fetched, exiting…", "yellow")
         sys.exit(1)
 
     print(f"Fetching peer data from {len(domain_list)} instances…")
@@ -2550,7 +2553,7 @@ async def run_fetch_mode(args):
                 if not shutdown_event.is_set():
                     elapsed_seconds = time.monotonic() - started_at
                     tqdm.write(
-                        f"{domain}: {colors['red']}Error: {e} {TIME_TEXT}[{elapsed_seconds:.2f}s]{colors['reset']}"
+                        f"{domain}: {colors['orange']}Error: {e} {TIME_TEXT}[{elapsed_seconds:.2f}s]{colors['reset']}"
                     )
             finally:
                 active_domains.discard(domain)
@@ -2870,7 +2873,7 @@ async def run_dni_mode(args):
     """Run the DNI list management mode."""
     vmc_output(f"{appname} v{appversion} (dni mode)", "bold")
     if _is_running_headless():
-        vmc_output("Running in headless mode", "pink")
+        vmc_output("Running in headless mode", "cyan")
 
     # List domains
     if args.list:
@@ -2996,7 +2999,7 @@ def add_nightly_version(
             return False
 
         if not _validate_nightly_date(end_date):
-            vmc_output(f"Invalid end_date format: {end_date}. Use YYYY-MM-DD", "red")
+            vmc_output(f"Invalid end_date format: {end_date}. Use YYYY-MM-DD", "yellow")
             return False
 
         # Check if version already exists
@@ -3069,7 +3072,7 @@ def update_nightly_end_date(nightly_version, new_end_date):
     """Update the end_date for a specific version."""
     try:
         if not _validate_nightly_date(new_end_date):
-            vmc_output(f"Invalid date format: {new_end_date}. Use YYYY-MM-DD", "red")
+            vmc_output(f"Invalid date format: {new_end_date}. Use YYYY-MM-DD", "yellow")
             return False
 
         with db_pool.connection() as conn, conn.cursor() as cur:
@@ -3115,7 +3118,7 @@ def interactive_add_nightly():
     # Get version
     nightly_version = input("Enter version (e.g., 4.9.0-alpha.7): ").strip()
     if not nightly_version:
-        vmc_output("Version cannot be empty", "red")
+        vmc_output("Version cannot be empty", "yellow")
         return
 
     # Get start date
@@ -3143,7 +3146,7 @@ def interactive_add_nightly():
 
         confirm = input("Continue? (y/n): ").strip().lower()
         if confirm != "y":
-            vmc_output("Operation cancelled", "pink")
+            vmc_output("Operation cancelled", "yellow")
             return
 
     # Add the version
@@ -3154,7 +3157,7 @@ def run_nightly_mode(args):
     """Run the nightly version management mode."""
     vmc_output(f"{appname} v{appversion} (nightly mode)", "bold")
     if _is_running_headless():
-        vmc_output("Running in headless mode", "pink")
+        vmc_output("Running in headless mode", "cyan")
 
     # List versions
     if args.list:
@@ -3223,7 +3226,7 @@ async def run_manage_mode(args):
     """Run the unified management mode with menu interface."""
     vmc_output(f"{appname} v{appversion} (manage mode)", "bold")
     if _is_running_headless():
-        vmc_output("Running in headless mode", "pink")
+        vmc_output("Running in headless mode", "cyan")
 
     while True:
         print_manage_menu()
@@ -3298,7 +3301,7 @@ async def run_manage_mode(args):
             if version_to_update and new_end_date:
                 _ = update_nightly_end_date(version_to_update, new_end_date)
             else:
-                vmc_output("Invalid input, operation cancelled", "red")
+                vmc_output("Invalid input, operation cancelled", "yellow")
             print()
             input("Press Enter to continue...")
 
@@ -3421,7 +3424,7 @@ async def run_manage_mode(args):
                 existing = cur.fetchone()
 
                 if not existing:
-                    vmc_output(f"Branch {branch} not found", "red")
+                    vmc_output(f"Branch {branch} not found", "yellow")
                     print()
                     input("Press Enter to continue...")
                     continue
@@ -3581,7 +3584,7 @@ async def run_manage_mode(args):
                 result = cur.fetchone()
 
                 if not result:
-                    vmc_output(f"Branch {branch} not found", "red")
+                    vmc_output(f"Branch {branch} not found", "yellow")
                     print()
                     input("Press Enter to continue...")
                     continue
@@ -3691,7 +3694,7 @@ async def run_manage_mode(args):
             input("Press Enter to continue...")
 
         else:
-            vmc_output("Invalid choice, please try again", "red")
+            vmc_output("Invalid choice, please try again", "yellow")
 
 
 # =============================================================================
@@ -3705,7 +3708,7 @@ def _handle_incorrect_file_type(domain, target, content_type, preserve_status=No
         content_type = "missing Content-Type"
     clean_content_type = RE_CONTENT_TYPE_CHARSET.sub("", content_type).strip()
     error_message = f"{target} is {clean_content_type}"
-    vmc_output(f"{domain}: {error_message}", "yellow", use_tqdm=True)
+    vmc_output(f"{domain}: {error_message}", "orange", use_tqdm=True)
     log_error(domain, error_message)
     increment_domain_error(domain, f"TYPE+{target}", preserve_status)
 
@@ -3736,7 +3739,7 @@ def _handle_tcp_exception(domain, target, exception, preserve_status=None):
     # Handle response size violations
     if isinstance(exception, ValueError) and "too large" in error_message_lower:
         error_reason = "FILE"
-        vmc_output(f"{domain}: Response too large", "yellow", use_tqdm=True)
+        vmc_output(f"{domain}: Response too large", "orange", use_tqdm=True)
         log_error(domain, "Response exceeds size limit")
         increment_domain_error(domain, f"{error_reason}+{target}", preserve_status)
         return
@@ -3744,7 +3747,7 @@ def _handle_tcp_exception(domain, target, exception, preserve_status=None):
     # Handle bad file descriptor (usually from cancellation/cleanup issues)
     if "bad file descriptor" in error_message_lower:
         error_reason = "FILE"
-        vmc_output(f"{domain}: Connection closed unexpectedly", "yellow", use_tqdm=True)
+        vmc_output(f"{domain}: Connection closed unexpectedly", "orange", use_tqdm=True)
         log_error(domain, "Bad file descriptor")
         increment_domain_error(domain, f"{error_reason}+{target}", preserve_status)
         return
@@ -3773,7 +3776,7 @@ def _handle_tcp_exception(domain, target, exception, preserve_status=None):
         # Fallback to original if cleaning resulted in empty string
         if not cleaned_message:
             cleaned_message = "SSL connection error"
-        vmc_output(f"{domain}: {cleaned_message}", "yellow", use_tqdm=True)
+        vmc_output(f"{domain}: {cleaned_message}", "orange", use_tqdm=True)
         log_error(domain, cleaned_message)
         increment_domain_error(domain, f"{error_reason}+{target}", preserve_status)
     # Check for DNS resolution errors
@@ -3799,7 +3802,7 @@ def _handle_tcp_exception(domain, target, exception, preserve_status=None):
         # Fallback to original if cleaning resulted in empty string
         if not cleaned_message:
             cleaned_message = "DNS resolution failed"
-        vmc_output(f"{domain}: {cleaned_message}", "yellow", use_tqdm=True)
+        vmc_output(f"{domain}: {cleaned_message}", "orange", use_tqdm=True)
         log_error(domain, cleaned_message)
         increment_domain_error(domain, f"{error_reason}+{target}", preserve_status)
     else:
@@ -3816,7 +3819,7 @@ def _handle_tcp_exception(domain, target, exception, preserve_status=None):
         # Fallback to original if cleaning resulted in empty string
         if not cleaned_message:
             cleaned_message = str(exception)[:100] or "TCP error"
-        vmc_output(f"{domain}: {cleaned_message}", "yellow", use_tqdm=True)
+        vmc_output(f"{domain}: {cleaned_message}", "orange", use_tqdm=True)
         log_error(domain, cleaned_message)
         increment_domain_error(domain, f"{error_reason}+{target}", preserve_status)
 
@@ -4887,7 +4890,7 @@ async def check_and_record_domains(
             for result in results:
                 if isinstance(result, Exception) and not shutdown_event.is_set():
                     tqdm.write(
-                        f"{colors['red']}Worker failed: {result}{colors['reset']}"
+                        f"{colors['orange']}Worker failed: {result}{colors['reset']}"
                     )
 
         except asyncio.CancelledError:
@@ -5815,14 +5818,14 @@ def load_from_database(user_choice):
         if user_choice == "50":
             patched_versions = all_patched_versions or []
             params = {"versions": patched_versions}
-            vmc_output("Excluding versions:", "pink")
+            vmc_output("Excluding versions:", "cyan")
             for ver in patched_versions:
-                vmc_output(f" - {ver}", "pink")
+                vmc_output(f" - {ver}", "cyan")
         elif user_choice == "51":
             params = [f"{version_main_branch or ''}%"]
 
     if not query:
-        vmc_output(f"Choice {user_choice} is invalid, using default query", "pink")
+        vmc_output(f"Choice {user_choice} is invalid, using default query", "yellow")
         query = query_map["1"]
 
     # Use server-side cursor for large result sets to avoid loading all into memory
@@ -6258,7 +6261,7 @@ async def async_main():
         try:
             await run_fetch_mode(args)
         except KeyboardInterrupt:
-            vmc_output(f"\n{appname} interrupted by user", "red")
+            vmc_output(f"\n{appname} interrupted by user", "yellow")
         finally:
             await cleanup_connections()
         return
@@ -6268,7 +6271,7 @@ async def async_main():
         try:
             await run_manage_mode(args)
         except KeyboardInterrupt:
-            vmc_output(f"\n{appname} interrupted by user", "red")
+            vmc_output(f"\n{appname} interrupted by user", "yellow")
         finally:
             await cleanup_connections()
         return
@@ -6287,7 +6290,7 @@ async def async_main():
     # Main crawl loop - runs continuously in headless mode, once in interactive mode
     vmc_output(f"{appname} v{appversion} ({current_filename})", "bold")
     if _is_running_headless():
-        vmc_output("Running in headless mode", "pink")
+        vmc_output("Running in headless mode", "cyan")
 
     # Determine if we should loop (headless without one-shot flags)
     should_loop = _is_running_headless() and not (args.file or args.target or args.new)
@@ -6384,11 +6387,11 @@ async def async_main():
                     break
 
                 # Brief pause before next cycle to avoid tight loop
-                vmc_output("Restarting crawl cycle...", "pink")
+                vmc_output("Restarting crawl cycle...", "cyan")
                 await asyncio.sleep(1)
 
             except KeyboardInterrupt:
-                vmc_output(f"\n{appname} interrupted by user", "red")
+                vmc_output(f"\n{appname} interrupted by user", "yellow")
                 break
 
     finally:
