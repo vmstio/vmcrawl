@@ -319,7 +319,8 @@ CREATE INDEX IF NOT EXISTS idx_nightly_versions_version
 -- =============================================================================
 
 -- n_level is the PRIMARY KEY, so it already has an index
--- branch and status are used in subqueries for statistics
+-- Branch stats subqueries use status + n_level to split release vs EOL buckets,
+-- then match mastodon_domains.software_version by branch/latest prefixes.
 -- With only a handful of rows, additional indexes provide no benefit
 
 -- =============================================================================
