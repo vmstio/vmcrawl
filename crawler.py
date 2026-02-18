@@ -2403,7 +2403,7 @@ async def process_fetch_domain(
         existing_domains: Set of domains already in database
 
     Returns:
-        tuple: (domain, unique_domains list, status message)
+        tuple: (domain, unique_domains list, status message or None)
     """
     # Use fixed-width display to prevent bar from jumping (truncate long domains)
     domain_display = domain[:25].ljust(25)
@@ -2420,7 +2420,8 @@ async def process_fetch_domain(
     elif domains:
         status = f"0 new ({len(domains)} known)"
     elif error_type == "no_peers":
-        status = f"{colors['orange']}No peers{colors['reset']}"
+        # disable_peer_fetch() already emits a red terminal alert
+        status = None
     elif error_type == "transient":
         status = f"{colors['yellow']}Error (transient){colors['reset']}"
     else:
@@ -2541,9 +2542,10 @@ async def run_fetch_mode(args):
                     if elapsed_seconds >= slow_domain_seconds
                     else ""
                 )
-                tqdm.write(
-                    f"{domain_name}: {status} {TIME_TEXT}[{elapsed_seconds:.2f}s]{colors['reset']}{slow_label}"
-                )
+                if status is not None:
+                    tqdm.write(
+                        f"{domain_name}: {status} {TIME_TEXT}[{elapsed_seconds:.2f}s]{colors['reset']}{slow_label}"
+                    )
             except Exception as e:
                 if not shutdown_event.is_set():
                     elapsed_seconds = time.monotonic() - started_at
