@@ -408,25 +408,27 @@ async def get_branch_stats(_api_key: str | None = Depends(get_api_key)):
         return {
             "main": {
                 "instances": main_result[0] if main_result else 0,
-                "monthly_active_users": main_result[1] if main_result else 0,
+                "monthly_active_users": (main_result[1] or 0) if main_result else 0,
             },
             "latest": {
                 "instances": latest_result[0] if latest_result else 0,
-                "monthly_active_users": latest_result[1] if latest_result else 0,
+                "monthly_active_users": (latest_result[1] or 0) if latest_result else 0,
             },
             "previous": {
                 "instances": previous_result[0] if previous_result else 0,
-                "monthly_active_users": previous_result[1] if previous_result else 0,
+                "monthly_active_users": (previous_result[1] or 0)
+                if previous_result
+                else 0,
             },
             "deprecated": {
                 "instances": deprecated_result[0] if deprecated_result else 0,
-                "monthly_active_users": deprecated_result[1]
+                "monthly_active_users": (deprecated_result[1] or 0)
                 if deprecated_result
                 else 0,
             },
             "eol": {
                 "instances": eol_result[0] if eol_result else 0,
-                "monthly_active_users": eol_result[1] if eol_result else 0,
+                "monthly_active_users": (eol_result[1] or 0) if eol_result else 0,
             },
         }
     except Exception as e:

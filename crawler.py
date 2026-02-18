@@ -547,7 +547,10 @@ def vmc_output(text: str, color: str, use_tqdm: bool = False, **kwargs: Any) -> 
 
 def _is_running_headless():
     """Check if running without a TTY (headless mode)."""
-    return not os.isatty(sys.stdout.fileno())
+    try:
+        return not os.isatty(sys.stdout.fileno())
+    except Exception:
+        return True
 
 
 # =============================================================================
@@ -749,7 +752,12 @@ async def get_domain_endings() -> set[str]:
 
         # Check if database cache is valid (less than 7 days old)
         if last_updated:
-            age = datetime.now(UTC) - last_updated.replace(tzinfo=UTC)
+            # Ensure last_updated is timezone-aware before subtracting.
+            # PostgreSQL may return a naive datetime (TIMESTAMP WITHOUT TIME ZONE)
+            # or an aware one (TIMESTAMP WITH TIME ZONE); handle both.
+            if last_updated.tzinfo is None:
+                last_updated = last_updated.replace(tzinfo=UTC)
+            age = datetime.now(UTC) - last_updated
             if age.days < max_cache_age_days:
                 tlds = get_tlds_from_db()
                 if tlds:
@@ -1167,8 +1175,23 @@ def _clean_version_nightly(
     return version
 
 
+_clean_version_fixes_warned = False
+
+
 def _clean_version_fixes(version: str) -> str:
     """Apply version-specific fixes using parsed components."""
+    global _clean_version_fixes_warned
+    if (
+        not version_main_branch
+        and not version_latest_release
+        and not _clean_version_fixes_warned
+    ):
+        vmc_output(
+            "Warning: version globals not loaded; version-fixing logic will be skipped",
+            "yellow",
+        )
+        _clean_version_fixes_warned = True
+
     # Handle arbitrary trailing letter suffixes (e.g., "3.4.6ht", "4.2.10kb10")
     # These are fork/instance identifiers that should be stripped
     trailing_match = RE_VERSION_TRAILING_SUFFIX.match(version)
@@ -2155,21 +2178,16 @@ def fetch_exclude_domains():
     """Fetch domains to exclude from peer fetching."""
     with db_pool.connection() as conn, conn.cursor() as cursor:
         try:
-            _ = cursor.execute(
-                "SELECT string_agg('''' || domain || '''', ',') FROM no_peers",
-            )
-            result = cursor.fetchone()
-            if result is None or result[0] is None:
-                return ""
-            exclude_domains_sql = result[0]
-            return exclude_domains_sql if exclude_domains_sql else ""
+            _ = cursor.execute("SELECT domain FROM no_peers")
+            rows = cursor.fetchall()
+            return [row[0] for row in rows] if rows else []
         except Exception as e:
             print(f"Failed to obtain excluded domain list: {e}")
             conn.rollback()
             return None
 
 
-def fetch_domain_list(exclude_domains_sql, db_limit, db_offset, randomize=False):
+def fetch_domain_list(exclude_domains, db_limit, db_offset, randomize=False):
     """Fetch list of domains to query for peers.
 
     When not randomizing, uses SQL LIMIT/OFFSET for efficiency.
@@ -2179,25 +2197,26 @@ def fetch_domain_list(exclude_domains_sql, db_limit, db_offset, randomize=False)
         try:
             min_active = int(os.getenv("VMCRAWL_FETCH_MIN_ACTIVE", "100"))
 
-            # Build base query using sql.SQL for safe composition
-            if exclude_domains_sql:
-                # exclude_domains_sql is pre-formatted as 'domain1','domain2',... from string_agg
+            # Build base query using parameterized values for safety
+            if exclude_domains:
                 base_query = sql.SQL(
                     "SELECT domain FROM mastodon_domains "
-                    + "WHERE active_users_monthly > %s "
-                    + "AND domain NOT IN ({}) "
-                    + "ORDER BY active_users_monthly DESC"
-                ).format(sql.SQL(exclude_domains_sql))
+                    "WHERE active_users_monthly > %s "
+                    "AND domain != ALL(%s) "
+                    "ORDER BY active_users_monthly DESC"
+                )
+                base_params: tuple = (min_active, exclude_domains)
             else:
                 base_query = sql.SQL(
                     "SELECT domain FROM mastodon_domains "
-                    + "WHERE active_users_monthly > %s "
-                    + "ORDER BY active_users_monthly DESC"
+                    "WHERE active_users_monthly > %s "
+                    "ORDER BY active_users_monthly DESC"
                 )
+                base_params = (min_active,)
 
             if randomize:
                 # For random selection, fetch all and shuffle in Python
-                _ = cursor.execute(base_query, (min_active,))
+                _ = cursor.execute(base_query, base_params)
                 # Stream results through cursor iterator
                 result = [row[0] for row in cursor]
                 random.shuffle(result)
@@ -2207,7 +2226,7 @@ def fetch_domain_list(exclude_domains_sql, db_limit, db_offset, randomize=False)
                 # For ordered selection, use SQL LIMIT/OFFSET for efficiency
                 fetch_limit = int(db_limit) + int(db_offset)
                 query_with_limit = base_query + sql.SQL(" LIMIT %s")
-                _ = cursor.execute(query_with_limit, (min_active, fetch_limit))
+                _ = cursor.execute(query_with_limit, (*base_params, fetch_limit))
                 all_domains = [row[0] for row in cursor]
                 start = int(db_offset)
                 end = start + int(db_limit)
@@ -2446,10 +2465,10 @@ async def run_fetch_mode(args):
     if _is_running_headless():
         vmc_output("Running in headless mode", "pink")
 
-    exclude_domains_sql = fetch_exclude_domains()
+    exclude_domains = fetch_exclude_domains()
     domain_endings = await get_domain_endings()
 
-    if exclude_domains_sql is None:
+    if exclude_domains is None:
         vmc_output("Failed to fetch excluded list, exiting…", "pink")
         sys.exit(1)
 
@@ -2457,7 +2476,7 @@ async def run_fetch_mode(args):
         domain_list = [args.target]
     else:
         domain_list = fetch_domain_list(
-            exclude_domains_sql, db_limit, db_offset, randomize=args.random
+            exclude_domains, db_limit, db_offset, randomize=args.random
         )
 
     if not domain_list:
@@ -3320,7 +3339,8 @@ async def run_manage_mode(args):
             vmc_output(f"Main version: {version_main_release}", "cyan")
             if version_backport_releases:
                 vmc_output(
-                    f"Supported releases: {', '.join(version_backport_releases)}", "cyan"
+                    f"Supported releases: {', '.join(version_backport_releases)}",
+                    "cyan",
                 )
             print()
             input("Press Enter to continue...")
@@ -4733,9 +4753,12 @@ async def process_domain(domain, nightly_version_ranges, user_choice=None):
         if software_data and isinstance(software_data, dict):
             await asyncio.to_thread(save_nodeinfo_software, domain, software_data)
 
-        await asyncio.to_thread(
-            mark_as_non_mastodon, domain, nodeinfo_20_result["software"]["name"]
+        software_name = (
+            nodeinfo_20_result.get("software", {}).get("name")
+            if isinstance(nodeinfo_20_result.get("software"), dict)
+            else None
         )
+        await asyncio.to_thread(mark_as_non_mastodon, domain, software_name)
 
 
 # =============================================================================
