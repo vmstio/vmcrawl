@@ -947,14 +947,12 @@ async def get_main_version_release():
     version_info = None
 
     try:
-        # Try using gh CLI first
+        # Try using gh CLI first (returns raw file content)
         result = subprocess.run(
             [
                 "gh",
                 "api",
                 "repos/mastodon/mastodon/contents/lib/mastodon/version.rb",
-                "--jq",
-                ".content",
                 "-H",
                 "Accept: application/vnd.github.raw+json",
             ],
@@ -3319,12 +3317,10 @@ async def run_manage_mode(args):
             load_versions_from_db()
 
             vmc_output("Version information updated successfully!", "green")
-            vmc_output(f"Main branch: {version_main_branch}", "cyan")
-            vmc_output(f"Main release: {version_main_release}", "cyan")
-            vmc_output(f"Latest stable: {version_latest_release}", "cyan")
+            vmc_output(f"Main version: {version_main_release}", "cyan")
             if version_backport_releases:
                 vmc_output(
-                    f"Backport releases: {', '.join(version_backport_releases)}", "cyan"
+                    f"Supported releases: {', '.join(version_backport_releases)}", "cyan"
                 )
             print()
             input("Press Enter to continue...")
