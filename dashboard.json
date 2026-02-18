@@ -3,7 +3,7 @@
   "kind": "DashboardWithAccessInfo",
   "metadata": {
     "name": "aedqo0q7klrswa",
-    "generation": 120,
+    "generation": 122,
     "creationTimestamp": "2025-11-21T19:31:21Z",
     "labels": {},
     "annotations": {}
@@ -144,7 +144,7 @@
                         "editorMode": "code",
                         "format": "table",
                         "rawQuery": true,
-                        "rawSql": "WITH version_cases AS (\n  SELECT software_version\n  FROM patch_versions\n),\neol_check AS (\n  SELECT DISTINCT md.software_version\n  FROM mastodon_domains md\n  WHERE EXISTS (\n    SELECT 1\n    FROM eol_versions ev\n    WHERE md.software_version LIKE ev.software_version || '.%'\n       OR md.software_version LIKE ev.software_version || '%'\n  )\n),\nagg AS (\n  SELECT\n    COUNT(DISTINCT md.domain) AS total_domains,\n    COALESCE(SUM(md.active_users_monthly), 0) AS total_users,\n    COUNT(*) FILTER (\n      WHERE md.software_version IN (SELECT software_version FROM eol_check)\n         OR md.software_version NOT IN (SELECT software_version FROM version_cases)\n    ) AS unpatched_or_eol_domains,\n    COALESCE(SUM(md.active_users_monthly) FILTER (\n      WHERE md.software_version IN (SELECT software_version FROM eol_check)\n         OR md.software_version NOT IN (SELECT software_version FROM version_cases)\n    ), 0) AS unpatched_or_eol_users\n  FROM mastodon_domains md\n)\nSELECT\n  ((total_domains - unpatched_or_eol_domains) * 100.0 / NULLIF(total_domains, 0)) AS \"Instances\",\n  ((total_users   - unpatched_or_eol_users)   * 100.0 / NULLIF(total_users, 0))   AS \"MAU\"\nFROM agg;",
+                        "rawSql": "WITH version_cases AS (\n  SELECT latest AS software_version\n  FROM release_versions\n  WHERE status IN ('release', 'main')\n),\neol_check AS (\n  SELECT DISTINCT md.software_version\n  FROM mastodon_domains md\n  WHERE EXISTS (\n    SELECT 1\n    FROM release_versions rv\n    WHERE rv.status = 'eol'\n      AND md.software_version LIKE rv.branch || '.%'\n  )\n),\nagg AS (\n  SELECT\n    COUNT(DISTINCT md.domain) AS total_domains,\n    COALESCE(SUM(md.active_users_monthly), 0) AS total_users,\n    COUNT(*) FILTER (\n      WHERE md.software_version IN (SELECT software_version FROM eol_check)\n         OR md.software_version NOT IN (SELECT software_version FROM version_cases)\n    ) AS unpatched_or_eol_domains,\n    COALESCE(SUM(md.active_users_monthly) FILTER (\n      WHERE md.software_version IN (SELECT software_version FROM eol_check)\n         OR md.software_version NOT IN (SELECT software_version FROM version_cases)\n    ), 0) AS unpatched_or_eol_users\n  FROM mastodon_domains md\n)\nSELECT\n  ((total_domains - unpatched_or_eol_domains) * 100.0 / NULLIF(total_domains, 0)) AS \"Instances\",\n  ((total_users   - unpatched_or_eol_users)   * 100.0 / NULLIF(total_users, 0))   AS \"MAU\"\nFROM agg;\n",
                         "sql": {
                           "columns": [
                             {
@@ -335,7 +335,7 @@
                         "editorMode": "code",
                         "format": "table",
                         "rawQuery": true,
-                        "rawSql": "SELECT COUNT(DISTINCT domain) as \"Main Patched\"\nFROM mastodon_domains \nWHERE software_version LIKE (\n    SELECT software_version \n    FROM patch_versions \n    WHERE main = True\n) || '%';\n",
+                        "rawSql": "SELECT COUNT(DISTINCT domain) as \"Main Patched\"\nFROM mastodon_domains \nWHERE software_version LIKE (\n    SELECT latest\n    FROM release_versions \n    WHERE n_level = -1\n) || '%';\n",
                         "sql": {
                           "columns": [
                             {
@@ -370,7 +370,7 @@
                         "editorMode": "code",
                         "format": "table",
                         "rawQuery": true,
-                        "rawSql": "SELECT COUNT(DISTINCT domain) as \"Main Total\"\nFROM mastodon_domains \nWHERE software_version LIKE (\n    SELECT branch || '.%'\n    FROM patch_versions \n    WHERE n_level = -1\n);\n",
+                        "rawSql": "SELECT COUNT(DISTINCT domain) as \"Main Total\"\nFROM mastodon_domains \nWHERE software_version LIKE (\n    SELECT branch || '.%'\n    FROM release_versions \n    WHERE n_level = -1\n);\n",
                         "sql": {
                           "columns": [
                             {
@@ -633,7 +633,7 @@
                         "editorMode": "code",
                         "format": "table",
                         "rawQuery": true,
-                        "rawSql": "SELECT COUNT(DISTINCT domain) AS \"Latest Patched\"\nFROM mastodon_domains\nWHERE software_version =\n(\n    SELECT software_version\n    FROM patch_versions\n    WHERE n_level = 0\n);\n",
+                        "rawSql": "SELECT COUNT(DISTINCT domain) AS \"Latest Patched\"\nFROM mastodon_domains\nWHERE software_version =\n(\n    SELECT latest\n    FROM release_versions\n    WHERE n_level = 0\n);\n",
                         "sql": {
                           "columns": [
                             {
@@ -668,7 +668,7 @@
                         "editorMode": "code",
                         "format": "table",
                         "rawQuery": true,
-                        "rawSql": "SELECT COUNT(DISTINCT domain) as \"Latest Total\"\nFROM mastodon_domains \nWHERE software_version LIKE (\n    SELECT branch || '.%'\n    FROM patch_versions \n    WHERE n_level = 0\n);\n",
+                        "rawSql": "SELECT COUNT(DISTINCT domain) as \"Latest Total\"\nFROM mastodon_domains \nWHERE software_version LIKE (\n    SELECT branch || '.%'\n    FROM release_versions \n    WHERE n_level = 0\n);\n",
                         "sql": {
                           "columns": [
                             {
@@ -800,7 +800,7 @@
                         "editorMode": "code",
                         "format": "table",
                         "rawQuery": true,
-                        "rawSql": "SELECT COUNT(DISTINCT domain) as \"Latest Patched\" \nFROM mastodon_domains md\nWHERE md.software_version LIKE ANY (\n    SELECT software_version || '%'\n    FROM patch_versions \n    WHERE n_level = 1\n);\n",
+                        "rawSql": "SELECT COUNT(DISTINCT domain) as \"Latest Patched\" \nFROM mastodon_domains md\nWHERE md.software_version LIKE ANY (\n    SELECT latest || '%'\n    FROM release_versions \n    WHERE n_level = 1\n);\n",
                         "sql": {
                           "columns": [
                             {
@@ -835,7 +835,7 @@
                         "editorMode": "code",
                         "format": "table",
                         "rawQuery": true,
-                        "rawSql": "SELECT COUNT(DISTINCT domain) as \"Latest Total\"\nFROM mastodon_domains \nWHERE software_version LIKE (\n    SELECT branch || '.%'\n    FROM patch_versions \n    WHERE n_level = 1\n);\n",
+                        "rawSql": "SELECT COUNT(DISTINCT domain) as \"Latest Total\"\nFROM mastodon_domains \nWHERE software_version LIKE (\n    SELECT branch || '.%'\n    FROM release_versions \n    WHERE n_level = 1\n);\n",
                         "sql": {
                           "columns": [
                             {
@@ -967,7 +967,7 @@
                         "editorMode": "code",
                         "format": "table",
                         "rawQuery": true,
-                        "rawSql": "SELECT SUM(active_users_monthly) as updated_users\nFROM mastodon_domains \nWHERE software_version LIKE ANY (\n    SELECT software_version || '%'\n    FROM patch_versions \n    WHERE n_level = -1\n);\n",
+                        "rawSql": "SELECT SUM(active_users_monthly) as updated_users\nFROM mastodon_domains \nWHERE software_version LIKE ANY (\n    SELECT latest || '%'\n    FROM release_versions \n    WHERE n_level = -1\n);\n",
                         "sql": {
                           "columns": [
                             {
@@ -1002,7 +1002,7 @@
                         "editorMode": "code",
                         "format": "table",
                         "rawQuery": true,
-                        "rawSql": "SELECT SUM(active_users_monthly) as \"Main Total\"\nFROM mastodon_domains\nWHERE software_version LIKE (\nSELECT branch || '.%'\nFROM patch_versions\nWHERE n_level = -1\n);",
+                        "rawSql": "SELECT SUM(active_users_monthly) as \"Main Total\"\nFROM mastodon_domains\nWHERE software_version LIKE (\nSELECT branch || '.%'\nFROM release_versions\nWHERE n_level = -1\n);",
                         "sql": {
                           "columns": [
                             {
@@ -1139,7 +1139,7 @@
                         "editorMode": "code",
                         "format": "table",
                         "rawQuery": true,
-                        "rawSql": "SELECT SUM(active_users_monthly) AS updated_users\nFROM mastodon_domains\nWHERE software_version =\n(\n    SELECT software_version\n    FROM patch_versions\n    WHERE n_level = 0\n);\n",
+                        "rawSql": "SELECT SUM(active_users_monthly) AS updated_users\nFROM mastodon_domains\nWHERE software_version =\n(\n    SELECT latest\n    FROM release_versions\n    WHERE n_level = 0\n);\n",
                         "sql": {
                           "columns": [
                             {
@@ -1174,7 +1174,7 @@
                         "editorMode": "code",
                         "format": "table",
                         "rawQuery": true,
-                        "rawSql": "SELECT SUM(active_users_monthly) as \"Main Total\"\nFROM mastodon_domains\nWHERE software_version LIKE (\nSELECT branch || '.%'\nFROM patch_versions\nWHERE n_level = 0\n);",
+                        "rawSql": "SELECT SUM(active_users_monthly) as \"Main Total\"\nFROM mastodon_domains\nWHERE software_version LIKE (\nSELECT branch || '.%'\nFROM release_versions\nWHERE n_level = 0\n);",
                         "sql": {
                           "columns": [
                             {
@@ -1311,7 +1311,7 @@
                         "editorMode": "code",
                         "format": "table",
                         "rawQuery": true,
-                        "rawSql": "SELECT SUM(active_users_monthly) as updated_users\nFROM mastodon_domains md\nWHERE md.software_version LIKE ANY (\n    SELECT software_version || '%'\n    FROM patch_versions \n    WHERE n_level = 1\n);",
+                        "rawSql": "SELECT SUM(active_users_monthly) as updated_users\nFROM mastodon_domains md\nWHERE md.software_version LIKE ANY (\n    SELECT latest || '%'\n    FROM release_versions \n    WHERE n_level = 1\n);",
                         "sql": {
                           "columns": [
                             {
@@ -1346,7 +1346,7 @@
                         "editorMode": "code",
                         "format": "table",
                         "rawQuery": true,
-                        "rawSql": "SELECT SUM(active_users_monthly) as \"Main Total\"\nFROM mastodon_domains\nWHERE software_version LIKE (\nSELECT branch || '.%'\nFROM patch_versions\nWHERE n_level = 1\n);",
+                        "rawSql": "SELECT SUM(active_users_monthly) as \"Main Total\"\nFROM mastodon_domains\nWHERE software_version LIKE (\nSELECT branch || '.%'\nFROM release_versions\nWHERE n_level = 1\n);",
                         "sql": {
                           "columns": [
                             {
@@ -1704,7 +1704,7 @@
                         "editorMode": "code",
                         "format": "table",
                         "rawQuery": true,
-                        "rawSql": "WITH version_cases AS (\n  SELECT software_version\n  FROM patch_versions\n),\neol_check AS (\n  SELECT DISTINCT software_version\n  FROM mastodon_domains md\n  WHERE EXISTS (\n    SELECT 1 \n    FROM eol_versions ev\n    WHERE md.software_version LIKE ev.software_version || '.%'\n       OR md.software_version LIKE ev.software_version || '%'\n  )\n)\nSELECT \n  CASE \n    WHEN software_version IN (SELECT software_version FROM version_cases) THEN software_version\n    WHEN software_version IN (SELECT software_version FROM eol_check) THEN 'EOL'\n    ELSE 'Unpatched'\n  END as version,\n  COUNT(*) as count\nFROM mastodon_domains \nGROUP BY CASE \n    WHEN software_version IN (SELECT software_version FROM version_cases) THEN software_version\n    WHEN software_version IN (SELECT software_version FROM eol_check) THEN 'EOL'\n    ELSE 'Unpatched'\n  END;\n",
+                        "rawSql": "WITH version_cases AS (\n  SELECT latest AS software_version\n  FROM release_versions\n  WHERE status IN ('release', 'main')\n),\neol_check AS (\n  SELECT DISTINCT md.software_version\n  FROM mastodon_domains md\n  WHERE EXISTS (\n    SELECT 1 \n    FROM release_versions rv\n    WHERE rv.status = 'eol'\n      AND md.software_version LIKE rv.branch || '.%'\n  )\n)\nSELECT \n  CASE \n    WHEN software_version IN (SELECT software_version FROM version_cases) THEN software_version\n    WHEN software_version IN (SELECT software_version FROM eol_check) THEN 'EOL'\n    ELSE 'Unpatched'\n  END as version,\n  COUNT(*) as count\nFROM mastodon_domains \nGROUP BY CASE \n    WHEN software_version IN (SELECT software_version FROM version_cases) THEN software_version\n    WHEN software_version IN (SELECT software_version FROM eol_check) THEN 'EOL'\n    ELSE 'Unpatched'\n  END;\n",
                         "sql": {
                           "columns": [
                             {
@@ -1838,7 +1838,7 @@
                         "editorMode": "code",
                         "format": "table",
                         "rawQuery": true,
-                        "rawSql": "WITH prefixes AS (\n    SELECT branch FROM patch_versions\n),\nmatched AS (\n    SELECT\n        pv.branch AS prefix,\n        COUNT(md.software_version) AS total\n    FROM prefixes pv\n    LEFT JOIN mastodon_domains md\n      ON md.software_version LIKE pv.branch || '%'\n    GROUP BY pv.branch\n),\neol AS (\n    SELECT\n        'EOL' AS prefix,\n        COUNT(*) AS total\n    FROM mastodon_domains md\n    WHERE NOT EXISTS (\n        SELECT 1\n        FROM prefixes p\n        WHERE md.software_version LIKE p.branch || '%'\n    )\n)\nSELECT * FROM matched\nUNION ALL\nSELECT * FROM eol\nORDER BY prefix;",
+                        "rawSql": "WITH prefixes AS (\n    SELECT branch \n    FROM release_versions \n    WHERE status IN ('release', 'main')\n),\nmatched AS (\n    SELECT\n        pv.branch AS prefix,\n        COUNT(md.software_version) AS total\n    FROM prefixes pv\n    LEFT JOIN mastodon_domains md\n      ON md.software_version LIKE pv.branch || '%'\n    GROUP BY pv.branch\n),\neol AS (\n    SELECT\n        'EOL' AS prefix,\n        COUNT(*) AS total\n    FROM mastodon_domains md\n    WHERE EXISTS (\n        SELECT 1\n        FROM release_versions rv\n        WHERE rv.status = 'eol'\n          AND md.software_version LIKE rv.branch || '%'\n    )\n)\nSELECT * FROM matched\nUNION ALL\nSELECT * FROM eol\nORDER BY prefix;\n",
                         "sql": {
                           "columns": [
                             {
@@ -1957,7 +1957,7 @@
                         "editorMode": "code",
                         "format": "table",
                         "rawQuery": true,
-                        "rawSql": "WITH prefixes AS (\n    SELECT branch FROM patch_versions\n),\nmatched AS (\n    SELECT\n        pv.branch AS prefix,\n        SUM(md.active_users_monthly) AS total_active_users\n    FROM prefixes pv\n    LEFT JOIN mastodon_domains md\n      ON md.software_version LIKE pv.branch || '%'\n    GROUP BY pv.branch\n),\neol AS (\n    SELECT\n        'EOL' AS prefix,\n        SUM(active_users_monthly) AS total_active_users\n    FROM mastodon_domains md\n    WHERE NOT EXISTS (\n        SELECT 1\n        FROM prefixes p\n        WHERE md.software_version LIKE p.branch || '%'\n    )\n)\nSELECT * FROM matched\nUNION ALL\nSELECT * FROM eol\nORDER BY prefix;",
+                        "rawSql": "WITH prefixes AS (\n    SELECT branch \n    FROM release_versions \n    WHERE status IN ('release', 'main')\n),\nmatched AS (\n    SELECT\n        pv.branch AS prefix,\n        SUM(md.active_users_monthly) AS total_active_users\n    FROM prefixes pv\n    LEFT JOIN mastodon_domains md\n      ON md.software_version LIKE pv.branch || '%'\n    GROUP BY pv.branch\n),\neol AS (\n    SELECT\n        'EOL' AS prefix,\n        SUM(active_users_monthly) AS total_active_users\n    FROM mastodon_domains md\n    WHERE EXISTS (\n        SELECT 1\n        FROM release_versions rv\n        WHERE rv.status = 'eol'\n          AND md.software_version LIKE rv.branch || '%'\n    )\n)\nSELECT * FROM matched\nUNION ALL\nSELECT * FROM eol\nORDER BY prefix;\n",
                         "sql": {
                           "columns": [
                             {
@@ -2076,7 +2076,7 @@
                         "editorMode": "code",
                         "format": "table",
                         "rawQuery": true,
-                        "rawSql": "WITH version_cases AS (\n  SELECT software_version\n  FROM patch_versions\n),\neol_check AS (\n  SELECT DISTINCT software_version\n  FROM mastodon_domains md\n  WHERE EXISTS (\n    SELECT 1 \n    FROM eol_versions ev\n    WHERE md.software_version LIKE ev.software_version || '.%'\n       OR md.software_version LIKE ev.software_version || '%'\n  )\n)\nSELECT \n  CASE \n    WHEN software_version IN (SELECT software_version FROM version_cases) THEN software_version\n    WHEN software_version IN (SELECT software_version FROM eol_check) THEN 'EOL'\n    ELSE 'Unpatched'\n  END as version,\n  SUM(active_users_monthly) as user_count\nFROM mastodon_domains \nGROUP BY CASE \n    WHEN software_version IN (SELECT software_version FROM version_cases) THEN software_version\n    WHEN software_version IN (SELECT software_version FROM eol_check) THEN 'EOL'\n    ELSE 'Unpatched'\n  END;\n",
+                        "rawSql": "WITH version_cases AS (\n  SELECT latest AS software_version\n  FROM release_versions\n  WHERE status IN ('release', 'main')\n),\neol_check AS (\n  SELECT DISTINCT md.software_version\n  FROM mastodon_domains md\n  WHERE EXISTS (\n    SELECT 1 \n    FROM release_versions rv\n    WHERE rv.status = 'eol'\n      AND md.software_version LIKE rv.branch || '.%'\n  )\n)\nSELECT \n  CASE \n    WHEN software_version IN (SELECT software_version FROM version_cases) THEN software_version\n    WHEN software_version IN (SELECT software_version FROM eol_check) THEN 'EOL'\n    ELSE 'Unpatched'\n  END as version,\n  SUM(active_users_monthly) as user_count\nFROM mastodon_domains \nGROUP BY CASE \n    WHEN software_version IN (SELECT software_version FROM version_cases) THEN software_version\n    WHEN software_version IN (SELECT software_version FROM eol_check) THEN 'EOL'\n    ELSE 'Unpatched'\n  END;\n",
                         "sql": {
                           "columns": [
                             {
@@ -2210,7 +2210,7 @@
                         "editorMode": "code",
                         "format": "table",
                         "rawQuery": true,
-                        "rawSql": "SELECT \n    COUNT(CASE WHEN \n        software_version LIKE '5.0%' OR\n        software_version LIKE '4.9%' OR\n        software_version LIKE '4.8%' OR\n        software_version LIKE '4.7%' OR\n        software_version LIKE '4.6%' OR\n        software_version LIKE '4.5%'\n    THEN 1 END) * 100.0 / COUNT(*) AS \"4.5+\",\n\n    COUNT(CASE WHEN \n        software_version LIKE '5.0%' OR\n        software_version LIKE '4.9%' OR\n        software_version LIKE '4.8%' OR\n        software_version LIKE '4.7%' OR\n        software_version LIKE '4.6%' OR\n        software_version LIKE '4.5%' OR \n        software_version LIKE '4.4%' \n    THEN 1 END) * 100.0 / COUNT(*) AS \"4.4+\",\n\n    COUNT(CASE WHEN \n        software_version LIKE '5.0%' OR\n        software_version LIKE '4.9%' OR\n        software_version LIKE '4.8%' OR\n        software_version LIKE '4.7%' OR\n        software_version LIKE '4.6%' OR\n        software_version LIKE '4.5%' OR \n        software_version LIKE '4.4%' OR \n        software_version LIKE '4.3%'\n    THEN 1 END) * 100.0 / COUNT(*) AS \"4.3+\",\n\n    COUNT(CASE WHEN \n        software_version LIKE '4.6%' OR\n        software_version LIKE '4.5%' OR \n        software_version LIKE '4.4%' OR \n        software_version LIKE '4.3%' OR\n        software_version LIKE '4.2%'\n    THEN 1 END) * 100.0 / COUNT(*) AS \"4.2+\",\n\n    COUNT(CASE WHEN \n        software_version LIKE '5.0%' OR\n        software_version LIKE '4.9%' OR\n        software_version LIKE '4.8%' OR\n        software_version LIKE '4.7%' OR\n        software_version LIKE '4.6%' OR\n        software_version LIKE '4.5%' OR \n        software_version LIKE '4.4%' OR \n        software_version LIKE '4.3%' OR\n        software_version LIKE '4.2%' OR\n        software_version LIKE '4.1%'\n    THEN 1 END) * 100.0 / COUNT(*) AS \"4.1+\",\n\n    COUNT(CASE WHEN \n        software_version LIKE '5.0%' OR\n        software_version LIKE '4.9%' OR\n        software_version LIKE '4.8%' OR\n        software_version LIKE '4.7%' OR\n        software_version LIKE '4.6%' OR\n        software_version LIKE '4.5%' OR \n        software_version LIKE '4.4%' OR \n        software_version LIKE '4.3%' OR\n        software_version LIKE '4.2%' OR\n        software_version LIKE '4.1%' OR\n        software_version LIKE '4.0%'\n    THEN 1 END) * 100.0 / COUNT(*) AS \"4.0+\"\n\nFROM \n    mastodon_domains\nWHERE \n    software_version IS NOT NULL;\n",
+                        "rawSql": "WITH recent_releases AS (\n    SELECT \n        branch,\n        n_level\n    FROM release_versions\n    WHERE status IN ('release', 'eol')\n    ORDER BY n_level\n    LIMIT 7\n),\ntotal_count AS (\n    SELECT COUNT(*) as total\n    FROM mastodon_domains\n    WHERE software_version IS NOT NULL\n),\nadoption_calc AS (\n    SELECT\n        rr.branch || '+' as version_label,\n        rr.n_level,\n        COUNT(CASE WHEN EXISTS (\n            SELECT 1 FROM release_versions rv \n            WHERE rv.n_level <= rr.n_level \n            AND md.software_version LIKE rv.branch || '%'\n        ) THEN 1 END) * 100.0 / tc.total AS adoption_percent\n    FROM recent_releases rr\n    CROSS JOIN mastodon_domains md\n    CROSS JOIN total_count tc\n    WHERE md.software_version IS NOT NULL\n    GROUP BY rr.branch, rr.n_level, tc.total\n)\nSELECT \n    version_label,\n    adoption_percent\nFROM adoption_calc\nORDER BY n_level;\n",
                         "sql": {
                           "columns": [
                             {
@@ -2283,7 +2283,7 @@
                     "lastNotNull"
                   ],
                   "fields": "",
-                  "values": false
+                  "values": true
                 },
                 "showUnfilled": true,
                 "sizing": "auto",
@@ -2312,7 +2312,7 @@
                         "editorMode": "code",
                         "format": "table",
                         "rawQuery": true,
-                        "rawSql": "SELECT \n    SUM(CASE WHEN \n        software_version LIKE '5.0%' OR\n        software_version LIKE '4.9%' OR\n        software_version LIKE '4.8%' OR\n        software_version LIKE '4.7%' OR\n        software_version LIKE '4.6%' OR\n        software_version LIKE '4.5%' \n    THEN active_users_monthly ELSE 0 END) * 100.0 / \n        SUM(active_users_monthly) AS \"4.5+\",\n\n    SUM(CASE WHEN \n        software_version LIKE '4.6%' OR \n        software_version LIKE '4.5%' OR \n        software_version LIKE '4.4%' \n    THEN active_users_monthly ELSE 0 END) * 100.0 / \n        SUM(active_users_monthly) AS \"4.4+\",\n\n    SUM(CASE WHEN\n        software_version LIKE '5.0%' OR\n        software_version LIKE '4.9%' OR\n        software_version LIKE '4.8%' OR\n        software_version LIKE '4.7%' OR\n        software_version LIKE '4.6%' OR\n        software_version LIKE '4.5%' OR \n        software_version LIKE '4.4%' OR \n        software_version LIKE '4.3%'\n    THEN active_users_monthly ELSE 0 END) * 100.0 / \n        SUM(active_users_monthly) AS \"4.3+\",\n\n    SUM(CASE WHEN \n        software_version LIKE '5.0%' OR\n        software_version LIKE '4.9%' OR\n        software_version LIKE '4.8%' OR\n        software_version LIKE '4.7%' OR\n        software_version LIKE '4.6%' OR\n        software_version LIKE '4.5%' OR \n        software_version LIKE '4.4%' OR \n        software_version LIKE '4.3%' OR\n        software_version LIKE '4.2%'\n    THEN active_users_monthly ELSE 0 END) * 100.0 / \n        SUM(active_users_monthly) AS \"4.2+\",\n\n    SUM(CASE WHEN \n        software_version LIKE '5.0%' OR\n        software_version LIKE '4.9%' OR\n        software_version LIKE '4.8%' OR\n        software_version LIKE '4.7%' OR\n        software_version LIKE '4.6%' OR\n        software_version LIKE '4.5%' OR \n        software_version LIKE '4.4%' OR \n        software_version LIKE '4.3%' OR\n        software_version LIKE '4.2%' OR\n        software_version LIKE '4.1%'\n    THEN active_users_monthly ELSE 0 END) * 100.0 / \n        SUM(active_users_monthly) AS \"4.1+\",\n\n    SUM(CASE WHEN \n        software_version LIKE '5.0%' OR\n        software_version LIKE '4.9%' OR\n        software_version LIKE '4.8%' OR\n        software_version LIKE '4.7%' OR\n        software_version LIKE '4.6%' OR\n        software_version LIKE '4.5%' OR \n        software_version LIKE '4.4%' OR \n        software_version LIKE '4.3%' OR\n        software_version LIKE '4.2%' OR\n        software_version LIKE '4.1%' OR\n        software_version LIKE '4.0%'\n    THEN active_users_monthly ELSE 0 END) * 100.0 / \n        SUM(active_users_monthly) AS \"4.0+\"\nFROM \n    mastodon_domains\nWHERE \n    software_version IS NOT NULL\n    AND active_users_monthly IS NOT NULL;\n",
+                        "rawSql": "WITH recent_releases AS (\n    -- Get the 7 most recent releases ordered by n_level\n    SELECT \n        branch,\n        n_level\n    FROM release_versions\n    WHERE status IN ('release', 'eol')\n    ORDER BY n_level\n    LIMIT 7\n),\ntotal_mau AS (\n    SELECT SUM(active_users_monthly) as total\n    FROM mastodon_domains\n    WHERE software_version IS NOT NULL\n      AND active_users_monthly IS NOT NULL\n),\nadoption_calc AS (\n    SELECT\n        rr.branch || '+' as version_label,\n        rr.n_level,\n        SUM(CASE WHEN EXISTS (\n            SELECT 1 FROM release_versions rv \n            WHERE rv.n_level <= rr.n_level \n            AND md.software_version LIKE rv.branch || '%'\n        ) THEN md.active_users_monthly ELSE 0 END) * 100.0 / tm.total AS adoption_percent\n    FROM recent_releases rr\n    CROSS JOIN mastodon_domains md\n    CROSS JOIN total_mau tm\n    WHERE md.software_version IS NOT NULL\n      AND md.active_users_monthly IS NOT NULL\n    GROUP BY rr.branch, rr.n_level, tm.total\n)\nSELECT \n    version_label,\n    adoption_percent\nFROM adoption_calc\nORDER BY n_level;\n",
                         "sql": {
                           "columns": [
                             {
@@ -2386,7 +2386,7 @@
                     "lastNotNull"
                   ],
                   "fields": "",
-                  "values": false
+                  "values": true
                 },
                 "showUnfilled": true,
                 "sizing": "auto",
@@ -2415,7 +2415,7 @@
                         "editorMode": "code",
                         "format": "table",
                         "rawQuery": true,
-                        "rawSql": "SELECT COUNT(DISTINCT domain) as \"Latest Patched\" \nFROM mastodon_domains md\nWHERE md.software_version LIKE ANY (\n    SELECT software_version || '%'\n    FROM patch_versions \n    WHERE n_level >= 2\n);\n",
+                        "rawSql": "SELECT COUNT(DISTINCT domain) as \"Latest Patched\" \nFROM mastodon_domains md\nWHERE md.software_version LIKE ANY (\n    SELECT latest || '%'\n    FROM release_versions \n    WHERE n_level >= 2\n    AND status != 'eol'\n);\n",
                         "sql": {
                           "columns": [
                             {
@@ -2450,7 +2450,7 @@
                         "editorMode": "code",
                         "format": "table",
                         "rawQuery": true,
-                        "rawSql": "SELECT COUNT(DISTINCT domain) as \"Latest Total\"\nFROM mastodon_domains \nWHERE software_version LIKE ANY (\n    SELECT branch || '.%'\n    FROM patch_versions \n    WHERE n_level >= 2\n);\n",
+                        "rawSql": "SELECT COUNT(DISTINCT domain) as \"Latest Total\"\nFROM mastodon_domains \nWHERE software_version LIKE ANY (\n    SELECT branch || '.%'\n    FROM release_versions \n    WHERE n_level >= 2\n    AND status != 'eol'\n);\n",
                         "sql": {
                           "columns": [
                             {
@@ -2495,7 +2495,7 @@
               ]
             }
           },
-          "description": "Count of instances running latest patches for branch release-2 (deprecated) or older, compared to the total instances on branch release-2 or older.",
+          "description": "Count of instances running latest patches for branch release-2 (deprecated) or older, compared to the instances on branch release-2 or older.",
           "id": 73,
           "links": [],
           "title": "Patched Instances, Deprecated",
@@ -2582,7 +2582,7 @@
                         "editorMode": "code",
                         "format": "table",
                         "rawQuery": true,
-                        "rawSql": "SELECT SUM(active_users_monthly) as updated_users\nFROM mastodon_domains md\nWHERE md.software_version LIKE ANY (\n    SELECT software_version || '%'\n    FROM patch_versions \n    WHERE n_level >= 2\n);",
+                        "rawSql": "SELECT SUM(active_users_monthly) as updated_users\nFROM mastodon_domains md\nWHERE md.software_version LIKE ANY (\n    SELECT latest || '%'\n    FROM release_versions \n    WHERE n_level >= 2\n);",
                         "sql": {
                           "columns": [
                             {
@@ -2617,7 +2617,7 @@
                         "editorMode": "code",
                         "format": "table",
                         "rawQuery": true,
-                        "rawSql": "SELECT SUM(active_users_monthly) as \"Main Total\"\nFROM mastodon_domains\nWHERE software_version LIKE ANY (\nSELECT branch || '.%'\nFROM patch_versions\nWHERE n_level >= 1\n);",
+                        "rawSql": "SELECT SUM(active_users_monthly) as \"Main Total\"\nFROM mastodon_domains\nWHERE software_version LIKE ANY (\nSELECT branch || '.%'\nFROM release_versions\nWHERE n_level >= 1\n);",
                         "sql": {
                           "columns": [
                             {
@@ -3530,7 +3530,7 @@
                         "editorMode": "code",
                         "format": "table",
                         "rawQuery": true,
-                        "rawSql": "WITH prefixes AS (\n  SELECT DISTINCT software_version AS prefix\n  FROM eol_versions\n  WHERE software_version IS NOT NULL\n    AND software_version <> ''\n    AND software_version NOT LIKE '1%'\n    AND software_version NOT LIKE '2%'\n),\nmatched AS (\n  SELECT\n    p.prefix,\n    COUNT(md.software_version) AS total\n  FROM prefixes p\n  LEFT JOIN mastodon_domains md\n    ON md.software_version LIKE p.prefix || '%'\n  GROUP BY p.prefix\n)\nSELECT prefix, total\nFROM matched\nORDER BY prefix;",
+                        "rawSql": "WITH prefixes AS (\n  SELECT DISTINCT branch AS prefix\n  FROM release_versions \n  WHERE branch IS NOT NULL\n    AND status = 'eol'\n),\nmatched AS (\n  SELECT\n    p.prefix,\n    COUNT(md.software_version) AS total\n  FROM prefixes p\n  LEFT JOIN mastodon_domains md\n    ON md.software_version LIKE p.prefix || '%'\n  GROUP BY p.prefix\n)\nSELECT prefix, total\nFROM matched\nORDER BY prefix;",
                         "sql": {
                           "columns": [
                             {
@@ -3739,7 +3739,7 @@
                         "editorMode": "code",
                         "format": "table",
                         "rawQuery": true,
-                        "rawSql": "WITH prefixes AS (\n  SELECT DISTINCT software_version AS prefix\n  FROM eol_versions\n  WHERE software_version IS NOT NULL\n    AND software_version <> ''\n    AND software_version NOT LIKE '1%'\n    AND software_version NOT LIKE '2%'\n),\nmatched AS (\n  SELECT\n    p.prefix,\n    COALESCE(SUM(md.active_users_monthly), 0) AS total_active_users\n  FROM prefixes p\n  LEFT JOIN mastodon_domains md\n    ON md.software_version LIKE p.prefix || '%'\n  GROUP BY p.prefix\n)\nSELECT prefix, total_active_users\nFROM matched\nORDER BY prefix;",
+                        "rawSql": "WITH prefixes AS (\n  SELECT DISTINCT branch AS prefix\n  FROM release_versions \n  WHERE branch IS NOT NULL\n    AND status = 'eol'\n),\nmatched AS (\n  SELECT\n    p.prefix,\n    COALESCE(SUM(md.active_users_monthly), 0) AS total_active_users\n  FROM prefixes p\n  LEFT JOIN mastodon_domains md\n    ON md.software_version LIKE p.prefix || '%'\n  GROUP BY p.prefix\n)\nSELECT prefix, total_active_users\nFROM matched\nORDER BY prefix;",
                         "sql": {
                           "columns": [
                             {
@@ -4116,7 +4116,7 @@
                   ]
                 }
               },
-              "title": "Adoption Gauges"
+              "title": "Patch Adoption"
             }
           },
           {
