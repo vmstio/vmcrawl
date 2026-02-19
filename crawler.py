@@ -142,6 +142,34 @@ def _get_domain_elapsed_seconds(domain: str) -> float | None:
     return max(0.0, time.monotonic() - started_at)
 
 
+def echo(text: str, color: str, use_tqdm: bool = False, **kwargs: Any) -> None:
+    """Print colored output, optionally using tqdm.write."""
+    if use_tqdm:
+        text = text.lower()
+    effective_color = color if color else "cyan"
+
+    if ":" in text:
+        before_colon, after_colon = text.split(":", 1)
+        if effective_color in {"yellow", "orange", "red", "green", "cyan"}:
+            elapsed_seconds = _get_domain_elapsed_seconds(before_colon.strip())
+            if elapsed_seconds is not None:
+                after_colon = (
+                    f"{after_colon} {TIME_TEXT}[{elapsed_seconds:.2f}s]"
+                    f"{colors.get(effective_color, '')}"
+                )
+        colored_text = (
+            f"{before_colon}:{colors.get(effective_color, '')}"
+            f"{after_colon}{colors['reset']}"
+        )
+    else:
+        colored_text = f"{colors.get(effective_color, '')}{text}{colors['reset']}"
+
+    if use_tqdm:
+        tqdm.write(colored_text, **kwargs)
+    else:
+        print(colored_text, **kwargs)
+
+
 # HTTP status codes for special handling
 http_codes_to_hardfail = [999, 451, 418, 410]  # gone
 
@@ -303,12 +331,13 @@ if _ssh_host:
         _tunnel_thread = threading.Thread(target=_ssh_tunnel_accept_loop, daemon=True)
         _tunnel_thread.start()
 
-        print(
+        echo(
             f"SSH tunnel established: 127.0.0.1:{_ssh_tunnel_port}"
-            f" -> {_db_host}:{_db_port} via {_ssh_host}"
+            f" -> {_db_host}:{_db_port} via {_ssh_host}",
+            "cyan",
         )
     except Exception as exception:
-        print(f"Error establishing SSH tunnel: {exception}")
+        echo(f"Error establishing SSH tunnel: {exception}", "red")
         sys.exit(1)
 
 _db_connect_host = (
@@ -368,7 +397,7 @@ try:
 
     _ = atexit.register(cleanup_db_connections)
 except psycopg.Error as exception:
-    print(f"Error connecting to PostgreSQL database: {exception}")
+    echo(f"Error connecting to PostgreSQL database: {exception}", "red")
     sys.exit(1)
 
 # =============================================================================
@@ -514,36 +543,6 @@ async def close_http_client() -> None:
     if _http1_client is not None:
         await _http1_client.aclose()
         _http1_client = None
-
-
-# =============================================================================
-# UTILITY FUNCTIONS - Output and Environment
-# =============================================================================
-
-
-def echo(text: str, color: str, use_tqdm: bool = False, **kwargs: Any) -> None:
-    """Print colored output, optionally using tqdm.write."""
-    if use_tqdm:
-        text = text.lower()
-    effective_color = color if color else "cyan"
-
-    if ":" in text:
-        before_colon, after_colon = text.split(":", 1)
-        if effective_color in {"yellow", "orange", "red", "green", "cyan"}:
-            elapsed_seconds = _get_domain_elapsed_seconds(before_colon.strip())
-            if elapsed_seconds is not None:
-                after_colon = (
-                    f"{after_colon} {TIME_TEXT}[{elapsed_seconds:.2f}s]"
-                    f"{colors.get(effective_color, '')}"
-                )
-        colored_text = f"{before_colon}:{colors.get(effective_color, '')}{after_colon}{colors['reset']}"
-    else:
-        colored_text = f"{colors.get(effective_color, '')}{text}{colors['reset']}"
-
-    if use_tqdm:
-        tqdm.write(colored_text, **kwargs)
-    else:
-        print(colored_text, **kwargs)
 
 
 def _is_running_headless():
@@ -1955,9 +1954,7 @@ def update_mastodon_domain(
     """
     # Validate that domain is not empty
     if not actual_domain or not actual_domain.strip():
-        echo(
-            "Attempted to insert empty domain, skipping", "yellow", use_tqdm=True
-        )
+        echo("Attempted to insert empty domain, skipping", "yellow", use_tqdm=True)
         return
 
     actual_domain = actual_domain.strip().lower()
@@ -2261,9 +2258,7 @@ def disable_peer_fetch(domain, use_tqdm=False):
                 (domain,),
             )
             if cursor.rowcount > 0:
-                echo(
-                    f"{domain}: peer polling disabled", "orange", use_tqdm=use_tqdm
-                )
+                echo(f"{domain}: peer polling disabled", "orange", use_tqdm=use_tqdm)
             conn.commit()
         except Exception as e:
             echo(
@@ -2800,9 +2795,11 @@ def list_dni_domains() -> None:
             for domain, comment, force, timestamp in domains:
                 comment_str = comment if comment else ""
                 force_str = force if force else "soft"
-                print(f"{domain:<40} {comment_str:<15} {force_str:<6} {timestamp}")
-            print()
-
+                echo(
+                    f"{domain:<40} {comment_str:<15} {force_str:<6} {timestamp}",
+                    "white",
+                )
+            echo("", "white")
         except Exception as e:
             echo(f"Failed to list DNI domains: {e}", "red")
             conn.rollback()
@@ -2951,9 +2948,8 @@ def display_nightly_versions():
             echo("-" * 70, "cyan")
 
             for version, start_date, end_date in versions:
-                print(f"{version:<20} {start_date} {end_date}")
-            print()
-
+                echo(f"{version:<20} {start_date} {end_date}", "white")
+            echo("", "white")
     except Exception as e:
         echo(f"Error fetching nightly versions: {e}", "red")
         sys.exit(1)
@@ -3195,29 +3191,29 @@ def run_nightly_mode(args):
 
 def print_manage_menu():
     """Print the management menu options."""
-    print()
+    echo("", "white")
     echo("Management Menu:", "bold")
     echo("-" * 50, "cyan")
-    print()
+    echo("", "white")
     echo("DNI (Do Not Interact) Management:", "yellow")
-    print("  1. Fetch and import IFTAS DNI list")
-    print("  2. List all DNI domains")
-    print("  3. Count DNI domains")
-    print()
+    echo("  1. Fetch and import IFTAS DNI list", "white")
+    echo("  2. List all DNI domains", "white")
+    echo("  3. Count DNI domains", "white")
+    echo("", "white")
     echo("Nightly Version Management:", "yellow")
-    print("  4. List all nightly versions")
-    print("  5. Add a new nightly version")
-    print("  6. Update nightly version end date")
-    print()
+    echo("  4. List all nightly versions", "white")
+    echo("  5. Add a new nightly version", "white")
+    echo("  6. Update nightly version end date", "white")
+    echo("", "white")
     echo("Mastodon Version Management:", "yellow")
-    print("  7. Update latest Mastodon versions")
-    print("  8. Show current version info")
-    print("  9. Promote branch to release")
-    print("  10. Mark branch as EOL")
-    print("  11. Reorder release branches")
-    print()
-    print("  q. Quit")
-    print()
+    echo("  7. Update latest Mastodon versions", "white")
+    echo("  8. Show current version info", "white")
+    echo("  9. Promote branch to release", "white")
+    echo("  10. Mark branch as EOL", "white")
+    echo("  11. Reorder release branches", "white")
+    echo("", "white")
+    echo("  q. Quit", "white")
+    echo("", "white")
 
 
 def get_manage_choice():
@@ -3269,7 +3265,7 @@ async def run_manage_mode(args):
 
             _ = count_dni_domains()
             echo("DNI import complete!", "bold")
-            print()
+            echo("", "white")
             input("Press Enter to continue...")
 
         elif choice == "2":
@@ -3280,7 +3276,7 @@ async def run_manage_mode(args):
         elif choice == "3":
             # Count DNI domains
             _ = count_dni_domains()
-            print()
+            echo("", "white")
             input("Press Enter to continue...")
 
         # Nightly Version Management
@@ -3292,12 +3288,12 @@ async def run_manage_mode(args):
         elif choice == "5":
             # Add a new nightly version (interactive)
             interactive_add_nightly()
-            print()
+            echo("", "white")
             input("Press Enter to continue...")
 
         elif choice == "6":
             # Update nightly version end date
-            print()
+            echo("", "white")
             version_to_update = input(
                 "Enter the version to update (e.g., 4.9.0-alpha.7): "
             ).strip()
@@ -3306,7 +3302,7 @@ async def run_manage_mode(args):
                 _ = update_nightly_end_date(version_to_update, new_end_date)
             else:
                 echo("Invalid input, operation cancelled", "yellow")
-            print()
+            echo("", "white")
             input("Press Enter to continue...")
 
         # Mastodon Version Management
@@ -3325,16 +3321,14 @@ async def run_manage_mode(args):
                     "UPDATE release_versions SET latest = %s WHERE n_level = -1",
                     (main_release,),
                 )
-                print(f"Updated main branch to {main_release}")
-
+                echo(f"Updated main branch to {main_release}", "white")
                 # Update release and EOL branches (tracked_versions is a dict: branch -> version)
                 for branch, version_str in tracked_versions.items():
                     _ = cur.execute(
                         "UPDATE release_versions SET latest = %s WHERE branch = %s AND status IN ('release', 'eol')",
                         (version_str, branch),
                     )
-                    print(f"Updated {branch} to {version_str}")
-
+                    echo(f"Updated {branch} to {version_str}", "white")
                 conn.commit()
 
             # Reload from database to update global variables
@@ -3347,7 +3341,7 @@ async def run_manage_mode(args):
                     f"Supported releases: {', '.join(version_backport_releases)}",
                     "cyan",
                 )
-            print()
+            echo("", "white")
             input("Press Enter to continue...")
 
         elif choice == "8":
@@ -3360,31 +3354,32 @@ async def run_manage_mode(args):
                     "yellow",
                 )
             else:
-                print()
-                echo(
-                    "Current Mastodon Version Information (from database):", "bold"
-                )
+                echo("", "white")
+                echo("Current Mastodon Version Information (from database):", "bold")
                 echo("-" * 60, "cyan")
 
                 if "main_branch" in db_versions:
-                    print(f"Main branch:       {db_versions['main_branch']}")
+                    echo(f"Main branch:       {db_versions['main_branch']}", "white")
                 if "main_release" in db_versions:
-                    print(f"Main release:      {db_versions['main_release']}")
+                    echo(f"Main release:      {db_versions['main_release']}", "white")
                 if "latest_stable" in db_versions:
-                    print(f"Latest stable:     {db_versions['latest_stable']}")
+                    echo(f"Latest stable:     {db_versions['latest_stable']}", "white")
                 if "backport_releases" in db_versions:
-                    print(
-                        f"Backport releases: {', '.join(db_versions['backport_releases'])}"
+                    echo(
+                        f"Backport releases: {', '.join(db_versions['backport_releases'])}",
+                        "white",
                     )
                 if "all_patched" in db_versions:
-                    print(f"All patched:       {', '.join(db_versions['all_patched'])}")
-                print()
-
+                    echo(
+                        f"All patched:       {', '.join(db_versions['all_patched'])}",
+                        "white",
+                    )
+                echo("", "white")
             input("Press Enter to continue...")
 
         elif choice == "9":
             # Promote branch to release
-            print()
+            echo("", "white")
             echo("Promote Branch to Release", "bold")
             echo("-" * 60, "cyan")
 
@@ -3402,21 +3397,20 @@ async def run_manage_mode(args):
 
                 if not promotable:
                     echo("No branches available to promote", "yellow")
-                    print()
+                    echo("", "white")
                     input("Press Enter to continue...")
                     continue
 
-                print("Branches available to promote:")
+                echo("Branches available to promote:", "white")
                 for branch, status, n_level, latest in promotable:
-                    print(f"  {branch} (status={status}, latest={latest})")
-                print()
-
+                    echo(f"  {branch} (status={status}, latest={latest})", "white")
+                echo("", "white")
                 branch = input(
                     "Enter branch to promote to release (or press Enter to cancel): "
                 ).strip()
                 if not branch:
                     echo("Operation cancelled", "yellow")
-                    print()
+                    echo("", "white")
                     input("Press Enter to continue...")
                     continue
 
@@ -3429,7 +3423,7 @@ async def run_manage_mode(args):
 
                 if not existing:
                     echo(f"Branch {branch} not found", "yellow")
-                    print()
+                    echo("", "white")
                     input("Press Enter to continue...")
                     continue
 
@@ -3439,7 +3433,7 @@ async def run_manage_mode(args):
                         f"Branch {branch} has status '{existing[1]}' and cannot be promoted",
                         "yellow",
                     )
-                    print()
+                    echo("", "white")
                     input("Press Enter to continue...")
                     continue
 
@@ -3543,12 +3537,12 @@ async def run_manage_mode(args):
                 # Reload global variables
                 load_versions_from_db()
 
-            print()
+            echo("", "white")
             input("Press Enter to continue...")
 
         elif choice == "10":
             # Mark branch as EOL
-            print()
+            echo("", "white")
             echo("Mark Branch as EOL", "bold")
             echo("-" * 60, "cyan")
 
@@ -3561,21 +3555,20 @@ async def run_manage_mode(args):
 
             if not release_branches:
                 echo("No release branches found", "yellow")
-                print()
+                echo("", "white")
                 input("Press Enter to continue...")
                 continue
 
-            print("Current release branches:")
+            echo("Current release branches:", "white")
             for branch, n_level, latest in release_branches:
-                print(f"  {branch} (n_level={n_level}, latest={latest})")
-            print()
-
+                echo(f"  {branch} (n_level={n_level}, latest={latest})", "white")
+            echo("", "white")
             branch = input(
                 "Enter branch to mark as EOL (or press Enter to cancel): "
             ).strip()
             if not branch:
                 echo("Operation cancelled", "yellow")
-                print()
+                echo("", "white")
                 input("Press Enter to continue...")
                 continue
 
@@ -3589,7 +3582,7 @@ async def run_manage_mode(args):
 
                 if not result:
                     echo(f"Branch {branch} not found", "yellow")
-                    print()
+                    echo("", "white")
                     input("Press Enter to continue...")
                     continue
 
@@ -3599,7 +3592,7 @@ async def run_manage_mode(args):
                     echo(
                         f"Branch {branch} is not a release (status={status})", "yellow"
                     )
-                    print()
+                    echo("", "white")
                     input("Press Enter to continue...")
                     continue
 
@@ -3615,12 +3608,12 @@ async def run_manage_mode(args):
                 # Reload global variables
                 load_versions_from_db()
 
-            print()
+            echo("", "white")
             input("Press Enter to continue...")
 
         elif choice == "11":
             # Reorder release branches
-            print()
+            echo("", "white")
             echo("Reorder Release Branches", "bold")
             echo("-" * 60, "cyan")
 
@@ -3633,15 +3626,14 @@ async def run_manage_mode(args):
 
             if not release_branches:
                 echo("No release branches found", "yellow")
-                print()
+                echo("", "white")
                 input("Press Enter to continue...")
                 continue
 
-            print("Current order (0 is latest stable):")
+            echo("Current order (0 is latest stable):", "white")
             for branch, n_level, latest in release_branches:
-                print(f"  {n_level}: {branch} ({latest})")
-            print()
-
+                echo(f"  {n_level}: {branch} ({latest})", "white")
+            echo("", "white")
             echo(
                 "Enter new order as comma-separated branches (e.g., 4.6,4.5,4.4)",
                 "cyan",
@@ -3650,7 +3642,7 @@ async def run_manage_mode(args):
 
             if not new_order:
                 echo("Operation cancelled", "yellow")
-                print()
+                echo("", "white")
                 input("Press Enter to continue...")
                 continue
 
@@ -3666,7 +3658,7 @@ async def run_manage_mode(args):
                 )
                 echo(f"Expected: {', '.join(sorted(current_branches))}", "yellow")
                 echo(f"Got: {', '.join(new_branches)}", "yellow")
-                print()
+                echo("", "white")
                 input("Press Enter to continue...")
                 continue
 
@@ -3687,14 +3679,13 @@ async def run_manage_mode(args):
                 )
                 new_release_branches = cur.fetchall()
 
-                print("\nNew order:")
+                echo("\nNew order:", "white")
                 for branch, n_level, latest in new_release_branches:
-                    print(f"  {n_level}: {branch} ({latest})")
-
+                    echo(f"  {n_level}: {branch} ({latest})", "white")
                 # Reload global variables
                 load_versions_from_db()
 
-            print()
+            echo("", "white")
             input("Press Enter to continue...")
 
         else:
@@ -4929,7 +4920,7 @@ def get_mastodon_domains():
         conn.commit()
         return value_to_return
     except Exception as e:
-        print(f"Failed to obtain total Mastodon domains: {e}")
+        echo(f"Failed to obtain total Mastodon domains: {e}", "white")
         conn.rollback()
     finally:
         cursor.close()
@@ -4949,7 +4940,7 @@ def get_unique_versions():
         conn.commit()
         return value_to_return
     except Exception as e:
-        print(f"Failed to obtain unique versions: {e}")
+        echo(f"Failed to obtain unique versions: {e}", "white")
         conn.rollback()
     finally:
         cursor.close()
@@ -4973,7 +4964,7 @@ def get_mau():
         conn.commit()
         return value_to_return
     except Exception as e:
-        print(f"Failed to obtain active users: {e}")
+        echo(f"Failed to obtain active users: {e}", "white")
         conn.rollback()
     finally:
         cursor.close()
@@ -5005,7 +4996,7 @@ def get_main_branch_instances():
         conn.commit()
         return value_to_return
     except Exception as e:
-        print(f"Failed to obtain total main instances: {e}")
+        echo(f"Failed to obtain total main instances: {e}", "white")
         conn.rollback()
     finally:
         cursor.close()
@@ -5032,7 +5023,7 @@ def get_latest_branch_instances():
         conn.commit()
         return value_to_return
     except Exception as e:
-        print(f"Failed to obtain total latest instances: {e}")
+        echo(f"Failed to obtain total latest instances: {e}", "white")
         conn.rollback()
     finally:
         cursor.close()
@@ -5059,7 +5050,7 @@ def get_previous_branch_instances():
         conn.commit()
         return value_to_return
     except Exception as e:
-        print(f"Failed to obtain total previous instances: {e}")
+        echo(f"Failed to obtain total previous instances: {e}", "white")
         conn.rollback()
     finally:
         cursor.close()
@@ -5089,7 +5080,7 @@ def get_deprecated_branch_instances():
         conn.commit()
         return value_to_return
     except Exception as e:
-        print(f"Failed to obtain total deprecated instances: {e}")
+        echo(f"Failed to obtain total deprecated instances: {e}", "white")
         conn.rollback()
     finally:
         cursor.close()
@@ -5118,7 +5109,7 @@ def get_eol_branch_instances():
         conn.commit()
         return value_to_return
     except Exception as e:
-        print(f"Failed to obtain total EOL instances: {e}")
+        echo(f"Failed to obtain total EOL instances: {e}", "white")
         conn.rollback()
     finally:
         cursor.close()
@@ -5150,7 +5141,7 @@ def get_main_patched_instances():
         conn.commit()
         return value_to_return
     except Exception as e:
-        print(f"Failed to obtain main patched instances: {e}")
+        echo(f"Failed to obtain main patched instances: {e}", "white")
         conn.rollback()
     finally:
         cursor.close()
@@ -5177,7 +5168,7 @@ def get_latest_patched_instances():
         conn.commit()
         return value_to_return
     except Exception as e:
-        print(f"Failed to obtain release patched instances: {e}")
+        echo(f"Failed to obtain release patched instances: {e}", "white")
         conn.rollback()
     finally:
         cursor.close()
@@ -5204,7 +5195,7 @@ def get_previous_patched_instances():
         conn.commit()
         return value_to_return
     except Exception as e:
-        print(f"Failed to obtain previous patched instances: {e}")
+        echo(f"Failed to obtain previous patched instances: {e}", "white")
         conn.rollback()
     finally:
         cursor.close()
@@ -5234,7 +5225,7 @@ def get_deprecated_patched_instances():
         conn.commit()
         return value_to_return
     except Exception as e:
-        print(f"Failed to obtain deprecated patched instances: {e}")
+        echo(f"Failed to obtain deprecated patched instances: {e}", "white")
         conn.rollback()
     finally:
         cursor.close()
@@ -5266,7 +5257,7 @@ def get_main_branch_mau():
         conn.commit()
         return value_to_return
     except Exception as e:
-        print(f"Failed to obtain active main instances users: {e}")
+        echo(f"Failed to obtain active main instances users: {e}", "white")
         conn.rollback()
     finally:
         cursor.close()
@@ -5293,7 +5284,7 @@ def get_latest_branch_mau():
         conn.commit()
         return value_to_return
     except Exception as e:
-        print(f"Failed to obtain active latest instances users: {e}")
+        echo(f"Failed to obtain active latest instances users: {e}", "white")
         conn.rollback()
     finally:
         cursor.close()
@@ -5320,7 +5311,7 @@ def get_previous_branch_mau():
         conn.commit()
         return value_to_return
     except Exception as e:
-        print(f"Failed to obtain active previous instances users: {e}")
+        echo(f"Failed to obtain active previous instances users: {e}", "white")
         conn.rollback()
     finally:
         cursor.close()
@@ -5350,7 +5341,7 @@ def get_deprecated_branch_mau():
         conn.commit()
         return value_to_return
     except Exception as e:
-        print(f"Failed to obtain active deprecated instances users: {e}")
+        echo(f"Failed to obtain active deprecated instances users: {e}", "white")
         conn.rollback()
     finally:
         cursor.close()
@@ -5379,7 +5370,7 @@ def get_eol_branch_mau():
         conn.commit()
         return value_to_return
     except Exception as e:
-        print(f"Failed to obtain active EOL instances users: {e}")
+        echo(f"Failed to obtain active EOL instances users: {e}", "white")
         conn.rollback()
     finally:
         cursor.close()
@@ -5411,7 +5402,7 @@ def get_main_patched_mau():
         conn.commit()
         return value_to_return
     except Exception as e:
-        print(f"Failed to obtain active main patched instances users: {e}")
+        echo(f"Failed to obtain active main patched instances users: {e}", "white")
         conn.rollback()
     finally:
         cursor.close()
@@ -5438,7 +5429,7 @@ def get_latest_patched_mau():
         conn.commit()
         return value_to_return
     except Exception as e:
-        print(f"Failed to obtain active release patched instances users: {e}")
+        echo(f"Failed to obtain active release patched instances users: {e}", "white")
         conn.rollback()
     finally:
         cursor.close()
@@ -5465,7 +5456,7 @@ def get_previous_patched_mau():
         conn.commit()
         return value_to_return
     except Exception as e:
-        print(f"Failed to obtain active previous patched instances users: {e}")
+        echo(f"Failed to obtain active previous patched instances users: {e}", "white")
         conn.rollback()
     finally:
         cursor.close()
@@ -5495,7 +5486,9 @@ def get_deprecated_patched_mau():
         conn.commit()
         return value_to_return
     except Exception as e:
-        print(f"Failed to obtain active deprecated patched instances users: {e}")
+        echo(
+            f"Failed to obtain active deprecated patched instances users: {e}", "white"
+        )
         conn.rollback()
     finally:
         cursor.close()
@@ -5663,7 +5656,7 @@ def write_statistics_to_database(stats_values):
             )
             conn.commit()
         except Exception as e:
-            print(f"Failed to insert/update statistics: {e}")
+            echo(f"Failed to insert/update statistics: {e}", "white")
             conn.rollback()
 
 
