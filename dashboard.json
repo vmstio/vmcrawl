@@ -3,19 +3,10 @@
   "kind": "DashboardWithAccessInfo",
   "metadata": {
     "name": "aedqo0q7klrswa",
-    "namespace": "stacks-1259573",
-    "uid": "652b1519-d415-470e-8296-7ebcdf7a925d",
-    "resourceVersion": "1771438438991573",
-    "generation": 125,
+    "generation": 130,
     "creationTimestamp": "2025-11-21T19:31:21Z",
     "labels": {},
-    "annotations": {
-      "grafana.app/createdBy": "user:fem23j76u5reoa",
-      "grafana.app/folder": "",
-      "grafana.app/saved-from-ui": "Grafana Cloud",
-      "grafana.app/updatedBy": "user:fem23j76u5reoa",
-      "grafana.app/updatedTimestamp": "2026-02-18T18:13:58Z"
-    }
+    "annotations": {}
   },
   "spec": {
     "annotations": [
@@ -28,9 +19,6 @@
           "iconColor": "rgba(0, 211, 255, 1)",
           "name": "Annotations & Alerts",
           "query": {
-            "datasource": {
-              "name": "-- Grafana --"
-            },
             "group": "grafana",
             "kind": "DataQuery",
             "spec": {},
@@ -55,9 +43,6 @@
                   "spec": {
                     "hidden": false,
                     "query": {
-                      "datasource": {
-                        "name": "df4ti9acrqsxsa"
-                      },
                       "group": "grafana-postgresql-datasource",
                       "kind": "DataQuery",
                       "spec": {
@@ -153,9 +138,6 @@
                   "spec": {
                     "hidden": false,
                     "query": {
-                      "datasource": {
-                        "name": "df4ti9acrqsxsa"
-                      },
                       "group": "grafana-postgresql-datasource",
                       "kind": "DataQuery",
                       "spec": {
@@ -252,9 +234,6 @@
                   "spec": {
                     "hidden": false,
                     "query": {
-                      "datasource": {
-                        "name": "df4ti9acrqsxsa"
-                      },
                       "group": "grafana-postgresql-datasource",
                       "kind": "DataQuery",
                       "spec": {
@@ -338,6 +317,101 @@
           }
         }
       },
+      "panel-109": {
+        "kind": "Panel",
+        "spec": {
+          "data": {
+            "kind": "QueryGroup",
+            "spec": {
+              "queries": [
+                {
+                  "kind": "PanelQuery",
+                  "spec": {
+                    "hidden": false,
+                    "query": {
+                      "group": "grafana-postgresql-datasource",
+                      "kind": "DataQuery",
+                      "spec": {
+                        "editorMode": "code",
+                        "format": "table",
+                        "rawQuery": true,
+                        "rawSql": "SELECT COUNT(DISTINCT domain) AS unique_domain_count\nFROM mastodon_domains;",
+                        "sql": {
+                          "columns": [
+                            {
+                              "parameters": [],
+                              "type": "function"
+                            }
+                          ],
+                          "groupBy": [
+                            {
+                              "property": {
+                                "type": "string"
+                              },
+                              "type": "groupBy"
+                            }
+                          ],
+                          "limit": 50
+                        }
+                      },
+                      "version": "v0"
+                    },
+                    "refId": "A"
+                  }
+                }
+              ],
+              "queryOptions": {},
+              "transformations": []
+            }
+          },
+          "description": "",
+          "id": 109,
+          "links": [],
+          "title": "Mastodon Instances",
+          "vizConfig": {
+            "group": "stat",
+            "kind": "VizConfig",
+            "spec": {
+              "fieldConfig": {
+                "defaults": {
+                  "color": {
+                    "mode": "thresholds"
+                  },
+                  "thresholds": {
+                    "mode": "absolute",
+                    "steps": [
+                      {
+                        "color": "purple",
+                        "value": 0
+                      }
+                    ]
+                  },
+                  "unit": "locale"
+                },
+                "overrides": []
+              },
+              "options": {
+                "colorMode": "value",
+                "graphMode": "area",
+                "justifyMode": "auto",
+                "orientation": "auto",
+                "percentChangeColorMode": "standard",
+                "reduceOptions": {
+                  "calcs": [
+                    "lastNotNull"
+                  ],
+                  "fields": "",
+                  "values": false
+                },
+                "showPercentChange": false,
+                "textMode": "auto",
+                "wideLayout": true
+              }
+            },
+            "version": "12.4.0-22066786794"
+          }
+        }
+      },
       "panel-11": {
         "kind": "Panel",
         "spec": {
@@ -350,9 +424,6 @@
                   "spec": {
                     "hidden": false,
                     "query": {
-                      "datasource": {
-                        "name": "df4ti9acrqsxsa"
-                      },
                       "group": "grafana-postgresql-datasource",
                       "kind": "DataQuery",
                       "spec": {
@@ -388,9 +459,6 @@
                   "spec": {
                     "hidden": false,
                     "query": {
-                      "datasource": {
-                        "name": "df4ti9acrqsxsa"
-                      },
                       "group": "grafana-postgresql-datasource",
                       "kind": "DataQuery",
                       "spec": {
@@ -447,10 +515,10 @@
               ]
             }
           },
-          "description": "Count of instances running latest patches for development branch (main), compared to the total instances on development branch.",
+          "description": "Count of instances running $main_latest off the main development branch ($main_branch) compared to the total instances on the main development branch.",
           "id": 11,
           "links": [],
-          "title": "Patched Instances, Main",
+          "title": "Patched Instances, Main ($main_branch)",
           "vizConfig": {
             "group": "gauge",
             "kind": "VizConfig",
@@ -484,7 +552,7 @@
                 "overrides": []
               },
               "options": {
-                "barShape": "flat",
+                "barShape": "rounded",
                 "barWidthFactor": 0.75,
                 "effects": {
                   "barGlow": false,
@@ -516,7 +584,7 @@
           }
         }
       },
-      "panel-12": {
+      "panel-110": {
         "kind": "Panel",
         "spec": {
           "data": {
@@ -528,16 +596,13 @@
                   "spec": {
                     "hidden": false,
                     "query": {
-                      "datasource": {
-                        "name": "df4ti9acrqsxsa"
-                      },
                       "group": "grafana-postgresql-datasource",
                       "kind": "DataQuery",
                       "spec": {
                         "editorMode": "code",
                         "format": "table",
                         "rawQuery": true,
-                        "rawSql": "SELECT \n    software_version AS \"Software Version\",\n    COUNT(*) AS \"Instances\"\nFROM mastodon_domains\nGROUP BY software_version\nORDER BY COUNT(*) DESC\nLIMIT 10;\n",
+                        "rawSql": "SELECT SUM(active_users_monthly) AS total_users FROM mastodon_domains;",
                         "sql": {
                           "columns": [
                             {
@@ -566,51 +631,25 @@
               "transformations": []
             }
           },
-          "description": "",
-          "id": 12,
+          "description": "Based on the total count of reported monthly active users (MAU) of all visible Mastodon instances.",
+          "id": 110,
           "links": [],
-          "title": "Top 10 Versions by Instance",
+          "title": "Mastodon Active Users (MAU)",
           "vizConfig": {
-            "group": "barchart",
+            "group": "stat",
             "kind": "VizConfig",
             "spec": {
               "fieldConfig": {
                 "defaults": {
                   "color": {
-                    "fixedColor": "purple",
-                    "mode": "fixed"
-                  },
-                  "custom": {
-                    "axisBorderShow": false,
-                    "axisCenteredZero": false,
-                    "axisColorMode": "text",
-                    "axisLabel": "",
-                    "axisPlacement": "auto",
-                    "fillOpacity": 80,
-                    "gradientMode": "none",
-                    "hideFrom": {
-                      "legend": false,
-                      "tooltip": false,
-                      "viz": false
-                    },
-                    "lineWidth": 1,
-                    "scaleDistribution": {
-                      "type": "linear"
-                    },
-                    "thresholdsStyle": {
-                      "mode": "off"
-                    }
+                    "mode": "thresholds"
                   },
                   "thresholds": {
                     "mode": "absolute",
                     "steps": [
                       {
-                        "color": "green",
+                        "color": "purple",
                         "value": 0
-                      },
-                      {
-                        "color": "red",
-                        "value": 80
                       }
                     ]
                   },
@@ -619,26 +658,212 @@
                 "overrides": []
               },
               "options": {
-                "barRadius": 0,
-                "barWidth": 0.97,
-                "fullHighlight": false,
-                "groupWidth": 0.7,
-                "legend": {
-                  "calcs": [],
-                  "displayMode": "list",
-                  "placement": "bottom",
-                  "showLegend": false
+                "colorMode": "value",
+                "graphMode": "area",
+                "justifyMode": "auto",
+                "orientation": "auto",
+                "percentChangeColorMode": "standard",
+                "reduceOptions": {
+                  "calcs": [
+                    "lastNotNull"
+                  ],
+                  "fields": "",
+                  "values": false
                 },
-                "orientation": "horizontal",
-                "showValue": "auto",
-                "stacking": "none",
-                "tooltip": {
-                  "hideZeros": false,
-                  "mode": "single",
-                  "sort": "none"
+                "showPercentChange": false,
+                "textMode": "auto",
+                "wideLayout": true
+              }
+            },
+            "version": "12.4.0-22066786794"
+          }
+        }
+      },
+      "panel-111": {
+        "kind": "Panel",
+        "spec": {
+          "data": {
+            "kind": "QueryGroup",
+            "spec": {
+              "queries": [
+                {
+                  "kind": "PanelQuery",
+                  "spec": {
+                    "hidden": false,
+                    "query": {
+                      "group": "grafana-postgresql-datasource",
+                      "kind": "DataQuery",
+                      "spec": {
+                        "editorMode": "code",
+                        "format": "table",
+                        "rawQuery": true,
+                        "rawSql": "WITH supported_branches AS (\n  SELECT DISTINCT branch\n  FROM release_versions\n  WHERE status IN ('release', 'main')\n),\neol_branches AS (\n  SELECT DISTINCT branch\n  FROM release_versions\n  WHERE status = 'eol'\n),\nagg AS (\n  SELECT\n    COUNT(DISTINCT md.domain) AS total_domains,\n    COALESCE(SUM(md.active_users_monthly), 0) AS total_users,\n\n    COUNT(DISTINCT md.domain) FILTER (\n      WHERE EXISTS (\n              SELECT 1\n              FROM eol_branches eb\n              WHERE md.software_version LIKE eb.branch || '.%'\n            )\n         OR NOT EXISTS (\n              SELECT 1\n              FROM supported_branches sb\n              WHERE md.software_version LIKE sb.branch || '.%'\n            )\n    ) AS unsupported_or_eol_domains,\n\n    COALESCE(SUM(md.active_users_monthly) FILTER (\n      WHERE EXISTS (\n              SELECT 1\n              FROM eol_branches eb\n              WHERE md.software_version LIKE eb.branch || '.%'\n            )\n         OR NOT EXISTS (\n              SELECT 1\n              FROM supported_branches sb\n              WHERE md.software_version LIKE sb.branch || '.%'\n            )\n    ), 0) AS unsupported_or_eol_users\n  FROM mastodon_domains md\n)\nSELECT\n  ((total_domains - unsupported_or_eol_domains) * 100.0 / NULLIF(total_domains, 0)) AS \"Instances\",\n  ((total_users   - unsupported_or_eol_users)   * 100.0 / NULLIF(total_users, 0))   AS \"MAU\"\nFROM agg;\n",
+                        "sql": {
+                          "columns": [
+                            {
+                              "parameters": [],
+                              "type": "function"
+                            }
+                          ],
+                          "groupBy": [
+                            {
+                              "property": {
+                                "type": "string"
+                              },
+                              "type": "groupBy"
+                            }
+                          ],
+                          "limit": 50
+                        }
+                      },
+                      "version": "v0"
+                    },
+                    "refId": "A"
+                  }
+                }
+              ],
+              "queryOptions": {},
+              "transformations": []
+            }
+          },
+          "description": "Instances running a supported branch with the latest patches applied.",
+          "id": 111,
+          "links": [],
+          "title": "Supported Branch",
+          "vizConfig": {
+            "group": "stat",
+            "kind": "VizConfig",
+            "spec": {
+              "fieldConfig": {
+                "defaults": {
+                  "color": {
+                    "mode": "thresholds"
+                  },
+                  "decimals": 1,
+                  "thresholds": {
+                    "mode": "absolute",
+                    "steps": [
+                      {
+                        "color": "purple",
+                        "value": 0
+                      }
+                    ]
+                  },
+                  "unit": "percent"
                 },
-                "xTickLabelRotation": 0,
-                "xTickLabelSpacing": 0
+                "overrides": []
+              },
+              "options": {
+                "colorMode": "value",
+                "graphMode": "area",
+                "justifyMode": "center",
+                "orientation": "auto",
+                "percentChangeColorMode": "standard",
+                "reduceOptions": {
+                  "calcs": [
+                    "lastNotNull"
+                  ],
+                  "fields": "",
+                  "values": false
+                },
+                "showPercentChange": false,
+                "textMode": "auto",
+                "wideLayout": true
+              }
+            },
+            "version": "12.4.0-22066786794"
+          }
+        }
+      },
+      "panel-112": {
+        "kind": "Panel",
+        "spec": {
+          "data": {
+            "kind": "QueryGroup",
+            "spec": {
+              "queries": [
+                {
+                  "kind": "PanelQuery",
+                  "spec": {
+                    "hidden": false,
+                    "query": {
+                      "group": "grafana-postgresql-datasource",
+                      "kind": "DataQuery",
+                      "spec": {
+                        "editorMode": "code",
+                        "format": "table",
+                        "rawQuery": true,
+                        "rawSql": "SELECT\n  COUNT(DISTINCT md.domain) FILTER (\n    WHERE md.\"timestamp\" <= NOW() - INTERVAL '1 hour'\n  ) AS \"1 Hour+\",\n  COUNT(DISTINCT md.domain) FILTER (\n    WHERE md.\"timestamp\" <= NOW() - INTERVAL '24 hours'\n  ) AS \"24 Hours+\",\n  COUNT(DISTINCT md.domain) FILTER (\n    WHERE md.\"timestamp\" <= NOW() - INTERVAL '48 hours'\n  ) AS \"48 Hours+\"\nFROM raw_domains rd\nINNER JOIN mastodon_domains md\n  ON rd.domain = md.domain\nWHERE rd.reason IS NOT NULL;",
+                        "sql": {
+                          "columns": [
+                            {
+                              "parameters": [],
+                              "type": "function"
+                            }
+                          ],
+                          "groupBy": [
+                            {
+                              "property": {
+                                "type": "string"
+                              },
+                              "type": "groupBy"
+                            }
+                          ],
+                          "limit": 50
+                        }
+                      },
+                      "version": "v0"
+                    },
+                    "refId": "A"
+                  }
+                }
+              ],
+              "queryOptions": {},
+              "transformations": []
+            }
+          },
+          "description": "Domains that returned an error on their last scan.",
+          "id": 112,
+          "links": [],
+          "title": "Instances w/ Stale Data",
+          "vizConfig": {
+            "group": "stat",
+            "kind": "VizConfig",
+            "spec": {
+              "fieldConfig": {
+                "defaults": {
+                  "color": {
+                    "mode": "thresholds"
+                  },
+                  "thresholds": {
+                    "mode": "absolute",
+                    "steps": [
+                      {
+                        "color": "text",
+                        "value": 0
+                      }
+                    ]
+                  },
+                  "unit": "locale"
+                },
+                "overrides": []
+              },
+              "options": {
+                "colorMode": "value",
+                "graphMode": "area",
+                "justifyMode": "center",
+                "orientation": "auto",
+                "percentChangeColorMode": "standard",
+                "reduceOptions": {
+                  "calcs": [
+                    "lastNotNull"
+                  ],
+                  "fields": "",
+                  "values": false
+                },
+                "showPercentChange": false,
+                "textMode": "auto",
+                "wideLayout": true
               }
             },
             "version": "12.4.0-22066786794"
@@ -657,9 +882,6 @@
                   "spec": {
                     "hidden": false,
                     "query": {
-                      "datasource": {
-                        "name": "df4ti9acrqsxsa"
-                      },
                       "group": "grafana-postgresql-datasource",
                       "kind": "DataQuery",
                       "spec": {
@@ -695,9 +917,6 @@
                   "spec": {
                     "hidden": false,
                     "query": {
-                      "datasource": {
-                        "name": "df4ti9acrqsxsa"
-                      },
                       "group": "grafana-postgresql-datasource",
                       "kind": "DataQuery",
                       "spec": {
@@ -749,10 +968,10 @@
               ]
             }
           },
-          "description": "Count of instances running latest patches for branch release-0 (latest), compared to the total instances on branch release-0.",
+          "description": "Count of instances running $latest_latest off the latest release branch ($latest_branch) compared to the total instances on the latest release branch.",
           "id": 21,
           "links": [],
-          "title": "Patched Instances, Latest",
+          "title": "Patched Instances, Latest ($latest_branch)",
           "vizConfig": {
             "group": "gauge",
             "kind": "VizConfig",
@@ -786,14 +1005,14 @@
                 "overrides": []
               },
               "options": {
-                "barShape": "flat",
+                "barShape": "rounded",
                 "barWidthFactor": 0.75,
                 "effects": {
                   "barGlow": false,
                   "centerGlow": false,
                   "gradient": false
                 },
-                "endpointMarker": "point",
+                "endpointMarker": "none",
                 "minVizHeight": 75,
                 "minVizWidth": 75,
                 "orientation": "auto",
@@ -830,9 +1049,6 @@
                   "spec": {
                     "hidden": false,
                     "query": {
-                      "datasource": {
-                        "name": "df4ti9acrqsxsa"
-                      },
                       "group": "grafana-postgresql-datasource",
                       "kind": "DataQuery",
                       "spec": {
@@ -868,9 +1084,6 @@
                   "spec": {
                     "hidden": false,
                     "query": {
-                      "datasource": {
-                        "name": "df4ti9acrqsxsa"
-                      },
                       "group": "grafana-postgresql-datasource",
                       "kind": "DataQuery",
                       "spec": {
@@ -922,10 +1135,10 @@
               ]
             }
           },
-          "description": "Count of instances running latest patches for branch release-1 (previous), compared to the total instances on branch release-1.",
+          "description": "Count of instances running $previous_latest off the latest release branch ($previous_branch) compared to the total instances on the previous release branch.",
           "id": 22,
           "links": [],
-          "title": "Patched Instances, Previous",
+          "title": "Patched Instances, Previous ($previous_branch)",
           "vizConfig": {
             "group": "gauge",
             "kind": "VizConfig",
@@ -959,14 +1172,14 @@
                 "overrides": []
               },
               "options": {
-                "barShape": "flat",
+                "barShape": "rounded",
                 "barWidthFactor": 0.75,
                 "effects": {
                   "barGlow": false,
                   "centerGlow": false,
                   "gradient": false
                 },
-                "endpointMarker": "point",
+                "endpointMarker": "none",
                 "minVizHeight": 75,
                 "minVizWidth": 75,
                 "orientation": "auto",
@@ -1003,9 +1216,6 @@
                   "spec": {
                     "hidden": false,
                     "query": {
-                      "datasource": {
-                        "name": "df4ti9acrqsxsa"
-                      },
                       "group": "grafana-postgresql-datasource",
                       "kind": "DataQuery",
                       "spec": {
@@ -1041,9 +1251,6 @@
                   "spec": {
                     "hidden": false,
                     "query": {
-                      "datasource": {
-                        "name": "df4ti9acrqsxsa"
-                      },
                       "group": "grafana-postgresql-datasource",
                       "kind": "DataQuery",
                       "spec": {
@@ -1100,10 +1307,10 @@
               ]
             }
           },
-          "description": "Count of monthly active users (MAUs) on instances running latest patches for development branch (main), compared to the total instances on development branch.",
+          "description": "Count of monthly active users (MAUs) on instances running $main_latest off the main development branch ($main_branch) compared to the total MAU on the main development branch.",
           "id": 32,
           "links": [],
-          "title": "Patched MAUs, Main",
+          "title": "Patched MAUs, Main ($main_branch)",
           "vizConfig": {
             "group": "gauge",
             "kind": "VizConfig",
@@ -1137,14 +1344,14 @@
                 "overrides": []
               },
               "options": {
-                "barShape": "flat",
+                "barShape": "rounded",
                 "barWidthFactor": 0.75,
                 "effects": {
                   "barGlow": false,
                   "centerGlow": false,
                   "gradient": false
                 },
-                "endpointMarker": "point",
+                "endpointMarker": "none",
                 "minVizHeight": 75,
                 "minVizWidth": 75,
                 "orientation": "auto",
@@ -1181,9 +1388,6 @@
                   "spec": {
                     "hidden": false,
                     "query": {
-                      "datasource": {
-                        "name": "df4ti9acrqsxsa"
-                      },
                       "group": "grafana-postgresql-datasource",
                       "kind": "DataQuery",
                       "spec": {
@@ -1219,9 +1423,6 @@
                   "spec": {
                     "hidden": false,
                     "query": {
-                      "datasource": {
-                        "name": "df4ti9acrqsxsa"
-                      },
                       "group": "grafana-postgresql-datasource",
                       "kind": "DataQuery",
                       "spec": {
@@ -1278,10 +1479,10 @@
               ]
             }
           },
-          "description": "Count of monthly active users (MAUs) on instances running latest patches for branch release-0 (latest), compared to the total instances on branch release-0.",
+          "description": "Count of monthly active users (MAUs) on instances running $latest_latest off the latest release branch ($latest_branch) compared to the total MAU on the latest release branch.",
           "id": 35,
           "links": [],
-          "title": "Patched MAUs, Latest",
+          "title": "Patched MAUs, Latest ($latest_branch)",
           "vizConfig": {
             "group": "gauge",
             "kind": "VizConfig",
@@ -1315,14 +1516,14 @@
                 "overrides": []
               },
               "options": {
-                "barShape": "flat",
+                "barShape": "rounded",
                 "barWidthFactor": 0.75,
                 "effects": {
                   "barGlow": false,
                   "centerGlow": false,
                   "gradient": false
                 },
-                "endpointMarker": "point",
+                "endpointMarker": "none",
                 "minVizHeight": 75,
                 "minVizWidth": 75,
                 "orientation": "auto",
@@ -1359,9 +1560,6 @@
                   "spec": {
                     "hidden": false,
                     "query": {
-                      "datasource": {
-                        "name": "df4ti9acrqsxsa"
-                      },
                       "group": "grafana-postgresql-datasource",
                       "kind": "DataQuery",
                       "spec": {
@@ -1397,9 +1595,6 @@
                   "spec": {
                     "hidden": false,
                     "query": {
-                      "datasource": {
-                        "name": "df4ti9acrqsxsa"
-                      },
                       "group": "grafana-postgresql-datasource",
                       "kind": "DataQuery",
                       "spec": {
@@ -1456,10 +1651,10 @@
               ]
             }
           },
-          "description": "Count of monthly active users (MAUs) on instances running latest patches for branch release-1 (previous), compared to the MAUs on branch release-1.",
+          "description": "Count of monthly active users (MAUs) on instances running $previous_latest off the latest release branch ($previous_branch) compared to the total MAU on the latest release branch.",
           "id": 36,
           "links": [],
-          "title": "Patched MAUs, Previous",
+          "title": "Patched MAUs, Previous ($previous_branch)",
           "vizConfig": {
             "group": "gauge",
             "kind": "VizConfig",
@@ -1493,14 +1688,14 @@
                 "overrides": []
               },
               "options": {
-                "barShape": "flat",
+                "barShape": "rounded",
                 "barWidthFactor": 0.75,
                 "effects": {
                   "barGlow": false,
                   "centerGlow": false,
                   "gradient": false
                 },
-                "endpointMarker": "point",
+                "endpointMarker": "none",
                 "minVizHeight": 75,
                 "minVizWidth": 75,
                 "orientation": "auto",
@@ -1537,9 +1732,6 @@
                   "spec": {
                     "hidden": false,
                     "query": {
-                      "datasource": {
-                        "name": "df4ti9acrqsxsa"
-                      },
                       "group": "grafana-postgresql-datasource",
                       "kind": "DataQuery",
                       "spec": {
@@ -1623,135 +1815,6 @@
           }
         }
       },
-      "panel-48": {
-        "kind": "Panel",
-        "spec": {
-          "data": {
-            "kind": "QueryGroup",
-            "spec": {
-              "queries": [
-                {
-                  "kind": "PanelQuery",
-                  "spec": {
-                    "hidden": false,
-                    "query": {
-                      "datasource": {
-                        "name": "df4ti9acrqsxsa"
-                      },
-                      "group": "grafana-postgresql-datasource",
-                      "kind": "DataQuery",
-                      "spec": {
-                        "editorMode": "code",
-                        "format": "table",
-                        "rawQuery": true,
-                        "rawSql": "SELECT \n    software_version AS \"Software Version\",\n    SUM(active_users_monthly) AS \"Monthly Active Users\"\nFROM mastodon_domains\nGROUP BY software_version\nORDER BY SUM(active_users_monthly) DESC\nLIMIT 10;\n",
-                        "sql": {
-                          "columns": [
-                            {
-                              "parameters": [],
-                              "type": "function"
-                            }
-                          ],
-                          "groupBy": [
-                            {
-                              "property": {
-                                "type": "string"
-                              },
-                              "type": "groupBy"
-                            }
-                          ],
-                          "limit": 50
-                        }
-                      },
-                      "version": "v0"
-                    },
-                    "refId": "A"
-                  }
-                }
-              ],
-              "queryOptions": {},
-              "transformations": []
-            }
-          },
-          "description": "",
-          "id": 48,
-          "links": [],
-          "title": "Top 10 Versions by MAUs",
-          "vizConfig": {
-            "group": "barchart",
-            "kind": "VizConfig",
-            "spec": {
-              "fieldConfig": {
-                "defaults": {
-                  "color": {
-                    "fixedColor": "purple",
-                    "mode": "fixed"
-                  },
-                  "custom": {
-                    "axisBorderShow": false,
-                    "axisCenteredZero": false,
-                    "axisColorMode": "text",
-                    "axisLabel": "",
-                    "axisPlacement": "auto",
-                    "fillOpacity": 80,
-                    "gradientMode": "none",
-                    "hideFrom": {
-                      "legend": false,
-                      "tooltip": false,
-                      "viz": false
-                    },
-                    "lineWidth": 1,
-                    "scaleDistribution": {
-                      "type": "linear"
-                    },
-                    "thresholdsStyle": {
-                      "mode": "off"
-                    }
-                  },
-                  "thresholds": {
-                    "mode": "absolute",
-                    "steps": [
-                      {
-                        "color": "green",
-                        "value": 0
-                      },
-                      {
-                        "color": "red",
-                        "value": 80
-                      }
-                    ]
-                  },
-                  "unit": "locale"
-                },
-                "overrides": []
-              },
-              "options": {
-                "barRadius": 0,
-                "barWidth": 0.97,
-                "fullHighlight": false,
-                "groupWidth": 0.7,
-                "legend": {
-                  "calcs": [],
-                  "displayMode": "list",
-                  "placement": "bottom",
-                  "showLegend": false
-                },
-                "orientation": "horizontal",
-                "showValue": "auto",
-                "stacking": "none",
-                "tooltip": {
-                  "hideZeros": false,
-                  "mode": "single",
-                  "sort": "none"
-                },
-                "xTickLabelRotation": 0,
-                "xTickLabelSpacing": 0
-              }
-            },
-            "version": "12.4.0-22066786794"
-          }
-        }
-      },
       "panel-5": {
         "kind": "Panel",
         "spec": {
@@ -1764,9 +1827,6 @@
                   "spec": {
                     "hidden": false,
                     "query": {
-                      "datasource": {
-                        "name": "df4ti9acrqsxsa"
-                      },
                       "group": "grafana-postgresql-datasource",
                       "kind": "DataQuery",
                       "spec": {
@@ -1901,9 +1961,6 @@
                   "spec": {
                     "hidden": false,
                     "query": {
-                      "datasource": {
-                        "name": "df4ti9acrqsxsa"
-                      },
                       "group": "grafana-postgresql-datasource",
                       "kind": "DataQuery",
                       "spec": {
@@ -2023,9 +2080,6 @@
                   "spec": {
                     "hidden": false,
                     "query": {
-                      "datasource": {
-                        "name": "df4ti9acrqsxsa"
-                      },
                       "group": "grafana-postgresql-datasource",
                       "kind": "DataQuery",
                       "spec": {
@@ -2145,9 +2199,6 @@
                   "spec": {
                     "hidden": false,
                     "query": {
-                      "datasource": {
-                        "name": "df4ti9acrqsxsa"
-                      },
                       "group": "grafana-postgresql-datasource",
                       "kind": "DataQuery",
                       "spec": {
@@ -2282,9 +2333,6 @@
                   "spec": {
                     "hidden": false,
                     "query": {
-                      "datasource": {
-                        "name": "df4ti9acrqsxsa"
-                      },
                       "group": "grafana-postgresql-datasource",
                       "kind": "DataQuery",
                       "spec": {
@@ -2387,9 +2435,6 @@
                   "spec": {
                     "hidden": false,
                     "query": {
-                      "datasource": {
-                        "name": "df4ti9acrqsxsa"
-                      },
                       "group": "grafana-postgresql-datasource",
                       "kind": "DataQuery",
                       "spec": {
@@ -2493,9 +2538,6 @@
                   "spec": {
                     "hidden": false,
                     "query": {
-                      "datasource": {
-                        "name": "df4ti9acrqsxsa"
-                      },
                       "group": "grafana-postgresql-datasource",
                       "kind": "DataQuery",
                       "spec": {
@@ -2531,9 +2573,6 @@
                   "spec": {
                     "hidden": false,
                     "query": {
-                      "datasource": {
-                        "name": "df4ti9acrqsxsa"
-                      },
                       "group": "grafana-postgresql-datasource",
                       "kind": "DataQuery",
                       "spec": {
@@ -2585,10 +2624,10 @@
               ]
             }
           },
-          "description": "Count of instances running latest patches for branch release-2 (deprecated) or older, compared to the instances on branch release-2 or older.",
+          "description": "Count of instances running $deprecated_latest off any deprecated release branches ($deprecated_branch) compared to the total instances on any deprecated release branches.",
           "id": 73,
           "links": [],
-          "title": "Patched Instances, Deprecated",
+          "title": "Patched Instances, Deprecated ($deprecated_branch)",
           "vizConfig": {
             "group": "gauge",
             "kind": "VizConfig",
@@ -2622,14 +2661,14 @@
                 "overrides": []
               },
               "options": {
-                "barShape": "flat",
+                "barShape": "rounded",
                 "barWidthFactor": 0.75,
                 "effects": {
                   "barGlow": false,
                   "centerGlow": false,
                   "gradient": false
                 },
-                "endpointMarker": "point",
+                "endpointMarker": "none",
                 "minVizHeight": 75,
                 "minVizWidth": 75,
                 "orientation": "auto",
@@ -2666,16 +2705,13 @@
                   "spec": {
                     "hidden": false,
                     "query": {
-                      "datasource": {
-                        "name": "df4ti9acrqsxsa"
-                      },
                       "group": "grafana-postgresql-datasource",
                       "kind": "DataQuery",
                       "spec": {
                         "editorMode": "code",
                         "format": "table",
                         "rawQuery": true,
-                        "rawSql": "SELECT SUM(active_users_monthly) as updated_users\nFROM mastodon_domains md\nWHERE md.software_version LIKE ANY (\n    SELECT latest || '%'\n    FROM release_versions \n    WHERE n_level >= 2\n);",
+                        "rawSql": "SELECT SUM(active_users_monthly) as updated_users\nFROM mastodon_domains md\nWHERE md.software_version LIKE ANY (\n    SELECT latest || '%'\n    FROM release_versions \n    WHERE n_level >= 2\n    AND status != 'eol'\n);",
                         "sql": {
                           "columns": [
                             {
@@ -2704,16 +2740,13 @@
                   "spec": {
                     "hidden": false,
                     "query": {
-                      "datasource": {
-                        "name": "df4ti9acrqsxsa"
-                      },
                       "group": "grafana-postgresql-datasource",
                       "kind": "DataQuery",
                       "spec": {
                         "editorMode": "code",
                         "format": "table",
                         "rawQuery": true,
-                        "rawSql": "SELECT SUM(active_users_monthly) as \"Main Total\"\nFROM mastodon_domains\nWHERE software_version LIKE ANY (\nSELECT branch || '.%'\nFROM release_versions\nWHERE n_level >= 1\n);",
+                        "rawSql": "SELECT SUM(active_users_monthly) as \"Main Total\"\nFROM mastodon_domains\nWHERE software_version LIKE ANY (\nSELECT branch || '.%'\nFROM release_versions\nWHERE n_level >= 1\nAND status != 'eol'\n);",
                         "sql": {
                           "columns": [
                             {
@@ -2763,10 +2796,10 @@
               ]
             }
           },
-          "description": "Count of monthly active users (MAUs) on  instances running latest patches for branch release-2 (deprecated) or older, compared to the MAUs on branch release-2 or older.",
+          "description": "Count of monthly active users (MAUs) on instances running $deprecated_latest off any deprecated release branches ($deprecated_branch) compared to the total MAU on any deprecated release branches.",
           "id": 74,
           "links": [],
-          "title": "Patched MAUs, Deprecated",
+          "title": "Patched MAUs, Deprecated ($deprecated_branch)",
           "vizConfig": {
             "group": "gauge",
             "kind": "VizConfig",
@@ -2800,14 +2833,14 @@
                 "overrides": []
               },
               "options": {
-                "barShape": "flat",
+                "barShape": "rounded",
                 "barWidthFactor": 0.75,
                 "effects": {
                   "barGlow": false,
                   "centerGlow": false,
                   "gradient": false
                 },
-                "endpointMarker": "point",
+                "endpointMarker": "none",
                 "minVizHeight": 75,
                 "minVizWidth": 75,
                 "orientation": "auto",
@@ -2844,9 +2877,6 @@
                   "spec": {
                     "hidden": false,
                     "query": {
-                      "datasource": {
-                        "name": "df4ti9acrqsxsa"
-                      },
                       "group": "grafana-postgresql-datasource",
                       "kind": "DataQuery",
                       "spec": {
@@ -2982,9 +3012,6 @@
                   "spec": {
                     "hidden": false,
                     "query": {
-                      "datasource": {
-                        "name": "df4ti9acrqsxsa"
-                      },
                       "group": "grafana-postgresql-datasource",
                       "kind": "DataQuery",
                       "spec": {
@@ -3107,7 +3134,7 @@
                 "overrides": []
               },
               "options": {
-                "barRadius": 0,
+                "barRadius": 0.1,
                 "barWidth": 0.97,
                 "fullHighlight": false,
                 "groupWidth": 0.7,
@@ -3146,9 +3173,6 @@
                   "spec": {
                     "hidden": false,
                     "query": {
-                      "datasource": {
-                        "name": "df4ti9acrqsxsa"
-                      },
                       "group": "grafana-postgresql-datasource",
                       "kind": "DataQuery",
                       "spec": {
@@ -3270,7 +3294,7 @@
                 "overrides": []
               },
               "options": {
-                "barRadius": 0,
+                "barRadius": 0.1,
                 "barWidth": 0.97,
                 "fullHighlight": false,
                 "groupWidth": 0.7,
@@ -3309,9 +3333,6 @@
                   "spec": {
                     "hidden": false,
                     "query": {
-                      "datasource": {
-                        "name": "df4ti9acrqsxsa"
-                      },
                       "group": "grafana-postgresql-datasource",
                       "kind": "DataQuery",
                       "spec": {
@@ -3433,7 +3454,7 @@
                 "overrides": []
               },
               "options": {
-                "barRadius": 0,
+                "barRadius": 0.1,
                 "barWidth": 0.97,
                 "fullHighlight": false,
                 "groupWidth": 0.7,
@@ -3472,9 +3493,6 @@
                   "spec": {
                     "hidden": false,
                     "query": {
-                      "datasource": {
-                        "name": "df4ti9acrqsxsa"
-                      },
                       "group": "grafana-postgresql-datasource",
                       "kind": "DataQuery",
                       "spec": {
@@ -3596,7 +3614,7 @@
                 "overrides": []
               },
               "options": {
-                "barRadius": 0,
+                "barRadius": 0.1,
                 "barWidth": 0.97,
                 "fullHighlight": false,
                 "groupWidth": 0.7,
@@ -3635,9 +3653,6 @@
                   "spec": {
                     "hidden": false,
                     "query": {
-                      "datasource": {
-                        "name": "df4ti9acrqsxsa"
-                      },
                       "group": "grafana-postgresql-datasource",
                       "kind": "DataQuery",
                       "spec": {
@@ -3847,9 +3862,6 @@
                   "spec": {
                     "hidden": false,
                     "query": {
-                      "datasource": {
-                        "name": "df4ti9acrqsxsa"
-                      },
                       "group": "grafana-postgresql-datasource",
                       "kind": "DataQuery",
                       "spec": {
@@ -4049,13 +4061,12 @@
       }
     },
     "layout": {
-      "kind": "RowsLayout",
+      "kind": "TabsLayout",
       "spec": {
-        "rows": [
+        "tabs": [
           {
-            "kind": "RowsLayoutRow",
+            "kind": "TabsLayoutTab",
             "spec": {
-              "collapse": false,
               "layout": {
                 "kind": "GridLayout",
                 "spec": {
@@ -4111,21 +4122,7 @@
                         "x": 18,
                         "y": 0
                       }
-                    }
-                  ]
-                }
-              },
-              "title": "Big Numbers"
-            }
-          },
-          {
-            "kind": "RowsLayoutRow",
-            "spec": {
-              "collapse": false,
-              "layout": {
-                "kind": "GridLayout",
-                "spec": {
-                  "items": [
+                    },
                     {
                       "kind": "GridLayoutItem",
                       "spec": {
@@ -4136,7 +4133,7 @@
                         "height": 7,
                         "width": 6,
                         "x": 0,
-                        "y": 0
+                        "y": 4
                       }
                     },
                     {
@@ -4149,7 +4146,7 @@
                         "height": 7,
                         "width": 6,
                         "x": 6,
-                        "y": 0
+                        "y": 4
                       }
                     },
                     {
@@ -4162,7 +4159,7 @@
                         "height": 7,
                         "width": 6,
                         "x": 12,
-                        "y": 0
+                        "y": 4
                       }
                     },
                     {
@@ -4175,7 +4172,7 @@
                         "height": 7,
                         "width": 6,
                         "x": 18,
-                        "y": 0
+                        "y": 4
                       }
                     },
                     {
@@ -4188,7 +4185,7 @@
                         "height": 7,
                         "width": 6,
                         "x": 0,
-                        "y": 7
+                        "y": 11
                       }
                     },
                     {
@@ -4201,7 +4198,7 @@
                         "height": 7,
                         "width": 6,
                         "x": 6,
-                        "y": 7
+                        "y": 11
                       }
                     },
                     {
@@ -4214,7 +4211,7 @@
                         "height": 7,
                         "width": 6,
                         "x": 12,
-                        "y": 7
+                        "y": 11
                       }
                     },
                     {
@@ -4227,23 +4224,9 @@
                         "height": 7,
                         "width": 6,
                         "x": 18,
-                        "y": 7
+                        "y": 11
                       }
-                    }
-                  ]
-                }
-              },
-              "title": "Patch Adoption"
-            }
-          },
-          {
-            "kind": "RowsLayoutRow",
-            "spec": {
-              "collapse": false,
-              "layout": {
-                "kind": "GridLayout",
-                "spec": {
-                  "items": [
+                    },
                     {
                       "kind": "GridLayoutItem",
                       "spec": {
@@ -4254,7 +4237,7 @@
                         "height": 18,
                         "width": 12,
                         "x": 0,
-                        "y": 0
+                        "y": 18
                       }
                     },
                     {
@@ -4267,7 +4250,124 @@
                         "height": 18,
                         "width": 12,
                         "x": 12,
+                        "y": 18
+                      }
+                    },
+                    {
+                      "kind": "GridLayoutItem",
+                      "spec": {
+                        "element": {
+                          "kind": "ElementReference",
+                          "name": "panel-88"
+                        },
+                        "height": 8,
+                        "width": 12,
+                        "x": 0,
+                        "y": 36
+                      }
+                    },
+                    {
+                      "kind": "GridLayoutItem",
+                      "spec": {
+                        "element": {
+                          "kind": "ElementReference",
+                          "name": "panel-89"
+                        },
+                        "height": 8,
+                        "width": 12,
+                        "x": 12,
+                        "y": 36
+                      }
+                    }
+                  ]
+                }
+              },
+              "title": "Patch Adoption"
+            }
+          },
+          {
+            "kind": "TabsLayoutTab",
+            "spec": {
+              "layout": {
+                "kind": "GridLayout",
+                "spec": {
+                  "items": [
+                    {
+                      "kind": "GridLayoutItem",
+                      "spec": {
+                        "element": {
+                          "kind": "ElementReference",
+                          "name": "panel-109"
+                        },
+                        "height": 4,
+                        "width": 6,
+                        "x": 0,
                         "y": 0
+                      }
+                    },
+                    {
+                      "kind": "GridLayoutItem",
+                      "spec": {
+                        "element": {
+                          "kind": "ElementReference",
+                          "name": "panel-110"
+                        },
+                        "height": 4,
+                        "width": 6,
+                        "x": 6,
+                        "y": 0
+                      }
+                    },
+                    {
+                      "kind": "GridLayoutItem",
+                      "spec": {
+                        "element": {
+                          "kind": "ElementReference",
+                          "name": "panel-111"
+                        },
+                        "height": 4,
+                        "width": 6,
+                        "x": 12,
+                        "y": 0
+                      }
+                    },
+                    {
+                      "kind": "GridLayoutItem",
+                      "spec": {
+                        "element": {
+                          "kind": "ElementReference",
+                          "name": "panel-112"
+                        },
+                        "height": 4,
+                        "width": 6,
+                        "x": 18,
+                        "y": 0
+                      }
+                    },
+                    {
+                      "kind": "GridLayoutItem",
+                      "spec": {
+                        "element": {
+                          "kind": "ElementReference",
+                          "name": "panel-70"
+                        },
+                        "height": 7,
+                        "width": 24,
+                        "x": 0,
+                        "y": 4
+                      }
+                    },
+                    {
+                      "kind": "GridLayoutItem",
+                      "spec": {
+                        "element": {
+                          "kind": "ElementReference",
+                          "name": "panel-71"
+                        },
+                        "height": 7,
+                        "width": 24,
+                        "x": 0,
+                        "y": 11
                       }
                     },
                     {
@@ -4321,21 +4421,7 @@
                         "x": 12,
                         "y": 36
                       }
-                    }
-                  ]
-                }
-              },
-              "title": "Adoption Donuts"
-            }
-          },
-          {
-            "kind": "RowsLayoutRow",
-            "spec": {
-              "collapse": false,
-              "layout": {
-                "kind": "GridLayout",
-                "spec": {
-                  "items": [
+                    },
                     {
                       "kind": "GridLayoutItem",
                       "spec": {
@@ -4346,7 +4432,7 @@
                         "height": 8,
                         "width": 12,
                         "x": 0,
-                        "y": 0
+                        "y": 54
                       }
                     },
                     {
@@ -4359,73 +4445,7 @@
                         "height": 8,
                         "width": 12,
                         "x": 12,
-                        "y": 0
-                      }
-                    },
-                    {
-                      "kind": "GridLayoutItem",
-                      "spec": {
-                        "element": {
-                          "kind": "ElementReference",
-                          "name": "panel-88"
-                        },
-                        "height": 8,
-                        "width": 12,
-                        "x": 0,
-                        "y": 8
-                      }
-                    },
-                    {
-                      "kind": "GridLayoutItem",
-                      "spec": {
-                        "element": {
-                          "kind": "ElementReference",
-                          "name": "panel-89"
-                        },
-                        "height": 8,
-                        "width": 12,
-                        "x": 12,
-                        "y": 8
-                      }
-                    }
-                  ]
-                }
-              },
-              "title": "Trend"
-            }
-          },
-          {
-            "kind": "RowsLayoutRow",
-            "spec": {
-              "collapse": false,
-              "layout": {
-                "kind": "GridLayout",
-                "spec": {
-                  "items": [
-                    {
-                      "kind": "GridLayoutItem",
-                      "spec": {
-                        "element": {
-                          "kind": "ElementReference",
-                          "name": "panel-70"
-                        },
-                        "height": 7,
-                        "width": 24,
-                        "x": 0,
-                        "y": 0
-                      }
-                    },
-                    {
-                      "kind": "GridLayoutItem",
-                      "spec": {
-                        "element": {
-                          "kind": "ElementReference",
-                          "name": "panel-71"
-                        },
-                        "height": 7,
-                        "width": 24,
-                        "x": 0,
-                        "y": 7
+                        "y": 54
                       }
                     }
                   ]
@@ -4435,49 +4455,8 @@
             }
           },
           {
-            "kind": "RowsLayoutRow",
+            "kind": "TabsLayoutTab",
             "spec": {
-              "collapse": false,
-              "layout": {
-                "kind": "GridLayout",
-                "spec": {
-                  "items": [
-                    {
-                      "kind": "GridLayoutItem",
-                      "spec": {
-                        "element": {
-                          "kind": "ElementReference",
-                          "name": "panel-12"
-                        },
-                        "height": 12,
-                        "width": 12,
-                        "x": 0,
-                        "y": 0
-                      }
-                    },
-                    {
-                      "kind": "GridLayoutItem",
-                      "spec": {
-                        "element": {
-                          "kind": "ElementReference",
-                          "name": "panel-48"
-                        },
-                        "height": 12,
-                        "width": 12,
-                        "x": 12,
-                        "y": 0
-                      }
-                    }
-                  ]
-                }
-              },
-              "title": "Top 10 Lists"
-            }
-          },
-          {
-            "kind": "RowsLayoutRow",
-            "spec": {
-              "collapse": false,
               "layout": {
                 "kind": "GridLayout",
                 "spec": {
@@ -4566,7 +4545,432 @@
       "to": "now"
     },
     "title": "vmcrawl",
-    "variables": []
+    "variables": [
+      {
+        "kind": "QueryVariable",
+        "spec": {
+          "allowCustomValue": true,
+          "current": {
+            "text": "",
+            "value": ""
+          },
+          "definition": "SELECT branch\nFROM release_versions\nWHERE n_level = -1;",
+          "hide": "hideVariable",
+          "includeAll": false,
+          "multi": false,
+          "name": "main_branch",
+          "options": [],
+          "query": {
+            "group": "grafana-postgresql-datasource",
+            "kind": "DataQuery",
+            "spec": {
+              "dataset": "vmcrawl",
+              "editorMode": "code",
+              "format": "table",
+              "query": "SELECT branch\nFROM release_versions\nWHERE n_level = -1;",
+              "rawQuery": true,
+              "rawSql": "SELECT branch\nFROM release_versions\nWHERE n_level = -1;",
+              "refId": "SQLVariableQueryEditor-VariableQuery",
+              "sql": {
+                "columns": [
+                  {
+                    "parameters": [],
+                    "type": "function"
+                  }
+                ],
+                "groupBy": [
+                  {
+                    "property": {
+                      "type": "string"
+                    },
+                    "type": "groupBy"
+                  }
+                ],
+                "limit": 50
+              },
+              "table": "release_versions"
+            },
+            "version": "v0"
+          },
+          "refresh": "onDashboardLoad",
+          "regex": "",
+          "regexApplyTo": "value",
+          "skipUrlSync": false,
+          "sort": "disabled"
+        }
+      },
+      {
+        "kind": "QueryVariable",
+        "spec": {
+          "allowCustomValue": true,
+          "current": {
+            "text": "",
+            "value": ""
+          },
+          "definition": "SELECT latest\nFROM release_versions\nWHERE n_level = -1;",
+          "hide": "hideVariable",
+          "includeAll": false,
+          "multi": false,
+          "name": "main_latest",
+          "options": [],
+          "query": {
+            "group": "grafana-postgresql-datasource",
+            "kind": "DataQuery",
+            "spec": {
+              "dataset": "vmcrawl",
+              "editorMode": "code",
+              "format": "table",
+              "query": "SELECT latest\nFROM release_versions\nWHERE n_level = -1;",
+              "rawQuery": true,
+              "rawSql": "SELECT latest\nFROM release_versions\nWHERE n_level = -1;",
+              "refId": "SQLVariableQueryEditor-VariableQuery",
+              "sql": {
+                "columns": [
+                  {
+                    "parameters": [],
+                    "type": "function"
+                  }
+                ],
+                "groupBy": [
+                  {
+                    "property": {
+                      "type": "string"
+                    },
+                    "type": "groupBy"
+                  }
+                ],
+                "limit": 50
+              },
+              "table": "release_versions"
+            },
+            "version": "v0"
+          },
+          "refresh": "onDashboardLoad",
+          "regex": "",
+          "regexApplyTo": "value",
+          "skipUrlSync": false,
+          "sort": "disabled"
+        }
+      },
+      {
+        "kind": "QueryVariable",
+        "spec": {
+          "allowCustomValue": true,
+          "current": {
+            "text": "",
+            "value": ""
+          },
+          "definition": "SELECT latest\nFROM release_versions\nWHERE n_level = 0;",
+          "hide": "hideVariable",
+          "includeAll": false,
+          "multi": false,
+          "name": "latest_latest",
+          "options": [],
+          "query": {
+            "group": "grafana-postgresql-datasource",
+            "kind": "DataQuery",
+            "spec": {
+              "dataset": "vmcrawl",
+              "editorMode": "code",
+              "format": "table",
+              "query": "SELECT latest\nFROM release_versions\nWHERE n_level = 0;",
+              "rawQuery": true,
+              "rawSql": "SELECT latest\nFROM release_versions\nWHERE n_level = 0;",
+              "refId": "SQLVariableQueryEditor-VariableQuery",
+              "sql": {
+                "columns": [
+                  {
+                    "parameters": [],
+                    "type": "function"
+                  }
+                ],
+                "groupBy": [
+                  {
+                    "property": {
+                      "type": "string"
+                    },
+                    "type": "groupBy"
+                  }
+                ],
+                "limit": 50
+              },
+              "table": "release_versions"
+            },
+            "version": "v0"
+          },
+          "refresh": "onDashboardLoad",
+          "regex": "",
+          "regexApplyTo": "value",
+          "skipUrlSync": false,
+          "sort": "disabled"
+        }
+      },
+      {
+        "kind": "QueryVariable",
+        "spec": {
+          "allowCustomValue": true,
+          "current": {
+            "text": "",
+            "value": ""
+          },
+          "definition": "SELECT branch\nFROM release_versions\nWHERE n_level = 0;",
+          "hide": "hideVariable",
+          "includeAll": false,
+          "multi": false,
+          "name": "latest_branch",
+          "options": [],
+          "query": {
+            "group": "grafana-postgresql-datasource",
+            "kind": "DataQuery",
+            "spec": {
+              "dataset": "vmcrawl",
+              "editorMode": "code",
+              "format": "table",
+              "query": "SELECT branch\nFROM release_versions\nWHERE n_level = 0;",
+              "rawQuery": true,
+              "rawSql": "SELECT branch\nFROM release_versions\nWHERE n_level = 0;",
+              "refId": "SQLVariableQueryEditor-VariableQuery",
+              "sql": {
+                "columns": [
+                  {
+                    "parameters": [],
+                    "type": "function"
+                  }
+                ],
+                "groupBy": [
+                  {
+                    "property": {
+                      "type": "string"
+                    },
+                    "type": "groupBy"
+                  }
+                ],
+                "limit": 50
+              },
+              "table": "release_versions"
+            },
+            "version": "v0"
+          },
+          "refresh": "onDashboardLoad",
+          "regex": "",
+          "regexApplyTo": "value",
+          "skipUrlSync": false,
+          "sort": "disabled"
+        }
+      },
+      {
+        "kind": "QueryVariable",
+        "spec": {
+          "allowCustomValue": true,
+          "current": {
+            "text": "",
+            "value": ""
+          },
+          "definition": "SELECT latest\nFROM release_versions\nWHERE n_level = 1;",
+          "hide": "hideVariable",
+          "includeAll": false,
+          "multi": false,
+          "name": "previous_latest",
+          "options": [],
+          "query": {
+            "group": "grafana-postgresql-datasource",
+            "kind": "DataQuery",
+            "spec": {
+              "dataset": "vmcrawl",
+              "editorMode": "code",
+              "format": "table",
+              "query": "SELECT latest\nFROM release_versions\nWHERE n_level = 1;",
+              "rawQuery": true,
+              "rawSql": "SELECT latest\nFROM release_versions\nWHERE n_level = 1;",
+              "refId": "SQLVariableQueryEditor-VariableQuery",
+              "sql": {
+                "columns": [
+                  {
+                    "parameters": [],
+                    "type": "function"
+                  }
+                ],
+                "groupBy": [
+                  {
+                    "property": {
+                      "type": "string"
+                    },
+                    "type": "groupBy"
+                  }
+                ],
+                "limit": 50
+              },
+              "table": "release_versions"
+            },
+            "version": "v0"
+          },
+          "refresh": "onDashboardLoad",
+          "regex": "",
+          "regexApplyTo": "value",
+          "skipUrlSync": false,
+          "sort": "disabled"
+        }
+      },
+      {
+        "kind": "QueryVariable",
+        "spec": {
+          "allowCustomValue": true,
+          "current": {
+            "text": "",
+            "value": ""
+          },
+          "definition": "SELECT latest\nFROM release_versions\nWHERE n_level = 2;",
+          "hide": "hideVariable",
+          "includeAll": false,
+          "multi": false,
+          "name": "deprecated_latest",
+          "options": [],
+          "query": {
+            "group": "grafana-postgresql-datasource",
+            "kind": "DataQuery",
+            "spec": {
+              "dataset": "vmcrawl",
+              "editorMode": "code",
+              "format": "table",
+              "query": "SELECT latest\nFROM release_versions\nWHERE n_level = 2;",
+              "rawQuery": true,
+              "rawSql": "SELECT latest\nFROM release_versions\nWHERE n_level = 2;",
+              "refId": "SQLVariableQueryEditor-VariableQuery",
+              "sql": {
+                "columns": [
+                  {
+                    "parameters": [],
+                    "type": "function"
+                  }
+                ],
+                "groupBy": [
+                  {
+                    "property": {
+                      "type": "string"
+                    },
+                    "type": "groupBy"
+                  }
+                ],
+                "limit": 50
+              },
+              "table": "release_versions"
+            },
+            "version": "v0"
+          },
+          "refresh": "onDashboardLoad",
+          "regex": "",
+          "regexApplyTo": "value",
+          "skipUrlSync": false,
+          "sort": "disabled"
+        }
+      },
+      {
+        "kind": "QueryVariable",
+        "spec": {
+          "allowCustomValue": true,
+          "current": {
+            "text": "",
+            "value": ""
+          },
+          "definition": "SELECT branch\nFROM release_versions\nWHERE n_level = 1;",
+          "hide": "hideVariable",
+          "includeAll": false,
+          "multi": false,
+          "name": "previous_branch",
+          "options": [],
+          "query": {
+            "group": "grafana-postgresql-datasource",
+            "kind": "DataQuery",
+            "spec": {
+              "dataset": "vmcrawl",
+              "editorMode": "code",
+              "format": "table",
+              "query": "SELECT branch\nFROM release_versions\nWHERE n_level = 1;",
+              "rawQuery": true,
+              "rawSql": "SELECT branch\nFROM release_versions\nWHERE n_level = 1;",
+              "refId": "SQLVariableQueryEditor-VariableQuery",
+              "sql": {
+                "columns": [
+                  {
+                    "parameters": [],
+                    "type": "function"
+                  }
+                ],
+                "groupBy": [
+                  {
+                    "property": {
+                      "type": "string"
+                    },
+                    "type": "groupBy"
+                  }
+                ],
+                "limit": 50
+              },
+              "table": "release_versions"
+            },
+            "version": "v0"
+          },
+          "refresh": "onDashboardLoad",
+          "regex": "",
+          "regexApplyTo": "value",
+          "skipUrlSync": false,
+          "sort": "disabled"
+        }
+      },
+      {
+        "kind": "QueryVariable",
+        "spec": {
+          "allowCustomValue": true,
+          "current": {
+            "text": "",
+            "value": ""
+          },
+          "definition": "SELECT branch\nFROM release_versions\nWHERE n_level = 2;",
+          "hide": "hideVariable",
+          "includeAll": false,
+          "multi": false,
+          "name": "deprecated_branch",
+          "options": [],
+          "query": {
+            "group": "grafana-postgresql-datasource",
+            "kind": "DataQuery",
+            "spec": {
+              "dataset": "vmcrawl",
+              "editorMode": "code",
+              "format": "table",
+              "query": "SELECT branch\nFROM release_versions\nWHERE n_level = 2;",
+              "rawQuery": true,
+              "rawSql": "SELECT branch\nFROM release_versions\nWHERE n_level = 2;",
+              "refId": "SQLVariableQueryEditor-VariableQuery",
+              "sql": {
+                "columns": [
+                  {
+                    "parameters": [],
+                    "type": "function"
+                  }
+                ],
+                "groupBy": [
+                  {
+                    "property": {
+                      "type": "string"
+                    },
+                    "type": "groupBy"
+                  }
+                ],
+                "limit": 50
+              },
+              "table": "release_versions"
+            },
+            "version": "v0"
+          },
+          "refresh": "onDashboardLoad",
+          "regex": "",
+          "regexApplyTo": "value",
+          "skipUrlSync": false,
+          "sort": "disabled"
+        }
+      }
+    ]
   },
   "status": {}
 }
