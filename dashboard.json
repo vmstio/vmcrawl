@@ -3,7 +3,7 @@
   "kind": "DashboardWithAccessInfo",
   "metadata": {
     "name": "aedqo0q7klrswa",
-    "generation": 130,
+    "generation": 138,
     "creationTimestamp": "2025-11-21T19:31:21Z",
     "labels": {},
     "annotations": {}
@@ -173,7 +173,7 @@
               "transformations": []
             }
           },
-          "description": "Instances running a supported branch with the latest patches applied.",
+          "description": "Instances and monthly active user (MAU) count from instances deploying the latest patch versions (${supported_patches:csv})",
           "id": 101,
           "links": [],
           "title": "Patch Coverage",
@@ -222,7 +222,7 @@
           }
         }
       },
-      "panel-108": {
+      "panel-102": {
         "kind": "Panel",
         "spec": {
           "data": {
@@ -240,7 +240,7 @@
                         "editorMode": "code",
                         "format": "table",
                         "rawQuery": true,
-                        "rawSql": "SELECT\n  COUNT(DISTINCT md.domain) FILTER (\n    WHERE md.\"timestamp\" <= NOW() - INTERVAL '1 hour'\n  ) AS \"1 Hour+\",\n  COUNT(DISTINCT md.domain) FILTER (\n    WHERE md.\"timestamp\" <= NOW() - INTERVAL '24 hours'\n  ) AS \"24 Hours+\",\n  COUNT(DISTINCT md.domain) FILTER (\n    WHERE md.\"timestamp\" <= NOW() - INTERVAL '48 hours'\n  ) AS \"48 Hours+\"\nFROM raw_domains rd\nINNER JOIN mastodon_domains md\n  ON rd.domain = md.domain\nWHERE rd.reason IS NOT NULL;",
+                        "rawSql": "WITH supported_branches AS (\n  SELECT DISTINCT branch\n  FROM release_versions\n  WHERE status IN ('release', 'main')\n),\neol_branches AS (\n  SELECT DISTINCT branch\n  FROM release_versions\n  WHERE status = 'eol'\n),\nagg AS (\n  SELECT\n    COUNT(DISTINCT md.domain) AS total_domains,\n    COALESCE(SUM(md.active_users_monthly), 0) AS total_users,\n\n    COUNT(DISTINCT md.domain) FILTER (\n      WHERE EXISTS (\n              SELECT 1\n              FROM eol_branches eb\n              WHERE md.software_version LIKE eb.branch || '.%'\n            )\n         OR NOT EXISTS (\n              SELECT 1\n              FROM supported_branches sb\n              WHERE md.software_version LIKE sb.branch || '.%'\n            )\n    ) AS unsupported_or_eol_domains,\n\n    COALESCE(SUM(md.active_users_monthly) FILTER (\n      WHERE EXISTS (\n              SELECT 1\n              FROM eol_branches eb\n              WHERE md.software_version LIKE eb.branch || '.%'\n            )\n         OR NOT EXISTS (\n              SELECT 1\n              FROM supported_branches sb\n              WHERE md.software_version LIKE sb.branch || '.%'\n            )\n    ), 0) AS unsupported_or_eol_users\n  FROM mastodon_domains md\n)\nSELECT\n  ((total_domains - unsupported_or_eol_domains) * 100.0 / NULLIF(total_domains, 0)) AS \"Instances\",\n  ((total_users   - unsupported_or_eol_users)   * 100.0 / NULLIF(total_users, 0))   AS \"MAU\"\nFROM agg;\n",
                         "sql": {
                           "columns": [
                             {
@@ -269,10 +269,10 @@
               "transformations": []
             }
           },
-          "description": "Domains that returned an error on their last scan.",
-          "id": 108,
+          "description": "Instances and monthly active user (MAU) count from instances deploying a supported branch (${supported_branches:csv})",
+          "id": 102,
           "links": [],
-          "title": "Instances w/ Stale Data",
+          "title": "Supported Branches",
           "vizConfig": {
             "group": "stat",
             "kind": "VizConfig",
@@ -282,101 +282,7 @@
                   "color": {
                     "mode": "thresholds"
                   },
-                  "thresholds": {
-                    "mode": "absolute",
-                    "steps": [
-                      {
-                        "color": "text",
-                        "value": 0
-                      }
-                    ]
-                  },
-                  "unit": "locale"
-                },
-                "overrides": []
-              },
-              "options": {
-                "colorMode": "value",
-                "graphMode": "area",
-                "justifyMode": "center",
-                "orientation": "auto",
-                "percentChangeColorMode": "standard",
-                "reduceOptions": {
-                  "calcs": [
-                    "lastNotNull"
-                  ],
-                  "fields": "",
-                  "values": false
-                },
-                "showPercentChange": false,
-                "textMode": "auto",
-                "wideLayout": true
-              }
-            },
-            "version": "12.4.0-22066786794"
-          }
-        }
-      },
-      "panel-109": {
-        "kind": "Panel",
-        "spec": {
-          "data": {
-            "kind": "QueryGroup",
-            "spec": {
-              "queries": [
-                {
-                  "kind": "PanelQuery",
-                  "spec": {
-                    "hidden": false,
-                    "query": {
-                      "group": "grafana-postgresql-datasource",
-                      "kind": "DataQuery",
-                      "spec": {
-                        "editorMode": "code",
-                        "format": "table",
-                        "rawQuery": true,
-                        "rawSql": "SELECT COUNT(DISTINCT domain) AS unique_domain_count\nFROM mastodon_domains;",
-                        "sql": {
-                          "columns": [
-                            {
-                              "parameters": [],
-                              "type": "function"
-                            }
-                          ],
-                          "groupBy": [
-                            {
-                              "property": {
-                                "type": "string"
-                              },
-                              "type": "groupBy"
-                            }
-                          ],
-                          "limit": 50
-                        }
-                      },
-                      "version": "v0"
-                    },
-                    "refId": "A"
-                  }
-                }
-              ],
-              "queryOptions": {},
-              "transformations": []
-            }
-          },
-          "description": "",
-          "id": 109,
-          "links": [],
-          "title": "Mastodon Instances",
-          "vizConfig": {
-            "group": "stat",
-            "kind": "VizConfig",
-            "spec": {
-              "fieldConfig": {
-                "defaults": {
-                  "color": {
-                    "mode": "thresholds"
-                  },
+                  "decimals": 1,
                   "thresholds": {
                     "mode": "absolute",
                     "steps": [
@@ -386,14 +292,14 @@
                       }
                     ]
                   },
-                  "unit": "locale"
+                  "unit": "percent"
                 },
                 "overrides": []
               },
               "options": {
                 "colorMode": "value",
                 "graphMode": "area",
-                "justifyMode": "auto",
+                "justifyMode": "center",
                 "orientation": "auto",
                 "percentChangeColorMode": "standard",
                 "reduceOptions": {
@@ -578,292 +484,6 @@
                 "sizing": "auto",
                 "sparkline": false,
                 "textMode": "value"
-              }
-            },
-            "version": "12.4.0-22066786794"
-          }
-        }
-      },
-      "panel-110": {
-        "kind": "Panel",
-        "spec": {
-          "data": {
-            "kind": "QueryGroup",
-            "spec": {
-              "queries": [
-                {
-                  "kind": "PanelQuery",
-                  "spec": {
-                    "hidden": false,
-                    "query": {
-                      "group": "grafana-postgresql-datasource",
-                      "kind": "DataQuery",
-                      "spec": {
-                        "editorMode": "code",
-                        "format": "table",
-                        "rawQuery": true,
-                        "rawSql": "SELECT SUM(active_users_monthly) AS total_users FROM mastodon_domains;",
-                        "sql": {
-                          "columns": [
-                            {
-                              "parameters": [],
-                              "type": "function"
-                            }
-                          ],
-                          "groupBy": [
-                            {
-                              "property": {
-                                "type": "string"
-                              },
-                              "type": "groupBy"
-                            }
-                          ],
-                          "limit": 50
-                        }
-                      },
-                      "version": "v0"
-                    },
-                    "refId": "A"
-                  }
-                }
-              ],
-              "queryOptions": {},
-              "transformations": []
-            }
-          },
-          "description": "Based on the total count of reported monthly active users (MAU) of all visible Mastodon instances.",
-          "id": 110,
-          "links": [],
-          "title": "Mastodon Active Users (MAU)",
-          "vizConfig": {
-            "group": "stat",
-            "kind": "VizConfig",
-            "spec": {
-              "fieldConfig": {
-                "defaults": {
-                  "color": {
-                    "mode": "thresholds"
-                  },
-                  "thresholds": {
-                    "mode": "absolute",
-                    "steps": [
-                      {
-                        "color": "purple",
-                        "value": 0
-                      }
-                    ]
-                  },
-                  "unit": "locale"
-                },
-                "overrides": []
-              },
-              "options": {
-                "colorMode": "value",
-                "graphMode": "area",
-                "justifyMode": "auto",
-                "orientation": "auto",
-                "percentChangeColorMode": "standard",
-                "reduceOptions": {
-                  "calcs": [
-                    "lastNotNull"
-                  ],
-                  "fields": "",
-                  "values": false
-                },
-                "showPercentChange": false,
-                "textMode": "auto",
-                "wideLayout": true
-              }
-            },
-            "version": "12.4.0-22066786794"
-          }
-        }
-      },
-      "panel-111": {
-        "kind": "Panel",
-        "spec": {
-          "data": {
-            "kind": "QueryGroup",
-            "spec": {
-              "queries": [
-                {
-                  "kind": "PanelQuery",
-                  "spec": {
-                    "hidden": false,
-                    "query": {
-                      "group": "grafana-postgresql-datasource",
-                      "kind": "DataQuery",
-                      "spec": {
-                        "editorMode": "code",
-                        "format": "table",
-                        "rawQuery": true,
-                        "rawSql": "WITH supported_branches AS (\n  SELECT DISTINCT branch\n  FROM release_versions\n  WHERE status IN ('release', 'main')\n),\neol_branches AS (\n  SELECT DISTINCT branch\n  FROM release_versions\n  WHERE status = 'eol'\n),\nagg AS (\n  SELECT\n    COUNT(DISTINCT md.domain) AS total_domains,\n    COALESCE(SUM(md.active_users_monthly), 0) AS total_users,\n\n    COUNT(DISTINCT md.domain) FILTER (\n      WHERE EXISTS (\n              SELECT 1\n              FROM eol_branches eb\n              WHERE md.software_version LIKE eb.branch || '.%'\n            )\n         OR NOT EXISTS (\n              SELECT 1\n              FROM supported_branches sb\n              WHERE md.software_version LIKE sb.branch || '.%'\n            )\n    ) AS unsupported_or_eol_domains,\n\n    COALESCE(SUM(md.active_users_monthly) FILTER (\n      WHERE EXISTS (\n              SELECT 1\n              FROM eol_branches eb\n              WHERE md.software_version LIKE eb.branch || '.%'\n            )\n         OR NOT EXISTS (\n              SELECT 1\n              FROM supported_branches sb\n              WHERE md.software_version LIKE sb.branch || '.%'\n            )\n    ), 0) AS unsupported_or_eol_users\n  FROM mastodon_domains md\n)\nSELECT\n  ((total_domains - unsupported_or_eol_domains) * 100.0 / NULLIF(total_domains, 0)) AS \"Instances\",\n  ((total_users   - unsupported_or_eol_users)   * 100.0 / NULLIF(total_users, 0))   AS \"MAU\"\nFROM agg;\n",
-                        "sql": {
-                          "columns": [
-                            {
-                              "parameters": [],
-                              "type": "function"
-                            }
-                          ],
-                          "groupBy": [
-                            {
-                              "property": {
-                                "type": "string"
-                              },
-                              "type": "groupBy"
-                            }
-                          ],
-                          "limit": 50
-                        }
-                      },
-                      "version": "v0"
-                    },
-                    "refId": "A"
-                  }
-                }
-              ],
-              "queryOptions": {},
-              "transformations": []
-            }
-          },
-          "description": "Instances running a supported branch with the latest patches applied.",
-          "id": 111,
-          "links": [],
-          "title": "Supported Branch",
-          "vizConfig": {
-            "group": "stat",
-            "kind": "VizConfig",
-            "spec": {
-              "fieldConfig": {
-                "defaults": {
-                  "color": {
-                    "mode": "thresholds"
-                  },
-                  "decimals": 1,
-                  "thresholds": {
-                    "mode": "absolute",
-                    "steps": [
-                      {
-                        "color": "purple",
-                        "value": 0
-                      }
-                    ]
-                  },
-                  "unit": "percent"
-                },
-                "overrides": []
-              },
-              "options": {
-                "colorMode": "value",
-                "graphMode": "area",
-                "justifyMode": "center",
-                "orientation": "auto",
-                "percentChangeColorMode": "standard",
-                "reduceOptions": {
-                  "calcs": [
-                    "lastNotNull"
-                  ],
-                  "fields": "",
-                  "values": false
-                },
-                "showPercentChange": false,
-                "textMode": "auto",
-                "wideLayout": true
-              }
-            },
-            "version": "12.4.0-22066786794"
-          }
-        }
-      },
-      "panel-112": {
-        "kind": "Panel",
-        "spec": {
-          "data": {
-            "kind": "QueryGroup",
-            "spec": {
-              "queries": [
-                {
-                  "kind": "PanelQuery",
-                  "spec": {
-                    "hidden": false,
-                    "query": {
-                      "group": "grafana-postgresql-datasource",
-                      "kind": "DataQuery",
-                      "spec": {
-                        "editorMode": "code",
-                        "format": "table",
-                        "rawQuery": true,
-                        "rawSql": "SELECT\n  COUNT(DISTINCT md.domain) FILTER (\n    WHERE md.\"timestamp\" <= NOW() - INTERVAL '1 hour'\n  ) AS \"1 Hour+\",\n  COUNT(DISTINCT md.domain) FILTER (\n    WHERE md.\"timestamp\" <= NOW() - INTERVAL '24 hours'\n  ) AS \"24 Hours+\",\n  COUNT(DISTINCT md.domain) FILTER (\n    WHERE md.\"timestamp\" <= NOW() - INTERVAL '48 hours'\n  ) AS \"48 Hours+\"\nFROM raw_domains rd\nINNER JOIN mastodon_domains md\n  ON rd.domain = md.domain\nWHERE rd.reason IS NOT NULL;",
-                        "sql": {
-                          "columns": [
-                            {
-                              "parameters": [],
-                              "type": "function"
-                            }
-                          ],
-                          "groupBy": [
-                            {
-                              "property": {
-                                "type": "string"
-                              },
-                              "type": "groupBy"
-                            }
-                          ],
-                          "limit": 50
-                        }
-                      },
-                      "version": "v0"
-                    },
-                    "refId": "A"
-                  }
-                }
-              ],
-              "queryOptions": {},
-              "transformations": []
-            }
-          },
-          "description": "Domains that returned an error on their last scan.",
-          "id": 112,
-          "links": [],
-          "title": "Instances w/ Stale Data",
-          "vizConfig": {
-            "group": "stat",
-            "kind": "VizConfig",
-            "spec": {
-              "fieldConfig": {
-                "defaults": {
-                  "color": {
-                    "mode": "thresholds"
-                  },
-                  "thresholds": {
-                    "mode": "absolute",
-                    "steps": [
-                      {
-                        "color": "text",
-                        "value": 0
-                      }
-                    ]
-                  },
-                  "unit": "locale"
-                },
-                "overrides": []
-              },
-              "options": {
-                "colorMode": "value",
-                "graphMode": "area",
-                "justifyMode": "center",
-                "orientation": "auto",
-                "percentChangeColorMode": "standard",
-                "reduceOptions": {
-                  "calcs": [
-                    "lastNotNull"
-                  ],
-                  "fields": "",
-                  "values": false
-                },
-                "showPercentChange": false,
-                "textMode": "auto",
-                "wideLayout": true
               }
             },
             "version": "12.4.0-22066786794"
@@ -2624,10 +2244,10 @@
               ]
             }
           },
-          "description": "Count of instances running $deprecated_latest off any deprecated release branches ($deprecated_branch) compared to the total instances on any deprecated release branches.",
+          "description": "Count of instances running ${deprecated_latest:csv} off any deprecated release branches (${deprecated_branch:csv}) compared to the total instances on any deprecated release branches.",
           "id": 73,
           "links": [],
-          "title": "Patched Instances, Deprecated ($deprecated_branch)",
+          "title": "Patched Instances, Deprecated (${deprecated_branch:csv})",
           "vizConfig": {
             "group": "gauge",
             "kind": "VizConfig",
@@ -2796,10 +2416,10 @@
               ]
             }
           },
-          "description": "Count of monthly active users (MAUs) on instances running $deprecated_latest off any deprecated release branches ($deprecated_branch) compared to the total MAU on any deprecated release branches.",
+          "description": "Count of monthly active users (MAUs) on instances running ${deprecated_latest:csv} off any deprecated release branches (${deprecated_branch:csv}) compared to the total MAU on any deprecated release branches.",
           "id": 74,
           "links": [],
-          "title": "Patched MAUs, Deprecated ($deprecated_branch)",
+          "title": "Patched MAUs, Deprecated (${deprecated_branch:csv})",
           "vizConfig": {
             "group": "gauge",
             "kind": "VizConfig",
@@ -3019,7 +2639,7 @@
                         "editorMode": "code",
                         "format": "table",
                         "rawQuery": true,
-                        "rawSql": "SELECT\n  statistics.date AS time,\n  statistics.main_patched_instances AS \"Main Branch\",\n  statistics.latest_patched_instances AS \"Latest Branch\",\n  statistics.previous_patched_instances AS \"Previous Branch\",\n  statistics.deprecated_patched_instances AS \"Deprecated Branch\"\nFROM\n  statistics\nORDER BY\n  statistics.date DESC\nLIMIT 7;",
+                        "rawSql": "SELECT\n  statistics.date AS time,\n  statistics.main_patched_instances AS \"Main Branch\",\n  statistics.latest_patched_instances AS \"Latest Branch\",\n  statistics.previous_patched_instances AS \"Previous Branch\",\n  statistics.deprecated_patched_instances AS \"Deprecated Branch\"\nFROM\n  statistics\nORDER BY\n  statistics.date DESC\nLIMIT 10;",
                         "sql": {
                           "columns": [
                             {
@@ -3180,7 +2800,7 @@
                         "editorMode": "code",
                         "format": "table",
                         "rawQuery": true,
-                        "rawSql": "SELECT\n  statistics.date AS time,\n  statistics.main_patched_mau AS \"Main Branch\",\n  statistics.latest_patched_mau AS \"Latest Branch\",\n  statistics.previous_patched_mau AS \"Previous Branch\",\n  statistics.deprecated_patched_mau AS \"Deprecated Branch\"\nFROM\n  statistics\nORDER BY\n  statistics.date DESC\nLIMIT 7;",
+                        "rawSql": "SELECT\n  statistics.date AS time,\n  statistics.main_patched_mau AS \"Main Branch\",\n  statistics.latest_patched_mau AS \"Latest Branch\",\n  statistics.previous_patched_mau AS \"Previous Branch\",\n  statistics.deprecated_patched_mau AS \"Deprecated Branch\"\nFROM\n  statistics\nORDER BY\n  statistics.date DESC\nLIMIT 10;",
                         "sql": {
                           "columns": [
                             {
@@ -3340,7 +2960,7 @@
                         "editorMode": "code",
                         "format": "table",
                         "rawQuery": true,
-                        "rawSql": "SELECT\n  statistics.date AS time,\n  statistics.main_instances AS \"Main Branch\",\n  statistics.latest_instances AS \"Latest Branch\",\n  statistics.previous_instances AS \"Previous Branch\",\n  statistics.deprecated_instances AS \"Deprecated Branch\",\n  statistics.eol_instances AS \"EOL Branches\"\nFROM\n  statistics\nORDER BY\n  statistics.date DESC\nLIMIT 7;",
+                        "rawSql": "SELECT\n  statistics.date AS time,\n  statistics.main_instances AS \"Main Branch\",\n  statistics.latest_instances AS \"Latest Branch\",\n  statistics.previous_instances AS \"Previous Branch\",\n  statistics.deprecated_instances AS \"Deprecated Branch\",\n  statistics.eol_instances AS \"EOL Branches\"\nFROM\n  statistics\nORDER BY\n  statistics.date DESC\nLIMIT 10;",
                         "sql": {
                           "columns": [
                             {
@@ -3500,7 +3120,7 @@
                         "editorMode": "code",
                         "format": "table",
                         "rawQuery": true,
-                        "rawSql": "SELECT\n  statistics.date AS time,\n  statistics.main_branch_mau AS \"Main Branch\",\n  statistics.latest_branch_mau AS \"Latest Branch\",\n  statistics.previous_branch_mau AS \"Previous Branch\",\n  statistics.deprecated_branch_mau AS \"Deprecated Branch\",\n  statistics.eol_branch_mau AS \"EOL Branches\"\nFROM\n  statistics\nORDER BY\n  statistics.date DESC\nLIMIT 7;",
+                        "rawSql": "SELECT\n  statistics.date AS time,\n  statistics.main_branch_mau AS \"Main Branch\",\n  statistics.latest_branch_mau AS \"Latest Branch\",\n  statistics.previous_branch_mau AS \"Previous Branch\",\n  statistics.deprecated_branch_mau AS \"Deprecated Branch\",\n  statistics.eol_branch_mau AS \"EOL Branches\"\nFROM\n  statistics\nORDER BY\n  statistics.date DESC\nLIMIT 10;",
                         "sql": {
                           "columns": [
                             {
@@ -4061,68 +3681,73 @@
       }
     },
     "layout": {
-      "kind": "TabsLayout",
+      "kind": "RowsLayout",
       "spec": {
-        "tabs": [
+        "rows": [
           {
-            "kind": "TabsLayoutTab",
+            "kind": "RowsLayoutRow",
             "spec": {
+              "collapse": false,
+              "hideHeader": true,
               "layout": {
-                "kind": "GridLayout",
+                "kind": "AutoGridLayout",
                 "spec": {
+                  "columnWidthMode": "standard",
                   "items": [
                     {
-                      "kind": "GridLayoutItem",
+                      "kind": "AutoGridLayoutItem",
                       "spec": {
                         "element": {
                           "kind": "ElementReference",
                           "name": "panel-1"
-                        },
-                        "height": 4,
-                        "width": 6,
-                        "x": 0,
-                        "y": 0
+                        }
                       }
                     },
                     {
-                      "kind": "GridLayoutItem",
+                      "kind": "AutoGridLayoutItem",
                       "spec": {
                         "element": {
                           "kind": "ElementReference",
                           "name": "panel-41"
-                        },
-                        "height": 4,
-                        "width": 6,
-                        "x": 6,
-                        "y": 0
+                        }
                       }
                     },
                     {
-                      "kind": "GridLayoutItem",
+                      "kind": "AutoGridLayoutItem",
                       "spec": {
                         "element": {
                           "kind": "ElementReference",
                           "name": "panel-101"
-                        },
-                        "height": 4,
-                        "width": 6,
-                        "x": 12,
-                        "y": 0
+                        }
                       }
                     },
                     {
-                      "kind": "GridLayoutItem",
+                      "kind": "AutoGridLayoutItem",
                       "spec": {
                         "element": {
                           "kind": "ElementReference",
-                          "name": "panel-108"
-                        },
-                        "height": 4,
-                        "width": 6,
-                        "x": 18,
-                        "y": 0
+                          "name": "panel-102"
+                        }
                       }
-                    },
+                    }
+                  ],
+                  "maxColumnCount": 4,
+                  "rowHeightMode": "short"
+                }
+              },
+              "title": "Big Numbers"
+            }
+          },
+          {
+            "kind": "RowsLayoutRow",
+            "spec": {
+              "collapse": false,
+              "fillScreen": false,
+              "hideHeader": false,
+              "layout": {
+                "kind": "GridLayout",
+                "spec": {
+                  "items": [
                     {
                       "kind": "GridLayoutItem",
                       "spec": {
@@ -4133,7 +3758,7 @@
                         "height": 7,
                         "width": 6,
                         "x": 0,
-                        "y": 4
+                        "y": 0
                       }
                     },
                     {
@@ -4146,7 +3771,7 @@
                         "height": 7,
                         "width": 6,
                         "x": 6,
-                        "y": 4
+                        "y": 0
                       }
                     },
                     {
@@ -4159,7 +3784,7 @@
                         "height": 7,
                         "width": 6,
                         "x": 12,
-                        "y": 4
+                        "y": 0
                       }
                     },
                     {
@@ -4172,7 +3797,7 @@
                         "height": 7,
                         "width": 6,
                         "x": 18,
-                        "y": 4
+                        "y": 0
                       }
                     },
                     {
@@ -4185,7 +3810,7 @@
                         "height": 7,
                         "width": 6,
                         "x": 0,
-                        "y": 11
+                        "y": 7
                       }
                     },
                     {
@@ -4198,7 +3823,7 @@
                         "height": 7,
                         "width": 6,
                         "x": 6,
-                        "y": 11
+                        "y": 7
                       }
                     },
                     {
@@ -4211,7 +3836,7 @@
                         "height": 7,
                         "width": 6,
                         "x": 12,
-                        "y": 11
+                        "y": 7
                       }
                     },
                     {
@@ -4224,59 +3849,7 @@
                         "height": 7,
                         "width": 6,
                         "x": 18,
-                        "y": 11
-                      }
-                    },
-                    {
-                      "kind": "GridLayoutItem",
-                      "spec": {
-                        "element": {
-                          "kind": "ElementReference",
-                          "name": "panel-5"
-                        },
-                        "height": 18,
-                        "width": 12,
-                        "x": 0,
-                        "y": 18
-                      }
-                    },
-                    {
-                      "kind": "GridLayoutItem",
-                      "spec": {
-                        "element": {
-                          "kind": "ElementReference",
-                          "name": "panel-7"
-                        },
-                        "height": 18,
-                        "width": 12,
-                        "x": 12,
-                        "y": 18
-                      }
-                    },
-                    {
-                      "kind": "GridLayoutItem",
-                      "spec": {
-                        "element": {
-                          "kind": "ElementReference",
-                          "name": "panel-88"
-                        },
-                        "height": 8,
-                        "width": 12,
-                        "x": 0,
-                        "y": 36
-                      }
-                    },
-                    {
-                      "kind": "GridLayoutItem",
-                      "spec": {
-                        "element": {
-                          "kind": "ElementReference",
-                          "name": "panel-89"
-                        },
-                        "height": 8,
-                        "width": 12,
-                        "x": 12,
-                        "y": 36
+                        "y": 7
                       }
                     }
                   ]
@@ -4286,195 +3859,186 @@
             }
           },
           {
-            "kind": "TabsLayoutTab",
+            "kind": "RowsLayoutRow",
             "spec": {
+              "collapse": false,
               "layout": {
-                "kind": "GridLayout",
+                "kind": "AutoGridLayout",
                 "spec": {
+                  "columnWidthMode": "standard",
                   "items": [
                     {
-                      "kind": "GridLayoutItem",
-                      "spec": {
-                        "element": {
-                          "kind": "ElementReference",
-                          "name": "panel-109"
-                        },
-                        "height": 4,
-                        "width": 6,
-                        "x": 0,
-                        "y": 0
-                      }
-                    },
-                    {
-                      "kind": "GridLayoutItem",
-                      "spec": {
-                        "element": {
-                          "kind": "ElementReference",
-                          "name": "panel-110"
-                        },
-                        "height": 4,
-                        "width": 6,
-                        "x": 6,
-                        "y": 0
-                      }
-                    },
-                    {
-                      "kind": "GridLayoutItem",
-                      "spec": {
-                        "element": {
-                          "kind": "ElementReference",
-                          "name": "panel-111"
-                        },
-                        "height": 4,
-                        "width": 6,
-                        "x": 12,
-                        "y": 0
-                      }
-                    },
-                    {
-                      "kind": "GridLayoutItem",
-                      "spec": {
-                        "element": {
-                          "kind": "ElementReference",
-                          "name": "panel-112"
-                        },
-                        "height": 4,
-                        "width": 6,
-                        "x": 18,
-                        "y": 0
-                      }
-                    },
-                    {
-                      "kind": "GridLayoutItem",
+                      "kind": "AutoGridLayoutItem",
                       "spec": {
                         "element": {
                           "kind": "ElementReference",
                           "name": "panel-70"
-                        },
-                        "height": 7,
-                        "width": 24,
-                        "x": 0,
-                        "y": 4
+                        }
                       }
                     },
                     {
-                      "kind": "GridLayoutItem",
+                      "kind": "AutoGridLayoutItem",
                       "spec": {
                         "element": {
                           "kind": "ElementReference",
                           "name": "panel-71"
-                        },
-                        "height": 7,
-                        "width": 24,
-                        "x": 0,
-                        "y": 11
-                      }
-                    },
-                    {
-                      "kind": "GridLayoutItem",
-                      "spec": {
-                        "element": {
-                          "kind": "ElementReference",
-                          "name": "panel-66"
-                        },
-                        "height": 18,
-                        "width": 12,
-                        "x": 0,
-                        "y": 18
-                      }
-                    },
-                    {
-                      "kind": "GridLayoutItem",
-                      "spec": {
-                        "element": {
-                          "kind": "ElementReference",
-                          "name": "panel-67"
-                        },
-                        "height": 18,
-                        "width": 12,
-                        "x": 12,
-                        "y": 18
-                      }
-                    },
-                    {
-                      "kind": "GridLayoutItem",
-                      "spec": {
-                        "element": {
-                          "kind": "ElementReference",
-                          "name": "panel-96"
-                        },
-                        "height": 18,
-                        "width": 12,
-                        "x": 0,
-                        "y": 36
-                      }
-                    },
-                    {
-                      "kind": "GridLayoutItem",
-                      "spec": {
-                        "element": {
-                          "kind": "ElementReference",
-                          "name": "panel-97"
-                        },
-                        "height": 18,
-                        "width": 12,
-                        "x": 12,
-                        "y": 36
-                      }
-                    },
-                    {
-                      "kind": "GridLayoutItem",
-                      "spec": {
-                        "element": {
-                          "kind": "ElementReference",
-                          "name": "panel-90"
-                        },
-                        "height": 8,
-                        "width": 12,
-                        "x": 0,
-                        "y": 54
-                      }
-                    },
-                    {
-                      "kind": "GridLayoutItem",
-                      "spec": {
-                        "element": {
-                          "kind": "ElementReference",
-                          "name": "panel-91"
-                        },
-                        "height": 8,
-                        "width": 12,
-                        "x": 12,
-                        "y": 54
+                        }
                       }
                     }
-                  ]
+                  ],
+                  "maxColumnCount": 1,
+                  "rowHeightMode": "standard"
                 }
               },
               "title": "Branch Adoption"
             }
           },
           {
-            "kind": "TabsLayoutTab",
+            "kind": "RowsLayoutRow",
             "spec": {
+              "collapse": false,
               "layout": {
-                "kind": "GridLayout",
+                "kind": "AutoGridLayout",
                 "spec": {
+                  "columnWidthMode": "standard",
                   "items": [
                     {
-                      "kind": "GridLayoutItem",
+                      "kind": "AutoGridLayoutItem",
+                      "spec": {
+                        "element": {
+                          "kind": "ElementReference",
+                          "name": "panel-5"
+                        }
+                      }
+                    },
+                    {
+                      "kind": "AutoGridLayoutItem",
+                      "spec": {
+                        "element": {
+                          "kind": "ElementReference",
+                          "name": "panel-7"
+                        }
+                      }
+                    },
+                    {
+                      "kind": "AutoGridLayoutItem",
+                      "spec": {
+                        "element": {
+                          "kind": "ElementReference",
+                          "name": "panel-66"
+                        }
+                      }
+                    },
+                    {
+                      "kind": "AutoGridLayoutItem",
+                      "spec": {
+                        "element": {
+                          "kind": "ElementReference",
+                          "name": "panel-67"
+                        }
+                      }
+                    },
+                    {
+                      "kind": "AutoGridLayoutItem",
+                      "spec": {
+                        "element": {
+                          "kind": "ElementReference",
+                          "name": "panel-96"
+                        }
+                      }
+                    },
+                    {
+                      "kind": "AutoGridLayoutItem",
+                      "spec": {
+                        "element": {
+                          "kind": "ElementReference",
+                          "name": "panel-97"
+                        }
+                      }
+                    }
+                  ],
+                  "maxColumnCount": 2,
+                  "rowHeightMode": "tall"
+                }
+              },
+              "title": "Adoption Donuts"
+            }
+          },
+          {
+            "kind": "RowsLayoutRow",
+            "spec": {
+              "collapse": false,
+              "layout": {
+                "kind": "AutoGridLayout",
+                "spec": {
+                  "columnWidthMode": "standard",
+                  "items": [
+                    {
+                      "kind": "AutoGridLayoutItem",
+                      "spec": {
+                        "element": {
+                          "kind": "ElementReference",
+                          "name": "panel-90"
+                        }
+                      }
+                    },
+                    {
+                      "kind": "AutoGridLayoutItem",
+                      "spec": {
+                        "element": {
+                          "kind": "ElementReference",
+                          "name": "panel-91"
+                        }
+                      }
+                    },
+                    {
+                      "kind": "AutoGridLayoutItem",
+                      "spec": {
+                        "element": {
+                          "kind": "ElementReference",
+                          "name": "panel-88"
+                        }
+                      }
+                    },
+                    {
+                      "kind": "AutoGridLayoutItem",
+                      "spec": {
+                        "element": {
+                          "kind": "ElementReference",
+                          "name": "panel-89"
+                        }
+                      }
+                    }
+                  ],
+                  "maxColumnCount": 2,
+                  "rowHeightMode": "tall"
+                }
+              },
+              "title": "Trends"
+            }
+          },
+          {
+            "kind": "RowsLayoutRow",
+            "spec": {
+              "collapse": false,
+              "layout": {
+                "kind": "AutoGridLayout",
+                "spec": {
+                  "columnWidthMode": "wide",
+                  "fillScreen": true,
+                  "items": [
+                    {
+                      "kind": "AutoGridLayoutItem",
                       "spec": {
                         "element": {
                           "kind": "ElementReference",
                           "name": "panel-76"
-                        },
-                        "height": 26,
-                        "width": 24,
-                        "x": 0,
-                        "y": 0
+                        }
                       }
                     }
-                  ]
+                  ],
+                  "maxColumnCount": 1,
+                  "rowHeightMode": "tall"
                 }
               },
               "title": "All Data"
@@ -4539,7 +4103,7 @@
         "1d"
       ],
       "fiscalYearStartMonth": 0,
-      "from": "now-6h",
+      "from": "now-5m",
       "hideTimepicker": false,
       "timezone": "browser",
       "to": "now"
@@ -4597,6 +4161,112 @@
           "regexApplyTo": "value",
           "skipUrlSync": false,
           "sort": "disabled"
+        }
+      },
+      {
+        "kind": "QueryVariable",
+        "spec": {
+          "allowCustomValue": true,
+          "current": {
+            "text": "",
+            "value": ""
+          },
+          "definition": "SELECT branch\nFROM release_versions\nWHERE (status = 'main' OR status = 'release');",
+          "hide": "hideVariable",
+          "includeAll": true,
+          "multi": true,
+          "name": "supported_branches",
+          "options": [],
+          "query": {
+            "group": "grafana-postgresql-datasource",
+            "kind": "DataQuery",
+            "spec": {
+              "dataset": "vmcrawl",
+              "editorMode": "code",
+              "format": "table",
+              "query": "SELECT branch\nFROM release_versions\nWHERE (status = 'main' OR status = 'release');",
+              "rawQuery": true,
+              "rawSql": "SELECT branch\nFROM release_versions\nWHERE (status = 'main' OR status = 'release');",
+              "refId": "SQLVariableQueryEditor-VariableQuery",
+              "sql": {
+                "columns": [
+                  {
+                    "parameters": [],
+                    "type": "function"
+                  }
+                ],
+                "groupBy": [
+                  {
+                    "property": {
+                      "type": "string"
+                    },
+                    "type": "groupBy"
+                  }
+                ],
+                "limit": 50
+              },
+              "table": "release_versions"
+            },
+            "version": "v0"
+          },
+          "refresh": "onDashboardLoad",
+          "regex": "",
+          "regexApplyTo": "value",
+          "skipUrlSync": false,
+          "sort": "disabled"
+        }
+      },
+      {
+        "kind": "QueryVariable",
+        "spec": {
+          "allowCustomValue": true,
+          "current": {
+            "text": "",
+            "value": ""
+          },
+          "definition": "SELECT latest\nFROM release_versions\nWHERE (status = 'main' OR status = 'release');",
+          "hide": "dontHide",
+          "includeAll": true,
+          "multi": true,
+          "name": "supported_patches",
+          "options": [],
+          "query": {
+            "group": "grafana-postgresql-datasource",
+            "kind": "DataQuery",
+            "spec": {
+              "dataset": "vmcrawl",
+              "editorMode": "code",
+              "format": "table",
+              "query": "SELECT latest\nFROM release_versions\nWHERE (status = 'main' OR status = 'release');",
+              "rawQuery": true,
+              "rawSql": "SELECT latest\nFROM release_versions\nWHERE (status = 'main' OR status = 'release');",
+              "refId": "SQLVariableQueryEditor-VariableQuery",
+              "sql": {
+                "columns": [
+                  {
+                    "parameters": [],
+                    "type": "function"
+                  }
+                ],
+                "groupBy": [
+                  {
+                    "property": {
+                      "type": "string"
+                    },
+                    "type": "groupBy"
+                  }
+                ],
+                "limit": 50
+              },
+              "table": "release_versions"
+            },
+            "version": "v0"
+          },
+          "refresh": "onDashboardLoad",
+          "regex": "",
+          "regexApplyTo": "value",
+          "skipUrlSync": false,
+          "sort": "numericalAsc"
         }
       },
       {
