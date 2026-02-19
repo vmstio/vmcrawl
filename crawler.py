@@ -523,7 +523,8 @@ async def close_http_client() -> None:
 
 def vmc_output(text: str, color: str, use_tqdm: bool = False, **kwargs: Any) -> None:
     """Print colored output, optionally using tqdm.write."""
-    text = text.lower()
+    if use_tqdm:
+        text = text.lower()
     effective_color = color if color else "cyan"
 
     if ":" in text:
@@ -2405,11 +2406,12 @@ async def process_fetch_domain(
         existing_domains: Set of domains already in database
 
     Returns:
-        tuple: (domain, unique_domains list, status message or None)
+        tuple: (domain, unique_domains list, status message or None, status color)
     """
     # Use fixed-width display to prevent bar from jumping (truncate long domains)
     domain_display = domain[:25].ljust(25)
     pbar.set_postfix_str(domain_display)
+    pbar.refresh()
 
     api_url = f"https://{domain}/api/v1/instance/peers"
 
@@ -2417,19 +2419,24 @@ async def process_fetch_domain(
     unique_domains = [d for d in domains if d not in existing_domains]
 
     if unique_domains:
-        status = f"{colors['green']}{len(unique_domains)} new{colors['reset']}"
+        status = f"{len(unique_domains)} new"
+        status_color = "green"
         await asyncio.to_thread(import_domains, unique_domains, True)
     elif domains:
         status = f"0 new ({len(domains)} known)"
+        status_color = "cyan"
     elif error_type == "no_peers":
         # disable_peer_fetch() already emits an orange terminal alert
         status = None
+        status_color = "cyan"
     elif error_type == "transient":
-        status = f"{colors['yellow']}Error (transient){colors['reset']}"
+        status = "Error (transient)"
+        status_color = "yellow"
     else:
-        status = f"{colors['yellow']}No peers{colors['reset']}"
+        status = "No peers"
+        status_color = "yellow"
 
-    return (domain, unique_domains, status)
+    return (domain, unique_domains, status, status_color)
 
 
 async def run_fetch_mode(args):
@@ -2473,7 +2480,7 @@ async def run_fetch_mode(args):
         vmc_output("No domains fetched, exiting…", "yellow")
         sys.exit(1)
 
-    print(f"Fetching peer data from {len(domain_list)} instances…")
+    vmc_output(f"Fetching peer data from {len(domain_list)} instances…", "cyan")
 
     # Pre-fetch filter lists once before concurrent processing
     dni = get_dni_domains() or set()
@@ -2533,27 +2540,22 @@ async def run_fetch_mode(args):
                     dni,
                     existing_domains,
                 )
-                domain_name, new_domains, status = result
+                domain_name, new_domains, status, status_color = result
 
                 if new_domains:
                     all_new_domains.extend(new_domains)
 
                 elapsed_seconds = time.monotonic() - started_at
-                slow_label = (
-                    f" {colors['orange']}[slow]{colors['reset']}"
-                    if elapsed_seconds >= slow_domain_seconds
-                    else ""
-                )
+                slow_label = " [slow]" if elapsed_seconds >= slow_domain_seconds else ""
                 if status is not None:
-                    tqdm.write(
-                        f"{domain_name}: {status} {TIME_TEXT}[{elapsed_seconds:.2f}s]{colors['reset']}{slow_label}"
+                    vmc_output(
+                        f"{domain_name}: {status}{slow_label}",
+                        status_color,
+                        use_tqdm=True,
                     )
             except Exception as e:
                 if not shutdown_event.is_set():
-                    elapsed_seconds = time.monotonic() - started_at
-                    tqdm.write(
-                        f"{domain}: {colors['orange']}Error: {e} {TIME_TEXT}[{elapsed_seconds:.2f}s]{colors['reset']}"
-                    )
+                    vmc_output(f"{domain}: Error: {e}", "orange", use_tqdm=True)
             finally:
                 active_domains.discard(domain)
                 _clear_domain_start_time(domain)
