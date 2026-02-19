@@ -521,7 +521,7 @@ async def close_http_client() -> None:
 # =============================================================================
 
 
-def vmc_output(text: str, color: str, use_tqdm: bool = False, **kwargs: Any) -> None:
+def echo(text: str, color: str, use_tqdm: bool = False, **kwargs: Any) -> None:
     """Print colored output, optionally using tqdm.write."""
     if use_tqdm:
         text = text.lower()
@@ -771,7 +771,7 @@ async def get_domain_endings() -> set[str]:
             return _exclude_tlds(tlds)
 
     except Exception as e:
-        vmc_output(f"Database TLD lookup failed, using file cache: {e}", "yellow")
+        echo(f"Database TLD lookup failed, using file cache: {e}", "yellow")
 
     # Fallback to file-based cache if database fails
     url = "http://data.iana.org/TLD/tlds-alpha-by-domain.txt"
@@ -827,7 +827,7 @@ async def read_main_version_info(url: str) -> dict[str, str] | None:
                     if value.isnumeric() or RE_QUOTED_STRING.match(value):
                         version_info[key] = value.replace("'", "")
     except httpx.HTTPError as exception:
-        vmc_output(f"Failed to retrieve Mastodon main version: {exception}", "red")
+        echo(f"Failed to retrieve Mastodon main version: {exception}", "red")
         return None
 
     return version_info
@@ -851,7 +851,7 @@ async def get_highest_mastodon_version() -> str | None:
                 ) > version.parse(highest_version):
                     highest_version = release_version
     except httpx.HTTPError as exception:
-        vmc_output(f"Failed to retrieve Mastodon release version: {exception}", "red")
+        echo(f"Failed to retrieve Mastodon release version: {exception}", "red")
         return None
 
     return highest_version
@@ -931,7 +931,7 @@ async def get_all_tracked_mastodon_versions():
 
     except (subprocess.CalledProcessError, FileNotFoundError, json.JSONDecodeError):
         # If gh fails, fall back to HTTP API
-        vmc_output("gh CLI failed, falling back to HTTP API", "yellow")
+        echo("gh CLI failed, falling back to HTTP API", "yellow")
         url = "https://api.github.com/repos/mastodon/mastodon/releases"
         response = await get_httpx(url)
         _ = response.raise_for_status()
@@ -989,7 +989,7 @@ async def get_main_version_release():
 
     except (subprocess.CalledProcessError, FileNotFoundError):
         # If gh fails, fall back to HTTP
-        vmc_output("gh CLI failed for main version, falling back to HTTP API", "yellow")
+        echo("gh CLI failed for main version, falling back to HTTP API", "yellow")
         url = "https://raw.githubusercontent.com/mastodon/mastodon/refs/heads/main/lib/mastodon/version.rb"
         version_info = await read_main_version_info(url)
 
@@ -1196,7 +1196,7 @@ def _clean_version_fixes(version: str) -> str:
         and not version_latest_release
         and not _clean_version_fixes_warned
     ):
-        vmc_output(
+        echo(
             "Warning: version globals not loaded; version-fixing logic will be skipped",
             "yellow",
         )
@@ -1306,7 +1306,7 @@ def get_backport_branches() -> list[str]:
             )
             return [row[0] for row in cur.fetchall()]
         except Exception as e:
-            vmc_output(f"Failed to load backport branches from database: {e}", "red")
+            echo(f"Failed to load backport branches from database: {e}", "red")
             return []
 
 
@@ -1328,7 +1328,7 @@ def get_all_tracked_branches() -> list[str]:
             )
             return [row[0] for row in cur.fetchall()]
         except Exception as e:
-            vmc_output(f"Failed to load tracked branches from database: {e}", "red")
+            echo(f"Failed to load tracked branches from database: {e}", "red")
             return []
 
 
@@ -1434,7 +1434,7 @@ def get_release_versions_from_db() -> dict[str, Any]:
 
             return result
         except Exception as e:
-            vmc_output(f"Failed to load version info from database: {e}", "red")
+            echo(f"Failed to load version info from database: {e}", "red")
             return {}
 
 
@@ -1472,7 +1472,7 @@ def log_error(domain: str, error_to_print: str) -> None:
             )
             conn.commit()
         except Exception as exception:
-            vmc_output(
+            echo(
                 f"{domain}: Failed to log error {exception}",
                 "red",
                 use_tqdm=True,
@@ -1677,7 +1677,7 @@ def increment_domain_error(
             )
             conn.commit()
         except Exception as exception:
-            vmc_output(
+            echo(
                 f"{domain}: Failed to increment domain error {exception}",
                 "red",
                 use_tqdm=True,
@@ -1716,7 +1716,7 @@ def clear_domain_error(domain: str) -> None:
             )
             conn.commit()
         except Exception as exception:
-            vmc_output(
+            echo(
                 f"{domain}: Failed to clear domain errors {exception}",
                 "red",
                 use_tqdm=True,
@@ -1744,7 +1744,7 @@ def _save_matrix_nodeinfo(domain: str) -> None:
             )
             conn.commit()
         except Exception as exception:
-            vmc_output(
+            echo(
                 f"{domain}: Failed to save Matrix nodeinfo {exception}",
                 "red",
                 use_tqdm=True,
@@ -1772,7 +1772,7 @@ def mark_domain_status(domain: str, status_type: str) -> None:
         status_map[col_name] = ({col_name: True}, col_name)
 
     if status_type not in status_map:
-        vmc_output(f"Invalid status type: {status_type}", "red")
+        echo(f"Invalid status type: {status_type}", "red")
         return
 
     overrides, label = status_map[status_type]
@@ -1803,7 +1803,7 @@ def mark_domain_status(domain: str, status_type: str) -> None:
             )
             conn.commit()
         except Exception as exception:
-            vmc_output(f"Failed to mark domain {label}: {exception}", "red")
+            echo(f"Failed to mark domain {label}: {exception}", "red")
             conn.rollback()
 
 
@@ -1824,7 +1824,7 @@ def delete_domain_if_known(domain: str) -> None:
             )
             conn.commit()
         except Exception as exception:
-            vmc_output(
+            echo(
                 f"{domain}: Failed to delete known domain {exception}",
                 "red",
                 use_tqdm=True,
@@ -1861,7 +1861,7 @@ def mark_domain_as_alias(domain: str) -> None:
             _ = cursor.execute(query, (domain,))
             conn.commit()
         except Exception as exception:
-            vmc_output(
+            echo(
                 f"{domain}: Failed to mark as alias: {exception}",
                 "red",
                 use_tqdm=True,
@@ -1881,7 +1881,7 @@ def delete_domain_from_raw(domain: str) -> None:
             )
             conn.commit()
         except Exception as exception:
-            vmc_output(
+            echo(
                 f"{domain}: Failed to delete known domain {exception}",
                 "red",
                 use_tqdm=True,
@@ -1934,7 +1934,7 @@ def save_nodeinfo_software(domain: str, software_data: dict[str, Any]) -> None:
                 )
             conn.commit()
         except Exception as exception:
-            vmc_output(
+            echo(
                 f"{domain}: Failed to save nodeinfo software {exception}",
                 "red",
                 use_tqdm=True,
@@ -1955,7 +1955,7 @@ def update_mastodon_domain(
     """
     # Validate that domain is not empty
     if not actual_domain or not actual_domain.strip():
-        vmc_output(
+        echo(
             "Attempted to insert empty domain, skipping", "yellow", use_tqdm=True
         )
         return
@@ -1988,7 +1988,7 @@ def update_mastodon_domain(
             )
             conn.commit()
         except Exception as exception:
-            vmc_output(f"{actual_domain}: {exception}", "red", use_tqdm=True)
+            echo(f"{actual_domain}: {exception}", "red", use_tqdm=True)
             conn.rollback()
 
 
@@ -2014,7 +2014,7 @@ def cleanup_old_domains():
 
             if not lock_acquired:
                 # Another instance is already running cleanup, skip
-                vmc_output(
+                echo(
                     "cleanup_old_domains: skipped (advisory lock held by another session)",
                     "yellow",
                 )
@@ -2031,14 +2031,14 @@ def cleanup_old_domains():
             deleted_domains = [row[0] for row in cursor.fetchall()]
             if deleted_domains:
                 for d in deleted_domains:
-                    vmc_output(
+                    echo(
                         f"{d}: Removed from active instance list",
                         "yellow",
                         use_tqdm=True,
                     )
             conn.commit()
         except Exception as exception:
-            vmc_output(f"Failed to clean up old domains: {exception}", "red")
+            echo(f"Failed to clean up old domains: {exception}", "red")
             conn.rollback()
 
 
@@ -2059,7 +2059,7 @@ def get_dni_domains():
             # Use set for O(1) lookup instead of O(n) list iteration
             return {row[0] for row in cursor}
         except Exception as exception:
-            vmc_output(f"Failed to obtain DNI domain list: {exception}", "red")
+            echo(f"Failed to obtain DNI domain list: {exception}", "red")
             conn.rollback()
     return set()
 
@@ -2075,7 +2075,7 @@ def get_domains_by_status(status_column):
     """
     valid_columns = list(BAD_COLUMNS)
     if status_column not in valid_columns:
-        vmc_output(f"Invalid status column: {status_column}", "red")
+        echo(f"Invalid status column: {status_column}", "red")
         return set()
 
     with db_pool.connection() as conn, conn.cursor() as cursor:
@@ -2087,7 +2087,7 @@ def get_domains_by_status(status_column):
             # Use set for O(1) lookup, stream results
             return {row[0].strip() for row in cursor if row[0] and row[0].strip()}
         except Exception as exception:
-            vmc_output(
+            echo(
                 f"Failed to obtain {status_column} domains: {exception}",
                 "red",
             )
@@ -2107,7 +2107,7 @@ def get_not_masto_domains():
             # Use set for O(1) lookup, stream results
             return {row[0].strip() for row in cursor if row[0] and row[0].strip()}
         except Exception as exception:
-            vmc_output(f"Failed to obtain non-mastodon domains: {exception}", "red")
+            echo(f"Failed to obtain non-mastodon domains: {exception}", "red")
             conn.rollback()
     return set()
 
@@ -2138,7 +2138,7 @@ def get_all_bad_domains() -> dict[str, set[str]]:
                     if row[1 + i]:
                         result[col].add(domain)
         except Exception as exception:
-            vmc_output(f"Failed to obtain bad domains: {exception}", "red")
+            echo(f"Failed to obtain bad domains: {exception}", "red")
             conn.rollback()
     return result
 
@@ -2185,7 +2185,7 @@ def ensure_mastodon_peers_column() -> bool:
             conn.commit()
             return True
         except Exception as e:
-            vmc_output(f"Failed to ensure peers column exists: {e}", "red")
+            echo(f"Failed to ensure peers column exists: {e}", "red")
             conn.rollback()
             return False
 
@@ -2228,7 +2228,7 @@ def fetch_domain_list(db_limit, db_offset, randomize=False):
 
             return result if result else ["vmst.io"]
         except Exception as e:
-            print(f"Failed to obtain primary domain list: {e}")
+            echo(f"Failed to obtain primary domain list: {e}", "red")
             conn.rollback()
             return None
 
@@ -2247,7 +2247,7 @@ def get_existing_domains() -> set[str] | None:
             conn.commit()
             return existing_domains
         except Exception as e:
-            vmc_output(f"Failed to get list of existing domains: {e}", "red")
+            echo(f"Failed to get list of existing domains: {e}", "red")
             conn.rollback()
             return None
 
@@ -2261,12 +2261,12 @@ def disable_peer_fetch(domain, use_tqdm=False):
                 (domain,),
             )
             if cursor.rowcount > 0:
-                vmc_output(
+                echo(
                     f"{domain}: peer polling disabled", "orange", use_tqdm=use_tqdm
                 )
             conn.commit()
         except Exception as e:
-            vmc_output(
+            echo(
                 f"Failed to disable peer polling for {domain}: {e}",
                 "orange",
                 use_tqdm=use_tqdm,
@@ -2290,7 +2290,7 @@ def import_domains(domains, use_tqdm=False):
                 _ = cursor.execute(query, flattened_values)
                 conn.commit()
         except Exception as e:
-            vmc_output(f"Failed to import domain list: {e}", "red", use_tqdm=use_tqdm)
+            echo(f"Failed to import domain list: {e}", "red", use_tqdm=use_tqdm)
             conn.rollback()
             return
 
@@ -2318,7 +2318,7 @@ def _detect_vowels(domain):
     try:
         return bool(RE_VOWEL_PATTERN.search(domain))
     except Exception as e:
-        vmc_output(f"Error detecting vowels: {e}", "red")
+        echo(f"Error detecting vowels: {e}", "red")
         return False
 
 
@@ -2443,11 +2443,11 @@ async def run_fetch_mode(args):
     """Run the fetch mode to discover new domains from instance peers."""
     # Validate argument combinations
     if (args.limit or args.offset) and args.target:
-        vmc_output("You cannot set both limit/offset and target arguments", "red")
+        echo("You cannot set both limit/offset and target arguments", "red")
         sys.exit(1)
 
     if args.offset and args.random:
-        vmc_output("You cannot set both offset and random arguments", "red")
+        echo("You cannot set both offset and random arguments", "red")
         sys.exit(1)
 
     # Set defaults from arguments or environment
@@ -2461,12 +2461,12 @@ async def run_fetch_mode(args):
     else:
         db_offset = int(os.getenv("VMCRAWL_FETCH_OFFSET", "0"))
 
-    vmc_output(f"{appname} v{appversion} (fetch mode)", "bold")
+    echo(f"{appname} v{appversion} (fetch mode)", "bold")
     if _is_running_headless():
-        vmc_output("Running in headless mode", "cyan")
+        echo("Running in headless mode", "cyan")
 
     if not ensure_mastodon_peers_column():
-        vmc_output("Failed to prepare fetch schema, exiting…", "red")
+        echo("Failed to prepare fetch schema, exiting…", "red")
         sys.exit(1)
 
     domain_endings = await get_domain_endings()
@@ -2477,10 +2477,10 @@ async def run_fetch_mode(args):
         domain_list = fetch_domain_list(db_limit, db_offset, randomize=args.random)
 
     if not domain_list:
-        vmc_output("No domains fetched, exiting…", "yellow")
+        echo("No domains fetched, exiting…", "yellow")
         sys.exit(1)
 
-    vmc_output(f"Fetching peer data from {len(domain_list)} instances…", "cyan")
+    echo(f"Fetching peer data from {len(domain_list)} instances…", "cyan")
 
     # Pre-fetch filter lists once before concurrent processing
     dni = get_dni_domains() or set()
@@ -2548,14 +2548,14 @@ async def run_fetch_mode(args):
                 elapsed_seconds = time.monotonic() - started_at
                 slow_label = " [slow]" if elapsed_seconds >= slow_domain_seconds else ""
                 if status is not None:
-                    vmc_output(
+                    echo(
                         f"{domain_name}: {status}{slow_label}",
                         status_color,
                         use_tqdm=True,
                     )
             except Exception as e:
                 if not shutdown_event.is_set():
-                    vmc_output(f"{domain}: Error: {e}", "orange", use_tqdm=True)
+                    echo(f"{domain}: Error: {e}", "orange", use_tqdm=True)
             finally:
                 active_domains.discard(domain)
                 _clear_domain_start_time(domain)
@@ -2574,7 +2574,10 @@ async def run_fetch_mode(args):
             queue.put_nowait(None)
 
         try:
-            _ = await asyncio.gather(*workers, return_exceptions=True)
+            results = await asyncio.gather(*workers, return_exceptions=True)
+            for result in results:
+                if isinstance(result, Exception) and not shutdown_event.is_set():
+                    echo(f"Worker failed: {result}", "orange", use_tqdm=True)
         except asyncio.CancelledError:
             shutdown_event.set()
             for worker in workers:
@@ -2590,7 +2593,7 @@ async def run_fetch_mode(args):
     finally:
         pbar.close()
 
-    vmc_output("Fetching complete!", "bold")
+    echo("Fetching complete!", "bold")
 
     # If we found new domains, crawl them
     if all_new_domains:
@@ -2602,7 +2605,7 @@ async def run_fetch_mode(args):
                 seen.add(d)
                 unique_new_domains.append(d)
 
-        vmc_output(
+        echo(
             f"\nProcessing {len(unique_new_domains)} newly discovered domains…",
             "bold",
         )
@@ -2621,9 +2624,9 @@ async def run_fetch_mode(args):
             filter_data["bad_domain_sets"],
         )
 
-        vmc_output("Crawling of new domains complete!", "bold")
+        echo("Crawling of new domains complete!", "bold")
     else:
-        vmc_output("No new domains to crawl.", "yellow")
+        echo("No new domains to crawl.", "yellow")
 
 
 # =============================================================================
@@ -2660,7 +2663,7 @@ def get_tlds_from_db() -> set[str]:
             tlds: set[str] = {row[0] for row in cursor}
             return _exclude_tlds(tlds)
         except Exception as e:
-            vmc_output(f"Failed to get TLDs from database: {e}", "red")
+            echo(f"Failed to get TLDs from database: {e}", "red")
             conn.rollback()
             return set()
 
@@ -2688,7 +2691,7 @@ def import_tlds(tlds: set[str]) -> int:
                 return inserted_count
             return 0
         except Exception as e:
-            vmc_output(f"Failed to import TLDs: {e}", "red")
+            echo(f"Failed to import TLDs: {e}", "red")
             conn.rollback()
             return 0
 
@@ -2708,7 +2711,7 @@ async def fetch_tlds_from_iana() -> set[str]:
             }
             return domain_endings
     except Exception as e:
-        vmc_output(f"Failed to fetch TLDs from IANA: {e}", "red")
+        echo(f"Failed to fetch TLDs from IANA: {e}", "red")
 
     return set()
 
@@ -2729,7 +2732,7 @@ def get_existing_dni_domains() -> set[str]:
             existing_domains: set[str] = {row[0] for row in cursor}
             return existing_domains
         except Exception as e:
-            vmc_output(f"Failed to get existing DNI domains: {e}", "red")
+            echo(f"Failed to get existing DNI domains: {e}", "red")
             conn.rollback()
             return set()
 
@@ -2764,16 +2767,16 @@ def import_dni_domains(
                 ).format(placeholders)
                 _ = cursor.execute(query, flattened_values)
                 inserted_count = cursor.rowcount
-                vmc_output(
+                echo(
                     f"Imported {inserted_count} new DNI domains (force={force})",
                     "green",
                 )
                 conn.commit()
                 return inserted_count
-            vmc_output("No new domains to import", "yellow")
+            echo("No new domains to import", "yellow")
             return 0
         except Exception as e:
-            vmc_output(f"Failed to import DNI domains: {e}", "red")
+            echo(f"Failed to import DNI domains: {e}", "red")
             conn.rollback()
             return 0
 
@@ -2788,11 +2791,11 @@ def list_dni_domains() -> None:
             domains = cursor.fetchall()
 
             if not domains:
-                vmc_output("No domains found in DNI table", "yellow")
+                echo("No domains found in DNI table", "yellow")
                 return
 
-            vmc_output(f"\nDNI Domains ({len(domains)} total):", "cyan")
-            vmc_output("-" * 90, "cyan")
+            echo(f"\nDNI Domains ({len(domains)} total):", "cyan")
+            echo("-" * 90, "cyan")
 
             for domain, comment, force, timestamp in domains:
                 comment_str = comment if comment else ""
@@ -2801,7 +2804,7 @@ def list_dni_domains() -> None:
             print()
 
         except Exception as e:
-            vmc_output(f"Failed to list DNI domains: {e}", "red")
+            echo(f"Failed to list DNI domains: {e}", "red")
             conn.rollback()
 
 
@@ -2812,10 +2815,10 @@ def count_dni_domains() -> int:
             _ = cursor.execute("SELECT COUNT(*) FROM dni")
             result = cursor.fetchone()
             count: int = result[0] if result else 0
-            vmc_output(f"Total DNI domains: {count}", "green")
+            echo(f"Total DNI domains: {count}", "green")
             return count
         except Exception as e:
-            vmc_output(f"Failed to count DNI domains: {e}", "red")
+            echo(f"Failed to count DNI domains: {e}", "red")
             conn.rollback()
             return 0
 
@@ -2823,18 +2826,18 @@ def count_dni_domains() -> int:
 async def fetch_dni_csv(url: str) -> str | None:
     """Fetch the DNI CSV file from the specified URL."""
     try:
-        vmc_output(f"Fetching DNI list from {url}…", "bold")
+        echo(f"Fetching DNI list from {url}…", "bold")
         response = await get_httpx(url)
 
         if response.status_code != 200:
-            vmc_output(f"Failed to fetch DNI CSV: HTTP {response.status_code}", "red")
+            echo(f"Failed to fetch DNI CSV: HTTP {response.status_code}", "red")
             return None
 
-        vmc_output("DNI CSV fetched successfully", "green")
+        echo("DNI CSV fetched successfully", "green")
         return response.text
 
     except Exception as e:
-        vmc_output(f"Error fetching DNI CSV: {e}", "red")
+        echo(f"Error fetching DNI CSV: {e}", "red")
         return None
 
 
@@ -2850,7 +2853,7 @@ def _parse_dni_csv(csv_content: str) -> list[str]:
 
         # Check if #domain column exists
         if not reader.fieldnames or "#domain" not in reader.fieldnames:
-            vmc_output(
+            echo(
                 "CSV header '#domain' not found. "
                 + f"Available headers: {reader.fieldnames}",
                 "red",
@@ -2862,19 +2865,19 @@ def _parse_dni_csv(csv_content: str) -> list[str]:
             if domain and domain != "#domain":  # Skip empty rows and header repeats
                 domains.append(domain.lower())
 
-        vmc_output(f"Parsed {len(domains)} domains from CSV", "green")
+        echo(f"Parsed {len(domains)} domains from CSV", "green")
         return domains
 
     except Exception as e:
-        vmc_output(f"Error parsing DNI CSV: {e}", "red")
+        echo(f"Error parsing DNI CSV: {e}", "red")
         return []
 
 
 async def run_dni_mode(args):
     """Run the DNI list management mode."""
-    vmc_output(f"{appname} v{appversion} (dni mode)", "bold")
+    echo(f"{appname} v{appversion} (dni mode)", "bold")
     if _is_running_headless():
-        vmc_output("Running in headless mode", "cyan")
+        echo("Running in headless mode", "cyan")
 
     # List domains
     if args.list:
@@ -2890,31 +2893,31 @@ async def run_dni_mode(args):
     existing_domains = get_existing_dni_domains()
 
     # Fetch and import DNI list
-    vmc_output("Fetching IFTAS DNI List…", "bold")
+    echo("Fetching IFTAS DNI List…", "bold")
     csv_content = await fetch_dni_csv(args.url)
     if not csv_content:
-        vmc_output("Failed to fetch DNI CSV", "red")
+        echo("Failed to fetch DNI CSV", "red")
         return
 
     domains = _parse_dni_csv(csv_content)
     if not domains:
-        vmc_output("No domains parsed from DNI CSV", "yellow")
+        echo("No domains parsed from DNI CSV", "yellow")
         return
 
     new_domains = [d for d in domains if d not in existing_domains]
-    vmc_output(
+    echo(
         f"Found {len(new_domains)} new DNI domains (out of {len(domains)} total)",
         "cyan",
     )
 
     if new_domains:
         imported = import_dni_domains(new_domains, comment="iftas-dni")
-        vmc_output(f"Total new domains imported: {imported}", "green")
+        echo(f"Total new domains imported: {imported}", "green")
     else:
-        vmc_output("All DNI domains already exist in database", "yellow")
+        echo("All DNI domains already exist in database", "yellow")
 
     _ = count_dni_domains()
-    vmc_output("DNI import complete!", "bold")
+    echo("DNI import complete!", "bold")
 
 
 # =============================================================================
@@ -2936,23 +2939,23 @@ def display_nightly_versions():
             versions = cur.fetchall()
 
             if not versions:
-                vmc_output("No nightly versions found in database", "yellow")
+                echo("No nightly versions found in database", "yellow")
                 return
 
-            vmc_output("\nCurrent Nightly Versions:", "cyan")
-            vmc_output("-" * 70, "cyan")
-            vmc_output(
+            echo("\nCurrent Nightly Versions:", "cyan")
+            echo("-" * 70, "cyan")
+            echo(
                 f"{'Version':<20} {'Start Date':<15} {'End Date':<15}",
                 "bold",
             )
-            vmc_output("-" * 70, "cyan")
+            echo("-" * 70, "cyan")
 
             for version, start_date, end_date in versions:
                 print(f"{version:<20} {start_date} {end_date}")
             print()
 
     except Exception as e:
-        vmc_output(f"Error fetching nightly versions: {e}", "red")
+        echo(f"Error fetching nightly versions: {e}", "red")
         sys.exit(1)
 
 
@@ -2972,7 +2975,7 @@ def get_active_nightly_version():
             result = cur.fetchone()
             return result if result else None
     except Exception as e:
-        vmc_output(f"Error fetching active version: {e}", "red")
+        echo(f"Error fetching active version: {e}", "red")
         return None
 
 
@@ -2993,14 +2996,14 @@ def add_nightly_version(
     try:
         # Validate dates
         if not _validate_nightly_date(start_date):
-            vmc_output(
+            echo(
                 f"Invalid start_date format: {start_date}. Use YYYY-MM-DD",
                 "red",
             )
             return False
 
         if not _validate_nightly_date(end_date):
-            vmc_output(f"Invalid end_date format: {end_date}. Use YYYY-MM-DD", "yellow")
+            echo(f"Invalid end_date format: {end_date}. Use YYYY-MM-DD", "yellow")
             return False
 
         # Check if version already exists
@@ -3012,7 +3015,7 @@ def add_nightly_version(
                 (nightly_version,),
             )
             if cur.fetchone():
-                vmc_output(
+                echo(
                     f"Version {nightly_version} already exists in database",
                     "yellow",
                 )
@@ -3028,10 +3031,10 @@ def add_nightly_version(
                     datetime.strptime(start_date, "%Y-%m-%d") - timedelta(days=1)
                 ).strftime("%Y-%m-%d")
 
-                vmc_output("\nUpdating previous active version:", "cyan")
-                vmc_output(f"  Version: {old_version}", "cyan")
-                vmc_output(f"  Old end date: {old_end}", "cyan")
-                vmc_output(f"  New end date: {new_end_date}", "cyan")
+                echo("\nUpdating previous active version:", "cyan")
+                echo(f"  Version: {old_version}", "cyan")
+                echo(f"  Old end date: {old_end}", "cyan")
+                echo(f"  New end date: {new_end_date}", "cyan")
 
                 with db_pool.connection() as conn, conn.cursor() as cur:
                     _ = cur.execute(
@@ -3044,7 +3047,7 @@ def add_nightly_version(
                     )
                     conn.commit()
 
-                vmc_output(f"Updated {old_version} end date to {new_end_date}", "green")
+                echo(f"Updated {old_version} end date to {new_end_date}", "green")
 
         # Insert new version
         with db_pool.connection() as conn, conn.cursor() as cur:
@@ -3057,15 +3060,15 @@ def add_nightly_version(
             )
             conn.commit()
 
-        vmc_output("\nSuccessfully added nightly version:", "green")
-        vmc_output(f"  Version: {nightly_version}", "green")
-        vmc_output(f"  Start date: {start_date}", "green")
-        vmc_output(f"  End date: {end_date}", "green")
+        echo("\nSuccessfully added nightly version:", "green")
+        echo(f"  Version: {nightly_version}", "green")
+        echo(f"  Start date: {start_date}", "green")
+        echo(f"  End date: {end_date}", "green")
 
         return True
 
     except Exception as e:
-        vmc_output(f"Error adding nightly version: {e}", "red")
+        echo(f"Error adding nightly version: {e}", "red")
         return False
 
 
@@ -3073,7 +3076,7 @@ def update_nightly_end_date(nightly_version, new_end_date):
     """Update the end_date for a specific version."""
     try:
         if not _validate_nightly_date(new_end_date):
-            vmc_output(f"Invalid date format: {new_end_date}. Use YYYY-MM-DD", "yellow")
+            echo(f"Invalid date format: {new_end_date}. Use YYYY-MM-DD", "yellow")
             return False
 
         with db_pool.connection() as conn, conn.cursor() as cur:
@@ -3087,16 +3090,16 @@ def update_nightly_end_date(nightly_version, new_end_date):
             )
 
             if cur.rowcount == 0:
-                vmc_output(f"Version {nightly_version} not found in database", "yellow")
+                echo(f"Version {nightly_version} not found in database", "yellow")
                 return False
 
             conn.commit()
 
-        vmc_output(f"Updated {nightly_version} end date to {new_end_date}", "green")
+        echo(f"Updated {nightly_version} end date to {new_end_date}", "green")
         return True
 
     except Exception as e:
-        vmc_output(f"Error updating end date: {e}", "red")
+        echo(f"Error updating end date: {e}", "red")
         return False
 
 
@@ -3111,7 +3114,7 @@ def _validate_nightly_date(date_string):
 
 def interactive_add_nightly():
     """Interactive mode for adding a new nightly version."""
-    vmc_output("\n=== Add New Nightly Version ===", "bold")
+    echo("\n=== Add New Nightly Version ===", "bold")
 
     # Show current versions
     display_nightly_versions()
@@ -3119,7 +3122,7 @@ def interactive_add_nightly():
     # Get version
     nightly_version = input("Enter version (e.g., 4.9.0-alpha.7): ").strip()
     if not nightly_version:
-        vmc_output("Version cannot be empty", "yellow")
+        echo("Version cannot be empty", "yellow")
         return
 
     # Get start date
@@ -3142,12 +3145,12 @@ def interactive_add_nightly():
             datetime.strptime(start_date, "%Y-%m-%d") - timedelta(days=1)
         ).strftime("%Y-%m-%d")
 
-        vmc_output("\nThis will update the previous active version:", "yellow")
-        vmc_output(f"  {old_version}: {old_end} -> {new_end}", "yellow")
+        echo("\nThis will update the previous active version:", "yellow")
+        echo(f"  {old_version}: {old_end} -> {new_end}", "yellow")
 
         confirm = input("Continue? (y/n): ").strip().lower()
         if confirm != "y":
-            vmc_output("Operation cancelled", "yellow")
+            echo("Operation cancelled", "yellow")
             return
 
     # Add the version
@@ -3156,9 +3159,9 @@ def interactive_add_nightly():
 
 def run_nightly_mode(args):
     """Run the nightly version management mode."""
-    vmc_output(f"{appname} v{appversion} (nightly mode)", "bold")
+    echo(f"{appname} v{appversion} (nightly mode)", "bold")
     if _is_running_headless():
-        vmc_output("Running in headless mode", "cyan")
+        echo("Running in headless mode", "cyan")
 
     # List versions
     if args.list:
@@ -3193,20 +3196,20 @@ def run_nightly_mode(args):
 def print_manage_menu():
     """Print the management menu options."""
     print()
-    vmc_output("Management Menu:", "bold")
-    vmc_output("-" * 50, "cyan")
+    echo("Management Menu:", "bold")
+    echo("-" * 50, "cyan")
     print()
-    vmc_output("DNI (Do Not Interact) Management:", "yellow")
+    echo("DNI (Do Not Interact) Management:", "yellow")
     print("  1. Fetch and import IFTAS DNI list")
     print("  2. List all DNI domains")
     print("  3. Count DNI domains")
     print()
-    vmc_output("Nightly Version Management:", "yellow")
+    echo("Nightly Version Management:", "yellow")
     print("  4. List all nightly versions")
     print("  5. Add a new nightly version")
     print("  6. Update nightly version end date")
     print()
-    vmc_output("Mastodon Version Management:", "yellow")
+    echo("Mastodon Version Management:", "yellow")
     print("  7. Update latest Mastodon versions")
     print("  8. Show current version info")
     print("  9. Promote branch to release")
@@ -3225,47 +3228,47 @@ def get_manage_choice():
 
 async def run_manage_mode(args):
     """Run the unified management mode with menu interface."""
-    vmc_output(f"{appname} v{appversion} (manage mode)", "bold")
+    echo(f"{appname} v{appversion} (manage mode)", "bold")
     if _is_running_headless():
-        vmc_output("Running in headless mode", "cyan")
+        echo("Running in headless mode", "cyan")
 
     while True:
         print_manage_menu()
         choice = get_manage_choice()
 
         if choice in {"q", "quit", "exit"}:
-            vmc_output("Exiting management mode", "cyan")
+            echo("Exiting management mode", "cyan")
             break
 
         # DNI Management
         elif choice == "1":
             # Fetch and import IFTAS DNI list
             existing_domains = get_existing_dni_domains()
-            vmc_output("Fetching IFTAS DNI List…", "bold")
+            echo("Fetching IFTAS DNI List…", "bold")
             csv_content = await fetch_dni_csv(DNI_CSV_URL)
             if not csv_content:
-                vmc_output("Failed to fetch DNI CSV", "red")
+                echo("Failed to fetch DNI CSV", "red")
                 continue
 
             domains = _parse_dni_csv(csv_content)
             if not domains:
-                vmc_output("No domains parsed from DNI CSV", "yellow")
+                echo("No domains parsed from DNI CSV", "yellow")
                 continue
 
             new_domains = [d for d in domains if d not in existing_domains]
-            vmc_output(
+            echo(
                 f"Found {len(new_domains)} new DNI domains (out of {len(domains)} total)",
                 "cyan",
             )
 
             if new_domains:
                 imported = import_dni_domains(new_domains, comment="iftas-dni")
-                vmc_output(f"Total new domains imported: {imported}", "green")
+                echo(f"Total new domains imported: {imported}", "green")
             else:
-                vmc_output("All DNI domains already exist in database", "yellow")
+                echo("All DNI domains already exist in database", "yellow")
 
             _ = count_dni_domains()
-            vmc_output("DNI import complete!", "bold")
+            echo("DNI import complete!", "bold")
             print()
             input("Press Enter to continue...")
 
@@ -3302,14 +3305,14 @@ async def run_manage_mode(args):
             if version_to_update and new_end_date:
                 _ = update_nightly_end_date(version_to_update, new_end_date)
             else:
-                vmc_output("Invalid input, operation cancelled", "yellow")
+                echo("Invalid input, operation cancelled", "yellow")
             print()
             input("Press Enter to continue...")
 
         # Mastodon Version Management
         elif choice == "7":
             # Update latest Mastodon versions (only existing branches)
-            vmc_output("Fetching latest Mastodon versions from GitHub…", "bold")
+            echo("Fetching latest Mastodon versions from GitHub…", "bold")
 
             # Fetch fresh version info from GitHub
             main_release = await get_main_version_release()
@@ -3337,10 +3340,10 @@ async def run_manage_mode(args):
             # Reload from database to update global variables
             load_versions_from_db()
 
-            vmc_output("Version information updated successfully!", "green")
-            vmc_output(f"Main version: {version_main_release}", "cyan")
+            echo("Version information updated successfully!", "green")
+            echo(f"Main version: {version_main_release}", "cyan")
             if version_backport_releases:
-                vmc_output(
+                echo(
                     f"Supported releases: {', '.join(version_backport_releases)}",
                     "cyan",
                 )
@@ -3352,16 +3355,16 @@ async def run_manage_mode(args):
             db_versions = get_release_versions_from_db()
 
             if not db_versions:
-                vmc_output(
+                echo(
                     "No version information found in database. Use option 7 to fetch.",
                     "yellow",
                 )
             else:
                 print()
-                vmc_output(
+                echo(
                     "Current Mastodon Version Information (from database):", "bold"
                 )
-                vmc_output("-" * 60, "cyan")
+                echo("-" * 60, "cyan")
 
                 if "main_branch" in db_versions:
                     print(f"Main branch:       {db_versions['main_branch']}")
@@ -3382,8 +3385,8 @@ async def run_manage_mode(args):
         elif choice == "9":
             # Promote branch to release
             print()
-            vmc_output("Promote Branch to Release", "bold")
-            vmc_output("-" * 60, "cyan")
+            echo("Promote Branch to Release", "bold")
+            echo("-" * 60, "cyan")
 
             with db_pool.connection() as conn, conn.cursor() as cur:
                 # Show main branch and any non-release branches that could be promoted
@@ -3398,7 +3401,7 @@ async def run_manage_mode(args):
                 promotable = cur.fetchall()
 
                 if not promotable:
-                    vmc_output("No branches available to promote", "yellow")
+                    echo("No branches available to promote", "yellow")
                     print()
                     input("Press Enter to continue...")
                     continue
@@ -3412,7 +3415,7 @@ async def run_manage_mode(args):
                     "Enter branch to promote to release (or press Enter to cancel): "
                 ).strip()
                 if not branch:
-                    vmc_output("Operation cancelled", "yellow")
+                    echo("Operation cancelled", "yellow")
                     print()
                     input("Press Enter to continue...")
                     continue
@@ -3425,14 +3428,14 @@ async def run_manage_mode(args):
                 existing = cur.fetchone()
 
                 if not existing:
-                    vmc_output(f"Branch {branch} not found", "yellow")
+                    echo(f"Branch {branch} not found", "yellow")
                     print()
                     input("Press Enter to continue...")
                     continue
 
                 # If it's already a release or EOL, abort
                 if existing[1] != "main":
-                    vmc_output(
+                    echo(
                         f"Branch {branch} has status '{existing[1]}' and cannot be promoted",
                         "yellow",
                     )
@@ -3463,7 +3466,7 @@ async def run_manage_mode(args):
                 new_level = 0
 
                 # Fetch latest version for this branch from GitHub
-                vmc_output(f"Fetching latest version for branch {branch}...", "cyan")
+                echo(f"Fetching latest version for branch {branch}...", "cyan")
                 url = "https://api.github.com/repos/mastodon/mastodon/releases"
                 response = await get_httpx(url)
                 _ = response.raise_for_status()
@@ -3478,7 +3481,7 @@ async def run_manage_mode(args):
 
                 if not latest_version:
                     latest_version = f"{branch}.0"
-                    vmc_output(
+                    echo(
                         f"No releases found for {branch}, using {latest_version}",
                         "yellow",
                     )
@@ -3499,7 +3502,7 @@ async def run_manage_mode(args):
                         """,
                         (branch, "release", new_level, latest_version),
                     )
-                    vmc_output(
+                    echo(
                         f"Promoted main branch {branch} to release (n_level={new_level}, latest={latest_version})",
                         "green",
                     )
@@ -3517,7 +3520,7 @@ async def run_manage_mode(args):
                         """,
                         (new_main_branch, "main", -1, new_main_version),
                     )
-                    vmc_output(
+                    echo(
                         f"Created new main branch {new_main_branch} ({new_main_version})",
                         "green",
                     )
@@ -3530,7 +3533,7 @@ async def run_manage_mode(args):
                         """,
                         (branch, "release", new_level, latest_version),
                     )
-                    vmc_output(
+                    echo(
                         f"Added branch {branch} as release (n_level={new_level}, latest={latest_version})",
                         "green",
                     )
@@ -3546,8 +3549,8 @@ async def run_manage_mode(args):
         elif choice == "10":
             # Mark branch as EOL
             print()
-            vmc_output("Mark Branch as EOL", "bold")
-            vmc_output("-" * 60, "cyan")
+            echo("Mark Branch as EOL", "bold")
+            echo("-" * 60, "cyan")
 
             # Show current release branches
             with db_pool.connection() as conn, conn.cursor() as cur:
@@ -3557,7 +3560,7 @@ async def run_manage_mode(args):
                 release_branches = cur.fetchall()
 
             if not release_branches:
-                vmc_output("No release branches found", "yellow")
+                echo("No release branches found", "yellow")
                 print()
                 input("Press Enter to continue...")
                 continue
@@ -3571,7 +3574,7 @@ async def run_manage_mode(args):
                 "Enter branch to mark as EOL (or press Enter to cancel): "
             ).strip()
             if not branch:
-                vmc_output("Operation cancelled", "yellow")
+                echo("Operation cancelled", "yellow")
                 print()
                 input("Press Enter to continue...")
                 continue
@@ -3585,7 +3588,7 @@ async def run_manage_mode(args):
                 result = cur.fetchone()
 
                 if not result:
-                    vmc_output(f"Branch {branch} not found", "yellow")
+                    echo(f"Branch {branch} not found", "yellow")
                     print()
                     input("Press Enter to continue...")
                     continue
@@ -3593,7 +3596,7 @@ async def run_manage_mode(args):
                 status, n_level = result
 
                 if status != "release":
-                    vmc_output(
+                    echo(
                         f"Branch {branch} is not a release (status={status})", "yellow"
                     )
                     print()
@@ -3607,7 +3610,7 @@ async def run_manage_mode(args):
                 )
                 conn.commit()
 
-                vmc_output(f"Marked branch {branch} as EOL", "green")
+                echo(f"Marked branch {branch} as EOL", "green")
 
                 # Reload global variables
                 load_versions_from_db()
@@ -3618,8 +3621,8 @@ async def run_manage_mode(args):
         elif choice == "11":
             # Reorder release branches
             print()
-            vmc_output("Reorder Release Branches", "bold")
-            vmc_output("-" * 60, "cyan")
+            echo("Reorder Release Branches", "bold")
+            echo("-" * 60, "cyan")
 
             # Get current release branches
             with db_pool.connection() as conn, conn.cursor() as cur:
@@ -3629,7 +3632,7 @@ async def run_manage_mode(args):
                 release_branches = cur.fetchall()
 
             if not release_branches:
-                vmc_output("No release branches found", "yellow")
+                echo("No release branches found", "yellow")
                 print()
                 input("Press Enter to continue...")
                 continue
@@ -3639,14 +3642,14 @@ async def run_manage_mode(args):
                 print(f"  {n_level}: {branch} ({latest})")
             print()
 
-            vmc_output(
+            echo(
                 "Enter new order as comma-separated branches (e.g., 4.6,4.5,4.4)",
                 "cyan",
             )
             new_order = input("New order: ").strip()
 
             if not new_order:
-                vmc_output("Operation cancelled", "yellow")
+                echo("Operation cancelled", "yellow")
                 print()
                 input("Press Enter to continue...")
                 continue
@@ -3658,11 +3661,11 @@ async def run_manage_mode(args):
             new_branches_set = set(new_branches)
 
             if current_branches != new_branches_set:
-                vmc_output(
+                echo(
                     "Error: New order must include all current release branches", "red"
                 )
-                vmc_output(f"Expected: {', '.join(sorted(current_branches))}", "yellow")
-                vmc_output(f"Got: {', '.join(new_branches)}", "yellow")
+                echo(f"Expected: {', '.join(sorted(current_branches))}", "yellow")
+                echo(f"Got: {', '.join(new_branches)}", "yellow")
                 print()
                 input("Press Enter to continue...")
                 continue
@@ -3676,7 +3679,7 @@ async def run_manage_mode(args):
                     )
                 conn.commit()
 
-                vmc_output("Branch order updated successfully!", "green")
+                echo("Branch order updated successfully!", "green")
 
                 # Show new order
                 _ = cur.execute(
@@ -3695,7 +3698,7 @@ async def run_manage_mode(args):
             input("Press Enter to continue...")
 
         else:
-            vmc_output("Invalid choice, please try again", "yellow")
+            echo("Invalid choice, please try again", "yellow")
 
 
 # =============================================================================
@@ -3709,7 +3712,7 @@ def _handle_incorrect_file_type(domain, target, content_type, preserve_status=No
         content_type = "missing Content-Type"
     clean_content_type = RE_CONTENT_TYPE_CHARSET.sub("", content_type).strip()
     error_message = f"{target} is {clean_content_type}"
-    vmc_output(f"{domain}: {error_message}", "orange", use_tqdm=True)
+    echo(f"{domain}: {error_message}", "orange", use_tqdm=True)
     log_error(domain, error_message)
     increment_domain_error(domain, f"TYPE+{target}", preserve_status)
 
@@ -3718,7 +3721,7 @@ def _handle_http_status_code(domain, target, response, preserve_status=None):
     """Handle non-fatal HTTP status codes."""
     code = response.status_code
     error_message = f"HTTP {code} on {target}"
-    vmc_output(f"{domain}: {error_message}", "yellow", use_tqdm=True)
+    echo(f"{domain}: {error_message}", "yellow", use_tqdm=True)
     log_error(domain, error_message)
     increment_domain_error(domain, f"{code}+{target}", preserve_status)
 
@@ -3727,7 +3730,7 @@ def _handle_http_failed(domain, target, response, preserve_status=None):
     """Handle HTTP 410/418/451/999 hard-fail codes via error counting."""
     code = response.status_code
     error_message = f"HTTP {code} on {target}"
-    vmc_output(f"{domain}: {error_message}", "yellow", use_tqdm=True)
+    echo(f"{domain}: {error_message}", "yellow", use_tqdm=True)
     log_error(domain, error_message)
     increment_domain_error(domain, f"HARD+{target}", preserve_status)
 
@@ -3740,7 +3743,7 @@ def _handle_tcp_exception(domain, target, exception, preserve_status=None):
     # Handle response size violations
     if isinstance(exception, ValueError) and "too large" in error_message_lower:
         error_reason = "FILE"
-        vmc_output(f"{domain}: Response too large", "orange", use_tqdm=True)
+        echo(f"{domain}: Response too large", "orange", use_tqdm=True)
         log_error(domain, "Response exceeds size limit")
         increment_domain_error(domain, f"{error_reason}+{target}", preserve_status)
         return
@@ -3748,7 +3751,7 @@ def _handle_tcp_exception(domain, target, exception, preserve_status=None):
     # Handle bad file descriptor (usually from cancellation/cleanup issues)
     if "bad file descriptor" in error_message_lower:
         error_reason = "FILE"
-        vmc_output(f"{domain}: Connection closed unexpectedly", "orange", use_tqdm=True)
+        echo(f"{domain}: Connection closed unexpectedly", "orange", use_tqdm=True)
         log_error(domain, "Bad file descriptor")
         increment_domain_error(domain, f"{error_reason}+{target}", preserve_status)
         return
@@ -3777,7 +3780,7 @@ def _handle_tcp_exception(domain, target, exception, preserve_status=None):
         # Fallback to original if cleaning resulted in empty string
         if not cleaned_message:
             cleaned_message = "SSL connection error"
-        vmc_output(f"{domain}: {cleaned_message}", "orange", use_tqdm=True)
+        echo(f"{domain}: {cleaned_message}", "orange", use_tqdm=True)
         log_error(domain, cleaned_message)
         increment_domain_error(domain, f"{error_reason}+{target}", preserve_status)
     # Check for DNS resolution errors
@@ -3803,7 +3806,7 @@ def _handle_tcp_exception(domain, target, exception, preserve_status=None):
         # Fallback to original if cleaning resulted in empty string
         if not cleaned_message:
             cleaned_message = "DNS resolution failed"
-        vmc_output(f"{domain}: {cleaned_message}", "orange", use_tqdm=True)
+        echo(f"{domain}: {cleaned_message}", "orange", use_tqdm=True)
         log_error(domain, cleaned_message)
         increment_domain_error(domain, f"{error_reason}+{target}", preserve_status)
     else:
@@ -3820,7 +3823,7 @@ def _handle_tcp_exception(domain, target, exception, preserve_status=None):
         # Fallback to original if cleaning resulted in empty string
         if not cleaned_message:
             cleaned_message = str(exception)[:100] or "TCP error"
-        vmc_output(f"{domain}: {cleaned_message}", "orange", use_tqdm=True)
+        echo(f"{domain}: {cleaned_message}", "orange", use_tqdm=True)
         log_error(domain, cleaned_message)
         increment_domain_error(domain, f"{error_reason}+{target}", preserve_status)
 
@@ -3829,7 +3832,7 @@ def _handle_json_exception(domain, target, exception, preserve_status=None):
     """Handle JSON parsing exceptions."""
     error_message = str(exception)
     error_reason = f"JSON+{target}"
-    vmc_output(f"{domain}: {target} {error_message}", "yellow", use_tqdm=True)
+    echo(f"{domain}: {target} {error_message}", "yellow", use_tqdm=True)
     log_error(domain, error_message)
     increment_domain_error(domain, f"{error_reason}", preserve_status)
 
@@ -3847,14 +3850,14 @@ def _should_skip_domain(
 ):
     """Check if a domain should be skipped based on its status."""
     if user_choice != "10" and domain in not_masto_domains:
-        vmc_output(f"{domain}: Other Platform", "cyan", use_tqdm=True)
+        echo(f"{domain}: Other Platform", "cyan", use_tqdm=True)
         return True
     # Check bad_* terminal states
     preserve_col = MENU_CHOICE_TO_STATUS_COLUMN.get(user_choice or "")
     for col_name, domain_set in bad_domain_sets.items():
         if domain in domain_set and preserve_col != col_name:
             label = col_name.replace("_", " ").title()
-            vmc_output(f"{domain}: {label}", "cyan", use_tqdm=True)
+            echo(f"{domain}: {label}", "cyan", use_tqdm=True)
             return True
     return False
 
@@ -3881,12 +3884,12 @@ def _is_dni_or_invalid_tld(domain, dni_domains, domain_endings):
         domain_endings: Set of valid TLDs (e.g., {"com", "org"})
     """
     if _is_dni_domain(domain, dni_domains):
-        vmc_output(f"{domain}: Purging known DNI domain", "cyan", use_tqdm=True)
+        echo(f"{domain}: Purging known DNI domain", "cyan", use_tqdm=True)
         delete_domain_if_known(domain)
         delete_domain_from_raw(domain)
         return True
     if not _has_valid_tld(domain, domain_endings):
-        vmc_output(f"{domain}: Purging invalid TLD", "cyan", use_tqdm=True)
+        echo(f"{domain}: Purging invalid TLD", "cyan", use_tqdm=True)
         delete_domain_if_known(domain)
         delete_domain_from_raw(domain)
         return True
@@ -3937,7 +3940,7 @@ async def check_robots_txt(domain, preserve_status=None):
                         disallow_path == "/" or disallow_path == "*"
                     ):
                         error_to_print = "Crawling is prohibited by robots.txt"
-                        vmc_output(
+                        echo(
                             f"{domain}: {error_to_print}",
                             "yellow",
                             use_tqdm=True,
@@ -4205,7 +4208,7 @@ async def check_nodeinfo(
 
             # Check if this is a Matrix server (has m.server field)
             if "m.server" in data:
-                vmc_output(f"{domain}: Matrix", "cyan", use_tqdm=True)
+                echo(f"{domain}: Matrix", "cyan", use_tqdm=True)
                 # Save nodeinfo as "matrix" and mark as non-Mastodon
                 await asyncio.to_thread(_save_matrix_nodeinfo, domain)
                 await asyncio.to_thread(clear_domain_error, domain)
@@ -4216,7 +4219,7 @@ async def check_nodeinfo(
             if "software" in data and "version" in data:
                 # This is nodeinfo data returned directly at the well-known endpoint
                 # Return it as if it came from a nodeinfo_20 request
-                vmc_output(
+                echo(
                     f"{domain}: NodeInfo data returned directly at well-known endpoint",
                     "white",
                     use_tqdm=True,
@@ -4233,7 +4236,7 @@ async def check_nodeinfo(
                 and ("rel" in data or "Rel" in data)
                 and ("href" in data or "Href" in data)
             ):
-                vmc_output(
+                echo(
                     f"{domain}: Single link object returned instead of array",
                     "white",
                     use_tqdm=True,
@@ -4427,7 +4430,7 @@ def mark_as_non_mastodon(domain, other_platform):
     if not other_platform:
         other_platform = "Unknown"
     other_platform = other_platform.lower().replace(" ", "-")
-    vmc_output(f"{domain}: {other_platform}", "cyan", use_tqdm=True)
+    echo(f"{domain}: {other_platform}", "cyan", use_tqdm=True)
     clear_domain_error(domain)
     delete_domain_if_known(domain)
 
@@ -4538,7 +4541,7 @@ def process_mastodon_instance(
 
     if not isinstance(users, dict) or not users:
         error_to_print = "No usage data in NodeInfo"
-        vmc_output(f"{db_domain}: {error_to_print}", "yellow", use_tqdm=True)
+        echo(f"{db_domain}: {error_to_print}", "yellow", use_tqdm=True)
         log_error(domain, error_to_print)
         increment_domain_error(domain, "JSON+nodeinfo_20", preserve_status)
         return
@@ -4551,7 +4554,7 @@ def process_mastodon_instance(
     for field, error_msg in required_fields:
         # Allow 0 user counts, but reject null values.
         if field not in users or users[field] is None:
-            vmc_output(f"{db_domain}: {error_msg}", "yellow", use_tqdm=True)
+            echo(f"{db_domain}: {error_msg}", "yellow", use_tqdm=True)
             log_error(domain, error_msg)
             increment_domain_error(domain, "JSON+nodeinfo_20", preserve_status)
             return
@@ -4562,7 +4565,7 @@ def process_mastodon_instance(
         software_version.split("-")[0]
     ) > version.parse(version_main_branch):
         error_to_print = "Mastodon version invalid"
-        vmc_output(f"{db_domain}: {error_to_print}", "yellow", use_tqdm=True)
+        echo(f"{db_domain}: {error_to_print}", "yellow", use_tqdm=True)
         log_error(domain, error_to_print)
         increment_domain_error(domain, "JSON+nodeinfo_20", preserve_status)
         return
@@ -4585,7 +4588,7 @@ def process_mastodon_instance(
     version_info = f"Mastodon v{software_version}"
     if software_version != nodeinfo_20_result["software"]["version"]:
         version_info = f"{version_info} ({nodeinfo_20_result['software']['version']})"
-    vmc_output(f"{db_domain}: {version_info}", "green", use_tqdm=True)
+    echo(f"{db_domain}: {version_info}", "green", use_tqdm=True)
 
 
 async def process_domain(domain, nightly_version_ranges, user_choice=None):
@@ -4657,7 +4660,7 @@ async def process_domain(domain, nightly_version_ranges, user_choice=None):
                     )
             else:
                 error_to_print = "Both host-meta and webfinger failed"
-                vmc_output(
+                echo(
                     f"{domain}: {error_to_print}",
                     "yellow",
                     use_tqdm=True,
@@ -4671,7 +4674,7 @@ async def process_domain(domain, nightly_version_ranges, user_choice=None):
                 )
             return
         else:
-            vmc_output(
+            echo(
                 f"{domain}: Found backend via {discovery_method}: {backend_domain}",
                 "white",
                 use_tqdm=True,
@@ -4716,7 +4719,7 @@ async def process_domain(domain, nightly_version_ranges, user_choice=None):
         if is_401:
             # Instance API requires authentication (401 Unauthorized)
             error_to_print = "Instance API requires authentication"
-            vmc_output(f"{domain}: {error_to_print}", "yellow", use_tqdm=True)
+            echo(f"{domain}: {error_to_print}", "yellow", use_tqdm=True)
             await asyncio.to_thread(log_error, domain, error_to_print)
             await asyncio.to_thread(
                 increment_domain_error, domain, "API+instance_api", preserve_status
@@ -4726,7 +4729,7 @@ async def process_domain(domain, nightly_version_ranges, user_choice=None):
         if instance_uri is None:
             # Instance API endpoint is required for Mastodon instances
             error_to_print = "could not retrieve instance URI"
-            vmc_output(f"{domain}: {error_to_print}", "yellow", use_tqdm=True)
+            echo(f"{domain}: {error_to_print}", "yellow", use_tqdm=True)
             await asyncio.to_thread(log_error, domain, error_to_print)
             await asyncio.to_thread(
                 increment_domain_error,
@@ -4871,8 +4874,10 @@ async def check_and_record_domains(
                 _refresh_progress_postfix()
                 elapsed_seconds = time.monotonic() - started_at
                 if log_all_domain_timings:
-                    tqdm.write(
-                        f"{domain}: {colors['orange']}Elapsed {elapsed_seconds:.2f}s{colors['reset']}"
+                    echo(
+                        f"{domain}: Elapsed {elapsed_seconds:.2f}s",
+                        "orange",
+                        use_tqdm=True,
                     )
                 queue.task_done()
 
@@ -4890,9 +4895,7 @@ async def check_and_record_domains(
             results = await asyncio.gather(*workers, return_exceptions=True)
             for result in results:
                 if isinstance(result, Exception) and not shutdown_event.is_set():
-                    tqdm.write(
-                        f"{colors['orange']}Worker failed: {result}{colors['reset']}"
-                    )
+                    echo(f"Worker failed: {result}", "orange", use_tqdm=True)
 
         except asyncio.CancelledError:
             shutdown_event.set()
@@ -5819,14 +5822,14 @@ def load_from_database(user_choice):
         if user_choice == "50":
             patched_versions = all_patched_versions or []
             params = {"versions": patched_versions}
-            vmc_output("Excluding versions:", "cyan")
+            echo("Excluding versions:", "cyan")
             for ver in patched_versions:
-                vmc_output(f" - {ver}", "cyan")
+                echo(f" - {ver}", "cyan")
         elif user_choice == "51":
             params = [f"{version_main_branch or ''}%"]
 
     if not query:
-        vmc_output(f"Choice {user_choice} is invalid, using default query", "yellow")
+        echo(f"Choice {user_choice} is invalid, using default query", "yellow")
         query = query_map["1"]
 
     # Use server-side cursor for large result sets to avoid loading all into memory
@@ -5842,7 +5845,7 @@ def load_from_database(user_choice):
             ]
             conn.commit()
         except Exception as exception:
-            vmc_output(f"Failed to obtain selected domain list: {exception}", "red")
+            echo(f"Failed to obtain selected domain list: {exception}", "red")
             conn.rollback()
             domain_list = []
 
@@ -5942,9 +5945,9 @@ def print_menu(menu_options: dict[str, dict[str, str]] | None = None) -> None:
 
     for category, options in menu_options.items():
         options_str = " ".join(f"({key}) {value}" for key, value in options.items())
-        vmc_output(f"{category}: ", "cyan", end="")
-        vmc_output(options_str, "")
-    vmc_output("Enter your choice (1, 2, 3, etc):", "bold", end=" ")
+        echo(f"{category}: ", "cyan", end="")
+        echo(options_str, "")
+    echo("Enter your choice (1, 2, 3, etc):", "bold", end=" ")
     _ = sys.stdout.flush()
 
 
@@ -6129,13 +6132,13 @@ async def maybe_refresh_versions():
             return
         else:
             # Database empty, fetch from GitHub
-            vmc_output("Fetching version information from GitHub...", "cyan")
+            echo("Fetching version information from GitHub...", "cyan")
             await initialize_versions()
             return
 
     # Refresh if interval has passed
     if (now - _version_last_refresh) >= VERSION_REFRESH_INTERVAL:
-        vmc_output("Refreshing version information from GitHub...", "cyan")
+        echo("Refreshing version information from GitHub...", "cyan")
         await initialize_versions()
 
 
@@ -6262,7 +6265,7 @@ async def async_main():
         try:
             await run_fetch_mode(args)
         except KeyboardInterrupt:
-            vmc_output(f"\n{appname} interrupted by user", "yellow")
+            echo(f"\n{appname} interrupted by user", "yellow")
         finally:
             await cleanup_connections()
         return
@@ -6272,7 +6275,7 @@ async def async_main():
         try:
             await run_manage_mode(args)
         except KeyboardInterrupt:
-            vmc_output(f"\n{appname} interrupted by user", "yellow")
+            echo(f"\n{appname} interrupted by user", "yellow")
         finally:
             await cleanup_connections()
         return
@@ -6285,13 +6288,13 @@ async def async_main():
             and args.file
             and args.target
         ):
-            vmc_output("You cannot set both file and target arguments", "red")
+            echo("You cannot set both file and target arguments", "red")
             sys.exit(1)
 
     # Main crawl loop - runs continuously in headless mode, once in interactive mode
-    vmc_output(f"{appname} v{appversion} ({current_filename})", "bold")
+    echo(f"{appname} v{appversion} ({current_filename})", "bold")
     if _is_running_headless():
-        vmc_output("Running in headless mode", "cyan")
+        echo("Running in headless mode", "cyan")
 
     # Determine if we should loop (headless without one-shot flags)
     should_loop = _is_running_headless() and not (args.file or args.target or args.new)
@@ -6317,12 +6320,12 @@ async def async_main():
                     if domain_list_file:
                         user_choice = "1"
                         domain_list = load_from_file(domain_list_file)
-                        vmc_output("Crawling domains from provided file", "cyan")
+                        echo("Crawling domains from provided file", "cyan")
                     elif single_domain_target:
                         user_choice = "1"
                         domain_list = single_domain_target.replace(" ", "").split(",")
                         domain_word = "s" if len(domain_list) > 1 else ""
-                        vmc_output(
+                        echo(
                             f"Crawling domain{domain_word} from target argument",
                             "cyan",
                         )
@@ -6342,7 +6345,7 @@ async def async_main():
                             else:
                                 user_choice = selection
 
-                        vmc_output(
+                        echo(
                             f"Crawling domains from database choice {user_choice}",
                             "cyan",
                         )
@@ -6354,10 +6357,10 @@ async def async_main():
                         random.shuffle(domain_list)
 
                 except FileNotFoundError:
-                    vmc_output(f"File not found: {domain_list_file}", "red")
+                    echo(f"File not found: {domain_list_file}", "red")
                     sys.exit(1)
                 except psycopg.Error as exception:
-                    vmc_output(f"Database error: {exception}", "red")
+                    echo(f"Database error: {exception}", "red")
                     sys.exit(1)
 
                 now = time.monotonic()
@@ -6388,11 +6391,11 @@ async def async_main():
                     break
 
                 # Brief pause before next cycle to avoid tight loop
-                vmc_output("Restarting crawl cycle...", "cyan")
+                echo("Restarting crawl cycle...", "cyan")
                 await asyncio.sleep(1)
 
             except KeyboardInterrupt:
-                vmc_output(f"\n{appname} interrupted by user", "yellow")
+                echo(f"\n{appname} interrupted by user", "yellow")
                 break
 
     finally:
