@@ -115,8 +115,6 @@ colors = {
     "yellow": "\033[93m",
     "white": "\033[0m",
 }
-TIME_TEXT = colors["gray"]
-
 # Track per-domain processing start times so error output can include elapsed time
 _domain_start_times: dict[str, float] = {}
 _domain_start_times_lock = threading.Lock()
@@ -152,7 +150,7 @@ def echo(text: str, color: str, use_tqdm: bool = False, **kwargs: Any) -> None:
             elapsed_seconds = _get_domain_elapsed_seconds(before_colon.strip())
             if elapsed_seconds is not None:
                 after_colon = (
-                    f"{after_colon} {TIME_TEXT}[{elapsed_seconds:.2f}s]"
+                    f"{after_colon} {colors.get('gray', '')}[{elapsed_seconds:.2f}s]"
                     f"{colors.get(effective_color, '')}"
                 )
         colored_text = (
