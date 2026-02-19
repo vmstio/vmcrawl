@@ -2830,6 +2830,69 @@ def remove_dni_domain(domain: str) -> bool:
             return False
 
 
+def display_domain_search(domain: str) -> None:
+    """Display all known data for a domain from raw_domains and mastodon_domains."""
+    lookup_domain = domain.strip().lower()
+    with db_pool.connection() as conn, conn.cursor() as cursor:
+        try:
+            echo(f"\nDomain lookup: {lookup_domain}", "bold")
+            echo("-" * 70, "cyan")
+
+            _ = cursor.execute(
+                "SELECT * FROM raw_domains WHERE domain = %s",
+                (lookup_domain,),
+            )
+            raw_row = cursor.fetchone()
+            raw_columns = (
+                [desc[0] for desc in cursor.description] if cursor.description else []
+            )
+
+            echo("raw_domains:", "yellow")
+            if raw_row is None:
+                echo("  No row found", "white")
+            else:
+                for column, value in zip(raw_columns, raw_row, strict=False):
+                    display_value = "NULL" if value is None else str(value)
+                    echo(f"  {column}: {display_value}", "white")
+
+            _ = cursor.execute(
+                "SELECT * FROM dni WHERE domain = %s",
+                (lookup_domain,),
+            )
+            dni_row = cursor.fetchone()
+            dni_columns = (
+                [desc[0] for desc in cursor.description] if cursor.description else []
+            )
+
+            echo("\ndni:", "yellow")
+            if dni_row is None:
+                echo("  No row found", "white")
+            else:
+                for column, value in zip(dni_columns, dni_row, strict=False):
+                    display_value = "NULL" if value is None else str(value)
+                    echo(f"  {column}: {display_value}", "white")
+
+            _ = cursor.execute(
+                "SELECT * FROM mastodon_domains WHERE domain = %s",
+                (lookup_domain,),
+            )
+            mastodon_row = cursor.fetchone()
+            mastodon_columns = (
+                [desc[0] for desc in cursor.description] if cursor.description else []
+            )
+
+            echo("\nmastodon_domains:", "yellow")
+            if mastodon_row is None:
+                echo("  No row found", "white")
+            else:
+                for column, value in zip(mastodon_columns, mastodon_row, strict=False):
+                    display_value = "NULL" if value is None else str(value)
+                    echo(f"  {column}: {display_value}", "white")
+        except Exception as e:
+            echo(f"Failed to search for domain {lookup_domain}: {e}", "red")
+            conn.rollback()
+
+
 async def fetch_dni_csv(url: str) -> str | None:
     """Fetch the DNI CSV file from the specified URL."""
     try:
@@ -3226,6 +3289,9 @@ def print_manage_menu():
     echo("", "white")
     echo("TLD Cache Management:", "yellow")
     echo("  14. Update TLD cache", "white")
+    echo("", "white")
+    echo("Domain Search:", "yellow")
+    echo("  15. Search domain details", "white")
     echo("", "white")
     echo("  q. Quit", "white")
     echo("", "white")
@@ -3774,6 +3840,19 @@ async def run_manage_mode(args):
             last_updated = get_tld_last_updated()
             if last_updated is not None:
                 echo(f"TLD cache last_updated: {last_updated}", "cyan")
+            echo("", "white")
+            input("Press Enter to continue...")
+
+        elif choice == "15":
+            # Search and display all known data for a domain
+            echo("", "white")
+            domain = input("Enter domain to search: ").strip().lower()
+            if not domain:
+                echo("Domain cannot be empty", "yellow")
+                echo("", "white")
+                input("Press Enter to continue...")
+                continue
+            display_domain_search(domain)
             echo("", "white")
             input("Press Enter to continue...")
 
@@ -6293,6 +6372,11 @@ async def async_main():
         type=str,
         help="target only a specific domain and ignore the database (ex: vmst.io)",
     )
+    _ = crawl_parser.add_argument(
+        "--db",
+        type=str,
+        help="show known domain details from raw_domains and mastodon_domains, then exit (ex: vmst.io)",
+    )
 
     # Manage subcommand (unified DNI and nightly management)
     _ = subparsers.add_parser(
@@ -6317,6 +6401,11 @@ async def async_main():
         "--target",
         type=str,
         help="target only a specific domain and ignore the database (ex: vmst.io)",
+    )
+    _ = parser.add_argument(
+        "--db",
+        type=str,
+        help="show known domain details from raw_domains and mastodon_domains, then exit (ex: vmst.io)",
     )
 
     args = parser.parse_args()
@@ -6364,6 +6453,17 @@ async def async_main():
 
     # Default crawl behavior (no subcommand or 'crawl' subcommand)
     if args.command == "crawl" or args.command is None:
+        if args.db:
+            if args.file or args.target or args.new:
+                echo(
+                    "You cannot combine --db with --file, --target, or --new",
+                    "red",
+                )
+                sys.exit(1)
+            display_domain_search(args.db)
+            await cleanup_connections()
+            return
+
         if (
             hasattr(args, "file")
             and hasattr(args, "target")

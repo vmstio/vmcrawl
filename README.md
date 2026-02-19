@@ -327,6 +327,12 @@ You can also process multiple domains using an external file, which contains eac
 ./vmcrawl.sh --file ~/domains.txt
 ```
 
+To quickly inspect all known information for one domain (from both `raw_domains` and `mastodon_domains`) without running a crawl:
+
+```bash
+./vmcrawl.sh --db vmst.io
+```
+
 ### Database and Version Management
 
 The crawler provides comprehensive database and version management through an interactive manage menu:
@@ -353,6 +359,7 @@ The crawler provides comprehensive database and version management through an in
 | `12`   | Mastodon  | Mark branch as EOL             |
 | `13`   | Mastodon  | Reorder release branches       |
 | `14`   | TLD Cache | Update TLD cache               |
+| `15`   | Search    | Search domain details          |
 
 #### DNI Management (Options 1-5)
 
@@ -469,6 +476,10 @@ Workflow:
 #### TLD Cache Management (Option 14)
 
 - **Option 14: Update TLD cache** - Fetches the latest IANA TLD list and refreshes the `tld_cache` table.
+
+#### Domain Search (Option 15)
+
+- **Option 15: Search domain details** - Prompts for a domain and displays all known columns from both `raw_domains` and `mastodon_domains`.
 
 **Version Lifecycle Workflow:**
 
