@@ -3,7 +3,7 @@
   "kind": "DashboardWithAccessInfo",
   "metadata": {
     "name": "aedqo0q7klrswa",
-    "generation": 138,
+    "generation": 140,
     "creationTimestamp": "2025-11-21T19:31:21Z",
     "labels": {},
     "annotations": {}
@@ -173,7 +173,7 @@
               "transformations": []
             }
           },
-          "description": "Instances and monthly active user (MAU) count from instances deploying the latest patch versions (${supported_patches:csv})",
+          "description": "Instances and monthly active user (MAU) count from instances deploying the latest patch versions (${main_latest}, ${latest_latest}, ${previous_latest}, ${deprecated_latest})",
           "id": 101,
           "links": [],
           "title": "Patch Coverage",
@@ -269,7 +269,7 @@
               "transformations": []
             }
           },
-          "description": "Instances and monthly active user (MAU) count from instances deploying a supported branch (${supported_branches:csv})",
+          "description": "Instances and monthly active user (MAU) count from instances deploying a supported branch (${main_branch}, ${latest_branch}, ${previous_branch}, ${deprecated_branch})",
           "id": 102,
           "links": [],
           "title": "Supported Branches",
@@ -4161,112 +4161,6 @@
           "regexApplyTo": "value",
           "skipUrlSync": false,
           "sort": "disabled"
-        }
-      },
-      {
-        "kind": "QueryVariable",
-        "spec": {
-          "allowCustomValue": true,
-          "current": {
-            "text": "",
-            "value": ""
-          },
-          "definition": "SELECT branch\nFROM release_versions\nWHERE (status = 'main' OR status = 'release');",
-          "hide": "hideVariable",
-          "includeAll": true,
-          "multi": true,
-          "name": "supported_branches",
-          "options": [],
-          "query": {
-            "group": "grafana-postgresql-datasource",
-            "kind": "DataQuery",
-            "spec": {
-              "dataset": "vmcrawl",
-              "editorMode": "code",
-              "format": "table",
-              "query": "SELECT branch\nFROM release_versions\nWHERE (status = 'main' OR status = 'release');",
-              "rawQuery": true,
-              "rawSql": "SELECT branch\nFROM release_versions\nWHERE (status = 'main' OR status = 'release');",
-              "refId": "SQLVariableQueryEditor-VariableQuery",
-              "sql": {
-                "columns": [
-                  {
-                    "parameters": [],
-                    "type": "function"
-                  }
-                ],
-                "groupBy": [
-                  {
-                    "property": {
-                      "type": "string"
-                    },
-                    "type": "groupBy"
-                  }
-                ],
-                "limit": 50
-              },
-              "table": "release_versions"
-            },
-            "version": "v0"
-          },
-          "refresh": "onDashboardLoad",
-          "regex": "",
-          "regexApplyTo": "value",
-          "skipUrlSync": false,
-          "sort": "disabled"
-        }
-      },
-      {
-        "kind": "QueryVariable",
-        "spec": {
-          "allowCustomValue": true,
-          "current": {
-            "text": "",
-            "value": ""
-          },
-          "definition": "SELECT latest\nFROM release_versions\nWHERE (status = 'main' OR status = 'release');",
-          "hide": "dontHide",
-          "includeAll": true,
-          "multi": true,
-          "name": "supported_patches",
-          "options": [],
-          "query": {
-            "group": "grafana-postgresql-datasource",
-            "kind": "DataQuery",
-            "spec": {
-              "dataset": "vmcrawl",
-              "editorMode": "code",
-              "format": "table",
-              "query": "SELECT latest\nFROM release_versions\nWHERE (status = 'main' OR status = 'release');",
-              "rawQuery": true,
-              "rawSql": "SELECT latest\nFROM release_versions\nWHERE (status = 'main' OR status = 'release');",
-              "refId": "SQLVariableQueryEditor-VariableQuery",
-              "sql": {
-                "columns": [
-                  {
-                    "parameters": [],
-                    "type": "function"
-                  }
-                ],
-                "groupBy": [
-                  {
-                    "property": {
-                      "type": "string"
-                    },
-                    "type": "groupBy"
-                  }
-                ],
-                "limit": 50
-              },
-              "table": "release_versions"
-            },
-            "version": "v0"
-          },
-          "refresh": "onDashboardLoad",
-          "regex": "",
-          "regexApplyTo": "value",
-          "skipUrlSync": false,
-          "sort": "numericalAsc"
         }
       },
       {
