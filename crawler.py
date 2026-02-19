@@ -2816,6 +2816,20 @@ def count_dni_domains() -> int:
             return 0
 
 
+def remove_dni_domain(domain: str) -> bool:
+    """Remove a domain from the dni table."""
+    with db_pool.connection() as conn, conn.cursor() as cursor:
+        try:
+            _ = cursor.execute("DELETE FROM dni WHERE domain = %s", (domain.lower(),))
+            removed = cursor.rowcount > 0
+            conn.commit()
+            return removed
+        except Exception as e:
+            echo(f"Failed to remove DNI domain {domain}: {e}", "red")
+            conn.rollback()
+            return False
+
+
 async def fetch_dni_csv(url: str) -> str | None:
     """Fetch the DNI CSV file from the specified URL."""
     try:
@@ -3195,18 +3209,23 @@ def print_manage_menu():
     echo("  1. Fetch and import IFTAS DNI list", "white")
     echo("  2. List all DNI domains", "white")
     echo("  3. Count DNI domains", "white")
+    echo("  4. Add DNI domain manually", "white")
+    echo("  5. Remove DNI domain", "white")
     echo("", "white")
     echo("Nightly Version Management:", "yellow")
-    echo("  4. List all nightly versions", "white")
-    echo("  5. Add a new nightly version", "white")
-    echo("  6. Update nightly version end date", "white")
+    echo("  6. List all nightly versions", "white")
+    echo("  7. Add a new nightly version", "white")
+    echo("  8. Update nightly version end date", "white")
     echo("", "white")
     echo("Mastodon Version Management:", "yellow")
-    echo("  7. Update latest Mastodon versions", "white")
-    echo("  8. Show current version info", "white")
-    echo("  9. Promote branch to release", "white")
-    echo("  10. Mark branch as EOL", "white")
-    echo("  11. Reorder release branches", "white")
+    echo("  9. Update latest Mastodon versions", "white")
+    echo("  10. Show current version info", "white")
+    echo("  11. Promote branch to release", "white")
+    echo("  12. Mark branch as EOL", "white")
+    echo("  13. Reorder release branches", "white")
+    echo("", "white")
+    echo("TLD Cache Management:", "yellow")
+    echo("  14. Update TLD cache", "white")
     echo("", "white")
     echo("  q. Quit", "white")
     echo("", "white")
@@ -3275,19 +3294,70 @@ async def run_manage_mode(args):
             echo("", "white")
             input("Press Enter to continue...")
 
-        # Nightly Version Management
         elif choice == "4":
+            # Add DNI domain manually
+            echo("", "white")
+            domain = input("Enter the domain to add: ").strip().lower()
+            comment = input("Enter comment: ").strip()
+            force = input("Enter force (hard/soft): ").strip().lower()
+
+            if not domain:
+                echo("Domain cannot be empty", "yellow")
+                echo("", "white")
+                input("Press Enter to continue...")
+                continue
+            if not comment:
+                echo("Comment cannot be empty", "yellow")
+                echo("", "white")
+                input("Press Enter to continue...")
+                continue
+            if force not in {"hard", "soft"}:
+                echo("Force must be 'hard' or 'soft'", "yellow")
+                echo("", "white")
+                input("Press Enter to continue...")
+                continue
+
+            imported = import_dni_domains([domain], comment=comment, force=force)
+            if imported > 0:
+                echo(
+                    f"Added DNI domain: {domain} (comment={comment}, force={force})",
+                    "green",
+                )
+            else:
+                echo(f"Domain already exists in DNI table: {domain}", "yellow")
+            echo("", "white")
+            input("Press Enter to continue...")
+
+        elif choice == "5":
+            # Remove DNI domain
+            echo("", "white")
+            domain = input("Enter the domain to remove: ").strip().lower()
+            if not domain:
+                echo("Domain cannot be empty", "yellow")
+                echo("", "white")
+                input("Press Enter to continue...")
+                continue
+
+            if remove_dni_domain(domain):
+                echo(f"Removed DNI domain: {domain}", "green")
+            else:
+                echo(f"Domain not found in DNI table: {domain}", "yellow")
+            echo("", "white")
+            input("Press Enter to continue...")
+
+        # Nightly Version Management
+        elif choice == "6":
             # List all nightly versions
             display_nightly_versions()
             input("Press Enter to continue...")
 
-        elif choice == "5":
+        elif choice == "7":
             # Add a new nightly version (interactive)
             interactive_add_nightly()
             echo("", "white")
             input("Press Enter to continue...")
 
-        elif choice == "6":
+        elif choice == "8":
             # Update nightly version end date
             echo("", "white")
             version_to_update = input(
@@ -3302,7 +3372,7 @@ async def run_manage_mode(args):
             input("Press Enter to continue...")
 
         # Mastodon Version Management
-        elif choice == "7":
+        elif choice == "9":
             # Update latest Mastodon versions (only existing branches)
             echo("Fetching latest Mastodon versions from GitHub…", "bold")
 
@@ -3340,7 +3410,7 @@ async def run_manage_mode(args):
             echo("", "white")
             input("Press Enter to continue...")
 
-        elif choice == "8":
+        elif choice == "10":
             # Show current version info (from database)
             db_versions = get_release_versions_from_db()
 
@@ -3373,7 +3443,7 @@ async def run_manage_mode(args):
                 echo("", "white")
             input("Press Enter to continue...")
 
-        elif choice == "9":
+        elif choice == "11":
             # Promote branch to release
             echo("", "white")
             echo("Promote Branch to Release", "bold")
@@ -3536,7 +3606,7 @@ async def run_manage_mode(args):
             echo("", "white")
             input("Press Enter to continue...")
 
-        elif choice == "10":
+        elif choice == "12":
             # Mark branch as EOL
             echo("", "white")
             echo("Mark Branch as EOL", "bold")
@@ -3607,7 +3677,7 @@ async def run_manage_mode(args):
             echo("", "white")
             input("Press Enter to continue...")
 
-        elif choice == "11":
+        elif choice == "13":
             # Reorder release branches
             echo("", "white")
             echo("Reorder Release Branches", "bold")
@@ -3681,6 +3751,29 @@ async def run_manage_mode(args):
                 # Reload global variables
                 load_versions_from_db()
 
+            echo("", "white")
+            input("Press Enter to continue...")
+
+        elif choice == "14":
+            # Refresh TLD cache from IANA
+            echo("", "white")
+            echo("Updating TLD cache from IANA…", "bold")
+            tlds = await fetch_tlds_from_iana()
+            if not tlds:
+                echo("Failed to fetch TLD data; cache not updated", "red")
+                echo("", "white")
+                input("Press Enter to continue...")
+                continue
+
+            imported = import_tlds(tlds)
+            if imported > 0:
+                echo(f"TLD cache updated with {imported} entries", "green")
+            else:
+                echo("TLD cache update completed with no entries", "yellow")
+
+            last_updated = get_tld_last_updated()
+            if last_updated is not None:
+                echo(f"TLD cache last_updated: {last_updated}", "cyan")
             echo("", "white")
             input("Press Enter to continue...")
 

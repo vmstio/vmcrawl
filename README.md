@@ -335,36 +335,38 @@ The crawler provides comprehensive database and version management through an in
 ./vmcrawl.sh manage
 ```
 
-#### Option 5: DNI List Management
+#### Manage Menu Quick Reference
 
-Manages the IFTAS DNI (Do Not Interact) list - domains identified for trust and safety concerns.
+| Option | Category  | Action                         |
+| ------ | --------- | ------------------------------ |
+| `1`    | DNI       | Fetch and import DNI list      |
+| `2`    | DNI       | List all DNI domains           |
+| `3`    | DNI       | Count DNI domains              |
+| `4`    | DNI       | Add DNI domain manually        |
+| `5`    | DNI       | Remove DNI domain              |
+| `6`    | Nightly   | List all nightly versions      |
+| `7`    | Nightly   | Add a new nightly version      |
+| `8`    | Nightly   | Update nightly version end date|
+| `9`    | Mastodon  | Update latest Mastodon versions|
+| `10`   | Mastodon  | Show current version info      |
+| `11`   | Mastodon  | Promote branch to release      |
+| `12`   | Mastodon  | Mark branch as EOL             |
+| `13`   | Mastodon  | Reorder release branches       |
+| `14`   | TLD Cache | Update TLD cache               |
 
-**Submenu Options:**
+#### DNI Management (Options 1-5)
 
-**1. Fetch and import DNI list** - Downloads the latest IFTAS DNI and Abandoned/Unmanaged lists from the IFTAS CSV source and imports them into the database
+Manages the IFTAS DNI (Do Not Interact) list and manual DNI entries for trust and safety controls.
 
-**2. List all DNI domains** - Displays all domains currently in the DNI database with their force levels and sources
+- **Option 1: Fetch and import DNI list** - Downloads the latest IFTAS DNI CSV source and imports new domains
+- **Option 2: List all DNI domains** - Displays all domains currently in the DNI table with comment/force/timestamp
+- **Option 3: Count DNI domains** - Shows total count of DNI domains
+- **Option 4: Add DNI domain manually** - Prompts for `domain`, `comment`, and `force` (`hard` or `soft`)
+- **Option 5: Remove DNI domain** - Prompts for a domain and removes it from DNI table
 
-**3. Count DNI domains** - Shows total count of DNI domains and breakdown by source
+Manual DNI entries are useful for local policy overrides without waiting for the upstream feed.
 
-**4. Use custom CSV URL** - Import DNI domains from a custom CSV source URL
-
-**Force Levels:**
-
-DNI domains are tagged with force levels that indicate the severity of the listing:
-- **Force 0**: Advisory - informational listing
-- **Force 1**: Recommended - suggested block
-- **Force 2**: Required - mandatory block for IFTAS members
-
-**Sources:**
-
-All domains are tagged with their source:
-- `iftas-dni` - Domains on the Do Not Interact list
-- `iftas-abandoned` - Abandoned or unmanaged instances
-
-DNI domains are excluded from crawling to respect federation safety standards.
-
-#### Option 6: Nightly Version Management
+#### Nightly Version Management (Options 6-8)
 
 Manages tracking of development/nightly versions used to identify instances running pre-release software (alpha, beta, rc versions).
 
@@ -382,7 +384,7 @@ Manages tracking of development/nightly versions used to identify instances runn
 
 When a new nightly version is added, the system can automatically set the end date of the previous nightly version to maintain a continuous timeline of development releases.
 
-#### Mastodon Release Version Management (Options 7-11)
+#### Mastodon Release Version Management (Options 9-13)
 
 The crawler provides a comprehensive version management system for tracking Mastodon releases and their lifecycle from main development branch through release to end-of-life.
 
@@ -407,7 +409,7 @@ To authenticate the GitHub CLI:
 gh auth login
 ```
 
-**Option 7: Update Latest Mastodon Versions**
+**Option 9: Update Latest Mastodon Versions**
 
 Updates the `latest` version for all tracked branches (main, release, and EOL) by querying the Mastodon GitHub repository. This should be run periodically to keep version data current.
 
@@ -415,7 +417,7 @@ Updates the `latest` version for all tracked branches (main, release, and EOL) b
 - Updates only the `latest` column for existing branches
 - Does not create new branches or change branch status
 
-**Option 8: Show Current Version Information**
+**Option 10: Show Current Version Information**
 
 Displays a detailed view of all tracked Mastodon versions:
 ```
@@ -431,7 +433,7 @@ End-of-Life Branches:
   Branch: 4.0    Status: eol       n_level: 3     Latest: 4.0.15
 ```
 
-**Option 9: Promote Main Branch to Release**
+**Option 11: Promote Main Branch to Release**
 
 Promotes the current main development branch to a release branch and creates a new main branch for the next version.
 
@@ -444,7 +446,7 @@ Workflow:
 
 This should be used when a new stable version is released.
 
-**Option 10: Mark Branch as End-of-Life**
+**Option 12: Mark Branch as End-of-Life**
 
 Marks a release branch as EOL when it no longer receives updates.
 
@@ -455,25 +457,28 @@ Workflow:
 
 EOL branches continue to be tracked for statistics but are not considered "supported" releases.
 
-**Option 11: Reorder Release Branches**
+**Option 13: Reorder Release Branches**
 
 Manually adjusts the ordering (n_level) of release branches. This is useful if you need to reorganize the priority of tracked releases.
 
 Workflow:
-1. Shows current release branches with n_level values
-2. Select branch to reorder
-3. Enter new n_level (must be unique)
-4. Branch is moved to new position
+1. Shows current release branches with current order
+2. Enter a full new order as a comma-separated branch list (e.g. `4.6,4.5,4.4`)
+3. All release branches are re-assigned `n_level` based on the provided order
+
+#### TLD Cache Management (Option 14)
+
+- **Option 14: Update TLD cache** - Fetches the latest IANA TLD list and refreshes the `tld_cache` table.
 
 **Version Lifecycle Workflow:**
 
 Typical version management workflow:
 
 1. **New Development Begins**: Main branch tracks next version (e.g., 4.5.0+nightly)
-2. **Regular Updates**: Run Option 7 periodically to update latest versions
-3. **New Release**: Use Option 9 to promote main to release when stable version ships
-4. **EOL Declaration**: Use Option 10 to mark old releases as EOL when support ends
-5. **Monitoring**: Use Option 8 to review current version status
+2. **Regular Updates**: Run Option 9 periodically to update latest versions
+3. **New Release**: Use Option 11 to promote main to release when stable version ships
+4. **EOL Declaration**: Use Option 12 to mark old releases as EOL when support ends
+5. **Monitoring**: Use Option 10 to review current version status
 
 ## Advanced Features
 
