@@ -3,8 +3,6 @@
 # =============================================================================
 # IMPORTS
 # =============================================================================
-from datetime import UTC
-
 try:
     import argparse
     import asyncio
@@ -25,7 +23,7 @@ try:
     import sys
     import threading
     import time
-    from datetime import date, datetime, timedelta
+    from datetime import UTC, date, datetime, timedelta
     from io import StringIO
     from typing import Any
     from urllib.parse import urlparse
