@@ -592,6 +592,7 @@ async def parse_json_with_fallback(
     domain: str,
     target: str,
     preserve_status: str | None = None,
+    suppress_errors: bool = False,
 ) -> Any | bool:
     """Parse JSON from response with fallback decoder for malformed JSON.
 
@@ -627,6 +628,8 @@ async def parse_json_with_fallback(
                 data, _ = decoder.raw_decode(normalized_text, 0)
                 return data
             except json.JSONDecodeError as exception:
+                if suppress_errors:
+                    return False
                 await asyncio.to_thread(
                     _handle_json_exception,
                     domain,
@@ -3907,29 +3910,39 @@ def _handle_http_failed(domain, target, response, preserve_status=None):
     increment_domain_error(domain, f"HARD+{target}", preserve_status)
 
 
-def _handle_tcp_exception(domain, target, exception, preserve_status=None):
-    """Handle TCP/connection exceptions with appropriate categorization."""
-    error_message = str(exception)
-    error_message_lower = error_message.casefold()
+def _clean_exception_message(error_message: str, default: str) -> str:
+    """Normalize noisy exception strings into concise error messages."""
+    cleaned_message = (
+        RE_CLEANUP_BRACKETS.sub("", error_message)
+        .replace(":", "")
+        .replace(",", "")
+        .split(" for ", 1)[0]
+        .lstrip()
+        .rstrip(" .")
+    )
+    return cleaned_message or default
 
-    # Handle response size violations
+
+def _iter_exception_chain(exception: BaseException):
+    """Yield exception plus chained causes/contexts exactly once."""
+    seen: set[int] = set()
+    current: BaseException | None = exception
+    while current is not None and id(current) not in seen:
+        seen.add(id(current))
+        yield current
+        current = current.__cause__ or current.__context__
+
+
+def _classify_request_exception(exception: Exception) -> str:
+    """Classify transport-layer exceptions into FILE/SSL/DNS/TCP buckets."""
+    error_message_lower = str(exception).casefold()
+
     if isinstance(exception, ValueError) and "too large" in error_message_lower:
-        error_reason = "FILE"
-        echo(f"{domain}: Response too large", "orange", use_tqdm=True)
-        log_error(domain, "Response exceeds size limit")
-        increment_domain_error(domain, f"{error_reason}+{target}", preserve_status)
-        return
-
-    # Handle bad file descriptor (usually from cancellation/cleanup issues)
+        return "FILE"
     if "bad file descriptor" in error_message_lower:
-        error_reason = "FILE"
-        echo(f"{domain}: Connection closed unexpectedly", "orange", use_tqdm=True)
-        log_error(domain, "Bad file descriptor")
-        increment_domain_error(domain, f"{error_reason}+{target}", preserve_status)
-        return
+        return "FILE"
 
-    # Check for SSL/TLS errors (includes certificate validation failures)
-    ssl_indicators = [
+    ssl_indicators = (
         "_ssl.c",
         "ssl",
         "tls",
@@ -3938,66 +3951,79 @@ def _handle_tcp_exception(domain, target, exception, preserve_status=None):
         "sslcertverficationerror",
         "handshake",
         "cipher",
-    ]
+    )
     if any(indicator in error_message_lower for indicator in ssl_indicators):
-        error_reason = "SSL"
-        cleaned_message = (
-            RE_CLEANUP_BRACKETS.sub("", error_message)
-            .replace(":", "")
-            .replace(",", "")
-            .split(" for ", 1)[0]
-            .lstrip()
-            .rstrip(" .")
-        )
-        # Fallback to original if cleaning resulted in empty string
-        if not cleaned_message:
-            cleaned_message = "SSL connection error"
+        return "SSL"
+
+    dns_indicators = (
+        "no address associated with hostname",
+        "temporary failure in name resolution",
+        "address family not supported",
+        "nodename nor servname provided",
+        "name or service not known",
+        "getaddrinfo",
+        "name resolution",
+    )
+    if any(indicator in error_message_lower for indicator in dns_indicators):
+        return "DNS"
+
+    for cause in _iter_exception_chain(exception):
+        if isinstance(cause, socket.gaierror):
+            return "DNS"
+        if isinstance(cause, ssl.SSLError):
+            return "SSL"
+
+    return "TCP"
+
+
+def _handle_tcp_exception(domain, target, exception, preserve_status=None):
+    """Handle TCP/connection exceptions with appropriate categorization."""
+    error_message = str(exception)
+    error_reason = _classify_request_exception(exception)
+
+    if error_reason == "FILE":
+        if (
+            isinstance(exception, ValueError)
+            and "too large" in error_message.casefold()
+        ):
+            echo(f"{domain}: Response too large", "orange", use_tqdm=True)
+            log_error(domain, "Response exceeds size limit")
+            increment_domain_error(domain, f"{error_reason}+{target}", preserve_status)
+            return
+        if "bad file descriptor" in error_message.casefold():
+            echo(f"{domain}: Connection closed unexpectedly", "orange", use_tqdm=True)
+            log_error(domain, "Bad file descriptor")
+            increment_domain_error(domain, f"{error_reason}+{target}", preserve_status)
+            return
+        cleaned_message = _clean_exception_message(error_message, "File/stream error")
         echo(f"{domain}: {cleaned_message}", "orange", use_tqdm=True)
         log_error(domain, cleaned_message)
         increment_domain_error(domain, f"{error_reason}+{target}", preserve_status)
-    # Check for DNS resolution errors
-    elif any(
-        msg in error_message_lower
-        for msg in [
-            "no address associated with hostname",
-            "temporary failure in name resolution",
-            "address family not supported",
-            "nodename nor servname provided",
-            "name or service not known",
-        ]
-    ):
-        error_reason = "DNS"
-        cleaned_message = (
-            RE_CLEANUP_BRACKETS.sub("", error_message)
-            .replace(":", "")
-            .replace(",", "")
-            .split(" for ", 1)[0]
-            .lstrip()
-            .rstrip(" .")
+        return
+
+    if error_reason == "SSL":
+        cleaned_message = _clean_exception_message(
+            error_message, "SSL connection error"
         )
-        # Fallback to original if cleaning resulted in empty string
-        if not cleaned_message:
-            cleaned_message = "DNS resolution failed"
         echo(f"{domain}: {cleaned_message}", "orange", use_tqdm=True)
         log_error(domain, cleaned_message)
         increment_domain_error(domain, f"{error_reason}+{target}", preserve_status)
-    else:
-        # All other errors (TCP, HTTP, etc.) categorized as TCP
-        error_reason = "TCP"
-        cleaned_message = (
-            RE_CLEANUP_BRACKETS.sub("", error_message)
-            .replace(":", "")
-            .replace(",", "")
-            .split(" for ", 1)[0]
-            .lstrip()
-            .rstrip(" .")
+        return
+
+    if error_reason == "DNS":
+        cleaned_message = _clean_exception_message(
+            error_message, "DNS resolution failed"
         )
-        # Fallback to original if cleaning resulted in empty string
-        if not cleaned_message:
-            cleaned_message = str(exception)[:100] or "TCP error"
         echo(f"{domain}: {cleaned_message}", "orange", use_tqdm=True)
         log_error(domain, cleaned_message)
         increment_domain_error(domain, f"{error_reason}+{target}", preserve_status)
+        return
+
+    # All remaining transport failures are categorized as TCP.
+    cleaned_message = _clean_exception_message(error_message, "TCP error")
+    echo(f"{domain}: {cleaned_message}", "orange", use_tqdm=True)
+    log_error(domain, cleaned_message)
+    increment_domain_error(domain, f"{error_reason}+{target}", preserve_status)
 
 
 def _handle_json_exception(domain, target, exception, preserve_status=None):
@@ -4365,6 +4391,11 @@ async def check_nodeinfo(
                     )
                 return None if suppress_errors else False
             if not response.content:
+                if suppress_errors:
+                    return {
+                        "suppressed_error": "reply is empty",
+                        "suppressed_error_type": "json",
+                    }
                 if not suppress_errors:
                     exception = "reply is empty"
                     await asyncio.to_thread(
@@ -4376,11 +4407,25 @@ async def check_nodeinfo(
                     )
                 return None if suppress_errors else False
             data = await parse_json_with_fallback(
-                response, domain, target, preserve_status
+                response,
+                domain,
+                target,
+                preserve_status,
+                suppress_errors=suppress_errors,
             )
             if data is False:
+                if suppress_errors:
+                    return {
+                        "suppressed_error": "invalid json in nodeinfo reply",
+                        "suppressed_error_type": "json",
+                    }
                 return None if suppress_errors else False
             if not isinstance(data, dict):
+                if suppress_errors:
+                    return {
+                        "suppressed_error": "nodeinfo reply is not an object",
+                        "suppressed_error_type": "json",
+                    }
                 return None
 
             # Check if this is a Matrix server (has m.server field)
@@ -4422,6 +4467,11 @@ async def check_nodeinfo(
                 links = [data]
 
             if links is not None and len(links) == 0:
+                if suppress_errors:
+                    return {
+                        "suppressed_error": "empty links array in reply",
+                        "suppressed_error_type": "json",
+                    }
                 if not suppress_errors:
                     exception = "empty links array in reply"
                     await asyncio.to_thread(
@@ -4473,6 +4523,11 @@ async def check_nodeinfo(
                     exception,
                     preserve_status,
                 )
+            elif suppress_errors:
+                return {
+                    "suppressed_error": "no links in reply",
+                    "suppressed_error_type": "json",
+                }
             return None if suppress_errors else False
         if response.status_code in http_codes_to_hardfail:
             await asyncio.to_thread(
@@ -4490,7 +4545,10 @@ async def check_nodeinfo(
         )
     except httpx.RequestError as exception:
         if suppress_errors:
-            return {"suppressed_error": exception, "suppressed_error_type": "tcp"}
+            return {
+                "suppressed_error": exception,
+                "suppressed_error_type": _classify_request_exception(exception).lower(),
+            }
         await asyncio.to_thread(
             _handle_tcp_exception,
             domain,
@@ -4811,7 +4869,7 @@ async def process_domain(domain, nightly_version_ranges, user_choice=None):
                 error = nodeinfo_probe_error["suppressed_error"]
                 error_type = nodeinfo_probe_error["suppressed_error_type"]
                 target = "nodeinfo"
-                if error_type == "tcp":
+                if error_type in {"tcp", "dns", "ssl", "file"}:
                     await asyncio.to_thread(
                         _handle_tcp_exception,
                         domain,
