@@ -186,6 +186,10 @@ ERROR_TYPE_TO_BAD_COLUMN: dict[str, str] = {
     "ROBOT": "bad_robot",
 }
 BAD_COLUMNS = tuple(ERROR_TYPE_TO_BAD_COLUMN.values())
+MASTODON_COMPATIBLE_SOFTWARE = ("mastodon", "hometown", "kmyblue")
+MASTODON_COMPATIBLE_SOFTWARE_SQL = ", ".join(
+    f"'{software}'" for software in MASTODON_COMPATIBLE_SOFTWARE
+)
 
 # Menu choice to status column mapping for preserve mechanism
 MENU_CHOICE_TO_STATUS_COLUMN: dict[str, str] = {
@@ -203,6 +207,14 @@ MENU_CHOICE_TO_STATUS_COLUMN: dict[str, str] = {
     "71": "bad_hard",
     "72": "bad_robot",
 }
+
+
+def is_mastodon_compatible_software(software_name: str | None) -> bool:
+    """Return True when NodeInfo software is Mastodon-compatible."""
+    if software_name is None:
+        return False
+    return software_name.lower() in MASTODON_COMPATIBLE_SOFTWARE
+
 
 # Pre-compiled regex patterns for version cleaning (performance optimization)
 RE_VERSION_SUFFIX_SPLIT = re.compile(r"[+~_ /@&]|patch")
@@ -1560,7 +1572,7 @@ def increment_domain_error(
                 # If domain is already in a terminal state, skip entirely
                 # unless the user is retrying that specific terminal state
                 active_terminal = any(current_bad.values()) or (
-                    nodeinfo and nodeinfo != "mastodon"
+                    nodeinfo and not is_mastodon_compatible_software(nodeinfo)
                 )
                 if active_terminal:
                     if preserve_status and current_bad.get(preserve_status):
@@ -1620,9 +1632,9 @@ def increment_domain_error(
                         mark_domain_status(domain, status)
                         delete_domain_if_known(domain)
                         return
-            # Skip error counting if nodeinfo is set to 'mastodon'
-            # For Mastodon instances, we still record the reason but clear the counter
-            elif nodeinfo == "mastodon":
+            # Skip error counting for Mastodon-compatible software.
+            # We still record the reason but clear the counter.
+            elif is_mastodon_compatible_software(nodeinfo):
                 new_errors = None
             else:
                 # Calculate new error count for non-Mastodon, non-immediate-terminal errors
@@ -1887,7 +1899,7 @@ def delete_domain_from_raw(domain: str) -> None:
 def save_nodeinfo_software(domain: str, software_data: dict[str, Any]) -> None:
     """Save software name from nodeinfo to raw_domains.nodeinfo for the domain.
 
-    When nodeinfo is set to anything other than 'mastodon', also clears
+    When nodeinfo is set to non-Mastodon-compatible software, also clears
     errors and reason since this is not an error condition - it's just a
     different platform.
 
@@ -1902,7 +1914,7 @@ def save_nodeinfo_software(domain: str, software_data: dict[str, Any]) -> None:
 
     with db_pool.connection() as conn, conn.cursor() as cursor:
         try:
-            if software_name != "mastodon":
+            if not is_mastodon_compatible_software(software_name):
                 # For non-Mastodon platforms, clear errors and reason
                 _ = cursor.execute(
                     """
@@ -1917,7 +1929,7 @@ def save_nodeinfo_software(domain: str, software_data: dict[str, Any]) -> None:
                     (domain, software_name, None, None),
                 )
             else:
-                # For Mastodon, just update nodeinfo
+                # For Mastodon-compatible software, just update nodeinfo
                 _ = cursor.execute(
                     """
                         INSERT INTO raw_domains (domain, nodeinfo)
@@ -2089,12 +2101,13 @@ def get_domains_by_status(status_column):
 
 
 def get_not_masto_domains():
-    """Get list of domains where nodeinfo is not 'mastodon'."""
+    """Get list of domains where nodeinfo is not Mastodon-compatible."""
     with db_pool.connection() as conn, conn.cursor() as cursor:
         try:
             query = (
                 "SELECT domain FROM raw_domains "
-                "WHERE nodeinfo IS NOT NULL AND nodeinfo != 'mastodon'"
+                "WHERE nodeinfo IS NOT NULL "
+                f"AND nodeinfo NOT IN ({MASTODON_COMPATIBLE_SOFTWARE_SQL})"
             )
             _ = cursor.execute(query)
             # Use set for O(1) lookup, stream results
@@ -4581,7 +4594,7 @@ def _is_mastodon_instance(nodeinfo_20_result: dict[str, Any]) -> bool:
     if software_name is None:
         return False
 
-    return software_name.lower() in {"mastodon"}
+    return is_mastodon_compatible_software(software_name)
 
 
 def mark_as_non_mastodon(domain, other_platform):
@@ -5848,14 +5861,14 @@ def load_from_database(user_choice):
             "SELECT domain FROM raw_domains WHERE "
             + " AND ".join(f"({col} IS NULL OR {col} = FALSE)" for col in BAD_COLUMNS)
             + " AND "
-            "(nodeinfo = 'mastodon' OR nodeinfo IS NULL) "
+            f"(nodeinfo IN ({MASTODON_COMPATIBLE_SOFTWARE_SQL}) OR nodeinfo IS NULL) "
             + no_alias
             + "ORDER BY domain"
         ),
         "4": (
             "SELECT DISTINCT rd.domain "
             "FROM raw_domains rd "
-            "WHERE rd.nodeinfo = 'mastodon' "
+            f"WHERE rd.nodeinfo IN ({MASTODON_COMPATIBLE_SOFTWARE_SQL}) "
             "  AND rd.reason IS NOT NULL "
             "  AND (rd.alias IS NULL OR rd.alias = FALSE) "
             "  AND NOT EXISTS ( "
@@ -5872,7 +5885,7 @@ def load_from_database(user_choice):
             "AND (rd.alias IS NULL OR rd.alias = FALSE)"
         ),
         "10": (
-            "SELECT domain FROM raw_domains WHERE nodeinfo != 'mastodon' "
+            f"SELECT domain FROM raw_domains WHERE nodeinfo NOT IN ({MASTODON_COMPATIBLE_SOFTWARE_SQL}) "
             + no_alias
             + "ORDER BY domain"
         ),
@@ -5967,7 +5980,7 @@ def load_from_database(user_choice):
             "SELECT domain FROM mastodon_domains ORDER BY active_users_monthly DESC"
         ),
         "53": (
-            "SELECT domain FROM raw_domains WHERE nodeinfo = 'mastodon' "
+            f"SELECT domain FROM raw_domains WHERE nodeinfo IN ({MASTODON_COMPATIBLE_SOFTWARE_SQL}) "
             + no_alias
             + "ORDER BY domain"
         ),
