@@ -3,7 +3,7 @@
   "kind": "DashboardWithAccessInfo",
   "metadata": {
     "name": "aedqo0q7klrswa",
-    "generation": 140,
+    "generation": 152,
     "creationTimestamp": "2025-11-21T19:31:21Z",
     "labels": {},
     "annotations": {}
@@ -173,7 +173,7 @@
               "transformations": []
             }
           },
-          "description": "Instances and monthly active user (MAU) count from instances deploying the latest patch versions (${main_latest}, ${latest_latest}, ${previous_latest}, ${deprecated_latest})",
+          "description": "Instances and monthly active user (MAU) count from instances deploying the latest patch versions",
           "id": 101,
           "links": [],
           "title": "Patch Coverage",
@@ -269,7 +269,7 @@
               "transformations": []
             }
           },
-          "description": "Instances and monthly active user (MAU) count from instances deploying a supported branch (${main_branch}, ${latest_branch}, ${previous_branch}, ${deprecated_branch})",
+          "description": "Instances and monthly active user (MAU) count from instances deploying a supported branch",
           "id": 102,
           "links": [],
           "title": "Supported Branches",
@@ -2010,7 +2010,8 @@
                         "value": 0
                       }
                     ]
-                  }
+                  },
+                  "unit": "percent"
                 },
                 "overrides": []
               },
@@ -2113,7 +2114,8 @@
                         "value": 0
                       }
                     ]
-                  }
+                  },
+                  "unit": "percent"
                 },
                 "overrides": []
               },
@@ -2244,7 +2246,7 @@
               ]
             }
           },
-          "description": "Count of instances running ${deprecated_latest:csv} off any deprecated release branches (${deprecated_branch:csv}) compared to the total instances on any deprecated release branches.",
+          "description": "Count of instances running $deprecated_latest off any deprecated release branches ($deprecated_branch) compared to the total instances on any deprecated release branches.",
           "id": 73,
           "links": [],
           "title": "Patched Instances, Deprecated (${deprecated_branch:csv})",
@@ -2416,7 +2418,7 @@
               ]
             }
           },
-          "description": "Count of monthly active users (MAUs) on instances running ${deprecated_latest:csv} off any deprecated release branches (${deprecated_branch:csv}) compared to the total MAU on any deprecated release branches.",
+          "description": "Count of monthly active users (MAUs) on instances running $deprecated_latest off any deprecated release branches ($deprecated_branch) compared to the total MAU on any deprecated release branches.",
           "id": 74,
           "links": [],
           "title": "Patched MAUs, Deprecated (${deprecated_branch:csv})",
@@ -2721,6 +2723,7 @@
                     "axisColorMode": "text",
                     "axisLabel": "",
                     "axisPlacement": "auto",
+                    "axisSoftMax": 9300,
                     "fillOpacity": 80,
                     "gradientMode": "none",
                     "hideFrom": {
@@ -2755,7 +2758,7 @@
               },
               "options": {
                 "barRadius": 0.1,
-                "barWidth": 0.97,
+                "barWidth": 0.95,
                 "fullHighlight": false,
                 "groupWidth": 0.7,
                 "legend": {
@@ -2882,6 +2885,7 @@
                     "axisColorMode": "text",
                     "axisLabel": "",
                     "axisPlacement": "auto",
+                    "axisSoftMax": 800000,
                     "fillOpacity": 80,
                     "gradientMode": "none",
                     "hideFrom": {
@@ -2915,7 +2919,7 @@
               },
               "options": {
                 "barRadius": 0.1,
-                "barWidth": 0.97,
+                "barWidth": 0.95,
                 "fullHighlight": false,
                 "groupWidth": 0.7,
                 "legend": {
@@ -3042,6 +3046,7 @@
                     "axisColorMode": "text",
                     "axisLabel": "",
                     "axisPlacement": "auto",
+                    "axisSoftMax": 9300,
                     "fillOpacity": 80,
                     "gradientMode": "none",
                     "hideFrom": {
@@ -3075,7 +3080,7 @@
               },
               "options": {
                 "barRadius": 0.1,
-                "barWidth": 0.97,
+                "barWidth": 0.95,
                 "fullHighlight": false,
                 "groupWidth": 0.7,
                 "legend": {
@@ -3202,6 +3207,7 @@
                     "axisColorMode": "text",
                     "axisLabel": "",
                     "axisPlacement": "auto",
+                    "axisSoftMax": 800000,
                     "fillOpacity": 80,
                     "gradientMode": "none",
                     "hideFrom": {
@@ -3235,7 +3241,7 @@
               },
               "options": {
                 "barRadius": 0.1,
-                "barWidth": 0.97,
+                "barWidth": 0.95,
                 "fullHighlight": false,
                 "groupWidth": 0.7,
                 "legend": {
@@ -3978,24 +3984,6 @@
                       "spec": {
                         "element": {
                           "kind": "ElementReference",
-                          "name": "panel-90"
-                        }
-                      }
-                    },
-                    {
-                      "kind": "AutoGridLayoutItem",
-                      "spec": {
-                        "element": {
-                          "kind": "ElementReference",
-                          "name": "panel-91"
-                        }
-                      }
-                    },
-                    {
-                      "kind": "AutoGridLayoutItem",
-                      "spec": {
-                        "element": {
-                          "kind": "ElementReference",
                           "name": "panel-88"
                         }
                       }
@@ -4006,6 +3994,24 @@
                         "element": {
                           "kind": "ElementReference",
                           "name": "panel-89"
+                        }
+                      }
+                    },
+                    {
+                      "kind": "AutoGridLayoutItem",
+                      "spec": {
+                        "element": {
+                          "kind": "ElementReference",
+                          "name": "panel-90"
+                        }
+                      }
+                    },
+                    {
+                      "kind": "AutoGridLayoutItem",
+                      "spec": {
+                        "element": {
+                          "kind": "ElementReference",
+                          "name": "panel-91"
                         }
                       }
                     }
@@ -4025,7 +4031,6 @@
                 "kind": "AutoGridLayout",
                 "spec": {
                   "columnWidthMode": "wide",
-                  "fillScreen": true,
                   "items": [
                     {
                       "kind": "AutoGridLayoutItem",
@@ -4103,7 +4108,7 @@
         "1d"
       ],
       "fiscalYearStartMonth": 0,
-      "from": "now-5m",
+      "from": "now-6h",
       "hideTimepicker": false,
       "timezone": "browser",
       "to": "now"
@@ -4113,7 +4118,7 @@
       {
         "kind": "QueryVariable",
         "spec": {
-          "allowCustomValue": true,
+          "allowCustomValue": false,
           "current": {
             "text": "",
             "value": ""
@@ -4156,7 +4161,7 @@
             },
             "version": "v0"
           },
-          "refresh": "onDashboardLoad",
+          "refresh": "onTimeRangeChanged",
           "regex": "",
           "regexApplyTo": "value",
           "skipUrlSync": false,
@@ -4166,7 +4171,7 @@
       {
         "kind": "QueryVariable",
         "spec": {
-          "allowCustomValue": true,
+          "allowCustomValue": false,
           "current": {
             "text": "",
             "value": ""
@@ -4209,7 +4214,7 @@
             },
             "version": "v0"
           },
-          "refresh": "onDashboardLoad",
+          "refresh": "onTimeRangeChanged",
           "regex": "",
           "regexApplyTo": "value",
           "skipUrlSync": false,
@@ -4219,7 +4224,7 @@
       {
         "kind": "QueryVariable",
         "spec": {
-          "allowCustomValue": true,
+          "allowCustomValue": false,
           "current": {
             "text": "",
             "value": ""
@@ -4262,7 +4267,7 @@
             },
             "version": "v0"
           },
-          "refresh": "onDashboardLoad",
+          "refresh": "onTimeRangeChanged",
           "regex": "",
           "regexApplyTo": "value",
           "skipUrlSync": false,
@@ -4272,7 +4277,7 @@
       {
         "kind": "QueryVariable",
         "spec": {
-          "allowCustomValue": true,
+          "allowCustomValue": false,
           "current": {
             "text": "",
             "value": ""
@@ -4315,7 +4320,7 @@
             },
             "version": "v0"
           },
-          "refresh": "onDashboardLoad",
+          "refresh": "onTimeRangeChanged",
           "regex": "",
           "regexApplyTo": "value",
           "skipUrlSync": false,
@@ -4325,7 +4330,7 @@
       {
         "kind": "QueryVariable",
         "spec": {
-          "allowCustomValue": true,
+          "allowCustomValue": false,
           "current": {
             "text": "",
             "value": ""
@@ -4368,7 +4373,7 @@
             },
             "version": "v0"
           },
-          "refresh": "onDashboardLoad",
+          "refresh": "onTimeRangeChanged",
           "regex": "",
           "regexApplyTo": "value",
           "skipUrlSync": false,
@@ -4378,7 +4383,7 @@
       {
         "kind": "QueryVariable",
         "spec": {
-          "allowCustomValue": true,
+          "allowCustomValue": false,
           "current": {
             "text": "",
             "value": ""
@@ -4421,7 +4426,7 @@
             },
             "version": "v0"
           },
-          "refresh": "onDashboardLoad",
+          "refresh": "onTimeRangeChanged",
           "regex": "",
           "regexApplyTo": "value",
           "skipUrlSync": false,
@@ -4431,7 +4436,7 @@
       {
         "kind": "QueryVariable",
         "spec": {
-          "allowCustomValue": true,
+          "allowCustomValue": false,
           "current": {
             "text": "",
             "value": ""
@@ -4474,7 +4479,7 @@
             },
             "version": "v0"
           },
-          "refresh": "onDashboardLoad",
+          "refresh": "onTimeRangeChanged",
           "regex": "",
           "regexApplyTo": "value",
           "skipUrlSync": false,
@@ -4484,7 +4489,7 @@
       {
         "kind": "QueryVariable",
         "spec": {
-          "allowCustomValue": true,
+          "allowCustomValue": false,
           "current": {
             "text": "",
             "value": ""
@@ -4527,7 +4532,7 @@
             },
             "version": "v0"
           },
-          "refresh": "onDashboardLoad",
+          "refresh": "onTimeRangeChanged",
           "regex": "",
           "regexApplyTo": "value",
           "skipUrlSync": false,
