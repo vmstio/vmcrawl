@@ -3887,7 +3887,7 @@ def _handle_incorrect_file_type(domain, target, content_type, preserve_status=No
         content_type = "missing Content-Type"
     clean_content_type = RE_CONTENT_TYPE_CHARSET.sub("", content_type).strip()
     error_message = f"{target} is {clean_content_type}"
-    echo(f"{domain}: {error_message}", "orange", use_tqdm=True)
+    echo(f"{domain}: {error_message}", "yellow", use_tqdm=True)
     log_error(domain, error_message)
     increment_domain_error(domain, f"TYPE+{target}", preserve_status)
 
