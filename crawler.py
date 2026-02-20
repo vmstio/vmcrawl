@@ -4350,6 +4350,11 @@ async def check_nodeinfo(
         if response.status_code == 200:
             content_type = response.headers.get("Content-Type", "")
             if "json" not in content_type:
+                if suppress_errors:
+                    return {
+                        "suppressed_error": content_type,
+                        "suppressed_error_type": "type",
+                    }
                 if not suppress_errors:
                     await asyncio.to_thread(
                         _handle_incorrect_file_type,
@@ -4817,6 +4822,14 @@ async def process_domain(domain, nightly_version_ranges, user_choice=None):
                 elif error_type == "http":
                     await asyncio.to_thread(
                         _handle_http_status_code,
+                        domain,
+                        target,
+                        error,
+                        preserve_status,
+                    )
+                elif error_type == "type":
+                    await asyncio.to_thread(
+                        _handle_incorrect_file_type,
                         domain,
                         target,
                         error,
