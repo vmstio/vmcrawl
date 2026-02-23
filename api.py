@@ -22,6 +22,8 @@ from fastapi.security import APIKeyHeader
 from psycopg import sql
 from psycopg_pool import ConnectionPool
 
+# Mastodon-compatible software names shared with crawler logic.
+MASTODON_COMPATIBLE_SOFTWARE = ("mastodon", "hometown", "kmyblue")
 # Load environment variables
 _ = load_dotenv()
 
@@ -541,19 +543,23 @@ async def get_crawler_health(_api_key: str | None = Depends(get_api_key)):
     """Get crawler health statistics (error counts by type)."""
     try:
         with db_pool.connection() as conn, conn.cursor() as cur:
+            compatible_software = list(MASTODON_COMPATIBLE_SOFTWARE)
+
             # TCP Issues
             _ = cur.execute(
                 """
                 SELECT COUNT(DISTINCT rd.domain) AS unique_domain_count
                 FROM raw_domains rd
-                WHERE rd.nodeinfo = 'mastodon'
+                WHERE LOWER(rd.nodeinfo) = ANY(%s::text[])
                   AND rd.reason LIKE 'TCP%'
+                  AND (rd.alias IS NULL OR rd.alias = FALSE)
                   AND EXISTS (
                     SELECT 1
                     FROM mastodon_domains md
                     WHERE md.domain = rd.domain
                   )
-            """
+            """,
+                (compatible_software,),
             )
             result = cur.fetchone()
             tcp_issues = result[0] if result else 0
@@ -563,7 +569,7 @@ async def get_crawler_health(_api_key: str | None = Depends(get_api_key)):
                 """
                 SELECT COUNT(DISTINCT rd.domain) AS unique_domain_count
                 FROM raw_domains rd
-                WHERE rd.nodeinfo = 'mastodon'
+                WHERE LOWER(rd.nodeinfo) = ANY(%s::text[])
                   AND rd.reason LIKE 'SSL%'
                   AND (rd.alias IS NULL OR rd.alias = FALSE)
                   AND EXISTS (
@@ -571,7 +577,8 @@ async def get_crawler_health(_api_key: str | None = Depends(get_api_key)):
                     FROM mastodon_domains md
                     WHERE md.domain = rd.domain
                   )
-            """
+            """,
+                (compatible_software,),
             )
             result = cur.fetchone()
             ssl_issues = result[0] if result else 0
@@ -581,7 +588,7 @@ async def get_crawler_health(_api_key: str | None = Depends(get_api_key)):
                 """
                 SELECT COUNT(DISTINCT rd.domain) AS unique_domain_count
                 FROM raw_domains rd
-                WHERE rd.nodeinfo = 'mastodon'
+                WHERE LOWER(rd.nodeinfo) = ANY(%s::text[])
                   AND rd.reason LIKE 'DNS%'
                   AND (rd.alias IS NULL OR rd.alias = FALSE)
                   AND EXISTS (
@@ -589,7 +596,8 @@ async def get_crawler_health(_api_key: str | None = Depends(get_api_key)):
                     FROM mastodon_domains md
                     WHERE md.domain = rd.domain
                   )
-            """
+            """,
+                (compatible_software,),
             )
             result = cur.fetchone()
             dns_issues = result[0] if result else 0
@@ -599,7 +607,7 @@ async def get_crawler_health(_api_key: str | None = Depends(get_api_key)):
                 """
                 SELECT COUNT(DISTINCT rd.domain) AS unique_domain_count
                 FROM raw_domains rd
-                WHERE rd.nodeinfo = 'mastodon'
+                WHERE LOWER(rd.nodeinfo) = ANY(%s::text[])
                   AND rd.reason ~ '^5[0-9]{2}'
                   AND (rd.alias IS NULL OR rd.alias = FALSE)
                   AND EXISTS (
@@ -607,7 +615,8 @@ async def get_crawler_health(_api_key: str | None = Depends(get_api_key)):
                     FROM mastodon_domains md
                     WHERE md.domain = rd.domain
                   )
-            """
+            """,
+                (compatible_software,),
             )
             result = cur.fetchone()
             http_5xx_issues = result[0] if result else 0
@@ -617,7 +626,7 @@ async def get_crawler_health(_api_key: str | None = Depends(get_api_key)):
                 """
                 SELECT COUNT(DISTINCT rd.domain) AS unique_domain_count
                 FROM raw_domains rd
-                WHERE rd.nodeinfo = 'mastodon'
+                WHERE LOWER(rd.nodeinfo) = ANY(%s::text[])
                   AND rd.reason ~ '^4[0-9]{2}'
                   AND (rd.alias IS NULL OR rd.alias = FALSE)
                   AND EXISTS (
@@ -625,7 +634,8 @@ async def get_crawler_health(_api_key: str | None = Depends(get_api_key)):
                     FROM mastodon_domains md
                     WHERE md.domain = rd.domain
                   )
-            """
+            """,
+                (compatible_software,),
             )
             result = cur.fetchone()
             http_4xx_issues = result[0] if result else 0
@@ -635,7 +645,7 @@ async def get_crawler_health(_api_key: str | None = Depends(get_api_key)):
                 """
                 SELECT COUNT(DISTINCT rd.domain) AS unique_domain_count
                 FROM raw_domains rd
-                WHERE rd.nodeinfo = 'mastodon'
+                WHERE LOWER(rd.nodeinfo) = ANY(%s::text[])
                   AND (rd.reason LIKE 'FILE%' or rd.reason LIKE 'TYPE%' or rd.reason LIKE 'JSON%')
                   AND (rd.alias IS NULL OR rd.alias = FALSE)
                   AND EXISTS (
@@ -643,7 +653,8 @@ async def get_crawler_health(_api_key: str | None = Depends(get_api_key)):
                     FROM mastodon_domains md
                     WHERE md.domain = rd.domain
                   )
-            """
+            """,
+                (compatible_software,),
             )
             result = cur.fetchone()
             file_issues = result[0] if result else 0
@@ -653,8 +664,11 @@ async def get_crawler_health(_api_key: str | None = Depends(get_api_key)):
                 """
                 SELECT COUNT(DISTINCT domain) AS unique_domain_count
                 FROM raw_domains
-                WHERE nodeinfo = 'mastodon' AND reason LIKE 'MAU%'
-            """
+                WHERE LOWER(nodeinfo) = ANY(%s::text[])
+                  AND reason LIKE 'MAU%'
+                  AND (alias IS NULL OR alias = FALSE)
+            """,
+                (compatible_software,),
             )
             result = cur.fetchone()
             mau_issues = result[0] if result else 0
@@ -709,8 +723,10 @@ async def get_domain_stats(_api_key: str | None = Depends(get_api_key)):
                 """
                 SELECT COUNT(DISTINCT domain) AS unique_domain_count
                 FROM raw_domains
-                WHERE "nodeinfo"::TEXT NOT ILIKE '%mastodon%'
-            """
+                WHERE nodeinfo IS NOT NULL
+                  AND LOWER(nodeinfo) != ALL(%s::text[])
+            """,
+                (list(MASTODON_COMPATIBLE_SOFTWARE),),
             )
             result = cur.fetchone()
             non_mastodon_instances = result[0] if result else 0
@@ -821,6 +837,7 @@ async def get_instances(
         )
 
     # Validate order
+    order = order.lower()
     if order not in ["asc", "desc"]:
         raise HTTPException(status_code=400, detail="Order must be 'asc' or 'desc'")
 
@@ -829,6 +846,11 @@ async def get_instances(
             # Use the validated order value directly as a SQL keyword
             sort_order_sql = (
                 sql.SQL("ASC") if order.lower() == "asc" else sql.SQL("DESC")
+            )
+            nulls_sql = (
+                sql.SQL(" NULLS LAST")
+                if valid_sort_fields[sort_by] == "active_users_monthly"
+                else sql.SQL("")
             )
             query = sql.SQL(
                 """
@@ -839,12 +861,13 @@ async def get_instances(
                     active_users_monthly,
                     timestamp
                 FROM mastodon_domains
-                ORDER BY {sort_field} {sort_order}
+                ORDER BY {sort_field} {sort_order}{nulls}
                 LIMIT %s OFFSET %s
             """
             ).format(
                 sort_field=sql.Identifier(valid_sort_fields[sort_by]),
                 sort_order=sort_order_sql,
+                nulls=nulls_sql,
             )
             _ = cur.execute(query, (limit, offset))
             results = cur.fetchall()
