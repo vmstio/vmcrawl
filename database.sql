@@ -77,10 +77,41 @@ CREATE TABLE IF NOT EXISTS statistics (
 
 
 CREATE TABLE IF NOT EXISTS nightly_versions (
-    version VARCHAR(50),
+    version VARCHAR(50) PRIMARY KEY,
     start_date DATE,
     end_date DATE
   );
+
+-- Upgrade path for older databases: ensure one row per nightly version
+-- before enforcing a primary key on nightly_versions.version.
+DELETE FROM nightly_versions nv
+USING nightly_versions other
+WHERE nv.version = other.version
+  AND (
+    nv.start_date < other.start_date
+    OR (
+      nv.start_date = other.start_date
+      AND nv.end_date < other.end_date
+    )
+    OR (
+      nv.start_date = other.start_date
+      AND nv.end_date = other.end_date
+      AND nv.ctid < other.ctid
+    )
+  );
+
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1
+    FROM pg_constraint
+    WHERE conrelid = 'nightly_versions'::regclass
+      AND contype = 'p'
+  ) THEN
+    ALTER TABLE nightly_versions
+      ADD CONSTRAINT nightly_versions_pkey PRIMARY KEY (version);
+  END IF;
+END $$;
 
 CREATE TABLE IF NOT EXISTS
   dni (
@@ -96,13 +127,19 @@ CREATE TABLE IF NOT EXISTS
     last_updated TIMESTAMP DEFAULT CURRENT_TIMESTAMP
   );
 
+CREATE TABLE IF NOT EXISTS
+  bad_tld (
+    tld TEXT PRIMARY KEY
+  );
+
 INSERT INTO
   bad_tld (tld)
 VALUES
   ('arpa'),
   ('gov'),
   ('mil'),
-  ('su');
+  ('su')
+ON CONFLICT (tld) DO NOTHING;
 
 INSERT INTO
   release_versions (branch, status, n_level, latest)
@@ -113,37 +150,50 @@ VALUES
   ('4.3', 'release', 2, '4.3.19'),
   ('4.2', 'eol', 3, '4.2.29'),
   ('4.1', 'eol', 4, '4.1.22'),
-  ('4.0', 'eol', 5, '4.0.15');
+  ('4.0', 'eol', 5, '4.0.15')
+ON CONFLICT (n_level) DO UPDATE
+SET
+  branch = EXCLUDED.branch,
+  status = EXCLUDED.status,
+  latest = EXCLUDED.latest;
 
 INSERT INTO
   nightly_versions (version, start_date, end_date)
-VALUES
-  ('4.4.0-rc.1', '2025-07-02', '2025-07-02'),
-  ('4.4.0-beta.2', '2025-06-18', '2025-07-01'),
-  ('4.4.0-beta.1', '2025-06-05', '2025-06-17'),
-  ('4.4.0-alpha.5', '2025-05-07', '2025-06-03'),
-  ('4.4.0-alpha.4', '2025-03-14', '2025-05-06'),
-  ('4.4.0-alpha.3', '2025-02-28', '2025-03-13'),
-  ('4.4.0-alpha.2', '2025-01-17', '2025-02-27'),
-  ('4.4.0-alpha.1', '2024-10-08', '2025-01-16'),
-  ('4.3.0-rc.1', '2024-10-01', '2024-10-07'),
-  ('4.3.0-beta.2', '2024-09-18', '2024-09-30'),
-  ('4.3.0-beta.1', '2024-08-24', '2024-09-17'),
-  ('4.3.0-alpha.5', '2024-07-05', '2024-08-23'),
-  ('4.3.0-alpha.4', '2024-05-31', '2024-07-04'),
-  ('4.3.0-alpha.3', '2024-02-17', '2024-05-30'),
-  ('4.3.0-alpha.2', '2024-02-15', '2024-02-17'),
-  ('4.3.0-alpha.1', '2024-01-30', '2024-02-14'),
-  ('4.3.0-alpha.0', '2023-09-28', '2024-01-29'),
-  ('4.5.0-alpha.1', '2025-07-03', '2029-08-05'),
-  ('4.5.0-alpha.2', '2025-08-06', '2025-10-13'),
-  ('4.5.0-beta.1', '2025-10-16', '2025-10-21'),
-  ('4.5.0-alpha.3', '2025-10-14', '2025-10-15'),
-  ('4.5.0-beta.2', '2025-10-22', '2025-10-29'),
-  ('4.5.0-rc.1', '2025-10-30', '2025-10-31'),
-  ('4.6.0-alpha.1', '2025-11-01', '2026-01-07'),
-  ('4.6.0-alpha.2', '2026-01-08', '2026-01-20'),
-  ('4.6.0-alpha.3', '2026-01-21', '2099-12-31');
+SELECT seed.version, seed.start_date, seed.end_date
+FROM (
+  VALUES
+    ('4.4.0-rc.1', DATE '2025-07-02', DATE '2025-07-02'),
+    ('4.4.0-beta.2', DATE '2025-06-18', DATE '2025-07-01'),
+    ('4.4.0-beta.1', DATE '2025-06-05', DATE '2025-06-17'),
+    ('4.4.0-alpha.5', DATE '2025-05-07', DATE '2025-06-03'),
+    ('4.4.0-alpha.4', DATE '2025-03-14', DATE '2025-05-06'),
+    ('4.4.0-alpha.3', DATE '2025-02-28', DATE '2025-03-13'),
+    ('4.4.0-alpha.2', DATE '2025-01-17', DATE '2025-02-27'),
+    ('4.4.0-alpha.1', DATE '2024-10-08', DATE '2025-01-16'),
+    ('4.3.0-rc.1', DATE '2024-10-01', DATE '2024-10-07'),
+    ('4.3.0-beta.2', DATE '2024-09-18', DATE '2024-09-30'),
+    ('4.3.0-beta.1', DATE '2024-08-24', DATE '2024-09-17'),
+    ('4.3.0-alpha.5', DATE '2024-07-05', DATE '2024-08-23'),
+    ('4.3.0-alpha.4', DATE '2024-05-31', DATE '2024-07-04'),
+    ('4.3.0-alpha.3', DATE '2024-02-17', DATE '2024-05-30'),
+    ('4.3.0-alpha.2', DATE '2024-02-15', DATE '2024-02-17'),
+    ('4.3.0-alpha.1', DATE '2024-01-30', DATE '2024-02-14'),
+    ('4.3.0-alpha.0', DATE '2023-09-28', DATE '2024-01-29'),
+    ('4.5.0-alpha.1', DATE '2025-07-03', DATE '2029-08-05'),
+    ('4.5.0-alpha.2', DATE '2025-08-06', DATE '2025-10-13'),
+    ('4.5.0-beta.1', DATE '2025-10-16', DATE '2025-10-21'),
+    ('4.5.0-alpha.3', DATE '2025-10-14', DATE '2025-10-15'),
+    ('4.5.0-beta.2', DATE '2025-10-22', DATE '2025-10-29'),
+    ('4.5.0-rc.1', DATE '2025-10-30', DATE '2025-10-31'),
+    ('4.6.0-alpha.1', DATE '2025-11-01', DATE '2026-01-07'),
+    ('4.6.0-alpha.2', DATE '2026-01-08', DATE '2026-01-20'),
+    ('4.6.0-alpha.3', DATE '2026-01-21', DATE '2099-12-31')
+) AS seed(version, start_date, end_date)
+WHERE NOT EXISTS (
+  SELECT 1
+  FROM nightly_versions nv
+  WHERE nv.version = seed.version
+);
 -- Note: 4.2.x and earlier do not have nightly builds
 
 
