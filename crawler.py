@@ -867,36 +867,6 @@ async def get_highest_mastodon_version() -> str | None:
     return highest_version
 
 
-async def get_backport_mastodon_versions():
-    """Get the latest version for each backport branch from GitHub."""
-    url = "https://api.github.com/repos/mastodon/mastodon/releases"
-
-    # Get current backport branches from database (release status only)
-    branches = get_backport_branches()
-    backport_versions = dict.fromkeys(branches, "")
-
-    response = await get_httpx(url)
-    _ = response.raise_for_status()
-    releases = response.json()
-
-    for release in releases:
-        release_version = release["tag_name"].lstrip("v")
-
-        for branch in branches:
-            if release_version.startswith(branch):
-                if not backport_versions[branch] or (
-                    version.parse(release_version)
-                    > version.parse(backport_versions[branch] or "0.0.0")
-                ):
-                    backport_versions[branch] = release_version
-
-    for branch in backport_versions:
-        if not backport_versions[branch]:
-            backport_versions[branch] = f"{branch}.0"
-
-    return list(backport_versions.values())
-
-
 async def get_all_tracked_mastodon_versions():
     """Get the latest version for each tracked branch (release + EOL) from GitHub.
 
@@ -1274,15 +1244,19 @@ def _clean_version_fixes(version: str) -> str:
     # Correct patch versions that exceed the latest release
     if version_latest_release:
         _vlr_parts = version_latest_release.split(".")
-        a, b, c = (
-            int(_vlr_parts[0]),
-            int(_vlr_parts[1]),
-            int(_vlr_parts[2].split("-")[0]),
-        )
+        if len(_vlr_parts) >= 3:
+            a, b, c = (
+                int(_vlr_parts[0]),
+                int(_vlr_parts[1]),
+                int(_vlr_parts[2].split("-")[0]),
+            )
+        else:
+            a, b, c = (0, 0, 0)
     else:
         a, b, c = (0, 0, 0)
 
-    m = int(version_main_branch.split(".")[1]) if version_main_branch else 0
+    _vmb_parts = version_main_branch.split(".") if version_main_branch else []
+    m = int(_vmb_parts[1]) if len(_vmb_parts) >= 2 else 0
 
     if x == a:
         if y == b and z > c:
@@ -1340,55 +1314,6 @@ def get_all_tracked_branches() -> list[str]:
         except Exception as e:
             echo(f"Failed to load tracked branches from database: {e}", "red")
             return []
-
-
-def update_release_versions():
-    """Update the release versions in the database using the new structure."""
-    with conn.cursor() as cur:
-        # Insert/update main branch (n_level = -1)
-        _ = cur.execute(
-            """
-            INSERT INTO release_versions (branch, status, n_level, latest)
-            VALUES (%s, %s, %s, %s)
-            ON CONFLICT (n_level) DO UPDATE
-            SET branch = EXCLUDED.branch,
-                latest = EXCLUDED.latest
-            """,
-            (version_main_branch, "main", -1, version_main_release),
-        )
-        conn.commit()
-
-    # Insert/update active releases (n_level >= 0)
-    with conn.cursor() as cur:
-        backport_releases = version_backport_releases or []
-        for n_level, version_str in enumerate(backport_releases):
-            # Extract branch from version (e.g., '4.5.6' -> '4.5')
-            branch = ".".join(version_str.split(".")[:2])
-            _ = cur.execute(
-                """
-                INSERT INTO release_versions (branch, status, n_level, latest)
-                VALUES (%s, %s, %s, %s)
-                ON CONFLICT (n_level) DO UPDATE
-                SET branch = EXCLUDED.branch,
-                    latest = EXCLUDED.latest
-                """,
-                (branch, "release", n_level, version_str),
-            )
-        conn.commit()
-
-
-def delete_old_release_versions():
-    """Delete release rows not in current versions list."""
-    with conn.cursor() as cur:
-        _ = cur.execute(
-            """
-            DELETE FROM release_versions
-            WHERE status IN ('main', 'release')
-            AND latest != ALL(%s::text[])
-            """,
-            (all_patched_versions or [],),
-        )
-        conn.commit()
 
 
 def get_release_versions_from_db() -> dict[str, Any]:
@@ -3652,6 +3577,9 @@ async def run_manage_mode(args):
                     # Now add a new main branch (next version)
                     # Calculate next version (e.g., 4.6 -> 4.7)
                     parts = branch.split(".")
+                    if len(parts) < 2:
+                        echo(f"Cannot calculate next branch from malformed branch '{branch}'", "red")
+                        continue
                     new_main_branch = f"{parts[0]}.{int(parts[1]) + 1}"
                     new_main_version = f"{new_main_branch}.0-alpha.1"
 
