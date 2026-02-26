@@ -3,7 +3,7 @@
   "kind": "DashboardWithAccessInfo",
   "metadata": {
     "name": "aedqo0q7klrswa",
-    "generation": 152,
+    "generation": 177,
     "creationTimestamp": "2025-11-21T19:31:21Z",
     "labels": {},
     "annotations": {}
@@ -49,7 +49,7 @@
                         "editorMode": "code",
                         "format": "table",
                         "rawQuery": true,
-                        "rawSql": "SELECT COUNT(DISTINCT domain) AS unique_domain_count\nFROM mastodon_domains;",
+                        "rawSql": "SELECT\n  s.\"time\",\n  s.\"total_instances\"\nFROM (\n  SELECT\n    statistics.updated_at::timestamp AS \"time\",\n    (\n      statistics.main_instances\n      + statistics.latest_instances\n      + statistics.previous_instances\n      + statistics.deprecated_instances\n      + statistics.eol_instances\n    ) AS \"total_instances\"\n  FROM statistics\n  ORDER BY statistics.date DESC\n  LIMIT 30\n) s\nORDER BY s.\"time\" ASC;",
                         "sql": {
                           "columns": [
                             {
@@ -122,7 +122,7 @@
                 "wideLayout": true
               }
             },
-            "version": "12.4.0-22066786794"
+            "version": "13.0.0-22246553003"
           }
         }
       },
@@ -218,7 +218,7 @@
                 "wideLayout": true
               }
             },
-            "version": "12.4.0-22066786794"
+            "version": "13.0.0-22246553003"
           }
         }
       },
@@ -314,7 +314,7 @@
                 "wideLayout": true
               }
             },
-            "version": "12.4.0-22066786794"
+            "version": "13.0.0-22246553003"
           }
         }
       },
@@ -421,10 +421,10 @@
               ]
             }
           },
-          "description": "Count of instances running $main_latest off the main development branch ($main_branch) compared to the total instances on the main development branch.",
+          "description": "Count of instances patched off the main development branch compared to the total instances on the main development branch.",
           "id": 11,
           "links": [],
-          "title": "Patched Instances, Main ($main_branch)",
+          "title": "Patched Instances, Main",
           "vizConfig": {
             "group": "gauge",
             "kind": "VizConfig",
@@ -458,7 +458,7 @@
                 "overrides": []
               },
               "options": {
-                "barShape": "rounded",
+                "barShape": "flat",
                 "barWidthFactor": 0.75,
                 "effects": {
                   "barGlow": false,
@@ -486,7 +486,7 @@
                 "textMode": "value"
               }
             },
-            "version": "12.4.0-22066786794"
+            "version": "13.0.0-22246553003"
           }
         }
       },
@@ -588,10 +588,10 @@
               ]
             }
           },
-          "description": "Count of instances running $latest_latest off the latest release branch ($latest_branch) compared to the total instances on the latest release branch.",
+          "description": "Count of instances patched off the latest release branch compared to the total instances on the latest release branch.",
           "id": 21,
           "links": [],
-          "title": "Patched Instances, Latest ($latest_branch)",
+          "title": "Patched Instances, Latest",
           "vizConfig": {
             "group": "gauge",
             "kind": "VizConfig",
@@ -625,7 +625,7 @@
                 "overrides": []
               },
               "options": {
-                "barShape": "rounded",
+                "barShape": "flat",
                 "barWidthFactor": 0.75,
                 "effects": {
                   "barGlow": false,
@@ -653,7 +653,7 @@
                 "textMode": "value"
               }
             },
-            "version": "12.4.0-22066786794"
+            "version": "13.0.0-22246553003"
           }
         }
       },
@@ -755,10 +755,10 @@
               ]
             }
           },
-          "description": "Count of instances running $previous_latest off the latest release branch ($previous_branch) compared to the total instances on the previous release branch.",
+          "description": "Count of instances patched off the previous release branch compared to the total instances on the previous release branch.",
           "id": 22,
           "links": [],
-          "title": "Patched Instances, Previous ($previous_branch)",
+          "title": "Patched Instances, Previous",
           "vizConfig": {
             "group": "gauge",
             "kind": "VizConfig",
@@ -792,7 +792,7 @@
                 "overrides": []
               },
               "options": {
-                "barShape": "rounded",
+                "barShape": "flat",
                 "barWidthFactor": 0.75,
                 "effects": {
                   "barGlow": false,
@@ -820,7 +820,7 @@
                 "textMode": "value"
               }
             },
-            "version": "12.4.0-22066786794"
+            "version": "13.0.0-22246553003"
           }
         }
       },
@@ -927,10 +927,10 @@
               ]
             }
           },
-          "description": "Count of monthly active users (MAUs) on instances running $main_latest off the main development branch ($main_branch) compared to the total MAU on the main development branch.",
+          "description": "Count of monthly active users (MAUs) on instances patched off the main development branch compared to the MAUs on the main development branch.",
           "id": 32,
           "links": [],
-          "title": "Patched MAUs, Main ($main_branch)",
+          "title": "Patched MAUs, Main",
           "vizConfig": {
             "group": "gauge",
             "kind": "VizConfig",
@@ -964,7 +964,7 @@
                 "overrides": []
               },
               "options": {
-                "barShape": "rounded",
+                "barShape": "flat",
                 "barWidthFactor": 0.75,
                 "effects": {
                   "barGlow": false,
@@ -992,7 +992,7 @@
                 "textMode": "value"
               }
             },
-            "version": "12.4.0-22066786794"
+            "version": "13.0.0-22246553003"
           }
         }
       },
@@ -1099,10 +1099,10 @@
               ]
             }
           },
-          "description": "Count of monthly active users (MAUs) on instances running $latest_latest off the latest release branch ($latest_branch) compared to the total MAU on the latest release branch.",
+          "description": "Count of monthly active users (MAUs) on instances patched off the latest release branch compared to the MAUs on the latest release branch.",
           "id": 35,
           "links": [],
-          "title": "Patched MAUs, Latest ($latest_branch)",
+          "title": "Patched MAUs, Latest",
           "vizConfig": {
             "group": "gauge",
             "kind": "VizConfig",
@@ -1136,7 +1136,7 @@
                 "overrides": []
               },
               "options": {
-                "barShape": "rounded",
+                "barShape": "flat",
                 "barWidthFactor": 0.75,
                 "effects": {
                   "barGlow": false,
@@ -1164,7 +1164,7 @@
                 "textMode": "value"
               }
             },
-            "version": "12.4.0-22066786794"
+            "version": "13.0.0-22246553003"
           }
         }
       },
@@ -1271,10 +1271,10 @@
               ]
             }
           },
-          "description": "Count of monthly active users (MAUs) on instances running $previous_latest off the latest release branch ($previous_branch) compared to the total MAU on the latest release branch.",
+          "description": "Count of monthly active users (MAUs) on instances patched off the previous release branch compared to the MAUs on the latest previous branch.",
           "id": 36,
           "links": [],
-          "title": "Patched MAUs, Previous ($previous_branch)",
+          "title": "Patched MAUs, Previous",
           "vizConfig": {
             "group": "gauge",
             "kind": "VizConfig",
@@ -1308,7 +1308,7 @@
                 "overrides": []
               },
               "options": {
-                "barShape": "rounded",
+                "barShape": "flat",
                 "barWidthFactor": 0.75,
                 "effects": {
                   "barGlow": false,
@@ -1336,7 +1336,7 @@
                 "textMode": "value"
               }
             },
-            "version": "12.4.0-22066786794"
+            "version": "13.0.0-22246553003"
           }
         }
       },
@@ -1358,7 +1358,7 @@
                         "editorMode": "code",
                         "format": "table",
                         "rawQuery": true,
-                        "rawSql": "SELECT SUM(active_users_monthly) AS total_users FROM mastodon_domains;",
+                        "rawSql": "SELECT\n  s.\"time\",\n  s.\"value\"\nFROM (\n  SELECT\n    statistics.updated_at::timestamp AS \"time\",\n    statistics.mau AS \"value\"\n  FROM statistics\n  ORDER BY statistics.date DESC\n  LIMIT 30\n) s\nORDER BY s.\"time\" ASC;",
                         "sql": {
                           "columns": [
                             {
@@ -1400,6 +1400,7 @@
                   "color": {
                     "mode": "thresholds"
                   },
+                  "fieldMinMax": false,
                   "thresholds": {
                     "mode": "absolute",
                     "steps": [
@@ -1426,12 +1427,12 @@
                   "fields": "",
                   "values": false
                 },
-                "showPercentChange": false,
+                "showPercentChange": true,
                 "textMode": "auto",
                 "wideLayout": true
               }
             },
-            "version": "12.4.0-22066786794"
+            "version": "13.0.0-22246553003"
           }
         }
       },
@@ -1565,7 +1566,7 @@
                 }
               }
             },
-            "version": "12.4.0-22066786794"
+            "version": "13.0.0-22229365497"
           }
         }
       },
@@ -1684,7 +1685,7 @@
                 }
               }
             },
-            "version": "12.4.0-22066786794"
+            "version": "13.0.0-22229365497"
           }
         }
       },
@@ -1803,7 +1804,7 @@
                 }
               }
             },
-            "version": "12.4.0-22066786794"
+            "version": "13.0.0-22229365497"
           }
         }
       },
@@ -1937,7 +1938,7 @@
                 }
               }
             },
-            "version": "12.4.0-22066786794"
+            "version": "13.0.0-22229365497"
           }
         }
       },
@@ -1991,7 +1992,7 @@
           "description": "",
           "id": 70,
           "links": [],
-          "title": "Percent of Instances",
+          "title": "Branch Adoption, Percent of Instances",
           "vizConfig": {
             "group": "bargauge",
             "kind": "VizConfig",
@@ -2040,7 +2041,7 @@
                 "valueMode": "color"
               }
             },
-            "version": "12.4.0-22066786794"
+            "version": "13.0.0-22229365497"
           }
         }
       },
@@ -2094,7 +2095,7 @@
           "description": "",
           "id": 71,
           "links": [],
-          "title": "Percent of MAUs",
+          "title": "Branch Adoption, Percent of MAUs",
           "vizConfig": {
             "group": "bargauge",
             "kind": "VizConfig",
@@ -2144,7 +2145,7 @@
                 "valueMode": "color"
               }
             },
-            "version": "12.4.0-22066786794"
+            "version": "13.0.0-22229365497"
           }
         }
       },
@@ -2246,10 +2247,10 @@
               ]
             }
           },
-          "description": "Count of instances running $deprecated_latest off any deprecated release branches ($deprecated_branch) compared to the total instances on any deprecated release branches.",
+          "description": "Count of instances patched off deprecated branches compared to the total instances on deprecated branches.",
           "id": 73,
           "links": [],
-          "title": "Patched Instances, Deprecated (${deprecated_branch:csv})",
+          "title": "Patched Instances, Deprecated",
           "vizConfig": {
             "group": "gauge",
             "kind": "VizConfig",
@@ -2283,7 +2284,7 @@
                 "overrides": []
               },
               "options": {
-                "barShape": "rounded",
+                "barShape": "flat",
                 "barWidthFactor": 0.75,
                 "effects": {
                   "barGlow": false,
@@ -2311,7 +2312,7 @@
                 "textMode": "value"
               }
             },
-            "version": "12.4.0-22066786794"
+            "version": "13.0.0-22246553003"
           }
         }
       },
@@ -2418,10 +2419,10 @@
               ]
             }
           },
-          "description": "Count of monthly active users (MAUs) on instances running $deprecated_latest off any deprecated release branches ($deprecated_branch) compared to the total MAU on any deprecated release branches.",
+          "description": "Count of monthly active users (MAUs) on instances patched off the deprecated branches compared to the MAUs on the deprecated branches.",
           "id": 74,
           "links": [],
-          "title": "Patched MAUs, Deprecated (${deprecated_branch:csv})",
+          "title": "Patched MAUs, Deprecated",
           "vizConfig": {
             "group": "gauge",
             "kind": "VizConfig",
@@ -2455,7 +2456,7 @@
                 "overrides": []
               },
               "options": {
-                "barShape": "rounded",
+                "barShape": "flat",
                 "barWidthFactor": 0.75,
                 "effects": {
                   "barGlow": false,
@@ -2483,7 +2484,7 @@
                 "textMode": "value"
               }
             },
-            "version": "12.4.0-22066786794"
+            "version": "13.0.0-22246553003"
           }
         }
       },
@@ -2505,7 +2506,7 @@
                         "editorMode": "code",
                         "format": "table",
                         "rawQuery": true,
-                        "rawSql": "SELECT \n    md.domain AS \"Instances\",\n    md.software_version AS \"Version\",\n    md.full_version AS \"Raw Version\",\n    md.active_users_monthly AS \"Monthly Active Users\",\n    md.\"timestamp\" AS \"Last Crawled\"\nFROM mastodon_domains md\nWHERE NOT EXISTS (\n    SELECT 1\n    FROM dni\n    WHERE md.domain LIKE '%' || dni.domain\n)\nORDER BY md.active_users_monthly DESC;",
+                        "rawSql": "SELECT \n    md.domain AS \"Instances\",\n    md.software_version AS \"Version\",\n    md.full_version AS \"Raw Version\",\n    rd.nodeinfo AS \"Software\",\n    md.active_users_monthly AS \"Monthly Active Users\",\n    md.\"timestamp\" AS \"Last Crawled\"\nFROM mastodon_domains md\nLEFT JOIN raw_domains rd\n    ON rd.domain = md.domain\nWHERE NOT EXISTS (\n    SELECT 1\n    FROM dni\n    WHERE md.domain LIKE '%' || dni.domain\n)\nORDER BY md.active_users_monthly DESC;",
                         "sql": {
                           "columns": [
                             {
@@ -2603,11 +2604,23 @@
                         "value": "right"
                       }
                     ]
+                  },
+                  {
+                    "matcher": {
+                      "id": "byName",
+                      "options": "Software"
+                    },
+                    "properties": [
+                      {
+                        "id": "custom.align",
+                        "value": "right"
+                      }
+                    ]
                   }
                 ]
               },
               "options": {
-                "cellHeight": "md",
+                "cellHeight": "sm",
                 "enablePagination": true,
                 "showHeader": true,
                 "sortBy": [
@@ -2618,7 +2631,7 @@
                 ]
               }
             },
-            "version": "12.4.0-22066786794"
+            "version": "13.0.0-22229365497"
           }
         }
       },
@@ -2707,7 +2720,7 @@
           "description": "",
           "id": 88,
           "links": [],
-          "title": "Patches by Instance",
+          "title": "Historical Patch Adoption by Instance",
           "vizConfig": {
             "group": "barchart",
             "kind": "VizConfig",
@@ -2780,7 +2793,7 @@
                 "xTickLabelSpacing": 0
               }
             },
-            "version": "12.4.0-22066786794"
+            "version": "13.0.0-22229365497"
           }
         }
       },
@@ -2869,7 +2882,7 @@
           "description": "",
           "id": 89,
           "links": [],
-          "title": "Patches by MAU",
+          "title": "Historical Patch Adoption by MAU",
           "vizConfig": {
             "group": "barchart",
             "kind": "VizConfig",
@@ -2941,7 +2954,7 @@
                 "xTickLabelSpacing": 0
               }
             },
-            "version": "12.4.0-22066786794"
+            "version": "13.0.0-22229365497"
           }
         }
       },
@@ -3030,7 +3043,7 @@
           "description": "",
           "id": 90,
           "links": [],
-          "title": "Branches by Instance",
+          "title": "Historical Branch Deployments by Instance",
           "vizConfig": {
             "group": "barchart",
             "kind": "VizConfig",
@@ -3102,7 +3115,7 @@
                 "xTickLabelSpacing": 0
               }
             },
-            "version": "12.4.0-22066786794"
+            "version": "13.0.0-22229365497"
           }
         }
       },
@@ -3191,7 +3204,7 @@
           "description": "",
           "id": 91,
           "links": [],
-          "title": "Branches by MAU",
+          "title": "Historical Branch Deployments by MAU",
           "vizConfig": {
             "group": "barchart",
             "kind": "VizConfig",
@@ -3263,7 +3276,7 @@
                 "xTickLabelSpacing": 0
               }
             },
-            "version": "12.4.0-22066786794"
+            "version": "13.0.0-22229365497"
           }
         }
       },
@@ -3472,7 +3485,7 @@
                 }
               }
             },
-            "version": "12.4.0-22066786794"
+            "version": "13.0.0-22229365497"
           }
         }
       },
@@ -3681,7 +3694,7 @@
                 }
               }
             },
-            "version": "12.4.0-22066786794"
+            "version": "13.0.0-22229365497"
           }
         }
       }
@@ -3694,6 +3707,7 @@
             "kind": "RowsLayoutRow",
             "spec": {
               "collapse": false,
+              "fillScreen": true,
               "hideHeader": true,
               "layout": {
                 "kind": "AutoGridLayout",
@@ -3737,8 +3751,8 @@
                       }
                     }
                   ],
-                  "maxColumnCount": 4,
-                  "rowHeightMode": "short"
+                  "maxColumnCount": 2,
+                  "rowHeightMode": "standard"
                 }
               },
               "title": "Big Numbers"
@@ -3748,117 +3762,88 @@
             "kind": "RowsLayoutRow",
             "spec": {
               "collapse": false,
-              "fillScreen": false,
-              "hideHeader": false,
+              "fillScreen": true,
+              "hideHeader": true,
               "layout": {
-                "kind": "GridLayout",
+                "kind": "AutoGridLayout",
                 "spec": {
+                  "columnWidthMode": "standard",
                   "items": [
                     {
-                      "kind": "GridLayoutItem",
+                      "kind": "AutoGridLayoutItem",
                       "spec": {
                         "element": {
                           "kind": "ElementReference",
                           "name": "panel-11"
-                        },
-                        "height": 7,
-                        "width": 6,
-                        "x": 0,
-                        "y": 0
+                        }
                       }
                     },
                     {
-                      "kind": "GridLayoutItem",
+                      "kind": "AutoGridLayoutItem",
                       "spec": {
                         "element": {
                           "kind": "ElementReference",
                           "name": "panel-21"
-                        },
-                        "height": 7,
-                        "width": 6,
-                        "x": 6,
-                        "y": 0
+                        }
                       }
                     },
                     {
-                      "kind": "GridLayoutItem",
+                      "kind": "AutoGridLayoutItem",
                       "spec": {
                         "element": {
                           "kind": "ElementReference",
                           "name": "panel-22"
-                        },
-                        "height": 7,
-                        "width": 6,
-                        "x": 12,
-                        "y": 0
+                        }
                       }
                     },
                     {
-                      "kind": "GridLayoutItem",
+                      "kind": "AutoGridLayoutItem",
                       "spec": {
                         "element": {
                           "kind": "ElementReference",
                           "name": "panel-73"
-                        },
-                        "height": 7,
-                        "width": 6,
-                        "x": 18,
-                        "y": 0
+                        }
                       }
                     },
                     {
-                      "kind": "GridLayoutItem",
+                      "kind": "AutoGridLayoutItem",
                       "spec": {
                         "element": {
                           "kind": "ElementReference",
                           "name": "panel-32"
-                        },
-                        "height": 7,
-                        "width": 6,
-                        "x": 0,
-                        "y": 7
+                        }
                       }
                     },
                     {
-                      "kind": "GridLayoutItem",
+                      "kind": "AutoGridLayoutItem",
                       "spec": {
                         "element": {
                           "kind": "ElementReference",
                           "name": "panel-35"
-                        },
-                        "height": 7,
-                        "width": 6,
-                        "x": 6,
-                        "y": 7
+                        }
                       }
                     },
                     {
-                      "kind": "GridLayoutItem",
+                      "kind": "AutoGridLayoutItem",
                       "spec": {
                         "element": {
                           "kind": "ElementReference",
                           "name": "panel-36"
-                        },
-                        "height": 7,
-                        "width": 6,
-                        "x": 12,
-                        "y": 7
+                        }
                       }
                     },
                     {
-                      "kind": "GridLayoutItem",
+                      "kind": "AutoGridLayoutItem",
                       "spec": {
                         "element": {
                           "kind": "ElementReference",
                           "name": "panel-74"
-                        },
-                        "height": 7,
-                        "width": 6,
-                        "x": 18,
-                        "y": 7
+                        }
                       }
                     }
-                  ]
+                  ],
+                  "maxColumnCount": 4,
+                  "rowHeightMode": "standard"
                 }
               },
               "title": "Patch Adoption"
@@ -3868,6 +3853,8 @@
             "kind": "RowsLayoutRow",
             "spec": {
               "collapse": false,
+              "fillScreen": true,
+              "hideHeader": true,
               "layout": {
                 "kind": "AutoGridLayout",
                 "spec": {
@@ -3903,6 +3890,8 @@
             "kind": "RowsLayoutRow",
             "spec": {
               "collapse": false,
+              "fillScreen": true,
+              "hideHeader": true,
               "layout": {
                 "kind": "AutoGridLayout",
                 "spec": {
@@ -3974,6 +3963,8 @@
             "kind": "RowsLayoutRow",
             "spec": {
               "collapse": false,
+              "fillScreen": true,
+              "hideHeader": true,
               "layout": {
                 "kind": "AutoGridLayout",
                 "spec": {
@@ -4027,6 +4018,8 @@
             "kind": "RowsLayoutRow",
             "spec": {
               "collapse": false,
+              "fillScreen": true,
+              "hideHeader": true,
               "layout": {
                 "kind": "AutoGridLayout",
                 "spec": {
@@ -4108,438 +4101,13 @@
         "1d"
       ],
       "fiscalYearStartMonth": 0,
-      "from": "now-6h",
+      "from": "now-6d",
       "hideTimepicker": false,
       "timezone": "browser",
       "to": "now"
     },
     "title": "vmcrawl",
-    "variables": [
-      {
-        "kind": "QueryVariable",
-        "spec": {
-          "allowCustomValue": false,
-          "current": {
-            "text": "",
-            "value": ""
-          },
-          "definition": "SELECT branch\nFROM release_versions\nWHERE n_level = -1;",
-          "hide": "hideVariable",
-          "includeAll": false,
-          "multi": false,
-          "name": "main_branch",
-          "options": [],
-          "query": {
-            "group": "grafana-postgresql-datasource",
-            "kind": "DataQuery",
-            "spec": {
-              "dataset": "vmcrawl",
-              "editorMode": "code",
-              "format": "table",
-              "query": "SELECT branch\nFROM release_versions\nWHERE n_level = -1;",
-              "rawQuery": true,
-              "rawSql": "SELECT branch\nFROM release_versions\nWHERE n_level = -1;",
-              "refId": "SQLVariableQueryEditor-VariableQuery",
-              "sql": {
-                "columns": [
-                  {
-                    "parameters": [],
-                    "type": "function"
-                  }
-                ],
-                "groupBy": [
-                  {
-                    "property": {
-                      "type": "string"
-                    },
-                    "type": "groupBy"
-                  }
-                ],
-                "limit": 50
-              },
-              "table": "release_versions"
-            },
-            "version": "v0"
-          },
-          "refresh": "onTimeRangeChanged",
-          "regex": "",
-          "regexApplyTo": "value",
-          "skipUrlSync": false,
-          "sort": "disabled"
-        }
-      },
-      {
-        "kind": "QueryVariable",
-        "spec": {
-          "allowCustomValue": false,
-          "current": {
-            "text": "",
-            "value": ""
-          },
-          "definition": "SELECT latest\nFROM release_versions\nWHERE n_level = -1;",
-          "hide": "hideVariable",
-          "includeAll": false,
-          "multi": false,
-          "name": "main_latest",
-          "options": [],
-          "query": {
-            "group": "grafana-postgresql-datasource",
-            "kind": "DataQuery",
-            "spec": {
-              "dataset": "vmcrawl",
-              "editorMode": "code",
-              "format": "table",
-              "query": "SELECT latest\nFROM release_versions\nWHERE n_level = -1;",
-              "rawQuery": true,
-              "rawSql": "SELECT latest\nFROM release_versions\nWHERE n_level = -1;",
-              "refId": "SQLVariableQueryEditor-VariableQuery",
-              "sql": {
-                "columns": [
-                  {
-                    "parameters": [],
-                    "type": "function"
-                  }
-                ],
-                "groupBy": [
-                  {
-                    "property": {
-                      "type": "string"
-                    },
-                    "type": "groupBy"
-                  }
-                ],
-                "limit": 50
-              },
-              "table": "release_versions"
-            },
-            "version": "v0"
-          },
-          "refresh": "onTimeRangeChanged",
-          "regex": "",
-          "regexApplyTo": "value",
-          "skipUrlSync": false,
-          "sort": "disabled"
-        }
-      },
-      {
-        "kind": "QueryVariable",
-        "spec": {
-          "allowCustomValue": false,
-          "current": {
-            "text": "",
-            "value": ""
-          },
-          "definition": "SELECT latest\nFROM release_versions\nWHERE n_level = 0;",
-          "hide": "hideVariable",
-          "includeAll": false,
-          "multi": false,
-          "name": "latest_latest",
-          "options": [],
-          "query": {
-            "group": "grafana-postgresql-datasource",
-            "kind": "DataQuery",
-            "spec": {
-              "dataset": "vmcrawl",
-              "editorMode": "code",
-              "format": "table",
-              "query": "SELECT latest\nFROM release_versions\nWHERE n_level = 0;",
-              "rawQuery": true,
-              "rawSql": "SELECT latest\nFROM release_versions\nWHERE n_level = 0;",
-              "refId": "SQLVariableQueryEditor-VariableQuery",
-              "sql": {
-                "columns": [
-                  {
-                    "parameters": [],
-                    "type": "function"
-                  }
-                ],
-                "groupBy": [
-                  {
-                    "property": {
-                      "type": "string"
-                    },
-                    "type": "groupBy"
-                  }
-                ],
-                "limit": 50
-              },
-              "table": "release_versions"
-            },
-            "version": "v0"
-          },
-          "refresh": "onTimeRangeChanged",
-          "regex": "",
-          "regexApplyTo": "value",
-          "skipUrlSync": false,
-          "sort": "disabled"
-        }
-      },
-      {
-        "kind": "QueryVariable",
-        "spec": {
-          "allowCustomValue": false,
-          "current": {
-            "text": "",
-            "value": ""
-          },
-          "definition": "SELECT branch\nFROM release_versions\nWHERE n_level = 0;",
-          "hide": "hideVariable",
-          "includeAll": false,
-          "multi": false,
-          "name": "latest_branch",
-          "options": [],
-          "query": {
-            "group": "grafana-postgresql-datasource",
-            "kind": "DataQuery",
-            "spec": {
-              "dataset": "vmcrawl",
-              "editorMode": "code",
-              "format": "table",
-              "query": "SELECT branch\nFROM release_versions\nWHERE n_level = 0;",
-              "rawQuery": true,
-              "rawSql": "SELECT branch\nFROM release_versions\nWHERE n_level = 0;",
-              "refId": "SQLVariableQueryEditor-VariableQuery",
-              "sql": {
-                "columns": [
-                  {
-                    "parameters": [],
-                    "type": "function"
-                  }
-                ],
-                "groupBy": [
-                  {
-                    "property": {
-                      "type": "string"
-                    },
-                    "type": "groupBy"
-                  }
-                ],
-                "limit": 50
-              },
-              "table": "release_versions"
-            },
-            "version": "v0"
-          },
-          "refresh": "onTimeRangeChanged",
-          "regex": "",
-          "regexApplyTo": "value",
-          "skipUrlSync": false,
-          "sort": "disabled"
-        }
-      },
-      {
-        "kind": "QueryVariable",
-        "spec": {
-          "allowCustomValue": false,
-          "current": {
-            "text": "",
-            "value": ""
-          },
-          "definition": "SELECT latest\nFROM release_versions\nWHERE n_level = 1;",
-          "hide": "hideVariable",
-          "includeAll": false,
-          "multi": false,
-          "name": "previous_latest",
-          "options": [],
-          "query": {
-            "group": "grafana-postgresql-datasource",
-            "kind": "DataQuery",
-            "spec": {
-              "dataset": "vmcrawl",
-              "editorMode": "code",
-              "format": "table",
-              "query": "SELECT latest\nFROM release_versions\nWHERE n_level = 1;",
-              "rawQuery": true,
-              "rawSql": "SELECT latest\nFROM release_versions\nWHERE n_level = 1;",
-              "refId": "SQLVariableQueryEditor-VariableQuery",
-              "sql": {
-                "columns": [
-                  {
-                    "parameters": [],
-                    "type": "function"
-                  }
-                ],
-                "groupBy": [
-                  {
-                    "property": {
-                      "type": "string"
-                    },
-                    "type": "groupBy"
-                  }
-                ],
-                "limit": 50
-              },
-              "table": "release_versions"
-            },
-            "version": "v0"
-          },
-          "refresh": "onTimeRangeChanged",
-          "regex": "",
-          "regexApplyTo": "value",
-          "skipUrlSync": false,
-          "sort": "disabled"
-        }
-      },
-      {
-        "kind": "QueryVariable",
-        "spec": {
-          "allowCustomValue": false,
-          "current": {
-            "text": "",
-            "value": ""
-          },
-          "definition": "SELECT latest\nFROM release_versions\nWHERE n_level = 2;",
-          "hide": "hideVariable",
-          "includeAll": false,
-          "multi": false,
-          "name": "deprecated_latest",
-          "options": [],
-          "query": {
-            "group": "grafana-postgresql-datasource",
-            "kind": "DataQuery",
-            "spec": {
-              "dataset": "vmcrawl",
-              "editorMode": "code",
-              "format": "table",
-              "query": "SELECT latest\nFROM release_versions\nWHERE n_level = 2;",
-              "rawQuery": true,
-              "rawSql": "SELECT latest\nFROM release_versions\nWHERE n_level = 2;",
-              "refId": "SQLVariableQueryEditor-VariableQuery",
-              "sql": {
-                "columns": [
-                  {
-                    "parameters": [],
-                    "type": "function"
-                  }
-                ],
-                "groupBy": [
-                  {
-                    "property": {
-                      "type": "string"
-                    },
-                    "type": "groupBy"
-                  }
-                ],
-                "limit": 50
-              },
-              "table": "release_versions"
-            },
-            "version": "v0"
-          },
-          "refresh": "onTimeRangeChanged",
-          "regex": "",
-          "regexApplyTo": "value",
-          "skipUrlSync": false,
-          "sort": "disabled"
-        }
-      },
-      {
-        "kind": "QueryVariable",
-        "spec": {
-          "allowCustomValue": false,
-          "current": {
-            "text": "",
-            "value": ""
-          },
-          "definition": "SELECT branch\nFROM release_versions\nWHERE n_level = 1;",
-          "hide": "hideVariable",
-          "includeAll": false,
-          "multi": false,
-          "name": "previous_branch",
-          "options": [],
-          "query": {
-            "group": "grafana-postgresql-datasource",
-            "kind": "DataQuery",
-            "spec": {
-              "dataset": "vmcrawl",
-              "editorMode": "code",
-              "format": "table",
-              "query": "SELECT branch\nFROM release_versions\nWHERE n_level = 1;",
-              "rawQuery": true,
-              "rawSql": "SELECT branch\nFROM release_versions\nWHERE n_level = 1;",
-              "refId": "SQLVariableQueryEditor-VariableQuery",
-              "sql": {
-                "columns": [
-                  {
-                    "parameters": [],
-                    "type": "function"
-                  }
-                ],
-                "groupBy": [
-                  {
-                    "property": {
-                      "type": "string"
-                    },
-                    "type": "groupBy"
-                  }
-                ],
-                "limit": 50
-              },
-              "table": "release_versions"
-            },
-            "version": "v0"
-          },
-          "refresh": "onTimeRangeChanged",
-          "regex": "",
-          "regexApplyTo": "value",
-          "skipUrlSync": false,
-          "sort": "disabled"
-        }
-      },
-      {
-        "kind": "QueryVariable",
-        "spec": {
-          "allowCustomValue": false,
-          "current": {
-            "text": "",
-            "value": ""
-          },
-          "definition": "SELECT branch\nFROM release_versions\nWHERE n_level = 2;",
-          "hide": "hideVariable",
-          "includeAll": false,
-          "multi": false,
-          "name": "deprecated_branch",
-          "options": [],
-          "query": {
-            "group": "grafana-postgresql-datasource",
-            "kind": "DataQuery",
-            "spec": {
-              "dataset": "vmcrawl",
-              "editorMode": "code",
-              "format": "table",
-              "query": "SELECT branch\nFROM release_versions\nWHERE n_level = 2;",
-              "rawQuery": true,
-              "rawSql": "SELECT branch\nFROM release_versions\nWHERE n_level = 2;",
-              "refId": "SQLVariableQueryEditor-VariableQuery",
-              "sql": {
-                "columns": [
-                  {
-                    "parameters": [],
-                    "type": "function"
-                  }
-                ],
-                "groupBy": [
-                  {
-                    "property": {
-                      "type": "string"
-                    },
-                    "type": "groupBy"
-                  }
-                ],
-                "limit": 50
-              },
-              "table": "release_versions"
-            },
-            "version": "v0"
-          },
-          "refresh": "onTimeRangeChanged",
-          "regex": "",
-          "regexApplyTo": "value",
-          "skipUrlSync": false,
-          "sort": "disabled"
-        }
-      }
-    ]
+    "variables": []
   },
   "status": {}
 }
