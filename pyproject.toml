@@ -1,6 +1,6 @@
 [project]
 name = "vmcrawl"
-version = "0.16.3"
+version = "0.16.4"
 description = "Mastodon-focused version reporting crawler"
 requires-python = ">=3.13"
 
