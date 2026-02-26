@@ -5795,7 +5795,7 @@ def write_statistics_to_database(stats_values):
             _ = cursor.execute(
                 """
         INSERT INTO statistics (
-        date, mau, unique_versions, main_instances,
+        date, updated_at, mau, unique_versions, main_instances,
         latest_instances, previous_instances, deprecated_instances,
         eol_instances, main_patched_instances,
         latest_patched_instances, previous_patched_instances,
@@ -5807,10 +5807,12 @@ def write_statistics_to_database(stats_values):
         )
         VALUES (
         (SELECT CURRENT_DATE AT TIME ZONE 'UTC'),
+        NOW() AT TIME ZONE 'UTC',
         %s, %s, %s, %s, %s, %s, %s, %s, %s, %s,
         %s, %s, %s, %s, %s, %s, %s, %s, %s, %s
         )
         ON CONFLICT (date) DO UPDATE SET
+        updated_at = NOW() AT TIME ZONE 'UTC',
         mau = EXCLUDED.mau,
         unique_versions = EXCLUDED.unique_versions,
         main_instances = EXCLUDED.main_instances,

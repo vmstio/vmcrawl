@@ -53,6 +53,7 @@ CREATE TABLE IF NOT EXISTS
 
 CREATE TABLE IF NOT EXISTS statistics (
     date DATE PRIMARY KEY,
+    updated_at TIMESTAMPTZ,
     mau INTEGER,
     unique_versions INTEGER,
     main_instances INTEGER,
