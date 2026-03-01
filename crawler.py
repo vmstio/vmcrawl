@@ -471,6 +471,7 @@ socket.getaddrinfo = _cached_getaddrinfo  # type: ignore[assignment]
 # =============================================================================
 
 http_timeout = int(os.getenv("VMCRAWL_HTTP_TIMEOUT", "5"))
+domain_timeout = int(os.getenv("VMCRAWL_DOMAIN_TIMEOUT", "30"))
 http_redirect = int(os.getenv("VMCRAWL_HTTP_REDIRECT", "2"))
 http_custom_user_agent = f"{appname}/{appversion} (https://docs.vmst.io/{appname})"
 http_custom_headers = {"User-Agent": http_custom_user_agent}
@@ -645,7 +646,7 @@ async def parse_json_with_fallback(
 # =============================================================================
 
 
-async def get_httpx(url: str) -> httpx.Response:
+async def get_httpx(url: str, timeout: float | None = None) -> httpx.Response:
     """Make async HTTP GET request with size limits."""
 
     def _is_retryable_dns_error(exception: httpx.RequestError) -> bool:
@@ -692,7 +693,10 @@ async def get_httpx(url: str) -> httpx.Response:
         return min(delay, remaining_budget)
 
     async def _stream_get_with_size_limit(client: httpx.AsyncClient) -> httpx.Response:
-        async with client.stream("GET", url) as response:
+        stream_kwargs: dict = {}
+        if timeout is not None:
+            stream_kwargs["timeout"] = timeout
+        async with client.stream("GET", url, **stream_kwargs) as response:
             # Check Content-Length header first if available
             content_length = response.headers.get("Content-Length")
             if content_length and int(content_length) > max_response_size:
@@ -4104,7 +4108,7 @@ async def check_host_meta(domain):
     """
     url = f"https://{domain}/.well-known/host-meta"
     try:
-        response = await get_httpx(url)
+        response = await get_httpx(url, timeout=3)
         if response.status_code == 200:
             # host-meta is typically XML
             if not response.content:
@@ -4157,7 +4161,7 @@ async def check_webfinger(domain):
     target = "webfinger"
     url = f"https://{domain}/.well-known/webfinger?resource=acct:{domain}@{domain}"
     try:
-        response = await get_httpx(url)
+        response = await get_httpx(url, timeout=3)
         content_type = response.headers.get("Content-Type", "")
         content_length = response.headers.get("Content-Length", "")
 
@@ -5023,7 +5027,18 @@ async def check_and_record_domains(
                     continue
 
                 try:
-                    await process_domain(domain, nightly_version_ranges, user_choice)
+                    async with asyncio.timeout(domain_timeout):
+                        await process_domain(domain, nightly_version_ranges, user_choice)
+                except TimeoutError:
+                    if not shutdown_event.is_set():
+                        preserve_status = _get_preserve_status(user_choice)
+                        await asyncio.to_thread(
+                            _handle_tcp_exception,
+                            domain,
+                            "timeout",
+                            TimeoutError(f"Domain processing timed out after {domain_timeout}s"),
+                            preserve_status,
+                        )
                 except httpx.CloseError:
                     pass
                 except Exception as exception:
