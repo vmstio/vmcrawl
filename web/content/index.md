@@ -37,7 +37,7 @@ Near real time Mastodon version adoption
   :::u-button
   ---
   color: neutral
-  icon: i-simple-icons-github
+  icon: i-simple-icons-googledocs
   to: https://docs.vmst.io/vmcrawl
   target: _blank
   variant: outline

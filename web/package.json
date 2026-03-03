@@ -1,5 +1,5 @@
 {
-  "name": "docus-mastoreqs",
+  "name": "docus-vmcrawl",
   "scripts": {
     "dev": "nuxt dev --extends docus",
     "build": "nuxt build --extends docus",
