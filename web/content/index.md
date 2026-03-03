@@ -20,7 +20,18 @@ Near real time Mastodon version adoption
   target: _blank
   variant: outline
   ---
-  Dashboard
+  Browse the Data
+  :::
+  
+  :::u-button
+  ---
+  color: neutral
+  icon: i-simple-icons-mastodon
+  to: https://vmst.io/@vmcrawl
+  target: _blank
+  variant: outline
+  ---
+  Follow on Mastodon
   :::
   
   :::u-button
@@ -31,7 +42,7 @@ Near real time Mastodon version adoption
   target: _blank
   variant: outline
   ---
-  Source
+  View the Source
   :::
   
   :::u-button
@@ -42,7 +53,7 @@ Near real time Mastodon version adoption
   target: _blank
   variant: outline
   ---
-  Docs
+  Read the Documentation
   :::
 ::
 
