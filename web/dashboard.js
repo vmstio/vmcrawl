@@ -329,7 +329,7 @@
                 tableState.order = tableState.order === 'desc' ? 'asc' : 'desc';
             } else {
                 tableState.sort_by = field;
-                tableState.order = field === 'domain' ? 'asc' : 'desc';
+                tableState.order = ['mau', 'last_crawled'].includes(field) ? 'desc' : 'asc';
             }
             tableState.offset = 0;
             loadTable();

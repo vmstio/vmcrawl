@@ -918,9 +918,12 @@ async def get_instances_table(
 ):
     """Get instances table with DNI filtering (for public dashboard)."""
     valid_sort_cols = {
-        "mau": "active_users_monthly",
-        "domain": "domain",
-        "version": "software_version",
+        "mau": ("md", "active_users_monthly"),
+        "domain": ("md", "domain"),
+        "version": ("md", "software_version"),
+        "raw_version": ("md", "full_version"),
+        "software": ("rd", "nodeinfo"),
+        "last_crawled": ("md", "timestamp"),
     }
     if sort_by not in valid_sort_cols:
         raise HTTPException(status_code=400, detail="Invalid sort_by field")
@@ -931,9 +934,10 @@ async def get_instances_table(
 
     try:
         with db_pool.connection() as conn, conn.cursor() as cur:
+            sort_table, sort_col = valid_sort_cols[sort_by]
             sort_field_sql = sql.SQL("{}.{}").format(
-                sql.Identifier("md"),
-                sql.Identifier(valid_sort_cols[sort_by]),
+                sql.Identifier(sort_table),
+                sql.Identifier(sort_col),
             )
             sort_order_sql = (
                 sql.SQL("ASC") if order == "asc" else sql.SQL("DESC")

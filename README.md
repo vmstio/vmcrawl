@@ -181,7 +181,7 @@ Doughnut charts showing EOL instances and MAU broken down by specific EOL branch
 
 Paginated table (100 per page) of all known instances with domain, version, raw version, software, MAU, and last crawled date. Supports:
 - Text search by domain
-- Sorting by domain, version, or MAU (click column header; active sort shown with ↑/↓, other sortable columns shown with ↕)
+- Sorting by any column (click column header; active sort shown with ↑/↓, other sortable columns shown with ↕)
 - Default sort: MAU descending
 
 ## Usage
