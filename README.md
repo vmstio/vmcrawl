@@ -88,11 +88,11 @@ On your PostgreSQL server, execute the contents of `database.sql` to create tabl
 ```bash
 # Make the shell script executable
 chmod +x /opt/vmcrawl/vmcrawl.sh
+```
 
-# Copy service files to systemd
-cp /opt/vmcrawl/vmcrawl.service /etc/systemd/system/
+Create a systemd service unit at `/etc/systemd/system/vmcrawl.service` appropriate for your environment, then reload systemd:
 
-# Reload systemd
+```bash
 systemctl daemon-reload
 ```
 
@@ -133,6 +133,56 @@ The project includes a single main script with multiple subcommands:
 **Statistics Generation:**
 
 Statistics are automatically generated and recorded by the main crawler (`crawler.py`) during its crawling operations. Historical statistics tracking is integrated into the crawling workflow, eliminating the need for a separate statistics service.
+
+## Web Dashboard
+
+The `web/` directory contains a static single-page dashboard for visualizing crawl data. It requires the API (`api.py`) to be running and accessible.
+
+### Configuration
+
+The dashboard reads its API base URL from `web/config.js`:
+
+```js
+window.VMCRAWL_API = 'https://your-api-host.example.com';
+```
+
+If `VMCRAWL_API` is not set, the dashboard defaults to the same origin as the page.
+
+### Sections
+
+**Summary Stats**
+
+Top-level metrics showing total known instances, monthly active users (MAU), patch adoption percentage, and percentage of instances on supported branches.
+
+**Patch Adoption by Branch**
+
+Semi-circular gauges for each tracked branch (main, latest, previous, deprecated), showing patched instance count and MAU. Gauge color indicates adoption level: green (≥66%), orange (33–66%), or red (<33%). The gauge track shows remaining capacity to 100%.
+
+**Patch Distribution**
+
+Doughnut charts breaking down instances and MAU by version category:
+- **Purple** — active/current versions
+- **Orange** — unpatched (older version on a supported branch)
+- **Red** — EOL versions
+
+**Branch Distribution**
+
+Doughnut charts showing the share of instances and MAU per release branch:
+- **Purple** — all active branches
+- **Red** — EOL aggregate
+
+**EOL Breakdown**
+
+Doughnut charts showing EOL instances and MAU broken down by specific EOL branch:
+- **Dark red** — legacy 3.x branches
+- **Red** — all other EOL branches
+
+**All Instances Table**
+
+Paginated table (100 per page) of all known instances with domain, version, raw version, software, MAU, and last crawled date. Supports:
+- Text search by domain
+- Sorting by domain, version, or MAU (click column header; active sort shown with ↑/↓, other sortable columns shown with ↕)
+- Default sort: MAU descending
 
 ## Usage
 
