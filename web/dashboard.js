@@ -155,9 +155,9 @@
         const ctx = document.getElementById(canvasId);
         if (!ctx) return;
         const bgColors = labels.map((l, i) => {
+            if (colors) return colors[i % colors.length];
             if (l === 'EOL') return RED;
             if (l === 'Unpatched') return ORANGE;
-            if (colors) return colors[i % colors.length];
             return CHART_COLORS[i % CHART_COLORS.length];
         });
         new Chart(ctx, {
@@ -377,37 +377,43 @@
 
         // Patch distribution pies
         const pd = patchDist.distribution.sort((a, b) => b.instances - a.instances);
+        const pdColors = pd.map(d => {
+            if (d.version === 'EOL') return RED;
+            if (d.version === 'Unpatched') return ORANGE;
+            return PURPLE;
+        });
         createPieChart(
             'pie-patch-instances',
             pd.map(d => d.version),
             pd.map(d => d.instances),
-            CHART_COLORS
+            pdColors
         );
         createPieChart(
             'pie-patch-mau',
             pd.map(d => d.version),
             pd.map(d => d.mau),
-            CHART_COLORS
+            pdColors
         );
 
         // Branch distribution pies
         const bd = branchDist.distribution;
+        const bdColors = bd.map(d => d.branch === 'EOL' ? RED : PURPLE);
         createPieChart(
             'pie-branch-instances',
             bd.map(d => d.branch),
             bd.map(d => d.instances),
-            BRANCH_COLORS
+            bdColors
         );
         createPieChart(
             'pie-branch-mau',
             bd.map(d => d.branch),
             bd.map(d => d.mau),
-            BRANCH_COLORS
+            bdColors
         );
 
         // EOL distribution pies
         const eol = eolDist.distribution.filter(d => d.instances > 0);
-        const eolColors = eol.map(() => RED_DARK);
+        const eolColors = eol.map(d => d.branch.startsWith('3') ? RED_DARK : RED);
         createPieChart(
             'pie-eol-instances',
             eol.map(d => d.branch),
