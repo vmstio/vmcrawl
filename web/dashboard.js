@@ -415,7 +415,7 @@
 
         // Branch distribution pies
         const bd = branchDist.distribution;
-        const bdColors = bd.map(d => d.branch === 'EOL' ? RED : PURPLE);
+        const bdColors = bd.map(d => d.branch === 'EOL' ? RED : GREEN);
         createPieChart(
             'pie-branch-instances',
             bd.map(d => d.branch),
