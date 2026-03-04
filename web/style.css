@@ -275,13 +275,9 @@ th[data-sort] {
 
 th[data-sort]:hover { color: var(--purple-light); }
 
-.sort-icon {
-    font-style: normal;
-    opacity: 0.35;
-    font-size: 0.75em;
-}
-
 .sort-icon--active {
+    font-style: normal;
+    font-size: 0.75em;
     opacity: 0.85;
     color: var(--purple-light);
 }

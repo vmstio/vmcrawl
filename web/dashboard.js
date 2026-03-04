@@ -310,15 +310,12 @@
             const field = th.dataset.sort;
             const existing = th.querySelector('.sort-icon');
             if (existing) existing.remove();
-            const icon = document.createElement('span');
-            icon.className = 'sort-icon';
             if (field === tableState.sort_by) {
+                const icon = document.createElement('span');
+                icon.className = 'sort-icon sort-icon--active';
                 icon.textContent = tableState.order === 'asc' ? ' ↑' : ' ↓';
-                icon.classList.add('sort-icon--active');
-            } else {
-                icon.textContent = ' ↕';
+                th.appendChild(icon);
             }
-            th.appendChild(icon);
         });
     }
 
