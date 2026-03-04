@@ -152,6 +152,7 @@ conn_string = (
     f"{_db_connect_host}:"
     f"{_db_connect_port}/"
     f"{os.getenv('VMCRAWL_POSTGRES_DATA')}"
+    f"?sslmode={os.getenv('VMCRAWL_POSTGRES_SSLMODE', 'require')}"
 )
 
 # Create connection pool
@@ -906,6 +907,111 @@ async def get_instances(
         raise HTTPException(status_code=500, detail=f"Database error: {str(e)}")
 
 
+@app.get("/instances/table", tags=["Dashboard"])
+async def get_instances_table(
+    _api_key: str | None = Depends(get_api_key),
+    limit: int = Query(100, ge=1, le=5000, description="Number of results"),
+    offset: int = Query(0, ge=0, description="Offset for pagination"),
+    sort_by: str = Query("mau", description="Sort: mau, domain, version"),
+    order: str = Query("desc", description="Sort order: asc or desc"),
+    q: str = Query("", description="Search query for domain"),
+):
+    """Get instances table with DNI filtering (for public dashboard)."""
+    valid_sort_cols = {
+        "mau": "active_users_monthly",
+        "domain": "domain",
+        "version": "software_version",
+    }
+    if sort_by not in valid_sort_cols:
+        raise HTTPException(status_code=400, detail="Invalid sort_by field")
+
+    order = order.lower()
+    if order not in ["asc", "desc"]:
+        raise HTTPException(status_code=400, detail="Order must be 'asc' or 'desc'")
+
+    try:
+        with db_pool.connection() as conn, conn.cursor() as cur:
+            sort_field_sql = sql.SQL("{}.{}").format(
+                sql.Identifier("md"),
+                sql.Identifier(valid_sort_cols[sort_by]),
+            )
+            sort_order_sql = (
+                sql.SQL("ASC") if order == "asc" else sql.SQL("DESC")
+            )
+            nulls_sql = (
+                sql.SQL(" NULLS LAST") if sort_by == "mau" else sql.SQL("")
+            )
+
+            where_clause = sql.SQL("")
+            params: list[Any] = []
+            if q:
+                where_clause = sql.SQL(" AND md.domain ILIKE %s")
+                params.append(f"%{q}%")
+
+            query = sql.SQL(
+                """
+                SELECT
+                    md.domain,
+                    md.software_version,
+                    md.full_version,
+                    rd.nodeinfo,
+                    md.active_users_monthly,
+                    md.timestamp
+                FROM mastodon_domains md
+                LEFT JOIN raw_domains rd ON rd.domain = md.domain
+                WHERE NOT EXISTS (
+                    SELECT 1 FROM dni WHERE md.domain LIKE '%%' || dni.domain
+                )
+                {where}
+                ORDER BY {sort} {order}{nulls}
+                LIMIT %s OFFSET %s
+            """
+            ).format(
+                where=where_clause,
+                sort=sort_field_sql,
+                order=sort_order_sql,
+                nulls=nulls_sql,
+            )
+            params.extend([limit, offset])
+            _ = cur.execute(query, params)
+            results = cur.fetchall()
+
+            # Total count with DNI filter
+            count_query = sql.SQL(
+                """
+                SELECT COUNT(*)
+                FROM mastodon_domains md
+                WHERE NOT EXISTS (
+                    SELECT 1 FROM dni WHERE md.domain LIKE '%%' || dni.domain
+                )
+                {where}
+            """
+            ).format(where=where_clause)
+            count_params = [f"%{q}%"] if q else []
+            _ = cur.execute(count_query, count_params)
+            result = cur.fetchone()
+            total_count = result[0] if result else 0
+
+        return {
+            "total": total_count,
+            "limit": limit,
+            "offset": offset,
+            "instances": [
+                {
+                    "domain": row[0],
+                    "version": row[1],
+                    "full_version": row[2],
+                    "software": row[3],
+                    "monthly_active_users": row[4],
+                    "last_updated": row[5].isoformat() if row[5] else None,
+                }
+                for row in results
+            ],
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Database error: {str(e)}")
+
+
 @app.get("/instances/{domain}", tags=["Instances"])
 async def get_instance(domain: str, _api_key: str | None = Depends(get_api_key)):
     """Get detailed information about a specific Mastodon instance."""
@@ -1591,111 +1697,6 @@ async def get_supported_branches_coverage(
             "mau_percent": (
                 round(float(result[1]), 1) if result and result[1] else 0
             ),
-        }
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Database error: {str(e)}")
-
-
-@app.get("/instances/table", tags=["Dashboard"])
-async def get_instances_table(
-    _api_key: str | None = Depends(get_api_key),
-    limit: int = Query(100, ge=1, le=5000, description="Number of results"),
-    offset: int = Query(0, ge=0, description="Offset for pagination"),
-    sort_by: str = Query("mau", description="Sort: mau, domain, version"),
-    order: str = Query("desc", description="Sort order: asc or desc"),
-    q: str = Query("", description="Search query for domain"),
-):
-    """Get instances table with DNI filtering (for public dashboard)."""
-    valid_sort_cols = {
-        "mau": "active_users_monthly",
-        "domain": "domain",
-        "version": "software_version",
-    }
-    if sort_by not in valid_sort_cols:
-        raise HTTPException(status_code=400, detail="Invalid sort_by field")
-
-    order = order.lower()
-    if order not in ["asc", "desc"]:
-        raise HTTPException(status_code=400, detail="Order must be 'asc' or 'desc'")
-
-    try:
-        with db_pool.connection() as conn, conn.cursor() as cur:
-            sort_field_sql = sql.SQL("{}.{}").format(
-                sql.Identifier("md"),
-                sql.Identifier(valid_sort_cols[sort_by]),
-            )
-            sort_order_sql = (
-                sql.SQL("ASC") if order == "asc" else sql.SQL("DESC")
-            )
-            nulls_sql = (
-                sql.SQL(" NULLS LAST") if sort_by == "mau" else sql.SQL("")
-            )
-
-            where_clause = sql.SQL("")
-            params: list[Any] = []
-            if q:
-                where_clause = sql.SQL(" AND md.domain ILIKE %s")
-                params.append(f"%{q}%")
-
-            query = sql.SQL(
-                """
-                SELECT
-                    md.domain,
-                    md.software_version,
-                    md.full_version,
-                    rd.nodeinfo,
-                    md.active_users_monthly,
-                    md.timestamp
-                FROM mastodon_domains md
-                LEFT JOIN raw_domains rd ON rd.domain = md.domain
-                WHERE NOT EXISTS (
-                    SELECT 1 FROM dni WHERE md.domain LIKE '%%' || dni.domain
-                )
-                {where}
-                ORDER BY {sort} {order}{nulls}
-                LIMIT %s OFFSET %s
-            """
-            ).format(
-                where=where_clause,
-                sort=sort_field_sql,
-                order=sort_order_sql,
-                nulls=nulls_sql,
-            )
-            params.extend([limit, offset])
-            _ = cur.execute(query, params)
-            results = cur.fetchall()
-
-            # Total count with DNI filter
-            count_query = sql.SQL(
-                """
-                SELECT COUNT(*)
-                FROM mastodon_domains md
-                WHERE NOT EXISTS (
-                    SELECT 1 FROM dni WHERE md.domain LIKE '%%' || dni.domain
-                )
-                {where}
-            """
-            ).format(where=where_clause)
-            count_params = [f"%{q}%"] if q else []
-            _ = cur.execute(count_query, count_params)
-            result = cur.fetchone()
-            total_count = result[0] if result else 0
-
-        return {
-            "total": total_count,
-            "limit": limit,
-            "offset": offset,
-            "instances": [
-                {
-                    "domain": row[0],
-                    "version": row[1],
-                    "full_version": row[2],
-                    "software": row[3],
-                    "monthly_active_users": row[4],
-                    "last_updated": row[5].isoformat() if row[5] else None,
-                }
-                for row in results
-            ],
         }
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Database error: {str(e)}")
