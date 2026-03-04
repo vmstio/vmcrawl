@@ -1,9 +1,9 @@
 {
   "apiVersion": "dashboard.grafana.app/v2beta1",
-  "kind": "DashboardWithAccessInfo",
+  "kind": "Dashboard",
   "metadata": {
     "name": "aedqo0q7klrswa",
-    "generation": 177,
+    "generation": 181,
     "creationTimestamp": "2025-11-21T19:31:21Z",
     "labels": {},
     "annotations": {}
@@ -13,17 +13,17 @@
       {
         "kind": "AnnotationQuery",
         "spec": {
-          "builtIn": true,
+          "query": {
+            "kind": "DataQuery",
+            "group": "grafana",
+            "version": "v0",
+            "spec": {}
+          },
           "enable": true,
           "hide": true,
           "iconColor": "rgba(0, 211, 255, 1)",
           "name": "Annotations & Alerts",
-          "query": {
-            "group": "grafana",
-            "kind": "DataQuery",
-            "spec": {},
-            "version": "v0"
-          }
+          "builtIn": true
         }
       }
     ],
@@ -34,6 +34,10 @@
       "panel-1": {
         "kind": "Panel",
         "spec": {
+          "id": 1,
+          "title": "Mastodon Instances",
+          "description": "",
+          "links": [],
           "data": {
             "kind": "QueryGroup",
             "spec": {
@@ -41,10 +45,10 @@
                 {
                   "kind": "PanelQuery",
                   "spec": {
-                    "hidden": false,
                     "query": {
-                      "group": "grafana-postgresql-datasource",
                       "kind": "DataQuery",
+                      "group": "grafana-postgresql-datasource",
+                      "version": "v0",
                       "spec": {
                         "editorMode": "code",
                         "format": "table",
@@ -67,43 +71,22 @@
                           ],
                           "limit": 50
                         }
-                      },
-                      "version": "v0"
+                      }
                     },
-                    "refId": "A"
+                    "refId": "A",
+                    "hidden": false
                   }
                 }
               ],
-              "queryOptions": {},
-              "transformations": []
+              "transformations": [],
+              "queryOptions": {}
             }
           },
-          "description": "",
-          "id": 1,
-          "links": [],
-          "title": "Mastodon Instances",
           "vizConfig": {
-            "group": "stat",
             "kind": "VizConfig",
+            "group": "stat",
+            "version": "13.0.0-22415502922",
             "spec": {
-              "fieldConfig": {
-                "defaults": {
-                  "color": {
-                    "mode": "thresholds"
-                  },
-                  "thresholds": {
-                    "mode": "absolute",
-                    "steps": [
-                      {
-                        "color": "purple",
-                        "value": 0
-                      }
-                    ]
-                  },
-                  "unit": "locale"
-                },
-                "overrides": []
-              },
               "options": {
                 "colorMode": "value",
                 "graphMode": "area",
@@ -120,15 +103,36 @@
                 "showPercentChange": false,
                 "textMode": "auto",
                 "wideLayout": true
+              },
+              "fieldConfig": {
+                "defaults": {
+                  "unit": "locale",
+                  "thresholds": {
+                    "mode": "absolute",
+                    "steps": [
+                      {
+                        "value": 0,
+                        "color": "purple"
+                      }
+                    ]
+                  },
+                  "color": {
+                    "mode": "thresholds"
+                  }
+                },
+                "overrides": []
               }
-            },
-            "version": "13.0.0-22246553003"
+            }
           }
         }
       },
       "panel-101": {
         "kind": "Panel",
         "spec": {
+          "id": 101,
+          "title": "Patch Coverage",
+          "description": "Instances and monthly active user (MAU) count from instances deploying the latest patch versions",
+          "links": [],
           "data": {
             "kind": "QueryGroup",
             "spec": {
@@ -136,10 +140,10 @@
                 {
                   "kind": "PanelQuery",
                   "spec": {
-                    "hidden": false,
                     "query": {
-                      "group": "grafana-postgresql-datasource",
                       "kind": "DataQuery",
+                      "group": "grafana-postgresql-datasource",
+                      "version": "v0",
                       "spec": {
                         "editorMode": "code",
                         "format": "table",
@@ -162,44 +166,22 @@
                           ],
                           "limit": 50
                         }
-                      },
-                      "version": "v0"
+                      }
                     },
-                    "refId": "A"
+                    "refId": "A",
+                    "hidden": false
                   }
                 }
               ],
-              "queryOptions": {},
-              "transformations": []
+              "transformations": [],
+              "queryOptions": {}
             }
           },
-          "description": "Instances and monthly active user (MAU) count from instances deploying the latest patch versions",
-          "id": 101,
-          "links": [],
-          "title": "Patch Coverage",
           "vizConfig": {
-            "group": "stat",
             "kind": "VizConfig",
+            "group": "stat",
+            "version": "13.0.0-22415502922",
             "spec": {
-              "fieldConfig": {
-                "defaults": {
-                  "color": {
-                    "mode": "thresholds"
-                  },
-                  "decimals": 1,
-                  "thresholds": {
-                    "mode": "absolute",
-                    "steps": [
-                      {
-                        "color": "purple",
-                        "value": 0
-                      }
-                    ]
-                  },
-                  "unit": "percent"
-                },
-                "overrides": []
-              },
               "options": {
                 "colorMode": "value",
                 "graphMode": "area",
@@ -216,15 +198,37 @@
                 "showPercentChange": false,
                 "textMode": "auto",
                 "wideLayout": true
+              },
+              "fieldConfig": {
+                "defaults": {
+                  "unit": "percent",
+                  "decimals": 1,
+                  "thresholds": {
+                    "mode": "absolute",
+                    "steps": [
+                      {
+                        "value": 0,
+                        "color": "purple"
+                      }
+                    ]
+                  },
+                  "color": {
+                    "mode": "thresholds"
+                  }
+                },
+                "overrides": []
               }
-            },
-            "version": "13.0.0-22246553003"
+            }
           }
         }
       },
       "panel-102": {
         "kind": "Panel",
         "spec": {
+          "id": 102,
+          "title": "Supported Branches",
+          "description": "Instances and monthly active user (MAU) count from instances deploying a supported branch",
+          "links": [],
           "data": {
             "kind": "QueryGroup",
             "spec": {
@@ -232,10 +236,10 @@
                 {
                   "kind": "PanelQuery",
                   "spec": {
-                    "hidden": false,
                     "query": {
-                      "group": "grafana-postgresql-datasource",
                       "kind": "DataQuery",
+                      "group": "grafana-postgresql-datasource",
+                      "version": "v0",
                       "spec": {
                         "editorMode": "code",
                         "format": "table",
@@ -258,44 +262,22 @@
                           ],
                           "limit": 50
                         }
-                      },
-                      "version": "v0"
+                      }
                     },
-                    "refId": "A"
+                    "refId": "A",
+                    "hidden": false
                   }
                 }
               ],
-              "queryOptions": {},
-              "transformations": []
+              "transformations": [],
+              "queryOptions": {}
             }
           },
-          "description": "Instances and monthly active user (MAU) count from instances deploying a supported branch",
-          "id": 102,
-          "links": [],
-          "title": "Supported Branches",
           "vizConfig": {
-            "group": "stat",
             "kind": "VizConfig",
+            "group": "stat",
+            "version": "13.0.0-22415502922",
             "spec": {
-              "fieldConfig": {
-                "defaults": {
-                  "color": {
-                    "mode": "thresholds"
-                  },
-                  "decimals": 1,
-                  "thresholds": {
-                    "mode": "absolute",
-                    "steps": [
-                      {
-                        "color": "purple",
-                        "value": 0
-                      }
-                    ]
-                  },
-                  "unit": "percent"
-                },
-                "overrides": []
-              },
               "options": {
                 "colorMode": "value",
                 "graphMode": "area",
@@ -312,15 +294,37 @@
                 "showPercentChange": false,
                 "textMode": "auto",
                 "wideLayout": true
+              },
+              "fieldConfig": {
+                "defaults": {
+                  "unit": "percent",
+                  "decimals": 1,
+                  "thresholds": {
+                    "mode": "absolute",
+                    "steps": [
+                      {
+                        "value": 0,
+                        "color": "purple"
+                      }
+                    ]
+                  },
+                  "color": {
+                    "mode": "thresholds"
+                  }
+                },
+                "overrides": []
               }
-            },
-            "version": "13.0.0-22246553003"
+            }
           }
         }
       },
       "panel-11": {
         "kind": "Panel",
         "spec": {
+          "id": 11,
+          "title": "Patched Instances, Main",
+          "description": "Count of instances patched off the main development branch compared to the total instances on the main development branch.",
+          "links": [],
           "data": {
             "kind": "QueryGroup",
             "spec": {
@@ -328,10 +332,10 @@
                 {
                   "kind": "PanelQuery",
                   "spec": {
-                    "hidden": false,
                     "query": {
-                      "group": "grafana-postgresql-datasource",
                       "kind": "DataQuery",
+                      "group": "grafana-postgresql-datasource",
+                      "version": "v0",
                       "spec": {
                         "editorMode": "code",
                         "format": "table",
@@ -354,19 +358,19 @@
                           ],
                           "limit": 50
                         }
-                      },
-                      "version": "v0"
+                      }
                     },
-                    "refId": "A"
+                    "refId": "A",
+                    "hidden": false
                   }
                 },
                 {
                   "kind": "PanelQuery",
                   "spec": {
-                    "hidden": false,
                     "query": {
-                      "group": "grafana-postgresql-datasource",
                       "kind": "DataQuery",
+                      "group": "grafana-postgresql-datasource",
+                      "version": "v0",
                       "spec": {
                         "editorMode": "code",
                         "format": "table",
@@ -389,14 +393,13 @@
                           ],
                           "limit": 50
                         }
-                      },
-                      "version": "v0"
+                      }
                     },
-                    "refId": "B"
+                    "refId": "B",
+                    "hidden": false
                   }
                 }
               ],
-              "queryOptions": {},
               "transformations": [
                 {
                   "kind": "configFromData",
@@ -418,45 +421,15 @@
                     }
                   }
                 }
-              ]
+              ],
+              "queryOptions": {}
             }
           },
-          "description": "Count of instances patched off the main development branch compared to the total instances on the main development branch.",
-          "id": 11,
-          "links": [],
-          "title": "Patched Instances, Main",
           "vizConfig": {
-            "group": "gauge",
             "kind": "VizConfig",
+            "group": "gauge",
+            "version": "13.0.0-22415502922",
             "spec": {
-              "fieldConfig": {
-                "defaults": {
-                  "color": {
-                    "mode": "thresholds"
-                  },
-                  "fieldMinMax": false,
-                  "min": 0,
-                  "thresholds": {
-                    "mode": "percentage",
-                    "steps": [
-                      {
-                        "color": "red",
-                        "value": 0
-                      },
-                      {
-                        "color": "orange",
-                        "value": 33
-                      },
-                      {
-                        "color": "green",
-                        "value": 66
-                      }
-                    ]
-                  },
-                  "unit": "locale"
-                },
-                "overrides": []
-              },
               "options": {
                 "barShape": "flat",
                 "barWidthFactor": 0.75,
@@ -484,15 +457,46 @@
                 "sizing": "auto",
                 "sparkline": false,
                 "textMode": "value"
+              },
+              "fieldConfig": {
+                "defaults": {
+                  "unit": "locale",
+                  "min": 0,
+                  "thresholds": {
+                    "mode": "percentage",
+                    "steps": [
+                      {
+                        "value": 0,
+                        "color": "red"
+                      },
+                      {
+                        "value": 33,
+                        "color": "orange"
+                      },
+                      {
+                        "value": 66,
+                        "color": "green"
+                      }
+                    ]
+                  },
+                  "color": {
+                    "mode": "thresholds"
+                  },
+                  "fieldMinMax": false
+                },
+                "overrides": []
               }
-            },
-            "version": "13.0.0-22246553003"
+            }
           }
         }
       },
       "panel-21": {
         "kind": "Panel",
         "spec": {
+          "id": 21,
+          "title": "Patched Instances, Latest",
+          "description": "Count of instances patched off the latest release branch compared to the total instances on the latest release branch.",
+          "links": [],
           "data": {
             "kind": "QueryGroup",
             "spec": {
@@ -500,10 +504,10 @@
                 {
                   "kind": "PanelQuery",
                   "spec": {
-                    "hidden": false,
                     "query": {
-                      "group": "grafana-postgresql-datasource",
                       "kind": "DataQuery",
+                      "group": "grafana-postgresql-datasource",
+                      "version": "v0",
                       "spec": {
                         "editorMode": "code",
                         "format": "table",
@@ -526,19 +530,19 @@
                           ],
                           "limit": 50
                         }
-                      },
-                      "version": "v0"
+                      }
                     },
-                    "refId": "A"
+                    "refId": "A",
+                    "hidden": false
                   }
                 },
                 {
                   "kind": "PanelQuery",
                   "spec": {
-                    "hidden": false,
                     "query": {
-                      "group": "grafana-postgresql-datasource",
                       "kind": "DataQuery",
+                      "group": "grafana-postgresql-datasource",
+                      "version": "v0",
                       "spec": {
                         "editorMode": "code",
                         "format": "table",
@@ -561,14 +565,13 @@
                           ],
                           "limit": 50
                         }
-                      },
-                      "version": "v0"
+                      }
                     },
-                    "refId": "B"
+                    "refId": "B",
+                    "hidden": false
                   }
                 }
               ],
-              "queryOptions": {},
               "transformations": [
                 {
                   "kind": "configFromData",
@@ -585,45 +588,15 @@
                     }
                   }
                 }
-              ]
+              ],
+              "queryOptions": {}
             }
           },
-          "description": "Count of instances patched off the latest release branch compared to the total instances on the latest release branch.",
-          "id": 21,
-          "links": [],
-          "title": "Patched Instances, Latest",
           "vizConfig": {
-            "group": "gauge",
             "kind": "VizConfig",
+            "group": "gauge",
+            "version": "13.0.0-22415502922",
             "spec": {
-              "fieldConfig": {
-                "defaults": {
-                  "color": {
-                    "mode": "thresholds"
-                  },
-                  "fieldMinMax": false,
-                  "min": 0,
-                  "thresholds": {
-                    "mode": "percentage",
-                    "steps": [
-                      {
-                        "color": "red",
-                        "value": 0
-                      },
-                      {
-                        "color": "orange",
-                        "value": 33
-                      },
-                      {
-                        "color": "green",
-                        "value": 66
-                      }
-                    ]
-                  },
-                  "unit": "locale"
-                },
-                "overrides": []
-              },
               "options": {
                 "barShape": "flat",
                 "barWidthFactor": 0.75,
@@ -651,15 +624,46 @@
                 "sizing": "auto",
                 "sparkline": false,
                 "textMode": "value"
+              },
+              "fieldConfig": {
+                "defaults": {
+                  "unit": "locale",
+                  "min": 0,
+                  "thresholds": {
+                    "mode": "percentage",
+                    "steps": [
+                      {
+                        "value": 0,
+                        "color": "red"
+                      },
+                      {
+                        "value": 33,
+                        "color": "orange"
+                      },
+                      {
+                        "value": 66,
+                        "color": "green"
+                      }
+                    ]
+                  },
+                  "color": {
+                    "mode": "thresholds"
+                  },
+                  "fieldMinMax": false
+                },
+                "overrides": []
               }
-            },
-            "version": "13.0.0-22246553003"
+            }
           }
         }
       },
       "panel-22": {
         "kind": "Panel",
         "spec": {
+          "id": 22,
+          "title": "Patched Instances, Previous",
+          "description": "Count of instances patched off the previous release branch compared to the total instances on the previous release branch.",
+          "links": [],
           "data": {
             "kind": "QueryGroup",
             "spec": {
@@ -667,10 +671,10 @@
                 {
                   "kind": "PanelQuery",
                   "spec": {
-                    "hidden": false,
                     "query": {
-                      "group": "grafana-postgresql-datasource",
                       "kind": "DataQuery",
+                      "group": "grafana-postgresql-datasource",
+                      "version": "v0",
                       "spec": {
                         "editorMode": "code",
                         "format": "table",
@@ -693,19 +697,19 @@
                           ],
                           "limit": 50
                         }
-                      },
-                      "version": "v0"
+                      }
                     },
-                    "refId": "A"
+                    "refId": "A",
+                    "hidden": false
                   }
                 },
                 {
                   "kind": "PanelQuery",
                   "spec": {
-                    "hidden": false,
                     "query": {
-                      "group": "grafana-postgresql-datasource",
                       "kind": "DataQuery",
+                      "group": "grafana-postgresql-datasource",
+                      "version": "v0",
                       "spec": {
                         "editorMode": "code",
                         "format": "table",
@@ -728,14 +732,13 @@
                           ],
                           "limit": 50
                         }
-                      },
-                      "version": "v0"
+                      }
                     },
-                    "refId": "B"
+                    "refId": "B",
+                    "hidden": false
                   }
                 }
               ],
-              "queryOptions": {},
               "transformations": [
                 {
                   "kind": "configFromData",
@@ -752,45 +755,15 @@
                     }
                   }
                 }
-              ]
+              ],
+              "queryOptions": {}
             }
           },
-          "description": "Count of instances patched off the previous release branch compared to the total instances on the previous release branch.",
-          "id": 22,
-          "links": [],
-          "title": "Patched Instances, Previous",
           "vizConfig": {
-            "group": "gauge",
             "kind": "VizConfig",
+            "group": "gauge",
+            "version": "13.0.0-22415502922",
             "spec": {
-              "fieldConfig": {
-                "defaults": {
-                  "color": {
-                    "mode": "thresholds"
-                  },
-                  "fieldMinMax": false,
-                  "min": 0,
-                  "thresholds": {
-                    "mode": "percentage",
-                    "steps": [
-                      {
-                        "color": "red",
-                        "value": 0
-                      },
-                      {
-                        "color": "orange",
-                        "value": 33
-                      },
-                      {
-                        "color": "green",
-                        "value": 66
-                      }
-                    ]
-                  },
-                  "unit": "locale"
-                },
-                "overrides": []
-              },
               "options": {
                 "barShape": "flat",
                 "barWidthFactor": 0.75,
@@ -818,15 +791,46 @@
                 "sizing": "auto",
                 "sparkline": false,
                 "textMode": "value"
+              },
+              "fieldConfig": {
+                "defaults": {
+                  "unit": "locale",
+                  "min": 0,
+                  "thresholds": {
+                    "mode": "percentage",
+                    "steps": [
+                      {
+                        "value": 0,
+                        "color": "red"
+                      },
+                      {
+                        "value": 33,
+                        "color": "orange"
+                      },
+                      {
+                        "value": 66,
+                        "color": "green"
+                      }
+                    ]
+                  },
+                  "color": {
+                    "mode": "thresholds"
+                  },
+                  "fieldMinMax": false
+                },
+                "overrides": []
               }
-            },
-            "version": "13.0.0-22246553003"
+            }
           }
         }
       },
       "panel-32": {
         "kind": "Panel",
         "spec": {
+          "id": 32,
+          "title": "Patched MAUs, Main",
+          "description": "Count of monthly active users (MAUs) on instances patched off the main development branch compared to the MAUs on the main development branch.",
+          "links": [],
           "data": {
             "kind": "QueryGroup",
             "spec": {
@@ -834,10 +838,10 @@
                 {
                   "kind": "PanelQuery",
                   "spec": {
-                    "hidden": false,
                     "query": {
-                      "group": "grafana-postgresql-datasource",
                       "kind": "DataQuery",
+                      "group": "grafana-postgresql-datasource",
+                      "version": "v0",
                       "spec": {
                         "editorMode": "code",
                         "format": "table",
@@ -860,19 +864,19 @@
                           ],
                           "limit": 50
                         }
-                      },
-                      "version": "v0"
+                      }
                     },
-                    "refId": "A"
+                    "refId": "A",
+                    "hidden": false
                   }
                 },
                 {
                   "kind": "PanelQuery",
                   "spec": {
-                    "hidden": false,
                     "query": {
-                      "group": "grafana-postgresql-datasource",
                       "kind": "DataQuery",
+                      "group": "grafana-postgresql-datasource",
+                      "version": "v0",
                       "spec": {
                         "editorMode": "code",
                         "format": "table",
@@ -895,14 +899,13 @@
                           ],
                           "limit": 50
                         }
-                      },
-                      "version": "v0"
+                      }
                     },
-                    "refId": "B"
+                    "refId": "B",
+                    "hidden": false
                   }
                 }
               ],
-              "queryOptions": {},
               "transformations": [
                 {
                   "kind": "configFromData",
@@ -924,45 +927,15 @@
                     }
                   }
                 }
-              ]
+              ],
+              "queryOptions": {}
             }
           },
-          "description": "Count of monthly active users (MAUs) on instances patched off the main development branch compared to the MAUs on the main development branch.",
-          "id": 32,
-          "links": [],
-          "title": "Patched MAUs, Main",
           "vizConfig": {
-            "group": "gauge",
             "kind": "VizConfig",
+            "group": "gauge",
+            "version": "13.0.0-22415502922",
             "spec": {
-              "fieldConfig": {
-                "defaults": {
-                  "color": {
-                    "mode": "thresholds"
-                  },
-                  "fieldMinMax": false,
-                  "min": 0,
-                  "thresholds": {
-                    "mode": "percentage",
-                    "steps": [
-                      {
-                        "color": "red",
-                        "value": 0
-                      },
-                      {
-                        "color": "orange",
-                        "value": 33
-                      },
-                      {
-                        "color": "green",
-                        "value": 66
-                      }
-                    ]
-                  },
-                  "unit": "locale"
-                },
-                "overrides": []
-              },
               "options": {
                 "barShape": "flat",
                 "barWidthFactor": 0.75,
@@ -990,15 +963,46 @@
                 "sizing": "auto",
                 "sparkline": false,
                 "textMode": "value"
+              },
+              "fieldConfig": {
+                "defaults": {
+                  "unit": "locale",
+                  "min": 0,
+                  "thresholds": {
+                    "mode": "percentage",
+                    "steps": [
+                      {
+                        "value": 0,
+                        "color": "red"
+                      },
+                      {
+                        "value": 33,
+                        "color": "orange"
+                      },
+                      {
+                        "value": 66,
+                        "color": "green"
+                      }
+                    ]
+                  },
+                  "color": {
+                    "mode": "thresholds"
+                  },
+                  "fieldMinMax": false
+                },
+                "overrides": []
               }
-            },
-            "version": "13.0.0-22246553003"
+            }
           }
         }
       },
       "panel-35": {
         "kind": "Panel",
         "spec": {
+          "id": 35,
+          "title": "Patched MAUs, Latest",
+          "description": "Count of monthly active users (MAUs) on instances patched off the latest release branch compared to the MAUs on the latest release branch.",
+          "links": [],
           "data": {
             "kind": "QueryGroup",
             "spec": {
@@ -1006,10 +1010,10 @@
                 {
                   "kind": "PanelQuery",
                   "spec": {
-                    "hidden": false,
                     "query": {
-                      "group": "grafana-postgresql-datasource",
                       "kind": "DataQuery",
+                      "group": "grafana-postgresql-datasource",
+                      "version": "v0",
                       "spec": {
                         "editorMode": "code",
                         "format": "table",
@@ -1032,19 +1036,19 @@
                           ],
                           "limit": 50
                         }
-                      },
-                      "version": "v0"
+                      }
                     },
-                    "refId": "A"
+                    "refId": "A",
+                    "hidden": false
                   }
                 },
                 {
                   "kind": "PanelQuery",
                   "spec": {
-                    "hidden": false,
                     "query": {
-                      "group": "grafana-postgresql-datasource",
                       "kind": "DataQuery",
+                      "group": "grafana-postgresql-datasource",
+                      "version": "v0",
                       "spec": {
                         "editorMode": "code",
                         "format": "table",
@@ -1067,14 +1071,13 @@
                           ],
                           "limit": 50
                         }
-                      },
-                      "version": "v0"
+                      }
                     },
-                    "refId": "B"
+                    "refId": "B",
+                    "hidden": false
                   }
                 }
               ],
-              "queryOptions": {},
               "transformations": [
                 {
                   "kind": "configFromData",
@@ -1096,45 +1099,15 @@
                     }
                   }
                 }
-              ]
+              ],
+              "queryOptions": {}
             }
           },
-          "description": "Count of monthly active users (MAUs) on instances patched off the latest release branch compared to the MAUs on the latest release branch.",
-          "id": 35,
-          "links": [],
-          "title": "Patched MAUs, Latest",
           "vizConfig": {
-            "group": "gauge",
             "kind": "VizConfig",
+            "group": "gauge",
+            "version": "13.0.0-22415502922",
             "spec": {
-              "fieldConfig": {
-                "defaults": {
-                  "color": {
-                    "mode": "thresholds"
-                  },
-                  "fieldMinMax": false,
-                  "min": 0,
-                  "thresholds": {
-                    "mode": "percentage",
-                    "steps": [
-                      {
-                        "color": "red",
-                        "value": 0
-                      },
-                      {
-                        "color": "orange",
-                        "value": 33
-                      },
-                      {
-                        "color": "green",
-                        "value": 66
-                      }
-                    ]
-                  },
-                  "unit": "locale"
-                },
-                "overrides": []
-              },
               "options": {
                 "barShape": "flat",
                 "barWidthFactor": 0.75,
@@ -1162,15 +1135,46 @@
                 "sizing": "auto",
                 "sparkline": false,
                 "textMode": "value"
+              },
+              "fieldConfig": {
+                "defaults": {
+                  "unit": "locale",
+                  "min": 0,
+                  "thresholds": {
+                    "mode": "percentage",
+                    "steps": [
+                      {
+                        "value": 0,
+                        "color": "red"
+                      },
+                      {
+                        "value": 33,
+                        "color": "orange"
+                      },
+                      {
+                        "value": 66,
+                        "color": "green"
+                      }
+                    ]
+                  },
+                  "color": {
+                    "mode": "thresholds"
+                  },
+                  "fieldMinMax": false
+                },
+                "overrides": []
               }
-            },
-            "version": "13.0.0-22246553003"
+            }
           }
         }
       },
       "panel-36": {
         "kind": "Panel",
         "spec": {
+          "id": 36,
+          "title": "Patched MAUs, Previous",
+          "description": "Count of monthly active users (MAUs) on instances patched off the previous release branch compared to the MAUs on the latest previous branch.",
+          "links": [],
           "data": {
             "kind": "QueryGroup",
             "spec": {
@@ -1178,10 +1182,10 @@
                 {
                   "kind": "PanelQuery",
                   "spec": {
-                    "hidden": false,
                     "query": {
-                      "group": "grafana-postgresql-datasource",
                       "kind": "DataQuery",
+                      "group": "grafana-postgresql-datasource",
+                      "version": "v0",
                       "spec": {
                         "editorMode": "code",
                         "format": "table",
@@ -1204,19 +1208,19 @@
                           ],
                           "limit": 50
                         }
-                      },
-                      "version": "v0"
+                      }
                     },
-                    "refId": "A"
+                    "refId": "A",
+                    "hidden": false
                   }
                 },
                 {
                   "kind": "PanelQuery",
                   "spec": {
-                    "hidden": false,
                     "query": {
-                      "group": "grafana-postgresql-datasource",
                       "kind": "DataQuery",
+                      "group": "grafana-postgresql-datasource",
+                      "version": "v0",
                       "spec": {
                         "editorMode": "code",
                         "format": "table",
@@ -1239,14 +1243,13 @@
                           ],
                           "limit": 50
                         }
-                      },
-                      "version": "v0"
+                      }
                     },
-                    "refId": "B"
+                    "refId": "B",
+                    "hidden": false
                   }
                 }
               ],
-              "queryOptions": {},
               "transformations": [
                 {
                   "kind": "configFromData",
@@ -1268,45 +1271,15 @@
                     }
                   }
                 }
-              ]
+              ],
+              "queryOptions": {}
             }
           },
-          "description": "Count of monthly active users (MAUs) on instances patched off the previous release branch compared to the MAUs on the latest previous branch.",
-          "id": 36,
-          "links": [],
-          "title": "Patched MAUs, Previous",
           "vizConfig": {
-            "group": "gauge",
             "kind": "VizConfig",
+            "group": "gauge",
+            "version": "13.0.0-22415502922",
             "spec": {
-              "fieldConfig": {
-                "defaults": {
-                  "color": {
-                    "mode": "thresholds"
-                  },
-                  "fieldMinMax": false,
-                  "min": 0,
-                  "thresholds": {
-                    "mode": "percentage",
-                    "steps": [
-                      {
-                        "color": "red",
-                        "value": 0
-                      },
-                      {
-                        "color": "orange",
-                        "value": 33
-                      },
-                      {
-                        "color": "green",
-                        "value": 66
-                      }
-                    ]
-                  },
-                  "unit": "locale"
-                },
-                "overrides": []
-              },
               "options": {
                 "barShape": "flat",
                 "barWidthFactor": 0.75,
@@ -1334,15 +1307,46 @@
                 "sizing": "auto",
                 "sparkline": false,
                 "textMode": "value"
+              },
+              "fieldConfig": {
+                "defaults": {
+                  "unit": "locale",
+                  "min": 0,
+                  "thresholds": {
+                    "mode": "percentage",
+                    "steps": [
+                      {
+                        "value": 0,
+                        "color": "red"
+                      },
+                      {
+                        "value": 33,
+                        "color": "orange"
+                      },
+                      {
+                        "value": 66,
+                        "color": "green"
+                      }
+                    ]
+                  },
+                  "color": {
+                    "mode": "thresholds"
+                  },
+                  "fieldMinMax": false
+                },
+                "overrides": []
               }
-            },
-            "version": "13.0.0-22246553003"
+            }
           }
         }
       },
       "panel-41": {
         "kind": "Panel",
         "spec": {
+          "id": 41,
+          "title": "Mastodon Active Users (MAU)",
+          "description": "Based on the total count of reported monthly active users (MAU) of all visible Mastodon instances.",
+          "links": [],
           "data": {
             "kind": "QueryGroup",
             "spec": {
@@ -1350,10 +1354,10 @@
                 {
                   "kind": "PanelQuery",
                   "spec": {
-                    "hidden": false,
                     "query": {
-                      "group": "grafana-postgresql-datasource",
                       "kind": "DataQuery",
+                      "group": "grafana-postgresql-datasource",
+                      "version": "v0",
                       "spec": {
                         "editorMode": "code",
                         "format": "table",
@@ -1376,44 +1380,22 @@
                           ],
                           "limit": 50
                         }
-                      },
-                      "version": "v0"
+                      }
                     },
-                    "refId": "A"
+                    "refId": "A",
+                    "hidden": false
                   }
                 }
               ],
-              "queryOptions": {},
-              "transformations": []
+              "transformations": [],
+              "queryOptions": {}
             }
           },
-          "description": "Based on the total count of reported monthly active users (MAU) of all visible Mastodon instances.",
-          "id": 41,
-          "links": [],
-          "title": "Mastodon Active Users (MAU)",
           "vizConfig": {
-            "group": "stat",
             "kind": "VizConfig",
+            "group": "stat",
+            "version": "13.0.0-22415502922",
             "spec": {
-              "fieldConfig": {
-                "defaults": {
-                  "color": {
-                    "mode": "thresholds"
-                  },
-                  "fieldMinMax": false,
-                  "thresholds": {
-                    "mode": "absolute",
-                    "steps": [
-                      {
-                        "color": "purple",
-                        "value": 0
-                      }
-                    ]
-                  },
-                  "unit": "locale"
-                },
-                "overrides": []
-              },
               "options": {
                 "colorMode": "value",
                 "graphMode": "area",
@@ -1430,15 +1412,37 @@
                 "showPercentChange": true,
                 "textMode": "auto",
                 "wideLayout": true
+              },
+              "fieldConfig": {
+                "defaults": {
+                  "unit": "locale",
+                  "thresholds": {
+                    "mode": "absolute",
+                    "steps": [
+                      {
+                        "value": 0,
+                        "color": "purple"
+                      }
+                    ]
+                  },
+                  "color": {
+                    "mode": "thresholds"
+                  },
+                  "fieldMinMax": false
+                },
+                "overrides": []
               }
-            },
-            "version": "13.0.0-22246553003"
+            }
           }
         }
       },
       "panel-5": {
         "kind": "Panel",
         "spec": {
+          "id": 5,
+          "title": "Latest Patches by Instances",
+          "description": "",
+          "links": [],
           "data": {
             "kind": "QueryGroup",
             "spec": {
@@ -1446,10 +1450,10 @@
                 {
                   "kind": "PanelQuery",
                   "spec": {
-                    "hidden": false,
                     "query": {
-                      "group": "grafana-postgresql-datasource",
                       "kind": "DataQuery",
+                      "group": "grafana-postgresql-datasource",
+                      "version": "v0",
                       "spec": {
                         "editorMode": "code",
                         "format": "table",
@@ -1472,30 +1476,54 @@
                           ],
                           "limit": 50
                         }
-                      },
-                      "version": "v0"
+                      }
                     },
-                    "refId": "A"
+                    "refId": "A",
+                    "hidden": false
                   }
                 }
               ],
-              "queryOptions": {},
-              "transformations": []
+              "transformations": [],
+              "queryOptions": {}
             }
           },
-          "description": "",
-          "id": 5,
-          "links": [],
-          "title": "Latest Patches by Instances",
           "vizConfig": {
-            "group": "piechart",
             "kind": "VizConfig",
+            "group": "piechart",
+            "version": "13.0.0-22229365497",
             "spec": {
+              "options": {
+                "displayLabels": [],
+                "legend": {
+                  "displayMode": "list",
+                  "placement": "bottom",
+                  "showLegend": true,
+                  "values": [
+                    "percent"
+                  ]
+                },
+                "pieType": "donut",
+                "reduceOptions": {
+                  "calcs": [
+                    "lastNotNull"
+                  ],
+                  "fields": "",
+                  "values": true
+                },
+                "sort": "desc",
+                "tooltip": {
+                  "hideZeros": false,
+                  "mode": "single",
+                  "sort": "none"
+                }
+              },
               "fieldConfig": {
                 "defaults": {
+                  "unit": "locale",
+                  "decimals": 1,
                   "color": {
-                    "fixedColor": "purple",
-                    "mode": "shades"
+                    "mode": "shades",
+                    "fixedColor": "purple"
                   },
                   "custom": {
                     "hideFrom": {
@@ -1503,9 +1531,7 @@
                       "tooltip": false,
                       "viz": false
                     }
-                  },
-                  "decimals": 1,
-                  "unit": "locale"
+                  }
                 },
                 "overrides": [
                   {
@@ -1539,40 +1565,18 @@
                     ]
                   }
                 ]
-              },
-              "options": {
-                "displayLabels": [],
-                "legend": {
-                  "displayMode": "list",
-                  "placement": "bottom",
-                  "showLegend": true,
-                  "values": [
-                    "percent"
-                  ]
-                },
-                "pieType": "donut",
-                "reduceOptions": {
-                  "calcs": [
-                    "lastNotNull"
-                  ],
-                  "fields": "",
-                  "values": true
-                },
-                "sort": "desc",
-                "tooltip": {
-                  "hideZeros": false,
-                  "mode": "single",
-                  "sort": "none"
-                }
               }
-            },
-            "version": "13.0.0-22229365497"
+            }
           }
         }
       },
       "panel-66": {
         "kind": "Panel",
         "spec": {
+          "id": 66,
+          "title": "Supported Branch by Instances",
+          "description": "",
+          "links": [],
           "data": {
             "kind": "QueryGroup",
             "spec": {
@@ -1580,10 +1584,10 @@
                 {
                   "kind": "PanelQuery",
                   "spec": {
-                    "hidden": false,
                     "query": {
-                      "group": "grafana-postgresql-datasource",
                       "kind": "DataQuery",
+                      "group": "grafana-postgresql-datasource",
+                      "version": "v0",
                       "spec": {
                         "editorMode": "code",
                         "format": "table",
@@ -1606,59 +1610,22 @@
                           ],
                           "limit": 50
                         }
-                      },
-                      "version": "v0"
+                      }
                     },
-                    "refId": "A"
+                    "refId": "A",
+                    "hidden": false
                   }
                 }
               ],
-              "queryOptions": {},
-              "transformations": []
+              "transformations": [],
+              "queryOptions": {}
             }
           },
-          "description": "",
-          "id": 66,
-          "links": [],
-          "title": "Supported Branch by Instances",
           "vizConfig": {
-            "group": "piechart",
             "kind": "VizConfig",
+            "group": "piechart",
+            "version": "13.0.0-22229365497",
             "spec": {
-              "fieldConfig": {
-                "defaults": {
-                  "color": {
-                    "fixedColor": "green",
-                    "mode": "shades"
-                  },
-                  "custom": {
-                    "hideFrom": {
-                      "legend": false,
-                      "tooltip": false,
-                      "viz": false
-                    }
-                  },
-                  "decimals": 1,
-                  "unit": "locale"
-                },
-                "overrides": [
-                  {
-                    "matcher": {
-                      "id": "byName",
-                      "options": "EOL"
-                    },
-                    "properties": [
-                      {
-                        "id": "color",
-                        "value": {
-                          "fixedColor": "red",
-                          "mode": "fixed"
-                        }
-                      }
-                    ]
-                  }
-                ]
-              },
               "options": {
                 "displayLabels": [],
                 "legend": {
@@ -1683,15 +1650,52 @@
                   "mode": "single",
                   "sort": "none"
                 }
+              },
+              "fieldConfig": {
+                "defaults": {
+                  "unit": "locale",
+                  "decimals": 1,
+                  "color": {
+                    "mode": "shades",
+                    "fixedColor": "green"
+                  },
+                  "custom": {
+                    "hideFrom": {
+                      "legend": false,
+                      "tooltip": false,
+                      "viz": false
+                    }
+                  }
+                },
+                "overrides": [
+                  {
+                    "matcher": {
+                      "id": "byName",
+                      "options": "EOL"
+                    },
+                    "properties": [
+                      {
+                        "id": "color",
+                        "value": {
+                          "fixedColor": "red",
+                          "mode": "fixed"
+                        }
+                      }
+                    ]
+                  }
+                ]
               }
-            },
-            "version": "13.0.0-22229365497"
+            }
           }
         }
       },
       "panel-67": {
         "kind": "Panel",
         "spec": {
+          "id": 67,
+          "title": "Supported Branch by MAUs",
+          "description": "",
+          "links": [],
           "data": {
             "kind": "QueryGroup",
             "spec": {
@@ -1699,10 +1703,10 @@
                 {
                   "kind": "PanelQuery",
                   "spec": {
-                    "hidden": false,
                     "query": {
-                      "group": "grafana-postgresql-datasource",
                       "kind": "DataQuery",
+                      "group": "grafana-postgresql-datasource",
+                      "version": "v0",
                       "spec": {
                         "editorMode": "code",
                         "format": "table",
@@ -1725,59 +1729,22 @@
                           ],
                           "limit": 50
                         }
-                      },
-                      "version": "v0"
+                      }
                     },
-                    "refId": "A"
+                    "refId": "A",
+                    "hidden": false
                   }
                 }
               ],
-              "queryOptions": {},
-              "transformations": []
+              "transformations": [],
+              "queryOptions": {}
             }
           },
-          "description": "",
-          "id": 67,
-          "links": [],
-          "title": "Supported Branch by MAUs",
           "vizConfig": {
-            "group": "piechart",
             "kind": "VizConfig",
+            "group": "piechart",
+            "version": "13.0.0-22229365497",
             "spec": {
-              "fieldConfig": {
-                "defaults": {
-                  "color": {
-                    "fixedColor": "green",
-                    "mode": "shades"
-                  },
-                  "custom": {
-                    "hideFrom": {
-                      "legend": false,
-                      "tooltip": false,
-                      "viz": false
-                    }
-                  },
-                  "decimals": 1,
-                  "unit": "locale"
-                },
-                "overrides": [
-                  {
-                    "matcher": {
-                      "id": "byName",
-                      "options": "EOL"
-                    },
-                    "properties": [
-                      {
-                        "id": "color",
-                        "value": {
-                          "fixedColor": "red",
-                          "mode": "fixed"
-                        }
-                      }
-                    ]
-                  }
-                ]
-              },
               "options": {
                 "displayLabels": [],
                 "legend": {
@@ -1802,15 +1769,52 @@
                   "mode": "single",
                   "sort": "none"
                 }
+              },
+              "fieldConfig": {
+                "defaults": {
+                  "unit": "locale",
+                  "decimals": 1,
+                  "color": {
+                    "mode": "shades",
+                    "fixedColor": "green"
+                  },
+                  "custom": {
+                    "hideFrom": {
+                      "legend": false,
+                      "tooltip": false,
+                      "viz": false
+                    }
+                  }
+                },
+                "overrides": [
+                  {
+                    "matcher": {
+                      "id": "byName",
+                      "options": "EOL"
+                    },
+                    "properties": [
+                      {
+                        "id": "color",
+                        "value": {
+                          "fixedColor": "red",
+                          "mode": "fixed"
+                        }
+                      }
+                    ]
+                  }
+                ]
               }
-            },
-            "version": "13.0.0-22229365497"
+            }
           }
         }
       },
       "panel-7": {
         "kind": "Panel",
         "spec": {
+          "id": 7,
+          "title": "Latest Patches by MAUs",
+          "description": "",
+          "links": [],
           "data": {
             "kind": "QueryGroup",
             "spec": {
@@ -1818,10 +1822,10 @@
                 {
                   "kind": "PanelQuery",
                   "spec": {
-                    "hidden": false,
                     "query": {
-                      "group": "grafana-postgresql-datasource",
                       "kind": "DataQuery",
+                      "group": "grafana-postgresql-datasource",
+                      "version": "v0",
                       "spec": {
                         "editorMode": "code",
                         "format": "table",
@@ -1844,30 +1848,54 @@
                           ],
                           "limit": 50
                         }
-                      },
-                      "version": "v0"
+                      }
                     },
-                    "refId": "A"
+                    "refId": "A",
+                    "hidden": false
                   }
                 }
               ],
-              "queryOptions": {},
-              "transformations": []
+              "transformations": [],
+              "queryOptions": {}
             }
           },
-          "description": "",
-          "id": 7,
-          "links": [],
-          "title": "Latest Patches by MAUs",
           "vizConfig": {
-            "group": "piechart",
             "kind": "VizConfig",
+            "group": "piechart",
+            "version": "13.0.0-22229365497",
             "spec": {
+              "options": {
+                "displayLabels": [],
+                "legend": {
+                  "displayMode": "list",
+                  "placement": "bottom",
+                  "showLegend": true,
+                  "values": [
+                    "percent"
+                  ]
+                },
+                "pieType": "donut",
+                "reduceOptions": {
+                  "calcs": [
+                    "lastNotNull"
+                  ],
+                  "fields": "",
+                  "values": true
+                },
+                "sort": "desc",
+                "tooltip": {
+                  "hideZeros": false,
+                  "mode": "single",
+                  "sort": "none"
+                }
+              },
               "fieldConfig": {
                 "defaults": {
+                  "unit": "locale",
+                  "decimals": 1,
                   "color": {
-                    "fixedColor": "purple",
-                    "mode": "shades"
+                    "mode": "shades",
+                    "fixedColor": "purple"
                   },
                   "custom": {
                     "hideFrom": {
@@ -1875,9 +1903,7 @@
                       "tooltip": false,
                       "viz": false
                     }
-                  },
-                  "decimals": 1,
-                  "unit": "locale"
+                  }
                 },
                 "overrides": [
                   {
@@ -1911,40 +1937,18 @@
                     ]
                   }
                 ]
-              },
-              "options": {
-                "displayLabels": [],
-                "legend": {
-                  "displayMode": "list",
-                  "placement": "bottom",
-                  "showLegend": true,
-                  "values": [
-                    "percent"
-                  ]
-                },
-                "pieType": "donut",
-                "reduceOptions": {
-                  "calcs": [
-                    "lastNotNull"
-                  ],
-                  "fields": "",
-                  "values": true
-                },
-                "sort": "desc",
-                "tooltip": {
-                  "hideZeros": false,
-                  "mode": "single",
-                  "sort": "none"
-                }
               }
-            },
-            "version": "13.0.0-22229365497"
+            }
           }
         }
       },
       "panel-70": {
         "kind": "Panel",
         "spec": {
+          "id": 70,
+          "title": "Branch Adoption, Percent of Instances",
+          "description": "",
+          "links": [],
           "data": {
             "kind": "QueryGroup",
             "spec": {
@@ -1952,10 +1956,10 @@
                 {
                   "kind": "PanelQuery",
                   "spec": {
-                    "hidden": false,
                     "query": {
-                      "group": "grafana-postgresql-datasource",
                       "kind": "DataQuery",
+                      "group": "grafana-postgresql-datasource",
+                      "version": "v0",
                       "spec": {
                         "editorMode": "code",
                         "format": "table",
@@ -1978,44 +1982,22 @@
                           ],
                           "limit": 50
                         }
-                      },
-                      "version": "v0"
+                      }
                     },
-                    "refId": "A"
+                    "refId": "A",
+                    "hidden": false
                   }
                 }
               ],
-              "queryOptions": {},
-              "transformations": []
+              "transformations": [],
+              "queryOptions": {}
             }
           },
-          "description": "",
-          "id": 70,
-          "links": [],
-          "title": "Branch Adoption, Percent of Instances",
           "vizConfig": {
-            "group": "bargauge",
             "kind": "VizConfig",
+            "group": "bargauge",
+            "version": "13.0.0-22229365497",
             "spec": {
-              "fieldConfig": {
-                "defaults": {
-                  "color": {
-                    "mode": "thresholds"
-                  },
-                  "min": 0,
-                  "thresholds": {
-                    "mode": "absolute",
-                    "steps": [
-                      {
-                        "color": "purple",
-                        "value": 0
-                      }
-                    ]
-                  },
-                  "unit": "percent"
-                },
-                "overrides": []
-              },
               "options": {
                 "displayMode": "gradient",
                 "legend": {
@@ -2039,15 +2021,37 @@
                 "showUnfilled": true,
                 "sizing": "auto",
                 "valueMode": "color"
+              },
+              "fieldConfig": {
+                "defaults": {
+                  "unit": "percent",
+                  "min": 0,
+                  "thresholds": {
+                    "mode": "absolute",
+                    "steps": [
+                      {
+                        "value": 0,
+                        "color": "purple"
+                      }
+                    ]
+                  },
+                  "color": {
+                    "mode": "thresholds"
+                  }
+                },
+                "overrides": []
               }
-            },
-            "version": "13.0.0-22229365497"
+            }
           }
         }
       },
       "panel-71": {
         "kind": "Panel",
         "spec": {
+          "id": 71,
+          "title": "Branch Adoption, Percent of MAUs",
+          "description": "",
+          "links": [],
           "data": {
             "kind": "QueryGroup",
             "spec": {
@@ -2055,10 +2059,10 @@
                 {
                   "kind": "PanelQuery",
                   "spec": {
-                    "hidden": false,
                     "query": {
-                      "group": "grafana-postgresql-datasource",
                       "kind": "DataQuery",
+                      "group": "grafana-postgresql-datasource",
+                      "version": "v0",
                       "spec": {
                         "editorMode": "code",
                         "format": "table",
@@ -2081,45 +2085,22 @@
                           ],
                           "limit": 50
                         }
-                      },
-                      "version": "v0"
+                      }
                     },
-                    "refId": "A"
+                    "refId": "A",
+                    "hidden": false
                   }
                 }
               ],
-              "queryOptions": {},
-              "transformations": []
+              "transformations": [],
+              "queryOptions": {}
             }
           },
-          "description": "",
-          "id": 71,
-          "links": [],
-          "title": "Branch Adoption, Percent of MAUs",
           "vizConfig": {
-            "group": "bargauge",
             "kind": "VizConfig",
+            "group": "bargauge",
+            "version": "13.0.0-22229365497",
             "spec": {
-              "fieldConfig": {
-                "defaults": {
-                  "color": {
-                    "mode": "thresholds"
-                  },
-                  "fieldMinMax": false,
-                  "min": 0,
-                  "thresholds": {
-                    "mode": "absolute",
-                    "steps": [
-                      {
-                        "color": "purple",
-                        "value": 0
-                      }
-                    ]
-                  },
-                  "unit": "percent"
-                },
-                "overrides": []
-              },
               "options": {
                 "displayMode": "gradient",
                 "legend": {
@@ -2143,15 +2124,38 @@
                 "showUnfilled": true,
                 "sizing": "auto",
                 "valueMode": "color"
+              },
+              "fieldConfig": {
+                "defaults": {
+                  "unit": "percent",
+                  "min": 0,
+                  "thresholds": {
+                    "mode": "absolute",
+                    "steps": [
+                      {
+                        "value": 0,
+                        "color": "purple"
+                      }
+                    ]
+                  },
+                  "color": {
+                    "mode": "thresholds"
+                  },
+                  "fieldMinMax": false
+                },
+                "overrides": []
               }
-            },
-            "version": "13.0.0-22229365497"
+            }
           }
         }
       },
       "panel-73": {
         "kind": "Panel",
         "spec": {
+          "id": 73,
+          "title": "Patched Instances, Deprecated",
+          "description": "Count of instances patched off deprecated branches compared to the total instances on deprecated branches.",
+          "links": [],
           "data": {
             "kind": "QueryGroup",
             "spec": {
@@ -2159,10 +2163,10 @@
                 {
                   "kind": "PanelQuery",
                   "spec": {
-                    "hidden": false,
                     "query": {
-                      "group": "grafana-postgresql-datasource",
                       "kind": "DataQuery",
+                      "group": "grafana-postgresql-datasource",
+                      "version": "v0",
                       "spec": {
                         "editorMode": "code",
                         "format": "table",
@@ -2185,19 +2189,19 @@
                           ],
                           "limit": 50
                         }
-                      },
-                      "version": "v0"
+                      }
                     },
-                    "refId": "A"
+                    "refId": "A",
+                    "hidden": false
                   }
                 },
                 {
                   "kind": "PanelQuery",
                   "spec": {
-                    "hidden": false,
                     "query": {
-                      "group": "grafana-postgresql-datasource",
                       "kind": "DataQuery",
+                      "group": "grafana-postgresql-datasource",
+                      "version": "v0",
                       "spec": {
                         "editorMode": "code",
                         "format": "table",
@@ -2220,14 +2224,13 @@
                           ],
                           "limit": 50
                         }
-                      },
-                      "version": "v0"
+                      }
                     },
-                    "refId": "B"
+                    "refId": "B",
+                    "hidden": false
                   }
                 }
               ],
-              "queryOptions": {},
               "transformations": [
                 {
                   "kind": "configFromData",
@@ -2244,45 +2247,15 @@
                     }
                   }
                 }
-              ]
+              ],
+              "queryOptions": {}
             }
           },
-          "description": "Count of instances patched off deprecated branches compared to the total instances on deprecated branches.",
-          "id": 73,
-          "links": [],
-          "title": "Patched Instances, Deprecated",
           "vizConfig": {
-            "group": "gauge",
             "kind": "VizConfig",
+            "group": "gauge",
+            "version": "13.0.0-22415502922",
             "spec": {
-              "fieldConfig": {
-                "defaults": {
-                  "color": {
-                    "mode": "thresholds"
-                  },
-                  "fieldMinMax": false,
-                  "min": 0,
-                  "thresholds": {
-                    "mode": "percentage",
-                    "steps": [
-                      {
-                        "color": "red",
-                        "value": 0
-                      },
-                      {
-                        "color": "orange",
-                        "value": 33
-                      },
-                      {
-                        "color": "green",
-                        "value": 66
-                      }
-                    ]
-                  },
-                  "unit": "locale"
-                },
-                "overrides": []
-              },
               "options": {
                 "barShape": "flat",
                 "barWidthFactor": 0.75,
@@ -2310,15 +2283,46 @@
                 "sizing": "auto",
                 "sparkline": false,
                 "textMode": "value"
+              },
+              "fieldConfig": {
+                "defaults": {
+                  "unit": "locale",
+                  "min": 0,
+                  "thresholds": {
+                    "mode": "percentage",
+                    "steps": [
+                      {
+                        "value": 0,
+                        "color": "red"
+                      },
+                      {
+                        "value": 33,
+                        "color": "orange"
+                      },
+                      {
+                        "value": 66,
+                        "color": "green"
+                      }
+                    ]
+                  },
+                  "color": {
+                    "mode": "thresholds"
+                  },
+                  "fieldMinMax": false
+                },
+                "overrides": []
               }
-            },
-            "version": "13.0.0-22246553003"
+            }
           }
         }
       },
       "panel-74": {
         "kind": "Panel",
         "spec": {
+          "id": 74,
+          "title": "Patched MAUs, Deprecated",
+          "description": "Count of monthly active users (MAUs) on instances patched off the deprecated branches compared to the MAUs on the deprecated branches.",
+          "links": [],
           "data": {
             "kind": "QueryGroup",
             "spec": {
@@ -2326,10 +2330,10 @@
                 {
                   "kind": "PanelQuery",
                   "spec": {
-                    "hidden": false,
                     "query": {
-                      "group": "grafana-postgresql-datasource",
                       "kind": "DataQuery",
+                      "group": "grafana-postgresql-datasource",
+                      "version": "v0",
                       "spec": {
                         "editorMode": "code",
                         "format": "table",
@@ -2352,19 +2356,19 @@
                           ],
                           "limit": 50
                         }
-                      },
-                      "version": "v0"
+                      }
                     },
-                    "refId": "A"
+                    "refId": "A",
+                    "hidden": false
                   }
                 },
                 {
                   "kind": "PanelQuery",
                   "spec": {
-                    "hidden": false,
                     "query": {
-                      "group": "grafana-postgresql-datasource",
                       "kind": "DataQuery",
+                      "group": "grafana-postgresql-datasource",
+                      "version": "v0",
                       "spec": {
                         "editorMode": "code",
                         "format": "table",
@@ -2387,14 +2391,13 @@
                           ],
                           "limit": 50
                         }
-                      },
-                      "version": "v0"
+                      }
                     },
-                    "refId": "B"
+                    "refId": "B",
+                    "hidden": false
                   }
                 }
               ],
-              "queryOptions": {},
               "transformations": [
                 {
                   "kind": "configFromData",
@@ -2416,45 +2419,15 @@
                     }
                   }
                 }
-              ]
+              ],
+              "queryOptions": {}
             }
           },
-          "description": "Count of monthly active users (MAUs) on instances patched off the deprecated branches compared to the MAUs on the deprecated branches.",
-          "id": 74,
-          "links": [],
-          "title": "Patched MAUs, Deprecated",
           "vizConfig": {
-            "group": "gauge",
             "kind": "VizConfig",
+            "group": "gauge",
+            "version": "13.0.0-22415502922",
             "spec": {
-              "fieldConfig": {
-                "defaults": {
-                  "color": {
-                    "mode": "thresholds"
-                  },
-                  "fieldMinMax": false,
-                  "min": 0,
-                  "thresholds": {
-                    "mode": "percentage",
-                    "steps": [
-                      {
-                        "color": "red",
-                        "value": 0
-                      },
-                      {
-                        "color": "orange",
-                        "value": 33
-                      },
-                      {
-                        "color": "green",
-                        "value": 66
-                      }
-                    ]
-                  },
-                  "unit": "locale"
-                },
-                "overrides": []
-              },
               "options": {
                 "barShape": "flat",
                 "barWidthFactor": 0.75,
@@ -2482,15 +2455,46 @@
                 "sizing": "auto",
                 "sparkline": false,
                 "textMode": "value"
+              },
+              "fieldConfig": {
+                "defaults": {
+                  "unit": "locale",
+                  "min": 0,
+                  "thresholds": {
+                    "mode": "percentage",
+                    "steps": [
+                      {
+                        "value": 0,
+                        "color": "red"
+                      },
+                      {
+                        "value": 33,
+                        "color": "orange"
+                      },
+                      {
+                        "value": 66,
+                        "color": "green"
+                      }
+                    ]
+                  },
+                  "color": {
+                    "mode": "thresholds"
+                  },
+                  "fieldMinMax": false
+                },
+                "overrides": []
               }
-            },
-            "version": "13.0.0-22246553003"
+            }
           }
         }
       },
       "panel-76": {
         "kind": "Panel",
         "spec": {
+          "id": 76,
+          "title": "All Instances",
+          "description": "Instances which appear on the IFTAS DNI list are not reported on in detail, but may be included in the aggregated results above.",
+          "links": [],
           "data": {
             "kind": "QueryGroup",
             "spec": {
@@ -2498,10 +2502,10 @@
                 {
                   "kind": "PanelQuery",
                   "spec": {
-                    "hidden": false,
                     "query": {
-                      "group": "grafana-postgresql-datasource",
                       "kind": "DataQuery",
+                      "group": "grafana-postgresql-datasource",
+                      "version": "v0",
                       "spec": {
                         "editorMode": "code",
                         "format": "table",
@@ -2530,27 +2534,49 @@
                           "limit": 50
                         },
                         "table": "mastodon_domains"
-                      },
-                      "version": "v0"
+                      }
                     },
-                    "refId": "A"
+                    "refId": "A",
+                    "hidden": false
                   }
                 }
               ],
-              "queryOptions": {},
-              "transformations": []
+              "transformations": [],
+              "queryOptions": {}
             }
           },
-          "description": "Instances which appear on the IFTAS DNI list are not reported on in detail, but may be included in the aggregated results above.",
-          "id": 76,
-          "links": [],
-          "title": "All Instances",
           "vizConfig": {
-            "group": "table",
             "kind": "VizConfig",
+            "group": "table",
+            "version": "13.0.0-22229365497",
             "spec": {
+              "options": {
+                "cellHeight": "sm",
+                "enablePagination": true,
+                "showHeader": true,
+                "sortBy": [
+                  {
+                    "desc": true,
+                    "displayName": "Monthly Active Users"
+                  }
+                ]
+              },
               "fieldConfig": {
                 "defaults": {
+                  "unit": "locale",
+                  "thresholds": {
+                    "mode": "absolute",
+                    "steps": [
+                      {
+                        "value": 0,
+                        "color": "green"
+                      },
+                      {
+                        "value": 80,
+                        "color": "red"
+                      }
+                    ]
+                  },
                   "color": {
                     "mode": "thresholds"
                   },
@@ -2564,21 +2590,7 @@
                       "reducers": []
                     },
                     "inspect": false
-                  },
-                  "thresholds": {
-                    "mode": "absolute",
-                    "steps": [
-                      {
-                        "color": "green",
-                        "value": 0
-                      },
-                      {
-                        "color": "red",
-                        "value": 80
-                      }
-                    ]
-                  },
-                  "unit": "locale"
+                  }
                 },
                 "overrides": [
                   {
@@ -2618,26 +2630,18 @@
                     ]
                   }
                 ]
-              },
-              "options": {
-                "cellHeight": "sm",
-                "enablePagination": true,
-                "showHeader": true,
-                "sortBy": [
-                  {
-                    "desc": true,
-                    "displayName": "Monthly Active Users"
-                  }
-                ]
               }
-            },
-            "version": "13.0.0-22229365497"
+            }
           }
         }
       },
       "panel-88": {
         "kind": "Panel",
         "spec": {
+          "id": 88,
+          "title": "Historical Patch Adoption by Instance",
+          "description": "",
+          "links": [],
           "data": {
             "kind": "QueryGroup",
             "spec": {
@@ -2645,10 +2649,10 @@
                 {
                   "kind": "PanelQuery",
                   "spec": {
-                    "hidden": false,
                     "query": {
-                      "group": "grafana-postgresql-datasource",
                       "kind": "DataQuery",
+                      "group": "grafana-postgresql-datasource",
+                      "version": "v0",
                       "spec": {
                         "dataset": "",
                         "editorMode": "code",
@@ -2672,14 +2676,13 @@
                           ],
                           "limit": 50
                         }
-                      },
-                      "version": "v0"
+                      }
                     },
-                    "refId": "A"
+                    "refId": "A",
+                    "hidden": false
                   }
                 }
               ],
-              "queryOptions": {},
               "transformations": [
                 {
                   "kind": "organize",
@@ -2714,19 +2717,53 @@
                     }
                   }
                 }
-              ]
+              ],
+              "queryOptions": {}
             }
           },
-          "description": "",
-          "id": 88,
-          "links": [],
-          "title": "Historical Patch Adoption by Instance",
           "vizConfig": {
-            "group": "barchart",
             "kind": "VizConfig",
+            "group": "barchart",
+            "version": "13.0.0-22229365497",
             "spec": {
+              "options": {
+                "barRadius": 0.1,
+                "barWidth": 0.95,
+                "fullHighlight": false,
+                "groupWidth": 0.7,
+                "legend": {
+                  "calcs": [],
+                  "displayMode": "list",
+                  "placement": "bottom",
+                  "showLegend": true
+                },
+                "orientation": "horizontal",
+                "showValue": "never",
+                "stacking": "normal",
+                "tooltip": {
+                  "hideZeros": false,
+                  "mode": "single",
+                  "sort": "none"
+                },
+                "xField": "time",
+                "xTickLabelRotation": 0,
+                "xTickLabelSpacing": 0
+              },
               "fieldConfig": {
                 "defaults": {
+                  "thresholds": {
+                    "mode": "absolute",
+                    "steps": [
+                      {
+                        "value": 0,
+                        "color": "green"
+                      },
+                      {
+                        "value": 80,
+                        "color": "red"
+                      }
+                    ]
+                  },
                   "color": {
                     "mode": "palette-classic"
                   },
@@ -2752,54 +2789,21 @@
                       "mode": "off"
                     }
                   },
-                  "fieldMinMax": false,
-                  "thresholds": {
-                    "mode": "absolute",
-                    "steps": [
-                      {
-                        "color": "green",
-                        "value": 0
-                      },
-                      {
-                        "color": "red",
-                        "value": 80
-                      }
-                    ]
-                  }
+                  "fieldMinMax": false
                 },
                 "overrides": []
-              },
-              "options": {
-                "barRadius": 0.1,
-                "barWidth": 0.95,
-                "fullHighlight": false,
-                "groupWidth": 0.7,
-                "legend": {
-                  "calcs": [],
-                  "displayMode": "list",
-                  "placement": "bottom",
-                  "showLegend": true
-                },
-                "orientation": "horizontal",
-                "showValue": "never",
-                "stacking": "normal",
-                "tooltip": {
-                  "hideZeros": false,
-                  "mode": "single",
-                  "sort": "none"
-                },
-                "xField": "time",
-                "xTickLabelRotation": 0,
-                "xTickLabelSpacing": 0
               }
-            },
-            "version": "13.0.0-22229365497"
+            }
           }
         }
       },
       "panel-89": {
         "kind": "Panel",
         "spec": {
+          "id": 89,
+          "title": "Historical Patch Adoption by MAU",
+          "description": "",
+          "links": [],
           "data": {
             "kind": "QueryGroup",
             "spec": {
@@ -2807,10 +2811,10 @@
                 {
                   "kind": "PanelQuery",
                   "spec": {
-                    "hidden": false,
                     "query": {
-                      "group": "grafana-postgresql-datasource",
                       "kind": "DataQuery",
+                      "group": "grafana-postgresql-datasource",
+                      "version": "v0",
                       "spec": {
                         "dataset": "",
                         "editorMode": "code",
@@ -2834,14 +2838,13 @@
                           ],
                           "limit": 50
                         }
-                      },
-                      "version": "v0"
+                      }
                     },
-                    "refId": "A"
+                    "refId": "A",
+                    "hidden": false
                   }
                 }
               ],
-              "queryOptions": {},
               "transformations": [
                 {
                   "kind": "organize",
@@ -2876,19 +2879,53 @@
                     }
                   }
                 }
-              ]
+              ],
+              "queryOptions": {}
             }
           },
-          "description": "",
-          "id": 89,
-          "links": [],
-          "title": "Historical Patch Adoption by MAU",
           "vizConfig": {
-            "group": "barchart",
             "kind": "VizConfig",
+            "group": "barchart",
+            "version": "13.0.0-22229365497",
             "spec": {
+              "options": {
+                "barRadius": 0.1,
+                "barWidth": 0.95,
+                "fullHighlight": false,
+                "groupWidth": 0.7,
+                "legend": {
+                  "calcs": [],
+                  "displayMode": "list",
+                  "placement": "bottom",
+                  "showLegend": true
+                },
+                "orientation": "horizontal",
+                "showValue": "never",
+                "stacking": "normal",
+                "tooltip": {
+                  "hideZeros": false,
+                  "mode": "single",
+                  "sort": "none"
+                },
+                "xField": "time",
+                "xTickLabelRotation": 0,
+                "xTickLabelSpacing": 0
+              },
               "fieldConfig": {
                 "defaults": {
+                  "thresholds": {
+                    "mode": "absolute",
+                    "steps": [
+                      {
+                        "value": 0,
+                        "color": "green"
+                      },
+                      {
+                        "value": 80,
+                        "color": "red"
+                      }
+                    ]
+                  },
                   "color": {
                     "mode": "palette-classic"
                   },
@@ -2913,54 +2950,21 @@
                     "thresholdsStyle": {
                       "mode": "off"
                     }
-                  },
-                  "thresholds": {
-                    "mode": "absolute",
-                    "steps": [
-                      {
-                        "color": "green",
-                        "value": 0
-                      },
-                      {
-                        "color": "red",
-                        "value": 80
-                      }
-                    ]
                   }
                 },
                 "overrides": []
-              },
-              "options": {
-                "barRadius": 0.1,
-                "barWidth": 0.95,
-                "fullHighlight": false,
-                "groupWidth": 0.7,
-                "legend": {
-                  "calcs": [],
-                  "displayMode": "list",
-                  "placement": "bottom",
-                  "showLegend": true
-                },
-                "orientation": "horizontal",
-                "showValue": "never",
-                "stacking": "normal",
-                "tooltip": {
-                  "hideZeros": false,
-                  "mode": "single",
-                  "sort": "none"
-                },
-                "xField": "time",
-                "xTickLabelRotation": 0,
-                "xTickLabelSpacing": 0
               }
-            },
-            "version": "13.0.0-22229365497"
+            }
           }
         }
       },
       "panel-90": {
         "kind": "Panel",
         "spec": {
+          "id": 90,
+          "title": "Historical Branch Deployments by Instance",
+          "description": "",
+          "links": [],
           "data": {
             "kind": "QueryGroup",
             "spec": {
@@ -2968,10 +2972,10 @@
                 {
                   "kind": "PanelQuery",
                   "spec": {
-                    "hidden": false,
                     "query": {
-                      "group": "grafana-postgresql-datasource",
                       "kind": "DataQuery",
+                      "group": "grafana-postgresql-datasource",
+                      "version": "v0",
                       "spec": {
                         "dataset": "",
                         "editorMode": "code",
@@ -2995,14 +2999,13 @@
                           ],
                           "limit": 50
                         }
-                      },
-                      "version": "v0"
+                      }
                     },
-                    "refId": "A"
+                    "refId": "A",
+                    "hidden": false
                   }
                 }
               ],
-              "queryOptions": {},
               "transformations": [
                 {
                   "kind": "organize",
@@ -3037,19 +3040,53 @@
                     }
                   }
                 }
-              ]
+              ],
+              "queryOptions": {}
             }
           },
-          "description": "",
-          "id": 90,
-          "links": [],
-          "title": "Historical Branch Deployments by Instance",
           "vizConfig": {
-            "group": "barchart",
             "kind": "VizConfig",
+            "group": "barchart",
+            "version": "13.0.0-22229365497",
             "spec": {
+              "options": {
+                "barRadius": 0.1,
+                "barWidth": 0.95,
+                "fullHighlight": false,
+                "groupWidth": 0.7,
+                "legend": {
+                  "calcs": [],
+                  "displayMode": "list",
+                  "placement": "bottom",
+                  "showLegend": true
+                },
+                "orientation": "horizontal",
+                "showValue": "never",
+                "stacking": "normal",
+                "tooltip": {
+                  "hideZeros": false,
+                  "mode": "single",
+                  "sort": "none"
+                },
+                "xField": "time",
+                "xTickLabelRotation": 0,
+                "xTickLabelSpacing": 0
+              },
               "fieldConfig": {
                 "defaults": {
+                  "thresholds": {
+                    "mode": "absolute",
+                    "steps": [
+                      {
+                        "value": 0,
+                        "color": "green"
+                      },
+                      {
+                        "value": 80,
+                        "color": "red"
+                      }
+                    ]
+                  },
                   "color": {
                     "mode": "palette-classic"
                   },
@@ -3074,54 +3111,21 @@
                     "thresholdsStyle": {
                       "mode": "off"
                     }
-                  },
-                  "thresholds": {
-                    "mode": "absolute",
-                    "steps": [
-                      {
-                        "color": "green",
-                        "value": 0
-                      },
-                      {
-                        "color": "red",
-                        "value": 80
-                      }
-                    ]
                   }
                 },
                 "overrides": []
-              },
-              "options": {
-                "barRadius": 0.1,
-                "barWidth": 0.95,
-                "fullHighlight": false,
-                "groupWidth": 0.7,
-                "legend": {
-                  "calcs": [],
-                  "displayMode": "list",
-                  "placement": "bottom",
-                  "showLegend": true
-                },
-                "orientation": "horizontal",
-                "showValue": "never",
-                "stacking": "normal",
-                "tooltip": {
-                  "hideZeros": false,
-                  "mode": "single",
-                  "sort": "none"
-                },
-                "xField": "time",
-                "xTickLabelRotation": 0,
-                "xTickLabelSpacing": 0
               }
-            },
-            "version": "13.0.0-22229365497"
+            }
           }
         }
       },
       "panel-91": {
         "kind": "Panel",
         "spec": {
+          "id": 91,
+          "title": "Historical Branch Deployments by MAU",
+          "description": "",
+          "links": [],
           "data": {
             "kind": "QueryGroup",
             "spec": {
@@ -3129,10 +3133,10 @@
                 {
                   "kind": "PanelQuery",
                   "spec": {
-                    "hidden": false,
                     "query": {
-                      "group": "grafana-postgresql-datasource",
                       "kind": "DataQuery",
+                      "group": "grafana-postgresql-datasource",
+                      "version": "v0",
                       "spec": {
                         "dataset": "",
                         "editorMode": "code",
@@ -3156,14 +3160,13 @@
                           ],
                           "limit": 50
                         }
-                      },
-                      "version": "v0"
+                      }
                     },
-                    "refId": "A"
+                    "refId": "A",
+                    "hidden": false
                   }
                 }
               ],
-              "queryOptions": {},
               "transformations": [
                 {
                   "kind": "organize",
@@ -3198,19 +3201,53 @@
                     }
                   }
                 }
-              ]
+              ],
+              "queryOptions": {}
             }
           },
-          "description": "",
-          "id": 91,
-          "links": [],
-          "title": "Historical Branch Deployments by MAU",
           "vizConfig": {
-            "group": "barchart",
             "kind": "VizConfig",
+            "group": "barchart",
+            "version": "13.0.0-22229365497",
             "spec": {
+              "options": {
+                "barRadius": 0.1,
+                "barWidth": 0.95,
+                "fullHighlight": false,
+                "groupWidth": 0.7,
+                "legend": {
+                  "calcs": [],
+                  "displayMode": "list",
+                  "placement": "bottom",
+                  "showLegend": true
+                },
+                "orientation": "horizontal",
+                "showValue": "never",
+                "stacking": "normal",
+                "tooltip": {
+                  "hideZeros": false,
+                  "mode": "single",
+                  "sort": "none"
+                },
+                "xField": "time",
+                "xTickLabelRotation": 0,
+                "xTickLabelSpacing": 0
+              },
               "fieldConfig": {
                 "defaults": {
+                  "thresholds": {
+                    "mode": "absolute",
+                    "steps": [
+                      {
+                        "value": 0,
+                        "color": "green"
+                      },
+                      {
+                        "value": 80,
+                        "color": "red"
+                      }
+                    ]
+                  },
                   "color": {
                     "mode": "palette-classic"
                   },
@@ -3235,54 +3272,21 @@
                     "thresholdsStyle": {
                       "mode": "off"
                     }
-                  },
-                  "thresholds": {
-                    "mode": "absolute",
-                    "steps": [
-                      {
-                        "color": "green",
-                        "value": 0
-                      },
-                      {
-                        "color": "red",
-                        "value": 80
-                      }
-                    ]
                   }
                 },
                 "overrides": []
-              },
-              "options": {
-                "barRadius": 0.1,
-                "barWidth": 0.95,
-                "fullHighlight": false,
-                "groupWidth": 0.7,
-                "legend": {
-                  "calcs": [],
-                  "displayMode": "list",
-                  "placement": "bottom",
-                  "showLegend": true
-                },
-                "orientation": "horizontal",
-                "showValue": "never",
-                "stacking": "normal",
-                "tooltip": {
-                  "hideZeros": false,
-                  "mode": "single",
-                  "sort": "none"
-                },
-                "xField": "time",
-                "xTickLabelRotation": 0,
-                "xTickLabelSpacing": 0
               }
-            },
-            "version": "13.0.0-22229365497"
+            }
           }
         }
       },
       "panel-96": {
         "kind": "Panel",
         "spec": {
+          "id": 96,
+          "title": "End of Life (EOL) Branch by Instances",
+          "description": "",
+          "links": [],
           "data": {
             "kind": "QueryGroup",
             "spec": {
@@ -3290,10 +3294,10 @@
                 {
                   "kind": "PanelQuery",
                   "spec": {
-                    "hidden": false,
                     "query": {
-                      "group": "grafana-postgresql-datasource",
                       "kind": "DataQuery",
+                      "group": "grafana-postgresql-datasource",
+                      "version": "v0",
                       "spec": {
                         "editorMode": "code",
                         "format": "table",
@@ -3316,30 +3320,54 @@
                           ],
                           "limit": 50
                         }
-                      },
-                      "version": "v0"
+                      }
                     },
-                    "refId": "A"
+                    "refId": "A",
+                    "hidden": false
                   }
                 }
               ],
-              "queryOptions": {},
-              "transformations": []
+              "transformations": [],
+              "queryOptions": {}
             }
           },
-          "description": "",
-          "id": 96,
-          "links": [],
-          "title": "End of Life (EOL) Branch by Instances",
           "vizConfig": {
-            "group": "piechart",
             "kind": "VizConfig",
+            "group": "piechart",
+            "version": "13.0.0-22229365497",
             "spec": {
+              "options": {
+                "displayLabels": [],
+                "legend": {
+                  "displayMode": "list",
+                  "placement": "bottom",
+                  "showLegend": true,
+                  "values": [
+                    "percent"
+                  ]
+                },
+                "pieType": "donut",
+                "reduceOptions": {
+                  "calcs": [
+                    "lastNotNull"
+                  ],
+                  "fields": "",
+                  "values": true
+                },
+                "sort": "desc",
+                "tooltip": {
+                  "hideZeros": false,
+                  "mode": "single",
+                  "sort": "none"
+                }
+              },
               "fieldConfig": {
                 "defaults": {
+                  "unit": "locale",
+                  "decimals": 1,
                   "color": {
-                    "fixedColor": "light-red",
-                    "mode": "fixed"
+                    "mode": "fixed",
+                    "fixedColor": "light-red"
                   },
                   "custom": {
                     "hideFrom": {
@@ -3347,9 +3375,7 @@
                       "tooltip": false,
                       "viz": false
                     }
-                  },
-                  "decimals": 1,
-                  "unit": "locale"
+                  }
                 },
                 "overrides": [
                   {
@@ -3458,40 +3484,18 @@
                     ]
                   }
                 ]
-              },
-              "options": {
-                "displayLabels": [],
-                "legend": {
-                  "displayMode": "list",
-                  "placement": "bottom",
-                  "showLegend": true,
-                  "values": [
-                    "percent"
-                  ]
-                },
-                "pieType": "donut",
-                "reduceOptions": {
-                  "calcs": [
-                    "lastNotNull"
-                  ],
-                  "fields": "",
-                  "values": true
-                },
-                "sort": "desc",
-                "tooltip": {
-                  "hideZeros": false,
-                  "mode": "single",
-                  "sort": "none"
-                }
               }
-            },
-            "version": "13.0.0-22229365497"
+            }
           }
         }
       },
       "panel-97": {
         "kind": "Panel",
         "spec": {
+          "id": 97,
+          "title": "End of Life (EOL) Branch by MAUs",
+          "description": "",
+          "links": [],
           "data": {
             "kind": "QueryGroup",
             "spec": {
@@ -3499,10 +3503,10 @@
                 {
                   "kind": "PanelQuery",
                   "spec": {
-                    "hidden": false,
                     "query": {
-                      "group": "grafana-postgresql-datasource",
                       "kind": "DataQuery",
+                      "group": "grafana-postgresql-datasource",
+                      "version": "v0",
                       "spec": {
                         "editorMode": "code",
                         "format": "table",
@@ -3525,30 +3529,54 @@
                           ],
                           "limit": 50
                         }
-                      },
-                      "version": "v0"
+                      }
                     },
-                    "refId": "A"
+                    "refId": "A",
+                    "hidden": false
                   }
                 }
               ],
-              "queryOptions": {},
-              "transformations": []
+              "transformations": [],
+              "queryOptions": {}
             }
           },
-          "description": "",
-          "id": 97,
-          "links": [],
-          "title": "End of Life (EOL) Branch by MAUs",
           "vizConfig": {
-            "group": "piechart",
             "kind": "VizConfig",
+            "group": "piechart",
+            "version": "13.0.0-22229365497",
             "spec": {
+              "options": {
+                "displayLabels": [],
+                "legend": {
+                  "displayMode": "list",
+                  "placement": "bottom",
+                  "showLegend": true,
+                  "values": [
+                    "percent"
+                  ]
+                },
+                "pieType": "donut",
+                "reduceOptions": {
+                  "calcs": [
+                    "lastNotNull"
+                  ],
+                  "fields": "",
+                  "values": true
+                },
+                "sort": "desc",
+                "tooltip": {
+                  "hideZeros": false,
+                  "mode": "single",
+                  "sort": "none"
+                }
+              },
               "fieldConfig": {
                 "defaults": {
+                  "unit": "locale",
+                  "decimals": 1,
                   "color": {
-                    "fixedColor": "light-red",
-                    "mode": "fixed"
+                    "mode": "fixed",
+                    "fixedColor": "light-red"
                   },
                   "custom": {
                     "hideFrom": {
@@ -3556,9 +3584,7 @@
                       "tooltip": false,
                       "viz": false
                     }
-                  },
-                  "decimals": 1,
-                  "unit": "locale"
+                  }
                 },
                 "overrides": [
                   {
@@ -3667,34 +3693,8 @@
                     ]
                   }
                 ]
-              },
-              "options": {
-                "displayLabels": [],
-                "legend": {
-                  "displayMode": "list",
-                  "placement": "bottom",
-                  "showLegend": true,
-                  "values": [
-                    "percent"
-                  ]
-                },
-                "pieType": "donut",
-                "reduceOptions": {
-                  "calcs": [
-                    "lastNotNull"
-                  ],
-                  "fields": "",
-                  "values": true
-                },
-                "sort": "desc",
-                "tooltip": {
-                  "hideZeros": false,
-                  "mode": "single",
-                  "sort": "none"
-                }
               }
-            },
-            "version": "13.0.0-22229365497"
+            }
           }
         }
       }
@@ -3706,13 +3706,16 @@
           {
             "kind": "RowsLayoutRow",
             "spec": {
+              "title": "Big Numbers",
               "collapse": false,
-              "fillScreen": true,
               "hideHeader": true,
+              "fillScreen": true,
               "layout": {
                 "kind": "AutoGridLayout",
                 "spec": {
+                  "maxColumnCount": 2,
                   "columnWidthMode": "standard",
+                  "rowHeightMode": "standard",
                   "items": [
                     {
                       "kind": "AutoGridLayoutItem",
@@ -3750,24 +3753,24 @@
                         }
                       }
                     }
-                  ],
-                  "maxColumnCount": 2,
-                  "rowHeightMode": "standard"
+                  ]
                 }
-              },
-              "title": "Big Numbers"
+              }
             }
           },
           {
             "kind": "RowsLayoutRow",
             "spec": {
+              "title": "Patch Adoption",
               "collapse": false,
-              "fillScreen": true,
               "hideHeader": true,
+              "fillScreen": true,
               "layout": {
                 "kind": "AutoGridLayout",
                 "spec": {
+                  "maxColumnCount": 4,
                   "columnWidthMode": "standard",
+                  "rowHeightMode": "standard",
                   "items": [
                     {
                       "kind": "AutoGridLayoutItem",
@@ -3841,24 +3844,24 @@
                         }
                       }
                     }
-                  ],
-                  "maxColumnCount": 4,
-                  "rowHeightMode": "standard"
+                  ]
                 }
-              },
-              "title": "Patch Adoption"
+              }
             }
           },
           {
             "kind": "RowsLayoutRow",
             "spec": {
+              "title": "Branch Adoption",
               "collapse": false,
-              "fillScreen": true,
               "hideHeader": true,
+              "fillScreen": true,
               "layout": {
                 "kind": "AutoGridLayout",
                 "spec": {
+                  "maxColumnCount": 1,
                   "columnWidthMode": "standard",
+                  "rowHeightMode": "standard",
                   "items": [
                     {
                       "kind": "AutoGridLayoutItem",
@@ -3878,24 +3881,24 @@
                         }
                       }
                     }
-                  ],
-                  "maxColumnCount": 1,
-                  "rowHeightMode": "standard"
+                  ]
                 }
-              },
-              "title": "Branch Adoption"
+              }
             }
           },
           {
             "kind": "RowsLayoutRow",
             "spec": {
+              "title": "Adoption Donuts",
               "collapse": false,
-              "fillScreen": true,
               "hideHeader": true,
+              "fillScreen": true,
               "layout": {
                 "kind": "AutoGridLayout",
                 "spec": {
+                  "maxColumnCount": 2,
                   "columnWidthMode": "standard",
+                  "rowHeightMode": "tall",
                   "items": [
                     {
                       "kind": "AutoGridLayoutItem",
@@ -3951,24 +3954,24 @@
                         }
                       }
                     }
-                  ],
-                  "maxColumnCount": 2,
-                  "rowHeightMode": "tall"
+                  ]
                 }
-              },
-              "title": "Adoption Donuts"
+              }
             }
           },
           {
             "kind": "RowsLayoutRow",
             "spec": {
+              "title": "Trends",
               "collapse": false,
-              "fillScreen": true,
               "hideHeader": true,
+              "fillScreen": true,
               "layout": {
                 "kind": "AutoGridLayout",
                 "spec": {
+                  "maxColumnCount": 2,
                   "columnWidthMode": "standard",
+                  "rowHeightMode": "tall",
                   "items": [
                     {
                       "kind": "AutoGridLayoutItem",
@@ -4006,24 +4009,24 @@
                         }
                       }
                     }
-                  ],
-                  "maxColumnCount": 2,
-                  "rowHeightMode": "tall"
+                  ]
                 }
-              },
-              "title": "Trends"
+              }
             }
           },
           {
             "kind": "RowsLayoutRow",
             "spec": {
+              "title": "All Data",
               "collapse": false,
-              "fillScreen": true,
               "hideHeader": true,
+              "fillScreen": true,
               "layout": {
                 "kind": "AutoGridLayout",
                 "spec": {
+                  "maxColumnCount": 1,
                   "columnWidthMode": "wide",
+                  "rowHeightMode": "tall",
                   "items": [
                     {
                       "kind": "AutoGridLayoutItem",
@@ -4034,12 +4037,9 @@
                         }
                       }
                     }
-                  ],
-                  "maxColumnCount": 1,
-                  "rowHeightMode": "tall"
+                  ]
                 }
-              },
-              "title": "All Data"
+              }
             }
           }
         ]
@@ -4047,46 +4047,49 @@
     },
     "links": [
       {
-        "asDropdown": false,
-        "icon": "doc",
-        "includeVars": false,
-        "keepTime": false,
-        "tags": [],
-        "targetBlank": true,
         "title": "Documentation",
-        "tooltip": "",
         "type": "link",
-        "url": "https://docs.vmst.io/vmcrawl"
+        "icon": "doc",
+        "tooltip": "",
+        "url": "https://docs.vmst.io/vmcrawl",
+        "tags": [],
+        "asDropdown": false,
+        "targetBlank": true,
+        "includeVars": false,
+        "keepTime": false
       },
       {
-        "asDropdown": false,
-        "icon": "info",
-        "includeVars": false,
-        "keepTime": false,
-        "tags": [],
-        "targetBlank": true,
         "title": "Source",
-        "tooltip": "",
         "type": "link",
-        "url": "https://github.com/vmstio/vmcrawl"
+        "icon": "info",
+        "tooltip": "",
+        "url": "https://github.com/vmstio/vmcrawl",
+        "tags": [],
+        "asDropdown": false,
+        "targetBlank": true,
+        "includeVars": false,
+        "keepTime": false
       },
       {
-        "asDropdown": false,
-        "icon": "external link",
-        "includeVars": false,
-        "keepTime": false,
-        "tags": [],
-        "targetBlank": true,
         "title": "Mastodon",
-        "tooltip": "",
         "type": "link",
-        "url": "https://vmst.io/@vmcrawl"
+        "icon": "external link",
+        "tooltip": "",
+        "url": "https://vmst.io/@vmcrawl",
+        "tags": [],
+        "asDropdown": false,
+        "targetBlank": true,
+        "includeVars": false,
+        "keepTime": false
       }
     ],
     "liveNow": true,
     "preload": false,
     "tags": [],
     "timeSettings": {
+      "timezone": "browser",
+      "from": "now-12d",
+      "to": "now",
       "autoRefresh": "5m",
       "autoRefreshIntervals": [
         "5s",
@@ -4100,14 +4103,10 @@
         "2h",
         "1d"
       ],
-      "fiscalYearStartMonth": 0,
-      "from": "now-6d",
       "hideTimepicker": false,
-      "timezone": "browser",
-      "to": "now"
+      "fiscalYearStartMonth": 0
     },
     "title": "vmcrawl",
     "variables": []
-  },
-  "status": {}
+  }
 }
