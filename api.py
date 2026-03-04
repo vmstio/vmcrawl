@@ -562,7 +562,7 @@ async def get_crawler_health(_api_key: str | None = Depends(get_api_key)):
                 SELECT COUNT(DISTINCT rd.domain) AS unique_domain_count
                 FROM raw_domains rd
                 WHERE LOWER(rd.nodeinfo) = ANY(%s::text[])
-                  AND rd.reason LIKE 'TCP%'
+                  AND rd.reason LIKE 'TCP%%'
                   AND (rd.alias IS NULL OR rd.alias = FALSE)
                   AND EXISTS (
                     SELECT 1
@@ -581,7 +581,7 @@ async def get_crawler_health(_api_key: str | None = Depends(get_api_key)):
                 SELECT COUNT(DISTINCT rd.domain) AS unique_domain_count
                 FROM raw_domains rd
                 WHERE LOWER(rd.nodeinfo) = ANY(%s::text[])
-                  AND rd.reason LIKE 'SSL%'
+                  AND rd.reason LIKE 'SSL%%'
                   AND (rd.alias IS NULL OR rd.alias = FALSE)
                   AND EXISTS (
                     SELECT 1
@@ -600,7 +600,7 @@ async def get_crawler_health(_api_key: str | None = Depends(get_api_key)):
                 SELECT COUNT(DISTINCT rd.domain) AS unique_domain_count
                 FROM raw_domains rd
                 WHERE LOWER(rd.nodeinfo) = ANY(%s::text[])
-                  AND rd.reason LIKE 'DNS%'
+                  AND rd.reason LIKE 'DNS%%'
                   AND (rd.alias IS NULL OR rd.alias = FALSE)
                   AND EXISTS (
                     SELECT 1
@@ -657,7 +657,7 @@ async def get_crawler_health(_api_key: str | None = Depends(get_api_key)):
                 SELECT COUNT(DISTINCT rd.domain) AS unique_domain_count
                 FROM raw_domains rd
                 WHERE LOWER(rd.nodeinfo) = ANY(%s::text[])
-                  AND (rd.reason LIKE 'FILE%' or rd.reason LIKE 'TYPE%' or rd.reason LIKE 'JSON%')
+                  AND (rd.reason LIKE 'FILE%%' or rd.reason LIKE 'TYPE%%' or rd.reason LIKE 'JSON%%')
                   AND (rd.alias IS NULL OR rd.alias = FALSE)
                   AND EXISTS (
                     SELECT 1
@@ -676,7 +676,7 @@ async def get_crawler_health(_api_key: str | None = Depends(get_api_key)):
                 SELECT COUNT(DISTINCT domain) AS unique_domain_count
                 FROM raw_domains
                 WHERE LOWER(nodeinfo) = ANY(%s::text[])
-                  AND reason LIKE 'MAU%'
+                  AND reason LIKE 'MAU%%'
                   AND (alias IS NULL OR alias = FALSE)
             """,
                 (compatible_software,),

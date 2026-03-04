@@ -264,7 +264,7 @@
             <td>${esc(i.full_version || '')}</td>
             <td>${esc(i.software || '')}</td>
             <td style="text-align:right">${i.monthly_active_users != null ? fmt(i.monthly_active_users) : ''}</td>
-            <td style="text-align:right">${i.last_updated ? new Date(i.last_updated).toLocaleDateString() : ''}</td>
+            <td style="text-align:right">${i.last_updated ? new Date(i.last_updated).toLocaleString() : ''}</td>
         </tr>`).join('');
 
         const pageInfo = document.getElementById('page-info');
