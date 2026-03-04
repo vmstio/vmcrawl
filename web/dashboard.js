@@ -1,7 +1,7 @@
 (function () {
     'use strict';
 
-    const API_BASE = window.location.origin;
+    const API_BASE = (window.VMCRAWL_API || '').replace(/\/$/, '') || window.location.origin;
 
     // Colors
     const PURPLE = '#9b59b6';
