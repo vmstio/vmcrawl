@@ -54,7 +54,7 @@
             data: {
                 datasets: [{
                     data: [value, remaining],
-                    backgroundColor: [color, '#1a1a24'],
+                    backgroundColor: [color, '#2e2e3e'],
                     borderWidth: 0,
                     circumference: 180,
                     rotation: 270,
