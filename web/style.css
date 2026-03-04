@@ -322,10 +322,11 @@ footer a {
     .header-content { flex-direction: column; gap: 0.5rem; }
     .chart-row { grid-template-columns: 1fr; }
     .stats-row { grid-template-columns: 1fr 1fr; }
+    .gauge-grid { grid-template-columns: 1fr 1fr; }
     main { padding: 1rem; }
 }
 
 @media (max-width: 480px) {
     .stats-row { grid-template-columns: 1fr; }
-    .gauge-grid { grid-template-columns: 1fr 1fr; }
+    .gauge-grid { grid-template-columns: 1fr; }
 }
