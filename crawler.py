@@ -473,7 +473,7 @@ socket.getaddrinfo = _cached_getaddrinfo  # type: ignore[assignment]
 http_timeout = int(os.getenv("VMCRAWL_HTTP_TIMEOUT", "5"))
 domain_timeout = int(os.getenv("VMCRAWL_DOMAIN_TIMEOUT", "30"))
 http_redirect = int(os.getenv("VMCRAWL_HTTP_REDIRECT", "2"))
-http_custom_user_agent = f"{appname}/{appversion} (https://docs.vmst.io/{appname})"
+http_custom_user_agent = f"{appname}/{appversion} (https://{appname}.com)"
 http_custom_headers = {"User-Agent": http_custom_user_agent}
 
 # Memory protection: limit response sizes to prevent memory bombs
