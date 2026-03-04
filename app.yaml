@@ -1,0 +1,32 @@
+name: vmcrawl
+region: tor
+
+services:
+  - name: api
+    github:
+      repo: vmstio/vmcrawl
+      branch: main
+      deploy_on_push: true
+    dockerfile_path: Dockerfile.api
+    http_port: 8080
+    instance_count: 1
+    instance_size_slug: basic-xxs
+    health_check:
+      http_path: /api
+    envs:
+      - key: VMCRAWL_POSTGRES_HOST
+        value: ${db.HOSTNAME}
+      - key: VMCRAWL_POSTGRES_PORT
+        value: ${db.PORT}
+      - key: VMCRAWL_POSTGRES_USER
+        value: ${db.USERNAME}
+      - key: VMCRAWL_POSTGRES_PASS
+        value: ${db.PASSWORD}
+      - key: VMCRAWL_POSTGRES_DATA
+        value: ${db.DATABASE}
+
+databases:
+  - name: db
+    engine: PG
+    cluster_name: your-cluster-name
+    production: true
