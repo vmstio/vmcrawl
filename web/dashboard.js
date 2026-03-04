@@ -79,11 +79,11 @@
                     c.textAlign = 'center';
                     c.textBaseline = 'bottom';
                     c.fillStyle = color;
-                    c.font = 'bold 16px -apple-system, sans-serif';
+                    c.font = 'bold 18px -apple-system, sans-serif';
                     c.fillText(fmt(value), cx, cy);
-                    c.fillStyle = TEXT_MUTED;
-                    c.font = '11px -apple-system, sans-serif';
-                    c.fillText('of ' + fmt(max), cx, cy + 14);
+                    c.fillStyle = '#c0c0cc';
+                    c.font = '13px -apple-system, sans-serif';
+                    c.fillText('of ' + fmt(max), cx, cy + 16);
                     c.restore();
                 }
             }]
