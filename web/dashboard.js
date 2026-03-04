@@ -271,6 +271,7 @@
 
         document.getElementById('prev-btn').disabled = s.offset === 0;
         document.getElementById('next-btn').disabled = s.offset + s.limit >= s.total;
+        updateSortIndicators();
     }
 
     function esc(str) {
@@ -303,6 +304,23 @@
         tableState.offset += tableState.limit;
         loadTable();
     });
+
+    function updateSortIndicators() {
+        document.querySelectorAll('th[data-sort]').forEach(th => {
+            const field = th.dataset.sort;
+            const existing = th.querySelector('.sort-icon');
+            if (existing) existing.remove();
+            const icon = document.createElement('span');
+            icon.className = 'sort-icon';
+            if (field === tableState.sort_by) {
+                icon.textContent = tableState.order === 'asc' ? ' ↑' : ' ↓';
+                icon.classList.add('sort-icon--active');
+            } else {
+                icon.textContent = ' ↕';
+            }
+            th.appendChild(icon);
+        });
+    }
 
     document.querySelectorAll('th[data-sort]').forEach(th => {
         th.addEventListener('click', () => {

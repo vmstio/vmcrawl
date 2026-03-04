@@ -275,6 +275,17 @@ th[data-sort] {
 
 th[data-sort]:hover { color: var(--purple-light); }
 
+.sort-icon {
+    font-style: normal;
+    opacity: 0.35;
+    font-size: 0.75em;
+}
+
+.sort-icon--active {
+    opacity: 0.85;
+    color: var(--purple-light);
+}
+
 td {
     padding: 0.5rem 0.75rem;
     border-bottom: 1px solid var(--border);
