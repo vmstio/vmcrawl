@@ -18,7 +18,9 @@ import paramiko
 import toml
 from dotenv import load_dotenv
 from fastapi import Depends, FastAPI, HTTPException, Query, Security, status
+from fastapi.middleware.cors import CORSMiddleware
 from fastapi.security import APIKeyHeader
+from fastapi.staticfiles import StaticFiles
 from psycopg import sql
 from psycopg_pool import ConnectionPool
 
@@ -188,6 +190,14 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
+# CORS middleware for dashboard frontend
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_methods=["GET"],
+    allow_headers=["*"],
+)
+
 
 # =============================================================================
 # AUTHENTICATION
@@ -230,9 +240,9 @@ def get_api_key(api_key: str | None = Security(api_key_header)):
 # =============================================================================
 
 
-@app.get("/", tags=["Health"])
+@app.get("/api", tags=["Health"])
 async def root():
-    """API root endpoint with basic information."""
+    """API information endpoint."""
     return {
         "name": f"{appname} API",
         "version": appversion,
@@ -1040,8 +1050,665 @@ async def search_instances(
 
 
 # =============================================================================
-# MAIN
+# DASHBOARD ENDPOINTS
 # =============================================================================
+
+
+@app.get("/stats/history", tags=["Dashboard"])
+async def get_history_stats(
+    _api_key: str | None = Depends(get_api_key),
+    days: int = Query(30, ge=1, le=365, description="Number of days of history"),
+):
+    """Get historical statistics from the statistics table."""
+    try:
+        with db_pool.connection() as conn, conn.cursor() as cur:
+            _ = cur.execute(
+                """
+                SELECT
+                    date,
+                    updated_at,
+                    mau,
+                    unique_versions,
+                    main_instances,
+                    latest_instances,
+                    previous_instances,
+                    deprecated_instances,
+                    eol_instances,
+                    main_patched_instances,
+                    latest_patched_instances,
+                    previous_patched_instances,
+                    deprecated_patched_instances,
+                    main_branch_mau,
+                    latest_branch_mau,
+                    previous_branch_mau,
+                    deprecated_branch_mau,
+                    eol_branch_mau,
+                    main_patched_mau,
+                    latest_patched_mau,
+                    previous_patched_mau,
+                    deprecated_patched_mau
+                FROM statistics
+                ORDER BY date DESC
+                LIMIT %s
+            """,
+                (days,),
+            )
+            results = cur.fetchall()
+
+        return {
+            "history": [
+                {
+                    "date": str(row[0]),
+                    "updated_at": row[1].isoformat() if row[1] else None,
+                    "mau": row[2] or 0,
+                    "unique_versions": row[3] or 0,
+                    "main_instances": row[4] or 0,
+                    "latest_instances": row[5] or 0,
+                    "previous_instances": row[6] or 0,
+                    "deprecated_instances": row[7] or 0,
+                    "eol_instances": row[8] or 0,
+                    "main_patched_instances": row[9] or 0,
+                    "latest_patched_instances": row[10] or 0,
+                    "previous_patched_instances": row[11] or 0,
+                    "deprecated_patched_instances": row[12] or 0,
+                    "main_branch_mau": row[13] or 0,
+                    "latest_branch_mau": row[14] or 0,
+                    "previous_branch_mau": row[15] or 0,
+                    "deprecated_branch_mau": row[16] or 0,
+                    "eol_branch_mau": row[17] or 0,
+                    "main_patched_mau": row[18] or 0,
+                    "latest_patched_mau": row[19] or 0,
+                    "previous_patched_mau": row[20] or 0,
+                    "deprecated_patched_mau": row[21] or 0,
+                }
+                for row in results
+            ]
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Database error: {str(e)}")
+
+
+@app.get("/stats/patch-detail", tags=["Dashboard"])
+async def get_patch_detail(_api_key: str | None = Depends(get_api_key)):
+    """Get per-branch patched vs total counts for instances and MAU."""
+    try:
+        with db_pool.connection() as conn, conn.cursor() as cur:
+            branches: dict[str, dict[str, Any]] = {}
+            for label, n_level in [
+                ("main", -1),
+                ("latest", 0),
+                ("previous", 1),
+            ]:
+                if label == "main":
+                    # Main uses LIKE with '%' suffix for patched
+                    _ = cur.execute(
+                        """
+                        SELECT COUNT(DISTINCT domain)
+                        FROM mastodon_domains
+                        WHERE software_version LIKE (
+                            SELECT latest || '%%' FROM release_versions WHERE n_level = %s
+                        )
+                    """,
+                        (n_level,),
+                    )
+                else:
+                    _ = cur.execute(
+                        """
+                        SELECT COUNT(DISTINCT domain)
+                        FROM mastodon_domains
+                        WHERE software_version = (
+                            SELECT latest FROM release_versions WHERE n_level = %s
+                        )
+                    """,
+                        (n_level,),
+                    )
+                result = cur.fetchone()
+                patched = result[0] if result else 0
+
+                _ = cur.execute(
+                    """
+                    SELECT COUNT(DISTINCT domain)
+                    FROM mastodon_domains
+                    WHERE software_version LIKE (
+                        SELECT branch || '.%%' FROM release_versions WHERE n_level = %s
+                    )
+                """,
+                    (n_level,),
+                )
+                result = cur.fetchone()
+                total = result[0] if result else 0
+
+                # MAU patched
+                if label == "main":
+                    _ = cur.execute(
+                        """
+                        SELECT COALESCE(SUM(active_users_monthly), 0)
+                        FROM mastodon_domains
+                        WHERE software_version LIKE ANY (
+                            SELECT latest || '%%' FROM release_versions WHERE n_level = %s
+                        )
+                    """,
+                        (n_level,),
+                    )
+                else:
+                    _ = cur.execute(
+                        """
+                        SELECT COALESCE(SUM(active_users_monthly), 0)
+                        FROM mastodon_domains
+                        WHERE software_version = (
+                            SELECT latest FROM release_versions WHERE n_level = %s
+                        )
+                    """,
+                        (n_level,),
+                    )
+                result = cur.fetchone()
+                mau_patched = result[0] if result else 0
+
+                _ = cur.execute(
+                    """
+                    SELECT COALESCE(SUM(active_users_monthly), 0)
+                    FROM mastodon_domains
+                    WHERE software_version LIKE (
+                        SELECT branch || '.%%' FROM release_versions WHERE n_level = %s
+                    )
+                """,
+                    (n_level,),
+                )
+                result = cur.fetchone()
+                mau_total = result[0] if result else 0
+
+                branches[label] = {
+                    "patched": patched,
+                    "total": total,
+                    "mau_patched": mau_patched,
+                    "mau_total": mau_total,
+                }
+
+            # Deprecated branches (n_level >= 2, not eol)
+            _ = cur.execute(
+                """
+                SELECT COUNT(DISTINCT domain)
+                FROM mastodon_domains md
+                WHERE md.software_version LIKE ANY (
+                    SELECT latest || '%%' FROM release_versions
+                    WHERE n_level >= 2 AND status != 'eol'
+                )
+            """
+            )
+            result = cur.fetchone()
+            dep_patched = result[0] if result else 0
+
+            _ = cur.execute(
+                """
+                SELECT COUNT(DISTINCT domain)
+                FROM mastodon_domains
+                WHERE software_version LIKE ANY (
+                    SELECT branch || '.%%' FROM release_versions
+                    WHERE n_level >= 2 AND status != 'eol'
+                )
+            """
+            )
+            result = cur.fetchone()
+            dep_total = result[0] if result else 0
+
+            _ = cur.execute(
+                """
+                SELECT COALESCE(SUM(active_users_monthly), 0)
+                FROM mastodon_domains md
+                WHERE md.software_version LIKE ANY (
+                    SELECT latest || '%%' FROM release_versions
+                    WHERE n_level >= 2 AND status != 'eol'
+                )
+            """
+            )
+            result = cur.fetchone()
+            dep_mau_patched = result[0] if result else 0
+
+            _ = cur.execute(
+                """
+                SELECT COALESCE(SUM(active_users_monthly), 0)
+                FROM mastodon_domains
+                WHERE software_version LIKE ANY (
+                    SELECT branch || '.%%' FROM release_versions
+                    WHERE n_level >= 2 AND status != 'eol'
+                )
+            """
+            )
+            result = cur.fetchone()
+            dep_mau_total = result[0] if result else 0
+
+            branches["deprecated"] = {
+                "patched": dep_patched,
+                "total": dep_total,
+                "mau_patched": dep_mau_patched,
+                "mau_total": dep_mau_total,
+            }
+
+        return {"branches": branches}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Database error: {str(e)}")
+
+
+@app.get("/stats/patch-distribution", tags=["Dashboard"])
+async def get_patch_distribution(_api_key: str | None = Depends(get_api_key)):
+    """Get patch distribution data for pie charts (by instances and MAU)."""
+    try:
+        with db_pool.connection() as conn, conn.cursor() as cur:
+            _ = cur.execute(
+                """
+                WITH version_cases AS (
+                  SELECT latest AS software_version
+                  FROM release_versions
+                  WHERE status IN ('release', 'main')
+                ),
+                eol_check AS (
+                  SELECT DISTINCT md.software_version
+                  FROM mastodon_domains md
+                  WHERE EXISTS (
+                    SELECT 1
+                    FROM release_versions rv
+                    WHERE rv.status = 'eol'
+                      AND md.software_version LIKE rv.branch || '.%'
+                  )
+                )
+                SELECT
+                  CASE
+                    WHEN software_version IN (SELECT software_version FROM version_cases)
+                      THEN software_version
+                    WHEN software_version IN (SELECT software_version FROM eol_check)
+                      THEN 'EOL'
+                    ELSE 'Unpatched'
+                  END as version,
+                  COUNT(*) as instance_count,
+                  COALESCE(SUM(active_users_monthly), 0) as mau_count
+                FROM mastodon_domains
+                GROUP BY CASE
+                    WHEN software_version IN (SELECT software_version FROM version_cases)
+                      THEN software_version
+                    WHEN software_version IN (SELECT software_version FROM eol_check)
+                      THEN 'EOL'
+                    ELSE 'Unpatched'
+                  END
+            """
+            )
+            results = cur.fetchall()
+
+        return {
+            "distribution": [
+                {
+                    "version": row[0],
+                    "instances": row[1],
+                    "mau": row[2] or 0,
+                }
+                for row in results
+            ]
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Database error: {str(e)}")
+
+
+@app.get("/stats/branch-distribution", tags=["Dashboard"])
+async def get_branch_distribution(_api_key: str | None = Depends(get_api_key)):
+    """Get branch distribution data for pie charts (by instances and MAU)."""
+    try:
+        with db_pool.connection() as conn, conn.cursor() as cur:
+            _ = cur.execute(
+                """
+                WITH prefixes AS (
+                    SELECT branch
+                    FROM release_versions
+                    WHERE status IN ('release', 'main')
+                ),
+                matched AS (
+                    SELECT
+                        pv.branch AS prefix,
+                        COUNT(md.software_version) AS instances,
+                        COALESCE(SUM(md.active_users_monthly), 0) AS mau
+                    FROM prefixes pv
+                    LEFT JOIN mastodon_domains md
+                      ON md.software_version LIKE pv.branch || '%%'
+                    GROUP BY pv.branch
+                ),
+                eol AS (
+                    SELECT
+                        'EOL' AS prefix,
+                        COUNT(*) AS instances,
+                        COALESCE(SUM(active_users_monthly), 0) AS mau
+                    FROM mastodon_domains md
+                    WHERE EXISTS (
+                        SELECT 1
+                        FROM release_versions rv
+                        WHERE rv.status = 'eol'
+                          AND md.software_version LIKE rv.branch || '%%'
+                    )
+                )
+                SELECT * FROM matched
+                UNION ALL
+                SELECT * FROM eol
+                ORDER BY prefix
+            """
+            )
+            results = cur.fetchall()
+
+        return {
+            "distribution": [
+                {
+                    "branch": row[0],
+                    "instances": row[1],
+                    "mau": row[2] or 0,
+                }
+                for row in results
+            ]
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Database error: {str(e)}")
+
+
+@app.get("/stats/eol-distribution", tags=["Dashboard"])
+async def get_eol_distribution(_api_key: str | None = Depends(get_api_key)):
+    """Get EOL branch breakdown for pie charts."""
+    try:
+        with db_pool.connection() as conn, conn.cursor() as cur:
+            _ = cur.execute(
+                """
+                WITH prefixes AS (
+                  SELECT DISTINCT branch AS prefix
+                  FROM release_versions
+                  WHERE branch IS NOT NULL AND status = 'eol'
+                ),
+                matched AS (
+                  SELECT
+                    p.prefix,
+                    COUNT(md.software_version) AS instances,
+                    COALESCE(SUM(md.active_users_monthly), 0) AS mau
+                  FROM prefixes p
+                  LEFT JOIN mastodon_domains md
+                    ON md.software_version LIKE p.prefix || '%%'
+                  GROUP BY p.prefix
+                )
+                SELECT prefix, instances, mau
+                FROM matched
+                ORDER BY prefix
+            """
+            )
+            results = cur.fetchall()
+
+        return {
+            "distribution": [
+                {
+                    "branch": row[0],
+                    "instances": row[1],
+                    "mau": row[2] or 0,
+                }
+                for row in results
+            ]
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Database error: {str(e)}")
+
+
+@app.get("/stats/branch-adoption", tags=["Dashboard"])
+async def get_branch_adoption(_api_key: str | None = Depends(get_api_key)):
+    """Get cumulative branch adoption percentages."""
+    try:
+        with db_pool.connection() as conn, conn.cursor() as cur:
+            _ = cur.execute(
+                """
+                WITH recent_releases AS (
+                    SELECT branch, n_level
+                    FROM release_versions
+                    WHERE status IN ('release', 'eol')
+                    ORDER BY n_level
+                    LIMIT 7
+                ),
+                total_count AS (
+                    SELECT COUNT(*) as total
+                    FROM mastodon_domains
+                    WHERE software_version IS NOT NULL
+                ),
+                total_mau AS (
+                    SELECT SUM(active_users_monthly) as total
+                    FROM mastodon_domains
+                    WHERE software_version IS NOT NULL
+                      AND active_users_monthly IS NOT NULL
+                ),
+                adoption_instances AS (
+                    SELECT
+                        rr.branch || '+' as version_label,
+                        rr.n_level,
+                        COUNT(CASE WHEN EXISTS (
+                            SELECT 1 FROM release_versions rv
+                            WHERE rv.n_level <= rr.n_level
+                            AND md.software_version LIKE rv.branch || '%%'
+                        ) THEN 1 END) * 100.0 / tc.total AS adoption_percent
+                    FROM recent_releases rr
+                    CROSS JOIN mastodon_domains md
+                    CROSS JOIN total_count tc
+                    WHERE md.software_version IS NOT NULL
+                    GROUP BY rr.branch, rr.n_level, tc.total
+                ),
+                adoption_mau AS (
+                    SELECT
+                        rr.branch || '+' as version_label,
+                        rr.n_level,
+                        SUM(CASE WHEN EXISTS (
+                            SELECT 1 FROM release_versions rv
+                            WHERE rv.n_level <= rr.n_level
+                            AND md.software_version LIKE rv.branch || '%%'
+                        ) THEN md.active_users_monthly ELSE 0 END) * 100.0 / tm.total AS adoption_percent
+                    FROM recent_releases rr
+                    CROSS JOIN mastodon_domains md
+                    CROSS JOIN total_mau tm
+                    WHERE md.software_version IS NOT NULL
+                      AND md.active_users_monthly IS NOT NULL
+                    GROUP BY rr.branch, rr.n_level, tm.total
+                )
+                SELECT
+                    ai.version_label,
+                    ai.adoption_percent AS instances_percent,
+                    COALESCE(am.adoption_percent, 0) AS mau_percent
+                FROM adoption_instances ai
+                LEFT JOIN adoption_mau am
+                  ON ai.version_label = am.version_label
+                ORDER BY ai.n_level
+            """
+            )
+            results = cur.fetchall()
+
+        return {
+            "adoption": [
+                {
+                    "branch": row[0],
+                    "instances_percent": round(float(row[1]), 2) if row[1] else 0,
+                    "mau_percent": round(float(row[2]), 2) if row[2] else 0,
+                }
+                for row in results
+            ]
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Database error: {str(e)}")
+
+
+@app.get("/stats/supported-branches", tags=["Dashboard"])
+async def get_supported_branches_coverage(
+    _api_key: str | None = Depends(get_api_key),
+):
+    """Get percentage of instances and MAU on supported branches."""
+    try:
+        with db_pool.connection() as conn, conn.cursor() as cur:
+            _ = cur.execute(
+                """
+                WITH supported_branches AS (
+                  SELECT DISTINCT branch
+                  FROM release_versions
+                  WHERE status IN ('release', 'main')
+                ),
+                eol_branches AS (
+                  SELECT DISTINCT branch
+                  FROM release_versions
+                  WHERE status = 'eol'
+                ),
+                agg AS (
+                  SELECT
+                    COUNT(DISTINCT md.domain) AS total_domains,
+                    COALESCE(SUM(md.active_users_monthly), 0) AS total_users,
+                    COUNT(DISTINCT md.domain) FILTER (
+                      WHERE EXISTS (
+                              SELECT 1 FROM eol_branches eb
+                              WHERE md.software_version LIKE eb.branch || '.%%'
+                            )
+                         OR NOT EXISTS (
+                              SELECT 1 FROM supported_branches sb
+                              WHERE md.software_version LIKE sb.branch || '.%%'
+                            )
+                    ) AS unsupported_or_eol_domains,
+                    COALESCE(SUM(md.active_users_monthly) FILTER (
+                      WHERE EXISTS (
+                              SELECT 1 FROM eol_branches eb
+                              WHERE md.software_version LIKE eb.branch || '.%%'
+                            )
+                         OR NOT EXISTS (
+                              SELECT 1 FROM supported_branches sb
+                              WHERE md.software_version LIKE sb.branch || '.%%'
+                            )
+                    ), 0) AS unsupported_or_eol_users
+                  FROM mastodon_domains md
+                )
+                SELECT
+                  ((total_domains - unsupported_or_eol_domains) * 100.0
+                    / NULLIF(total_domains, 0)) AS instances_percent,
+                  ((total_users - unsupported_or_eol_users) * 100.0
+                    / NULLIF(total_users, 0)) AS mau_percent
+                FROM agg
+            """
+            )
+            result = cur.fetchone()
+
+        return {
+            "instances_percent": (
+                round(float(result[0]), 1) if result and result[0] else 0
+            ),
+            "mau_percent": (
+                round(float(result[1]), 1) if result and result[1] else 0
+            ),
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Database error: {str(e)}")
+
+
+@app.get("/instances/table", tags=["Dashboard"])
+async def get_instances_table(
+    _api_key: str | None = Depends(get_api_key),
+    limit: int = Query(100, ge=1, le=5000, description="Number of results"),
+    offset: int = Query(0, ge=0, description="Offset for pagination"),
+    sort_by: str = Query("mau", description="Sort: mau, domain, version"),
+    order: str = Query("desc", description="Sort order: asc or desc"),
+    q: str = Query("", description="Search query for domain"),
+):
+    """Get instances table with DNI filtering (for public dashboard)."""
+    valid_sort_cols = {
+        "mau": "active_users_monthly",
+        "domain": "domain",
+        "version": "software_version",
+    }
+    if sort_by not in valid_sort_cols:
+        raise HTTPException(status_code=400, detail="Invalid sort_by field")
+
+    order = order.lower()
+    if order not in ["asc", "desc"]:
+        raise HTTPException(status_code=400, detail="Order must be 'asc' or 'desc'")
+
+    try:
+        with db_pool.connection() as conn, conn.cursor() as cur:
+            sort_field_sql = sql.SQL("{}.{}").format(
+                sql.Identifier("md"),
+                sql.Identifier(valid_sort_cols[sort_by]),
+            )
+            sort_order_sql = (
+                sql.SQL("ASC") if order == "asc" else sql.SQL("DESC")
+            )
+            nulls_sql = (
+                sql.SQL(" NULLS LAST") if sort_by == "mau" else sql.SQL("")
+            )
+
+            where_clause = sql.SQL("")
+            params: list[Any] = []
+            if q:
+                where_clause = sql.SQL(" AND md.domain ILIKE %s")
+                params.append(f"%{q}%")
+
+            query = sql.SQL(
+                """
+                SELECT
+                    md.domain,
+                    md.software_version,
+                    md.full_version,
+                    rd.nodeinfo,
+                    md.active_users_monthly,
+                    md.timestamp
+                FROM mastodon_domains md
+                LEFT JOIN raw_domains rd ON rd.domain = md.domain
+                WHERE NOT EXISTS (
+                    SELECT 1 FROM dni WHERE md.domain LIKE '%%' || dni.domain
+                )
+                {where}
+                ORDER BY {sort} {order}{nulls}
+                LIMIT %s OFFSET %s
+            """
+            ).format(
+                where=where_clause,
+                sort=sort_field_sql,
+                order=sort_order_sql,
+                nulls=nulls_sql,
+            )
+            params.extend([limit, offset])
+            _ = cur.execute(query, params)
+            results = cur.fetchall()
+
+            # Total count with DNI filter
+            count_query = sql.SQL(
+                """
+                SELECT COUNT(*)
+                FROM mastodon_domains md
+                WHERE NOT EXISTS (
+                    SELECT 1 FROM dni WHERE md.domain LIKE '%%' || dni.domain
+                )
+                {where}
+            """
+            ).format(where=where_clause)
+            count_params = [f"%{q}%"] if q else []
+            _ = cur.execute(count_query, count_params)
+            result = cur.fetchone()
+            total_count = result[0] if result else 0
+
+        return {
+            "total": total_count,
+            "limit": limit,
+            "offset": offset,
+            "instances": [
+                {
+                    "domain": row[0],
+                    "version": row[1],
+                    "full_version": row[2],
+                    "software": row[3],
+                    "monthly_active_users": row[4],
+                    "last_updated": row[5].isoformat() if row[5] else None,
+                }
+                for row in results
+            ],
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Database error: {str(e)}")
+
+
+# =============================================================================
+# STATIC FILES & MAIN
+# =============================================================================
+
+# Mount static files for dashboard (must be after all API routes)
+_web_dir = os.path.join(os.path.dirname(__file__), "web")
+if os.path.isdir(_web_dir):
+    app.mount("/", StaticFiles(directory=_web_dir, html=True), name="web")
 
 
 if __name__ == "__main__":
