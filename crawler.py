@@ -384,7 +384,6 @@ try:
         max_waiting=max_workers
         * 3,  # Allow more queuing since we have fewer connections
     )
-    # Maintain single connection for backwards compatibility
     conn = psycopg.connect(conn_string)
 
     # Register cleanup handler to prevent threading errors on early exit

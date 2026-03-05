@@ -280,29 +280,33 @@
         return d.innerHTML;
     }
 
+    function handleTableError(err) {
+        console.error('Table load error:', err);
+    }
+
     // Table event handlers
     document.getElementById('search-btn').addEventListener('click', () => {
         tableState.q = document.getElementById('search-input').value.trim();
         tableState.offset = 0;
-        loadTable();
+        loadTable().catch(handleTableError);
     });
 
     document.getElementById('search-input').addEventListener('keydown', e => {
         if (e.key === 'Enter') {
             tableState.q = e.target.value.trim();
             tableState.offset = 0;
-            loadTable();
+            loadTable().catch(handleTableError);
         }
     });
 
     document.getElementById('prev-btn').addEventListener('click', () => {
         tableState.offset = Math.max(0, tableState.offset - tableState.limit);
-        loadTable();
+        loadTable().catch(handleTableError);
     });
 
     document.getElementById('next-btn').addEventListener('click', () => {
         tableState.offset += tableState.limit;
-        loadTable();
+        loadTable().catch(handleTableError);
     });
 
     function updateSortIndicators() {
@@ -329,7 +333,7 @@
                 tableState.order = ['mau', 'last_crawled'].includes(field) ? 'desc' : 'asc';
             }
             tableState.offset = 0;
-            loadTable();
+            loadTable().catch(handleTableError);
         });
     });
 

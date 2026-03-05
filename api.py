@@ -11,6 +11,7 @@ import getpass
 import os
 import socket
 import threading
+import time
 from contextlib import asynccontextmanager
 from typing import Any
 
@@ -49,30 +50,37 @@ if _ssh_host:
 
     _db_host = os.getenv("VMCRAWL_POSTGRES_HOST", "localhost")
     _db_port = int(os.getenv("VMCRAWL_POSTGRES_PORT", "5432"))
-    try:
-        _ssh_transport = paramiko.Transport(
-            (_ssh_host, int(os.getenv("VMCRAWL_SSH_PORT", "22")))
-        )
-        _ssh_key_path = os.path.expanduser(
-            os.getenv("VMCRAWL_SSH_KEY", "~/.ssh/id_rsa")
-        )
-        _ssh_key_pass = os.getenv("VMCRAWL_SSH_KEY_PASS")
-        _ssh_pkey: paramiko.PKey | None = None
-        for _key_class in (paramiko.Ed25519Key, paramiko.ECDSAKey, paramiko.RSAKey):
-            try:
-                _ssh_pkey = _key_class.from_private_key_file(
-                    _ssh_key_path, password=_ssh_key_pass
-                )
-                break
-            except (paramiko.SSHException, ValueError):
-                continue
-        if _ssh_pkey is None:
-            raise paramiko.SSHException(f"Unable to load SSH key: {_ssh_key_path}")
-        _ssh_transport.connect(
-            username=os.getenv("VMCRAWL_SSH_USER") or getpass.getuser(), pkey=_ssh_pkey
-        )
+    _ssh_port = int(os.getenv("VMCRAWL_SSH_PORT", "22"))
+    _ssh_user = os.getenv("VMCRAWL_SSH_USER") or getpass.getuser()
+    _ssh_key_path = os.path.expanduser(os.getenv("VMCRAWL_SSH_KEY", "~/.ssh/id_rsa"))
+    _ssh_key_pass = os.getenv("VMCRAWL_SSH_KEY_PASS")
 
-        # Bind a local listening socket for the tunnel
+    # Load the SSH key once at startup
+    _ssh_pkey: paramiko.PKey | None = None
+    for _key_class in (paramiko.Ed25519Key, paramiko.ECDSAKey, paramiko.RSAKey):
+        try:
+            _ssh_pkey = _key_class.from_private_key_file(
+                _ssh_key_path, password=_ssh_key_pass
+            )
+            break
+        except (paramiko.SSHException, ValueError):
+            continue
+    if _ssh_pkey is None:
+        print(f"Error establishing SSH tunnel: Unable to load SSH key: {_ssh_key_path}")
+        sys.exit(1)
+
+    _ssh_host_str: str = _ssh_host  # narrowed: we're inside `if _ssh_host:`
+
+    def _connect_ssh_transport() -> paramiko.Transport:
+        """Open and authenticate a new SSH transport."""
+        transport = paramiko.Transport((_ssh_host_str, _ssh_port))
+        transport.connect(username=_ssh_user, pkey=_ssh_pkey)
+        return transport
+
+    try:
+        _ssh_transport = _connect_ssh_transport()
+
+        # Bind a local listening socket for the tunnel (port stays fixed for lifetime)
         _tunnel_sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         _tunnel_sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
         _tunnel_sock.bind(("127.0.0.1", 0))
@@ -80,8 +88,28 @@ if _ssh_host:
         _tunnel_sock.listen(15)
 
         def _ssh_tunnel_accept_loop() -> None:
-            """Accept local connections and forward them through the SSH tunnel."""
-            while _ssh_transport and _ssh_transport.is_active():
+            """Accept local connections and forward them through the SSH tunnel.
+
+            Reconnects automatically if the SSH transport drops.
+            """
+            global _ssh_transport
+            _reconnect_delay = 5  # seconds between reconnect attempts
+
+            while True:
+                # Reconnect if the transport has gone away
+                if _ssh_transport is None or not _ssh_transport.is_active():
+                    print("SSH tunnel lost, attempting to reconnect…")
+                    try:
+                        _ssh_transport = _connect_ssh_transport()
+                        print(
+                            f"SSH tunnel reconnected: 127.0.0.1:{_ssh_tunnel_port}"
+                            f" -> {_db_host}:{_db_port} via {_ssh_host}"
+                        )
+                    except Exception as exc:
+                        print(f"SSH reconnect failed: {exc}, retrying in {_reconnect_delay}s")
+                        time.sleep(_reconnect_delay)
+                        continue
+
                 try:
                     _tunnel_sock.settimeout(1.0)
                     client_sock, _ = _tunnel_sock.accept()
