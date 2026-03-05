@@ -2065,6 +2065,169 @@ async def chart_branch_adoption(
         raise HTTPException(status_code=500, detail=f"Database error: {str(e)}")
 
 
+@app.get("/charts/patch-history.png", tags=["Charts"], response_class=Response)
+async def chart_patch_history(
+    metric: str = Query("instances", pattern="^(instances|mau)$"),
+    days: int = Query(30, ge=7, le=365, description="Days of history to pull"),
+    _api_key: str | None = Depends(get_api_key),
+):
+    """Render patched-instance historical trends as a PNG stacked bar chart."""
+    try:
+        with db_pool.connection() as conn, conn.cursor() as cur:
+            _ = cur.execute(
+                """
+                SELECT date,
+                       main_patched_instances, latest_patched_instances,
+                       previous_patched_instances, deprecated_patched_instances,
+                       main_patched_mau, latest_patched_mau,
+                       previous_patched_mau, deprecated_patched_mau
+                FROM statistics
+                ORDER BY date DESC
+                LIMIT %s
+                """,
+                (days,),
+            )
+            rows = cur.fetchall()
+
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Database error: {str(e)}")
+
+    # Reverse so oldest → newest left-to-right; take last 10 for readability
+    hist = list(reversed(rows))[-10:]
+    labels = [
+        row[0].strftime("%d %b") if hasattr(row[0], "strftime") else str(row[0])
+        for row in hist
+    ]
+
+    if metric == "instances":
+        datasets = [
+            {"label": "Main Branch",       "data": [r[1] for r in hist], "backgroundColor": "#3498db"},
+            {"label": "Latest Branch",     "data": [r[2] for r in hist], "backgroundColor": "#2ecc71"},
+            {"label": "Previous Branch",   "data": [r[3] for r in hist], "backgroundColor": "#9b59b6"},
+            {"label": "Deprecated Branch", "data": [r[4] for r in hist], "backgroundColor": "#f39c12"},
+        ]
+    else:
+        datasets = [
+            {"label": "Main Branch",       "data": [r[5] for r in hist], "backgroundColor": "#3498db"},
+            {"label": "Latest Branch",     "data": [r[6] for r in hist], "backgroundColor": "#2ecc71"},
+            {"label": "Previous Branch",   "data": [r[7] for r in hist], "backgroundColor": "#9b59b6"},
+            {"label": "Deprecated Branch", "data": [r[8] for r in hist], "backgroundColor": "#f39c12"},
+        ]
+
+    metric_label = "Instances" if metric == "instances" else "Monthly Active Users"
+    chart_config = {
+        "type": "bar",
+        "data": {"labels": labels, "datasets": datasets},
+        "options": {
+            "indexAxis": "y",
+            "scales": {
+                "x": {"stacked": True, "ticks": {"color": "#8888a0"}, "grid": {"color": "#2a2a3a"}},
+                "y": {"stacked": True, "ticks": {"color": "#8888a0"}, "grid": {"display": False}},
+            },
+            "plugins": {
+                "title": {
+                    "display": True,
+                    "text": f"Patched Instance Trend ({metric_label})",
+                    "color": "#ffffff",
+                    "font": {"size": 16},
+                },
+                "legend": {
+                    "position": "bottom",
+                    "labels": {"color": "#8888a0", "usePointStyle": True, "font": {"size": 11}},
+                },
+            },
+        },
+    }
+
+    try:
+        png = await _fetch_chart_png(chart_config)
+    except httpx.HTTPError as e:
+        raise HTTPException(status_code=502, detail=f"Chart rendering error: {str(e)}")
+    return Response(content=png, media_type="image/png")
+
+
+@app.get("/charts/branch-history.png", tags=["Charts"], response_class=Response)
+async def chart_branch_history(
+    metric: str = Query("instances", pattern="^(instances|mau)$"),
+    days: int = Query(30, ge=7, le=365, description="Days of history to pull"),
+    _api_key: str | None = Depends(get_api_key),
+):
+    """Render total branch deployment historical trends as a PNG stacked bar chart."""
+    try:
+        with db_pool.connection() as conn, conn.cursor() as cur:
+            _ = cur.execute(
+                """
+                SELECT date,
+                       main_instances, latest_instances,
+                       previous_instances, deprecated_instances, eol_instances,
+                       main_branch_mau, latest_branch_mau,
+                       previous_branch_mau, deprecated_branch_mau, eol_branch_mau
+                FROM statistics
+                ORDER BY date DESC
+                LIMIT %s
+                """,
+                (days,),
+            )
+            rows = cur.fetchall()
+
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Database error: {str(e)}")
+
+    hist = list(reversed(rows))[-10:]
+    labels = [
+        row[0].strftime("%d %b") if hasattr(row[0], "strftime") else str(row[0])
+        for row in hist
+    ]
+
+    if metric == "instances":
+        datasets = [
+            {"label": "Main Branch",       "data": [r[1] for r in hist], "backgroundColor": "#3498db"},
+            {"label": "Latest Branch",     "data": [r[2] for r in hist], "backgroundColor": "#2ecc71"},
+            {"label": "Previous Branch",   "data": [r[3] for r in hist], "backgroundColor": "#9b59b6"},
+            {"label": "Deprecated Branch", "data": [r[4] for r in hist], "backgroundColor": "#f39c12"},
+            {"label": "EOL Branches",      "data": [r[5] for r in hist], "backgroundColor": "#e74c3c"},
+        ]
+    else:
+        datasets = [
+            {"label": "Main Branch",       "data": [r[6] for r in hist],  "backgroundColor": "#3498db"},
+            {"label": "Latest Branch",     "data": [r[7] for r in hist],  "backgroundColor": "#2ecc71"},
+            {"label": "Previous Branch",   "data": [r[8] for r in hist],  "backgroundColor": "#9b59b6"},
+            {"label": "Deprecated Branch", "data": [r[9] for r in hist],  "backgroundColor": "#f39c12"},
+            {"label": "EOL Branches",      "data": [r[10] for r in hist], "backgroundColor": "#e74c3c"},
+        ]
+
+    metric_label = "Instances" if metric == "instances" else "Monthly Active Users"
+    chart_config = {
+        "type": "bar",
+        "data": {"labels": labels, "datasets": datasets},
+        "options": {
+            "indexAxis": "y",
+            "scales": {
+                "x": {"stacked": True, "ticks": {"color": "#8888a0"}, "grid": {"color": "#2a2a3a"}},
+                "y": {"stacked": True, "ticks": {"color": "#8888a0"}, "grid": {"display": False}},
+            },
+            "plugins": {
+                "title": {
+                    "display": True,
+                    "text": f"Branch Deployment Trend ({metric_label})",
+                    "color": "#ffffff",
+                    "font": {"size": 16},
+                },
+                "legend": {
+                    "position": "bottom",
+                    "labels": {"color": "#8888a0", "usePointStyle": True, "font": {"size": 11}},
+                },
+            },
+        },
+    }
+
+    try:
+        png = await _fetch_chart_png(chart_config)
+    except httpx.HTTPError as e:
+        raise HTTPException(status_code=502, detail=f"Chart rendering error: {str(e)}")
+    return Response(content=png, media_type="image/png")
+
+
 # =============================================================================
 # STATIC FILES & MAIN
 # =============================================================================
