@@ -8,6 +8,7 @@ version information, and domain data.
 """
 
 import getpass
+import json
 import os
 import socket
 import threading
@@ -15,10 +16,12 @@ import time
 from contextlib import asynccontextmanager
 from typing import Any
 
+import httpx
+
 import paramiko
 import toml
 from dotenv import load_dotenv
-from fastapi import Depends, FastAPI, HTTPException, Query, Security, status
+from fastapi import Depends, FastAPI, HTTPException, Query, Response, Security, status
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.security import APIKeyHeader
 from fastapi.staticfiles import StaticFiles
@@ -1730,6 +1733,334 @@ async def get_supported_branches_coverage(
                 round(float(result[1]), 1) if result and result[1] else 0
             ),
         }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Database error: {str(e)}")
+
+
+# =============================================================================
+# CHART IMAGE ENDPOINTS
+# =============================================================================
+
+QUICKCHART_URL = "https://quickchart.io/chart"
+CHART_COLORS = ["#9b59b6", "#3498db", "#2ecc71", "#f39c12", "#1abc9c", "#e67e22", "#95a5a6"]
+BRANCH_COLORS = ["#2ecc71", "#3498db", "#9b59b6", "#f39c12", "#1abc9c", "#e67e22"]
+RED = "#e74c3c"
+ORANGE = "#f39c12"
+PURPLE = "#9b59b6"
+GREEN = "#2ecc71"
+
+
+async def _fetch_chart_png(chart_config: dict) -> bytes:
+    params = {
+        "c": json.dumps(chart_config),
+        "w": 600,
+        "h": 400,
+        "bkg": "#1a1a24",
+    }
+    async with httpx.AsyncClient(timeout=15) as client:
+        resp = await client.get(QUICKCHART_URL, params=params)
+        resp.raise_for_status()
+        return resp.content
+
+
+@app.get("/charts/patch-distribution.png", tags=["Charts"], response_class=Response)
+async def chart_patch_distribution(
+    metric: str = Query("instances", pattern="^(instances|mau)$"),
+    _api_key: str | None = Depends(get_api_key),
+):
+    """Render patch distribution as a PNG doughnut chart (patched / unpatched / EOL)."""
+    try:
+        with db_pool.connection() as conn, conn.cursor() as cur:
+            _ = cur.execute(
+                """
+                WITH version_cases AS (
+                  SELECT latest AS software_version
+                  FROM release_versions
+                  WHERE status IN ('release', 'main')
+                ),
+                eol_check AS (
+                  SELECT DISTINCT md.software_version
+                  FROM mastodon_domains md
+                  WHERE EXISTS (
+                    SELECT 1
+                    FROM release_versions rv
+                    WHERE rv.status = 'eol'
+                      AND md.software_version LIKE rv.branch || '.%'
+                  )
+                )
+                SELECT
+                  CASE
+                    WHEN software_version IN (SELECT software_version FROM version_cases)
+                      THEN software_version
+                    WHEN software_version IN (SELECT software_version FROM eol_check)
+                      THEN 'EOL'
+                    ELSE 'Unpatched'
+                  END as version,
+                  COUNT(*) as instance_count,
+                  COALESCE(SUM(active_users_monthly), 0) as mau_count
+                FROM mastodon_domains
+                GROUP BY CASE
+                    WHEN software_version IN (SELECT software_version FROM version_cases)
+                      THEN software_version
+                    WHEN software_version IN (SELECT software_version FROM eol_check)
+                      THEN 'EOL'
+                    ELSE 'Unpatched'
+                  END
+                ORDER BY instance_count DESC
+                """
+            )
+            rows = cur.fetchall()
+
+        distribution = [
+            {"version": r[0], "instances": r[1], "mau": r[2] or 0} for r in rows
+        ]
+        distribution.sort(key=lambda d: d["instances"], reverse=True)
+
+        labels = [d["version"] for d in distribution]
+        values = [d[metric] for d in distribution]
+        colors = [
+            RED if lbl == "EOL" else ORANGE if lbl == "Unpatched" else PURPLE
+            for lbl in labels
+        ]
+        metric_label = "Instances" if metric == "instances" else "Monthly Active Users"
+
+        chart_config = {
+            "type": "doughnut",
+            "data": {
+                "labels": labels,
+                "datasets": [{"data": values, "backgroundColor": colors, "borderWidth": 1, "borderColor": "#1a1a24"}],
+            },
+            "options": {
+                "plugins": {
+                    "title": {
+                        "display": True,
+                        "text": f"Patch Distribution ({metric_label})",
+                        "color": "#ffffff",
+                        "font": {"size": 16},
+                    },
+                    "legend": {
+                        "position": "bottom",
+                        "labels": {"color": "#8888a0", "usePointStyle": True, "font": {"size": 11}},
+                    },
+                }
+            },
+        }
+
+        png = await _fetch_chart_png(chart_config)
+        return Response(content=png, media_type="image/png")
+    except httpx.HTTPError as e:
+        raise HTTPException(status_code=502, detail=f"Chart rendering error: {str(e)}")
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Database error: {str(e)}")
+
+
+@app.get("/charts/branch-distribution.png", tags=["Charts"], response_class=Response)
+async def chart_branch_distribution(
+    metric: str = Query("instances", pattern="^(instances|mau)$"),
+    _api_key: str | None = Depends(get_api_key),
+):
+    """Render branch distribution as a PNG doughnut chart."""
+    try:
+        with db_pool.connection() as conn, conn.cursor() as cur:
+            _ = cur.execute(
+                """
+                WITH prefixes AS (
+                    SELECT branch
+                    FROM release_versions
+                    WHERE status IN ('release', 'main')
+                ),
+                matched AS (
+                    SELECT
+                        pv.branch AS prefix,
+                        COUNT(md.software_version) AS instances,
+                        COALESCE(SUM(md.active_users_monthly), 0) AS mau
+                    FROM prefixes pv
+                    LEFT JOIN mastodon_domains md
+                      ON md.software_version LIKE pv.branch || '%%'
+                    GROUP BY pv.branch
+                ),
+                eol AS (
+                    SELECT
+                        'EOL' AS prefix,
+                        COUNT(*) AS instances,
+                        COALESCE(SUM(active_users_monthly), 0) AS mau
+                    FROM mastodon_domains md
+                    WHERE EXISTS (
+                        SELECT 1
+                        FROM release_versions rv
+                        WHERE rv.status = 'eol'
+                          AND md.software_version LIKE rv.branch || '%%'
+                    )
+                )
+                SELECT * FROM matched
+                UNION ALL
+                SELECT * FROM eol
+                ORDER BY prefix
+                """
+            )
+            rows = cur.fetchall()
+
+        distribution = [{"branch": r[0], "instances": r[1], "mau": r[2] or 0} for r in rows]
+
+        labels = [d["branch"] for d in distribution]
+        values = [d[metric] for d in distribution]
+        colors = [RED if lbl == "EOL" else GREEN for lbl in labels]
+        metric_label = "Instances" if metric == "instances" else "Monthly Active Users"
+
+        chart_config = {
+            "type": "doughnut",
+            "data": {
+                "labels": labels,
+                "datasets": [{"data": values, "backgroundColor": colors, "borderWidth": 1, "borderColor": "#1a1a24"}],
+            },
+            "options": {
+                "plugins": {
+                    "title": {
+                        "display": True,
+                        "text": f"Branch Distribution ({metric_label})",
+                        "color": "#ffffff",
+                        "font": {"size": 16},
+                    },
+                    "legend": {
+                        "position": "bottom",
+                        "labels": {"color": "#8888a0", "usePointStyle": True, "font": {"size": 11}},
+                    },
+                }
+            },
+        }
+
+        png = await _fetch_chart_png(chart_config)
+        return Response(content=png, media_type="image/png")
+    except httpx.HTTPError as e:
+        raise HTTPException(status_code=502, detail=f"Chart rendering error: {str(e)}")
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Database error: {str(e)}")
+
+
+@app.get("/charts/branch-adoption.png", tags=["Charts"], response_class=Response)
+async def chart_branch_adoption(
+    metric: str = Query("instances", pattern="^(instances|mau)$"),
+    _api_key: str | None = Depends(get_api_key),
+):
+    """Render cumulative branch adoption as a PNG horizontal bar chart."""
+    try:
+        with db_pool.connection() as conn, conn.cursor() as cur:
+            _ = cur.execute(
+                """
+                WITH recent_releases AS (
+                    SELECT branch, n_level
+                    FROM release_versions
+                    WHERE status IN ('release', 'eol')
+                    ORDER BY n_level
+                    LIMIT 7
+                ),
+                total_count AS (
+                    SELECT COUNT(*) as total
+                    FROM mastodon_domains
+                    WHERE software_version IS NOT NULL
+                ),
+                total_mau AS (
+                    SELECT SUM(active_users_monthly) as total
+                    FROM mastodon_domains
+                    WHERE software_version IS NOT NULL
+                      AND active_users_monthly IS NOT NULL
+                ),
+                adoption_instances AS (
+                    SELECT
+                        rr.branch || '+' as version_label,
+                        rr.n_level,
+                        COUNT(CASE WHEN EXISTS (
+                            SELECT 1 FROM release_versions rv
+                            WHERE rv.n_level <= rr.n_level
+                            AND md.software_version LIKE rv.branch || '%%'
+                        ) THEN 1 END) * 100.0 / tc.total AS adoption_percent
+                    FROM recent_releases rr
+                    CROSS JOIN mastodon_domains md
+                    CROSS JOIN total_count tc
+                    WHERE md.software_version IS NOT NULL
+                    GROUP BY rr.branch, rr.n_level, tc.total
+                ),
+                adoption_mau AS (
+                    SELECT
+                        rr.branch || '+' as version_label,
+                        rr.n_level,
+                        SUM(CASE WHEN EXISTS (
+                            SELECT 1 FROM release_versions rv
+                            WHERE rv.n_level <= rr.n_level
+                            AND md.software_version LIKE rv.branch || '%%'
+                        ) THEN md.active_users_monthly ELSE 0 END) * 100.0 / tm.total AS adoption_percent
+                    FROM recent_releases rr
+                    CROSS JOIN mastodon_domains md
+                    CROSS JOIN total_mau tm
+                    WHERE md.software_version IS NOT NULL
+                      AND md.active_users_monthly IS NOT NULL
+                    GROUP BY rr.branch, rr.n_level, tm.total
+                )
+                SELECT
+                    ai.version_label,
+                    ai.adoption_percent AS instances_percent,
+                    COALESCE(am.adoption_percent, 0) AS mau_percent
+                FROM adoption_instances ai
+                LEFT JOIN adoption_mau am
+                  ON ai.version_label = am.version_label
+                ORDER BY ai.n_level
+                """
+            )
+            rows = cur.fetchall()
+
+        adoption = [
+            {
+                "branch": r[0],
+                "instances_percent": round(float(r[1]), 2) if r[1] else 0,
+                "mau_percent": round(float(r[2]), 2) if r[2] else 0,
+            }
+            for r in rows
+        ]
+
+        labels = [d["branch"] for d in adoption]
+        values = [d[f"{metric}_percent"] for d in adoption]
+        metric_label = "Instances" if metric == "instances" else "Monthly Active Users"
+
+        chart_config = {
+            "type": "bar",
+            "data": {
+                "labels": labels,
+                "datasets": [
+                    {
+                        "data": values,
+                        "backgroundColor": PURPLE,
+                        "borderRadius": 4,
+                        "label": "% on branch or newer",
+                    }
+                ],
+            },
+            "options": {
+                "indexAxis": "y",
+                "scales": {
+                    "x": {
+                        "min": 0,
+                        "max": 100,
+                        "ticks": {"color": "#8888a0", "callback": "function(v){ return v + '%' }"},
+                        "grid": {"color": "#2a2a3a"},
+                    },
+                    "y": {"ticks": {"color": "#8888a0"}, "grid": {"display": False}},
+                },
+                "plugins": {
+                    "title": {
+                        "display": True,
+                        "text": f"Cumulative Branch Adoption ({metric_label})",
+                        "color": "#ffffff",
+                        "font": {"size": 16},
+                    },
+                    "legend": {"display": False},
+                },
+            },
+        }
+
+        png = await _fetch_chart_png(chart_config)
+        return Response(content=png, media_type="image/png")
+    except httpx.HTTPError as e:
+        raise HTTPException(status_code=502, detail=f"Chart rendering error: {str(e)}")
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Database error: {str(e)}")
 
