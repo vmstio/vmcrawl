@@ -88,11 +88,11 @@ On your PostgreSQL server, execute the contents of `database.sql` to create tabl
 ```bash
 # Make the shell script executable
 chmod +x /opt/vmcrawl/vmcrawl.sh
-```
 
-Create a systemd service unit at `/etc/systemd/system/vmcrawl.service` appropriate for your environment, then reload systemd:
+# Copy service files to systemd
+cp /opt/vmcrawl/vmcrawl.service /etc/systemd/system/
 
-```bash
+# Reload systemd
 systemctl daemon-reload
 ```
 
