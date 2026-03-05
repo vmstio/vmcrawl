@@ -1756,6 +1756,7 @@ async def _fetch_chart_png(chart_config: dict) -> bytes:
         "w": 600,
         "h": 400,
         "bkg": "#1a1a24",
+        "v": "4",
     }
     async with httpx.AsyncClient(timeout=15) as client:
         resp = await client.get(QUICKCHART_URL, params=params)
