@@ -14,6 +14,7 @@ import socket
 import threading
 import time
 from contextlib import asynccontextmanager
+from datetime import datetime, timezone
 from typing import Any
 
 import httpx
@@ -1751,6 +1752,15 @@ GREEN = "#2ecc71"
 
 
 async def _fetch_chart_png(chart_config: dict) -> bytes:
+    now = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M UTC")
+    plugins = chart_config.setdefault("options", {}).setdefault("plugins", {})
+    plugins["subtitle"] = {
+        "display": True,
+        "text": f"Generated {now}",
+        "color": "#8888a0",
+        "font": {"size": 11},
+        "padding": {"bottom": 8},
+    }
     params = {
         "c": json.dumps(chart_config),
         "w": 600,
