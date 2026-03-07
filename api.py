@@ -1827,13 +1827,14 @@ async def chart_patch_distribution(
         ]
         distribution.sort(key=lambda d: d["instances"], reverse=True)
 
-        labels = [d["version"] for d in distribution]
+        raw_labels = [d["version"] for d in distribution]
         values = [d[metric] for d in distribution]
         colors = [
             RED if lbl == "EOL" else ORANGE if lbl == "Unpatched" else PURPLE
-            for lbl in labels
+            for lbl in raw_labels
         ]
         metric_label = "Instances" if metric == "instances" else "Monthly Active Users"
+        labels = [f"{lbl} ({v:,})" for lbl, v in zip(raw_labels, values)]
 
         chart_config = {
             "type": "doughnut",
@@ -1853,6 +1854,7 @@ async def chart_patch_distribution(
                         "position": "bottom",
                         "labels": {"color": "#8888a0", "usePointStyle": True, "font": {"size": 11}},
                     },
+                    "datalabels": {"display": False},
                 }
             },
         }
@@ -1913,10 +1915,11 @@ async def chart_branch_distribution(
 
         distribution = [{"branch": r[0], "instances": r[1], "mau": r[2] or 0} for r in rows]
 
-        labels = [d["branch"] for d in distribution]
+        raw_labels = [d["branch"] for d in distribution]
         values = [d[metric] for d in distribution]
-        colors = [RED if lbl == "EOL" else GREEN for lbl in labels]
+        colors = [RED if lbl == "EOL" else GREEN for lbl in raw_labels]
         metric_label = "Instances" if metric == "instances" else "Monthly Active Users"
+        labels = [f"{lbl} ({v:,})" for lbl, v in zip(raw_labels, values)]
 
         chart_config = {
             "type": "doughnut",
@@ -1936,6 +1939,7 @@ async def chart_branch_distribution(
                         "position": "bottom",
                         "labels": {"color": "#8888a0", "usePointStyle": True, "font": {"size": 11}},
                     },
+                    "datalabels": {"display": False},
                 }
             },
         }
