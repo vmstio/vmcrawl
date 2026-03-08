@@ -1,239 +1,274 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>vmcrawl</title>
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4"></script>
-    <link rel="stylesheet" href="/style.css">
-</head>
-<body>
+    <link rel="stylesheet" href="/style.css" />
+  </head>
+  <body>
     <header>
-        <div class="header-content">
-            <h1>vmcrawl</h1>
-            <p class="subtitle">Mastodon Version Adoption &amp; Patch Coverage</p>
-            <nav>
-                <a rel="me" href="https://vmst.io/@vmcrawl" target="_blank" rel="noopener">Mastodon</a>
-                <a href="https://github.com/vmstio/vmcrawl" target="_blank" rel="noopener">GitHub</a>
-                <a href="https://docs.vmst.io/vmcrawl" target="_blank" rel="noopener">Documentation</a>
-                <a href="/docs" target="_blank" rel="noopener">API</a>
-            </nav>
-        </div>
+      <div class="header-content">
+        <h1>vmcrawl</h1>
+        <p class="subtitle">Mastodon Version Adoption &amp; Patch Coverage</p>
+        <nav>
+          <a rel="me noopener" href="https://vmst.io/@vmcrawl" target="_blank"
+            >Mastodon</a
+          >
+          <a
+            href="https://github.com/vmstio/vmcrawl"
+            target="_blank"
+            rel="noopener"
+            >GitHub</a
+          >
+          <a href="https://docs.vmst.io/vmcrawl" target="_blank" rel="noopener"
+            >Documentation</a
+          >
+          <a href="/docs" target="_blank" rel="noopener">API</a>
+        </nav>
+      </div>
     </header>
 
     <main>
-        <!-- Instance & User Stats -->
-        <section class="stats-row">
-            <div class="stat-card purple">
-                <div class="stat-label">Mastodon Instances</div>
-                <div class="stat-value" id="total-instances">--</div>
-                <div class="stat-sparkline"><canvas id="spark-instances" height="40"></canvas></div>
-            </div>
-            <div class="stat-card purple">
-                <div class="stat-label">Monthly Active Users</div>
-                <div class="stat-value" id="total-mau">--</div>
-                <div class="stat-sparkline"><canvas id="spark-mau" height="40"></canvas></div>
-            </div>
-        </section>
+      <!-- Instance & User Stats -->
+      <section class="stats-row">
+        <div class="stat-card purple">
+          <div class="stat-label">Mastodon Instances</div>
+          <div class="stat-value" id="total-instances">--</div>
+          <div class="stat-sparkline">
+            <canvas id="spark-instances" height="40"></canvas>
+          </div>
+        </div>
+        <div class="stat-card purple">
+          <div class="stat-label">Monthly Active Users</div>
+          <div class="stat-value" id="total-mau">--</div>
+          <div class="stat-sparkline">
+            <canvas id="spark-mau" height="40"></canvas>
+          </div>
+        </div>
+      </section>
 
-        <!-- Patch & Branch Stats -->
-        <section class="stats-row">
-            <div class="stat-card purple">
-                <div class="stat-label">Patch Coverage</div>
-                <div class="stat-detail">
-                    <span id="patch-instances">--</span> Instances &middot;
-                    <span id="patch-mau">--</span> MAU
-                </div>
-            </div>
-            <div class="stat-card purple">
-                <div class="stat-label">Supported Branches</div>
-                <div class="stat-detail">
-                    <span id="supported-instances">--</span> Instances &middot;
-                    <span id="supported-mau">--</span> MAU
-                </div>
-            </div>
-        </section>
+      <!-- Patch & Branch Stats -->
+      <section class="stats-row">
+        <div class="stat-card purple">
+          <div class="stat-label">Patch Coverage</div>
+          <div class="stat-detail">
+            <span id="patch-instances">--</span> Instances &middot;
+            <span id="patch-mau">--</span> MAU
+          </div>
+        </div>
+        <div class="stat-card purple">
+          <div class="stat-label">Supported Branches</div>
+          <div class="stat-detail">
+            <span id="supported-instances">--</span> Instances &middot;
+            <span id="supported-mau">--</span> MAU
+          </div>
+        </div>
+      </section>
 
-        <!-- Patch Adoption Gauges -->
-        <section class="section">
-            <h2>Patch Adoption by Branch</h2>
-            <div class="gauge-grid">
-                <div class="gauge-card">
-                    <h3>Main</h3>
-                    <div class="gauge-pair">
-                        <div class="gauge-item">
-                            <canvas id="gauge-main-instances"></canvas>
-                            <div class="gauge-label">Instances</div>
-                        </div>
-                        <div class="gauge-item">
-                            <canvas id="gauge-main-mau"></canvas>
-                            <div class="gauge-label">MAU</div>
-                        </div>
-                    </div>
-                </div>
-                <div class="gauge-card">
-                    <h3>Latest</h3>
-                    <div class="gauge-pair">
-                        <div class="gauge-item">
-                            <canvas id="gauge-latest-instances"></canvas>
-                            <div class="gauge-label">Instances</div>
-                        </div>
-                        <div class="gauge-item">
-                            <canvas id="gauge-latest-mau"></canvas>
-                            <div class="gauge-label">MAU</div>
-                        </div>
-                    </div>
-                </div>
-                <div class="gauge-card">
-                    <h3>Previous</h3>
-                    <div class="gauge-pair">
-                        <div class="gauge-item">
-                            <canvas id="gauge-previous-instances"></canvas>
-                            <div class="gauge-label">Instances</div>
-                        </div>
-                        <div class="gauge-item">
-                            <canvas id="gauge-previous-mau"></canvas>
-                            <div class="gauge-label">MAU</div>
-                        </div>
-                    </div>
-                </div>
-                <div class="gauge-card">
-                    <h3>Deprecated</h3>
-                    <div class="gauge-pair">
-                        <div class="gauge-item">
-                            <canvas id="gauge-deprecated-instances"></canvas>
-                            <div class="gauge-label">Instances</div>
-                        </div>
-                        <div class="gauge-item">
-                            <canvas id="gauge-deprecated-mau"></canvas>
-                            <div class="gauge-label">MAU</div>
-                        </div>
-                    </div>
-                </div>
+      <!-- Patch Adoption Gauges -->
+      <section class="section">
+        <h2>Patch Adoption by Branch</h2>
+        <div class="gauge-grid">
+          <div class="gauge-card">
+            <h3>Main</h3>
+            <div class="gauge-pair">
+              <div class="gauge-item">
+                <canvas id="gauge-main-instances"></canvas>
+                <div class="gauge-label">Instances</div>
+              </div>
+              <div class="gauge-item">
+                <canvas id="gauge-main-mau"></canvas>
+                <div class="gauge-label">MAU</div>
+              </div>
             </div>
-        </section>
+          </div>
+          <div class="gauge-card">
+            <h3>Latest</h3>
+            <div class="gauge-pair">
+              <div class="gauge-item">
+                <canvas id="gauge-latest-instances"></canvas>
+                <div class="gauge-label">Instances</div>
+              </div>
+              <div class="gauge-item">
+                <canvas id="gauge-latest-mau"></canvas>
+                <div class="gauge-label">MAU</div>
+              </div>
+            </div>
+          </div>
+          <div class="gauge-card">
+            <h3>Previous</h3>
+            <div class="gauge-pair">
+              <div class="gauge-item">
+                <canvas id="gauge-previous-instances"></canvas>
+                <div class="gauge-label">Instances</div>
+              </div>
+              <div class="gauge-item">
+                <canvas id="gauge-previous-mau"></canvas>
+                <div class="gauge-label">MAU</div>
+              </div>
+            </div>
+          </div>
+          <div class="gauge-card">
+            <h3>Deprecated</h3>
+            <div class="gauge-pair">
+              <div class="gauge-item">
+                <canvas id="gauge-deprecated-instances"></canvas>
+                <div class="gauge-label">Instances</div>
+              </div>
+              <div class="gauge-item">
+                <canvas id="gauge-deprecated-mau"></canvas>
+                <div class="gauge-label">MAU</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
 
-        <!-- Branch Adoption Bars -->
-        <section class="section">
-            <h2>Cumulative Branch Adoption</h2>
-            <div class="chart-row">
-                <div class="chart-card">
-                    <h3>Percent of Instances</h3>
-                    <canvas id="chart-adoption-instances"></canvas>
-                </div>
-                <div class="chart-card">
-                    <h3>Percent of MAUs</h3>
-                    <canvas id="chart-adoption-mau"></canvas>
-                </div>
-            </div>
-        </section>
+      <!-- Branch Adoption Bars -->
+      <section class="section">
+        <h2>Cumulative Branch Adoption</h2>
+        <div class="chart-row">
+          <div class="chart-card">
+            <h3>Percent of Instances</h3>
+            <canvas id="chart-adoption-instances"></canvas>
+          </div>
+          <div class="chart-card">
+            <h3>Percent of MAUs</h3>
+            <canvas id="chart-adoption-mau"></canvas>
+          </div>
+        </div>
+      </section>
 
-        <!-- Pie Charts Row 1 -->
-        <section class="section">
-            <h2>Patch Distribution</h2>
-            <div class="chart-row">
-                <div class="chart-card">
-                    <h3>By Instances</h3>
-                    <div class="pie-container"><canvas id="pie-patch-instances"></canvas></div>
-                </div>
-                <div class="chart-card">
-                    <h3>By MAU</h3>
-                    <div class="pie-container"><canvas id="pie-patch-mau"></canvas></div>
-                </div>
+      <!-- Pie Charts Row 1 -->
+      <section class="section">
+        <h2>Patch Distribution</h2>
+        <div class="chart-row">
+          <div class="chart-card">
+            <h3>By Instances</h3>
+            <div class="pie-container">
+              <canvas id="pie-patch-instances"></canvas>
             </div>
-        </section>
+          </div>
+          <div class="chart-card">
+            <h3>By MAU</h3>
+            <div class="pie-container">
+              <canvas id="pie-patch-mau"></canvas>
+            </div>
+          </div>
+        </div>
+      </section>
 
-        <!-- Pie Charts Row 2 -->
-        <section class="section">
-            <h2>Branch Distribution</h2>
-            <div class="chart-row">
-                <div class="chart-card">
-                    <h3>By Instances</h3>
-                    <div class="pie-container"><canvas id="pie-branch-instances"></canvas></div>
-                </div>
-                <div class="chart-card">
-                    <h3>By MAU</h3>
-                    <div class="pie-container"><canvas id="pie-branch-mau"></canvas></div>
-                </div>
+      <!-- Pie Charts Row 2 -->
+      <section class="section">
+        <h2>Branch Distribution</h2>
+        <div class="chart-row">
+          <div class="chart-card">
+            <h3>By Instances</h3>
+            <div class="pie-container">
+              <canvas id="pie-branch-instances"></canvas>
             </div>
-        </section>
+          </div>
+          <div class="chart-card">
+            <h3>By MAU</h3>
+            <div class="pie-container">
+              <canvas id="pie-branch-mau"></canvas>
+            </div>
+          </div>
+        </div>
+      </section>
 
-        <!-- EOL Breakdown -->
-        <section class="section">
-            <h2>End of Life (EOL) Breakdown</h2>
-            <div class="chart-row">
-                <div class="chart-card">
-                    <h3>By Instances</h3>
-                    <div class="pie-container"><canvas id="pie-eol-instances"></canvas></div>
-                </div>
-                <div class="chart-card">
-                    <h3>By MAU</h3>
-                    <div class="pie-container"><canvas id="pie-eol-mau"></canvas></div>
-                </div>
+      <!-- EOL Breakdown -->
+      <section class="section">
+        <h2>End of Life (EOL) Breakdown</h2>
+        <div class="chart-row">
+          <div class="chart-card">
+            <h3>By Instances</h3>
+            <div class="pie-container">
+              <canvas id="pie-eol-instances"></canvas>
             </div>
-        </section>
+          </div>
+          <div class="chart-card">
+            <h3>By MAU</h3>
+            <div class="pie-container"><canvas id="pie-eol-mau"></canvas></div>
+          </div>
+        </div>
+      </section>
 
-        <!-- Historical Charts -->
-        <section class="section">
-            <h2>Historical Trends</h2>
-            <div class="chart-row">
-                <div class="chart-card">
-                    <h3>Patch Adoption by Instance</h3>
-                    <canvas id="chart-hist-patch-instances"></canvas>
-                </div>
-                <div class="chart-card">
-                    <h3>Patch Adoption by MAU</h3>
-                    <canvas id="chart-hist-patch-mau"></canvas>
-                </div>
-            </div>
-            <div class="chart-row">
-                <div class="chart-card">
-                    <h3>Branch Deployments by Instance</h3>
-                    <canvas id="chart-hist-branch-instances"></canvas>
-                </div>
-                <div class="chart-card">
-                    <h3>Branch Deployments by MAU</h3>
-                    <canvas id="chart-hist-branch-mau"></canvas>
-                </div>
-            </div>
-        </section>
+      <!-- Historical Charts -->
+      <section class="section">
+        <h2>Historical Trends</h2>
+        <div class="chart-row">
+          <div class="chart-card">
+            <h3>Patch Adoption by Instance</h3>
+            <canvas id="chart-hist-patch-instances"></canvas>
+          </div>
+          <div class="chart-card">
+            <h3>Patch Adoption by MAU</h3>
+            <canvas id="chart-hist-patch-mau"></canvas>
+          </div>
+        </div>
+        <div class="chart-row">
+          <div class="chart-card">
+            <h3>Branch Deployments by Instance</h3>
+            <canvas id="chart-hist-branch-instances"></canvas>
+          </div>
+          <div class="chart-card">
+            <h3>Branch Deployments by MAU</h3>
+            <canvas id="chart-hist-branch-mau"></canvas>
+          </div>
+        </div>
+      </section>
 
-        <!-- Instance Table -->
-        <section class="section">
-            <h2>All Instances</h2>
-            <p class="table-note">Instances on the IFTAS DNI list are excluded from this table but may be included in aggregated statistics above.</p>
-            <div class="table-controls">
-                <input type="text" id="search-input" placeholder="Search by domain..." />
-                <button id="search-btn">Search</button>
-            </div>
-            <div class="table-wrapper">
-                <table id="instances-table">
-                    <thead>
-                        <tr>
-                            <th data-sort="domain">Domain</th>
-                            <th data-sort="version">Version</th>
-                            <th data-sort="raw_version">Raw Version</th>
-                            <th data-sort="software">Software</th>
-                            <th data-sort="mau" style="text-align:right">MAU</th>
-                            <th data-sort="last_crawled" style="text-align:right">Last Crawled</th>
-                        </tr>
-                    </thead>
-                    <tbody id="instances-tbody"></tbody>
-                </table>
-            </div>
-            <div class="pagination">
-                <button id="prev-btn" disabled>Previous</button>
-                <span id="page-info">--</span>
-                <button id="next-btn" disabled>Next</button>
-            </div>
-        </section>
+      <!-- Instance Table -->
+      <section class="section">
+        <h2>All Instances</h2>
+        <p class="table-note">
+          Instances on the IFTAS DNI list are excluded from this table but may
+          be included in aggregated statistics above.
+        </p>
+        <div class="table-controls">
+          <input
+            type="text"
+            id="search-input"
+            placeholder="Search by domain..."
+          />
+          <button id="search-btn">Search</button>
+        </div>
+        <div class="table-wrapper">
+          <table id="instances-table">
+            <thead>
+              <tr>
+                <th data-sort="domain">Domain</th>
+                <th data-sort="version">Version</th>
+                <th data-sort="raw_version">Raw Version</th>
+                <th data-sort="software">Software</th>
+                <th data-sort="mau" style="text-align: right">MAU</th>
+                <th data-sort="last_crawled" style="text-align: right">
+                  Last Crawled
+                </th>
+              </tr>
+            </thead>
+            <tbody id="instances-tbody"></tbody>
+          </table>
+        </div>
+        <div class="pagination">
+          <button id="prev-btn" disabled>Previous</button>
+          <span id="page-info">--</span>
+          <button id="next-btn" disabled>Next</button>
+        </div>
+      </section>
     </main>
 
     <footer>
-        <p>Supported by <a href="https://vmst.io">vmst.io</a> &middot; <a href="https://vmst.io/@vmstan">@vmstan@vmst.io</a></p>
+      <p>
+        Supported by <a href="https://vmst.io">vmst.io</a> &middot;
+        <a href="https://vmst.io/@vmstan">@vmstan@vmst.io</a>
+      </p>
     </footer>
 
     <script src="/config.js"></script>
     <script src="/dashboard.js"></script>
-</body>
+  </body>
 </html>

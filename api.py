@@ -18,7 +18,6 @@ from datetime import datetime, timezone
 from typing import Any
 
 import httpx
-
 import paramiko
 import toml
 from dotenv import load_dotenv
@@ -110,7 +109,9 @@ if _ssh_host:
                             f" -> {_db_host}:{_db_port} via {_ssh_host}"
                         )
                     except Exception as exc:
-                        print(f"SSH reconnect failed: {exc}, retrying in {_reconnect_delay}s")
+                        print(
+                            f"SSH reconnect failed: {exc}, retrying in {_reconnect_delay}s"
+                        )
                         time.sleep(_reconnect_delay)
                         continue
 
@@ -971,12 +972,8 @@ async def get_instances_table(
                 sql.Identifier(sort_table),
                 sql.Identifier(sort_col),
             )
-            sort_order_sql = (
-                sql.SQL("ASC") if order == "asc" else sql.SQL("DESC")
-            )
-            nulls_sql = (
-                sql.SQL(" NULLS LAST") if sort_by == "mau" else sql.SQL("")
-            )
+            sort_order_sql = sql.SQL("ASC") if order == "asc" else sql.SQL("DESC")
+            nulls_sql = sql.SQL(" NULLS LAST") if sort_by == "mau" else sql.SQL("")
 
             where_clause = sql.SQL("")
             params: list[Any] = []
@@ -1622,7 +1619,7 @@ async def get_branch_adoption(_api_key: str | None = Depends(get_api_key)):
                             SELECT 1 FROM release_versions rv
                             WHERE rv.n_level <= rr.n_level
                             AND md.software_version LIKE rv.branch || '%%'
-                        ) THEN 1 END) * 100.0 / tc.total AS adoption_percent
+                        ) THEN 1 END) * 100.0 / NULLIF(tc.total, 0) AS adoption_percent
                     FROM recent_releases rr
                     CROSS JOIN mastodon_domains md
                     CROSS JOIN total_count tc
@@ -1637,7 +1634,7 @@ async def get_branch_adoption(_api_key: str | None = Depends(get_api_key)):
                             SELECT 1 FROM release_versions rv
                             WHERE rv.n_level <= rr.n_level
                             AND md.software_version LIKE rv.branch || '%%'
-                        ) THEN md.active_users_monthly ELSE 0 END) * 100.0 / tm.total AS adoption_percent
+                        ) THEN md.active_users_monthly ELSE 0 END) * 100.0 / NULLIF(tm.total, 0) AS adoption_percent
                     FROM recent_releases rr
                     CROSS JOIN mastodon_domains md
                     CROSS JOIN total_mau tm
@@ -1730,9 +1727,7 @@ async def get_supported_branches_coverage(
             "instances_percent": (
                 round(float(result[0]), 1) if result and result[0] else 0
             ),
-            "mau_percent": (
-                round(float(result[1]), 1) if result and result[1] else 0
-            ),
+            "mau_percent": (round(float(result[1]), 1) if result and result[1] else 0),
         }
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Database error: {str(e)}")
@@ -1743,7 +1738,15 @@ async def get_supported_branches_coverage(
 # =============================================================================
 
 QUICKCHART_URL = "https://quickchart.io/chart"
-CHART_COLORS = ["#9b59b6", "#3498db", "#2ecc71", "#f39c12", "#1abc9c", "#e67e22", "#95a5a6"]
+CHART_COLORS = [
+    "#9b59b6",
+    "#3498db",
+    "#2ecc71",
+    "#f39c12",
+    "#1abc9c",
+    "#e67e22",
+    "#95a5a6",
+]
 BRANCH_COLORS = ["#2ecc71", "#3498db", "#9b59b6", "#f39c12", "#1abc9c", "#e67e22"]
 RED = "#e74c3c"
 ORANGE = "#f39c12"
@@ -1840,7 +1843,14 @@ async def chart_patch_distribution(
             "type": "doughnut",
             "data": {
                 "labels": labels,
-                "datasets": [{"data": values, "backgroundColor": colors, "borderWidth": 1, "borderColor": "#1a1a24"}],
+                "datasets": [
+                    {
+                        "data": values,
+                        "backgroundColor": colors,
+                        "borderWidth": 1,
+                        "borderColor": "#1a1a24",
+                    }
+                ],
             },
             "options": {
                 "plugins": {
@@ -1852,7 +1862,11 @@ async def chart_patch_distribution(
                     },
                     "legend": {
                         "position": "bottom",
-                        "labels": {"color": "#8888a0", "usePointStyle": True, "font": {"size": 11}},
+                        "labels": {
+                            "color": "#8888a0",
+                            "usePointStyle": True,
+                            "font": {"size": 11},
+                        },
                     },
                     "datalabels": {"display": False},
                 }
@@ -1913,7 +1927,9 @@ async def chart_branch_distribution(
             )
             rows = cur.fetchall()
 
-        distribution = [{"branch": r[0], "instances": r[1], "mau": r[2] or 0} for r in rows]
+        distribution = [
+            {"branch": r[0], "instances": r[1], "mau": r[2] or 0} for r in rows
+        ]
 
         raw_labels = [d["branch"] for d in distribution]
         values = [d[metric] for d in distribution]
@@ -1925,7 +1941,14 @@ async def chart_branch_distribution(
             "type": "doughnut",
             "data": {
                 "labels": labels,
-                "datasets": [{"data": values, "backgroundColor": colors, "borderWidth": 1, "borderColor": "#1a1a24"}],
+                "datasets": [
+                    {
+                        "data": values,
+                        "backgroundColor": colors,
+                        "borderWidth": 1,
+                        "borderColor": "#1a1a24",
+                    }
+                ],
             },
             "options": {
                 "plugins": {
@@ -1937,7 +1960,11 @@ async def chart_branch_distribution(
                     },
                     "legend": {
                         "position": "bottom",
-                        "labels": {"color": "#8888a0", "usePointStyle": True, "font": {"size": 11}},
+                        "labels": {
+                            "color": "#8888a0",
+                            "usePointStyle": True,
+                            "font": {"size": 11},
+                        },
                     },
                     "datalabels": {"display": False},
                 }
@@ -1988,7 +2015,7 @@ async def chart_branch_adoption(
                             SELECT 1 FROM release_versions rv
                             WHERE rv.n_level <= rr.n_level
                             AND md.software_version LIKE rv.branch || '%%'
-                        ) THEN 1 END) * 100.0 / tc.total AS adoption_percent
+                        ) THEN 1 END) * 100.0 / NULLIF(tc.total, 0) AS adoption_percent
                     FROM recent_releases rr
                     CROSS JOIN mastodon_domains md
                     CROSS JOIN total_count tc
@@ -2003,7 +2030,7 @@ async def chart_branch_adoption(
                             SELECT 1 FROM release_versions rv
                             WHERE rv.n_level <= rr.n_level
                             AND md.software_version LIKE rv.branch || '%%'
-                        ) THEN md.active_users_monthly ELSE 0 END) * 100.0 / tm.total AS adoption_percent
+                        ) THEN md.active_users_monthly ELSE 0 END) * 100.0 / NULLIF(tm.total, 0) AS adoption_percent
                     FROM recent_releases rr
                     CROSS JOIN mastodon_domains md
                     CROSS JOIN total_mau tm
@@ -2055,7 +2082,10 @@ async def chart_branch_adoption(
                     "x": {
                         "min": 0,
                         "max": 100,
-                        "ticks": {"color": "#8888a0", "callback": "function(v){ return v + '%' }"},
+                        "ticks": {
+                            "color": "#8888a0",
+                            "callback": "function(v){ return v + '%' }",
+                        },
                         "grid": {"color": "#2a2a3a"},
                     },
                     "y": {"ticks": {"color": "#8888a0"}, "grid": {"display": False}},
@@ -2116,17 +2146,49 @@ async def chart_patch_history(
 
     if metric == "instances":
         datasets = [
-            {"label": "Main Branch",       "data": [r[1] for r in hist], "backgroundColor": "#3498db"},
-            {"label": "Latest Branch",     "data": [r[2] for r in hist], "backgroundColor": "#2ecc71"},
-            {"label": "Previous Branch",   "data": [r[3] for r in hist], "backgroundColor": "#9b59b6"},
-            {"label": "Deprecated Branch", "data": [r[4] for r in hist], "backgroundColor": "#f39c12"},
+            {
+                "label": "Main Branch",
+                "data": [r[1] for r in hist],
+                "backgroundColor": "#3498db",
+            },
+            {
+                "label": "Latest Branch",
+                "data": [r[2] for r in hist],
+                "backgroundColor": "#2ecc71",
+            },
+            {
+                "label": "Previous Branch",
+                "data": [r[3] for r in hist],
+                "backgroundColor": "#9b59b6",
+            },
+            {
+                "label": "Deprecated Branch",
+                "data": [r[4] for r in hist],
+                "backgroundColor": "#f39c12",
+            },
         ]
     else:
         datasets = [
-            {"label": "Main Branch",       "data": [r[5] for r in hist], "backgroundColor": "#3498db"},
-            {"label": "Latest Branch",     "data": [r[6] for r in hist], "backgroundColor": "#2ecc71"},
-            {"label": "Previous Branch",   "data": [r[7] for r in hist], "backgroundColor": "#9b59b6"},
-            {"label": "Deprecated Branch", "data": [r[8] for r in hist], "backgroundColor": "#f39c12"},
+            {
+                "label": "Main Branch",
+                "data": [r[5] for r in hist],
+                "backgroundColor": "#3498db",
+            },
+            {
+                "label": "Latest Branch",
+                "data": [r[6] for r in hist],
+                "backgroundColor": "#2ecc71",
+            },
+            {
+                "label": "Previous Branch",
+                "data": [r[7] for r in hist],
+                "backgroundColor": "#9b59b6",
+            },
+            {
+                "label": "Deprecated Branch",
+                "data": [r[8] for r in hist],
+                "backgroundColor": "#f39c12",
+            },
         ]
 
     metric_label = "Instances" if metric == "instances" else "Monthly Active Users"
@@ -2136,8 +2198,16 @@ async def chart_patch_history(
         "options": {
             "indexAxis": "y",
             "scales": {
-                "x": {"stacked": True, "ticks": {"color": "#8888a0"}, "grid": {"color": "#2a2a3a"}},
-                "y": {"stacked": True, "ticks": {"color": "#8888a0"}, "grid": {"display": False}},
+                "x": {
+                    "stacked": True,
+                    "ticks": {"color": "#8888a0"},
+                    "grid": {"color": "#2a2a3a"},
+                },
+                "y": {
+                    "stacked": True,
+                    "ticks": {"color": "#8888a0"},
+                    "grid": {"display": False},
+                },
             },
             "plugins": {
                 "title": {
@@ -2148,7 +2218,11 @@ async def chart_patch_history(
                 },
                 "legend": {
                     "position": "bottom",
-                    "labels": {"color": "#8888a0", "usePointStyle": True, "font": {"size": 11}},
+                    "labels": {
+                        "color": "#8888a0",
+                        "usePointStyle": True,
+                        "font": {"size": 11},
+                    },
                 },
             },
         },
@@ -2196,19 +2270,59 @@ async def chart_branch_history(
 
     if metric == "instances":
         datasets = [
-            {"label": "Main Branch",       "data": [r[1] for r in hist], "backgroundColor": "#3498db"},
-            {"label": "Latest Branch",     "data": [r[2] for r in hist], "backgroundColor": "#2ecc71"},
-            {"label": "Previous Branch",   "data": [r[3] for r in hist], "backgroundColor": "#9b59b6"},
-            {"label": "Deprecated Branch", "data": [r[4] for r in hist], "backgroundColor": "#f39c12"},
-            {"label": "EOL Branches",      "data": [r[5] for r in hist], "backgroundColor": "#e74c3c"},
+            {
+                "label": "Main Branch",
+                "data": [r[1] for r in hist],
+                "backgroundColor": "#3498db",
+            },
+            {
+                "label": "Latest Branch",
+                "data": [r[2] for r in hist],
+                "backgroundColor": "#2ecc71",
+            },
+            {
+                "label": "Previous Branch",
+                "data": [r[3] for r in hist],
+                "backgroundColor": "#9b59b6",
+            },
+            {
+                "label": "Deprecated Branch",
+                "data": [r[4] for r in hist],
+                "backgroundColor": "#f39c12",
+            },
+            {
+                "label": "EOL Branches",
+                "data": [r[5] for r in hist],
+                "backgroundColor": "#e74c3c",
+            },
         ]
     else:
         datasets = [
-            {"label": "Main Branch",       "data": [r[6] for r in hist],  "backgroundColor": "#3498db"},
-            {"label": "Latest Branch",     "data": [r[7] for r in hist],  "backgroundColor": "#2ecc71"},
-            {"label": "Previous Branch",   "data": [r[8] for r in hist],  "backgroundColor": "#9b59b6"},
-            {"label": "Deprecated Branch", "data": [r[9] for r in hist],  "backgroundColor": "#f39c12"},
-            {"label": "EOL Branches",      "data": [r[10] for r in hist], "backgroundColor": "#e74c3c"},
+            {
+                "label": "Main Branch",
+                "data": [r[6] for r in hist],
+                "backgroundColor": "#3498db",
+            },
+            {
+                "label": "Latest Branch",
+                "data": [r[7] for r in hist],
+                "backgroundColor": "#2ecc71",
+            },
+            {
+                "label": "Previous Branch",
+                "data": [r[8] for r in hist],
+                "backgroundColor": "#9b59b6",
+            },
+            {
+                "label": "Deprecated Branch",
+                "data": [r[9] for r in hist],
+                "backgroundColor": "#f39c12",
+            },
+            {
+                "label": "EOL Branches",
+                "data": [r[10] for r in hist],
+                "backgroundColor": "#e74c3c",
+            },
         ]
 
     metric_label = "Instances" if metric == "instances" else "Monthly Active Users"
@@ -2218,8 +2332,16 @@ async def chart_branch_history(
         "options": {
             "indexAxis": "y",
             "scales": {
-                "x": {"stacked": True, "ticks": {"color": "#8888a0"}, "grid": {"color": "#2a2a3a"}},
-                "y": {"stacked": True, "ticks": {"color": "#8888a0"}, "grid": {"display": False}},
+                "x": {
+                    "stacked": True,
+                    "ticks": {"color": "#8888a0"},
+                    "grid": {"color": "#2a2a3a"},
+                },
+                "y": {
+                    "stacked": True,
+                    "ticks": {"color": "#8888a0"},
+                    "grid": {"display": False},
+                },
             },
             "plugins": {
                 "title": {
@@ -2230,7 +2352,11 @@ async def chart_branch_history(
                 },
                 "legend": {
                     "position": "bottom",
-                    "labels": {"color": "#8888a0", "usePointStyle": True, "font": {"size": 11}},
+                    "labels": {
+                        "color": "#8888a0",
+                        "usePointStyle": True,
+                        "font": {"size": 11},
+                    },
                 },
             },
         },
