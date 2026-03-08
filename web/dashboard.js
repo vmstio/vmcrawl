@@ -4,36 +4,47 @@
   const API_BASE =
     (window.VMCRAWL_API || "").replace(/\/$/, "") || window.location.origin;
 
-  // Colors
-  const PURPLE = "#9b59b6";
-  const PURPLE_LIGHT = "#c39bd3";
-  const GREEN = "#2ecc71";
-  const ORANGE = "#f39c12";
-  const RED = "#e74c3c";
-  const RED_DARK = "#922b21";
-  const BLUE = "#3498db";
-  const TEAL = "#1abc9c";
-  const CHART_COLORS = [
-    PURPLE,
-    BLUE,
-    GREEN,
-    ORANGE,
-    TEAL,
-    "#e67e22",
-    "#95a5a6",
-  ];
-  const BRANCH_COLORS = [
-    "#2ecc71",
-    "#3498db",
-    "#9b59b6",
-    "#f39c12",
-    "#1abc9c",
-    "#e67e22",
-  ];
-  const TEXT_MUTED = "#8888a0";
+  function cssVar(name, fallback) {
+    const value = getComputedStyle(document.documentElement)
+      .getPropertyValue(name)
+      .trim();
+    return value || fallback;
+  }
 
-  Chart.defaults.color = TEXT_MUTED;
-  Chart.defaults.borderColor = "#2a2a3a";
+  function getThemePalette() {
+    const purple = cssVar("--purple", "#9b59b6");
+    const blue = cssVar("--blue", "#3498db");
+    const green = cssVar("--green", "#2ecc71");
+    const orange = cssVar("--orange", "#f39c12");
+    const red = cssVar("--red", "#e74c3c");
+    return {
+      purple,
+      green,
+      orange,
+      red,
+      redDark: cssVar("--red-dark", "#922b21"),
+      blue,
+      chartColors: [purple, blue, green, orange, "#1abc9c", "#e67e22", "#95a5a6"],
+      textMuted: cssVar("--text-muted", "#8888a0"),
+      border: cssVar("--border", "#2a2a3a"),
+      bgCard: cssVar("--bg-card", "#1a1a24"),
+      bgChartRest: cssVar("--bg-chart-rest", "#2e2e3e"),
+    };
+  }
+
+  const theme = getThemePalette();
+
+  // Colors
+  const PURPLE = theme.purple;
+  const GREEN = theme.green;
+  const ORANGE = theme.orange;
+  const RED = theme.red;
+  const RED_DARK = theme.redDark;
+  const BLUE = theme.blue;
+  const CHART_COLORS = theme.chartColors;
+
+  Chart.defaults.color = theme.textMuted;
+  Chart.defaults.borderColor = theme.border;
 
   function fmt(n) {
     if (n == null) return "--";
@@ -71,7 +82,7 @@
         datasets: [
           {
             data: [value, remaining],
-            backgroundColor: [color, "#2e2e3e"],
+            backgroundColor: [color, theme.bgChartRest],
             borderWidth: 0,
             circumference: 180,
             rotation: 270,
@@ -159,7 +170,7 @@
             min: 0,
             max: 100,
             ticks: { callback: (v) => v + "%" },
-            grid: { color: "#2a2a3a" },
+            grid: { color: theme.border },
           },
           y: { grid: { display: false } },
         },
@@ -193,7 +204,7 @@
             data: values,
             backgroundColor: bgColors,
             borderWidth: 1,
-            borderColor: "#1a1a24",
+            borderColor: theme.bgCard,
           },
         ],
       },
@@ -238,7 +249,7 @@
         scales: {
           x: {
             stacked: true,
-            grid: { color: "#2a2a3a" },
+            grid: { color: theme.border },
             ticks: { callback: (v) => fmt(v) },
           },
           y: {
@@ -637,4 +648,9 @@
   init().catch((err) => {
     console.error("Dashboard load error:", err);
   });
+
+  const colorSchemeQuery = window.matchMedia("(prefers-color-scheme: dark)");
+  if (typeof colorSchemeQuery.addEventListener === "function") {
+    colorSchemeQuery.addEventListener("change", () => window.location.reload());
+  }
 })();
