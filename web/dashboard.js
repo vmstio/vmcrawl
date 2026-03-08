@@ -3,6 +3,14 @@
 
   const API_BASE =
     (window.VMCRAWL_API || "").replace(/\/$/, "") || window.location.origin;
+  const colorSchemeQuery = window.matchMedia("(prefers-color-scheme: dark)");
+
+  function applySystemTheme() {
+    const themeName = colorSchemeQuery.matches ? "dark" : "light";
+    document.documentElement.setAttribute("data-theme", themeName);
+  }
+
+  applySystemTheme();
 
   function cssVar(name, fallback) {
     const value = getComputedStyle(document.documentElement)
@@ -649,8 +657,10 @@
     console.error("Dashboard load error:", err);
   });
 
-  const colorSchemeQuery = window.matchMedia("(prefers-color-scheme: dark)");
   if (typeof colorSchemeQuery.addEventListener === "function") {
-    colorSchemeQuery.addEventListener("change", () => window.location.reload());
+    colorSchemeQuery.addEventListener("change", () => {
+      applySystemTheme();
+      window.location.reload();
+    });
   }
 })();
