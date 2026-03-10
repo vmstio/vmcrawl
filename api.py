@@ -1356,11 +1356,19 @@ async def get_patch_detail(_api_key: str | None = Depends(get_api_key)):
                 result = cur.fetchone()
                 mau_total = result[0] if result else 0
 
+                _ = cur.execute(
+                    "SELECT latest FROM release_versions WHERE n_level = %s",
+                    (n_level,),
+                )
+                version_result = cur.fetchone()
+                version = version_result[0] if version_result else None
+
                 branches[label] = {
                     "patched": patched,
                     "total": total,
                     "mau_patched": mau_patched,
                     "mau_total": mau_total,
+                    "version": version,
                 }
 
             # Deprecated branches (n_level >= 2, not eol)
@@ -1416,11 +1424,22 @@ async def get_patch_detail(_api_key: str | None = Depends(get_api_key)):
             result = cur.fetchone()
             dep_mau_total = result[0] if result else 0
 
+            _ = cur.execute(
+                """
+                SELECT latest FROM release_versions
+                WHERE n_level >= 2 AND status != 'eol'
+                ORDER BY n_level ASC
+            """
+            )
+            dep_ver_rows = cur.fetchall()
+            dep_version = ", ".join(r[0] for r in dep_ver_rows) if dep_ver_rows else None
+
             branches["deprecated"] = {
                 "patched": dep_patched,
                 "total": dep_total,
                 "mau_patched": dep_mau_patched,
                 "mau_total": dep_mau_total,
+                "version": dep_version,
             }
 
         return {"branches": branches}

@@ -457,6 +457,10 @@
     const branches = patchDetail.branches;
     for (const branch of ["main", "latest", "previous", "deprecated"]) {
       const b = branches[branch];
+      if (b.version) {
+        const titleEl = document.getElementById(`gauge-title-${branch}`);
+        if (titleEl) titleEl.textContent = b.version;
+      }
       createGauge(`gauge-${branch}-instances`, b.patched, b.total);
       createGauge(`gauge-${branch}-mau`, b.mau_patched, b.mau_total);
     }
