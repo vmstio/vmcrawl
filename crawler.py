@@ -350,6 +350,11 @@ if _ssh_host:
         )
     except Exception as exception:
         echo(f"Error establishing SSH tunnel: {exception}", "red")
+        if _ssh_transport is not None:
+            try:
+                _ssh_transport.close()
+            except Exception:
+                pass
         sys.exit(1)
 
 _db_connect_host = (
@@ -2970,7 +2975,7 @@ def display_nightly_versions():
             echo("", "white")
     except Exception as e:
         echo(f"Error fetching nightly versions: {e}", "red")
-        sys.exit(1)
+        raise
 
 
 def get_active_nightly_version():
