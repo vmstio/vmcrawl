@@ -115,6 +115,10 @@ colors = {
     "yellow": "\033[93m",
     "white": "\033[0m",
 }
+EXIT_SUCCESS = 0
+EXIT_FAILURE = 1
+EXIT_INTERRUPTED = 130
+
 # Track per-domain processing start times so error output can include elapsed time
 _domain_start_times: dict[str, float] = {}
 _domain_start_times_lock = threading.Lock()
@@ -2369,16 +2373,16 @@ async def process_fetch_domain(
     return (domain, unique_domains, status, status_color)
 
 
-async def run_fetch_mode(args):
+async def run_fetch_mode(args: argparse.Namespace) -> int:
     """Run the fetch mode to discover new domains from instance peers."""
     # Validate argument combinations
     if (args.limit or args.offset) and args.target:
         echo("You cannot set both limit/offset and target arguments", "red")
-        sys.exit(1)
+        return EXIT_FAILURE
 
     if args.offset and args.random:
         echo("You cannot set both offset and random arguments", "red")
-        sys.exit(1)
+        return EXIT_FAILURE
 
     # Set defaults from arguments or environment
     if args.limit is not None:
@@ -2397,7 +2401,7 @@ async def run_fetch_mode(args):
 
     if not ensure_mastodon_peers_column():
         echo("Failed to prepare fetch schema, exiting…", "red")
-        sys.exit(1)
+        return EXIT_FAILURE
 
     domain_endings = await get_domain_endings()
 
@@ -2408,7 +2412,7 @@ async def run_fetch_mode(args):
 
     if not domain_list:
         echo("No domains fetched, exiting…", "yellow")
-        sys.exit(1)
+        return EXIT_FAILURE
 
     echo(f"Fetching peer data from {len(domain_list)} instances…", "cyan")
 
@@ -2557,6 +2561,8 @@ async def run_fetch_mode(args):
         echo("Crawling of new domains complete!", "bold")
     else:
         echo("No new domains to crawl.", "yellow")
+
+    return EXIT_SUCCESS
 
 
 # =============================================================================
@@ -3242,7 +3248,7 @@ def get_manage_choice():
     return choice
 
 
-async def run_manage_mode(args):
+async def run_manage_mode(args: argparse.Namespace) -> int:
     """Run the unified management mode with menu interface."""
     echo(f"{appname} v{appversion} (manage mode)", "bold")
     if _is_running_headless():
@@ -3800,6 +3806,8 @@ async def run_manage_mode(args):
 
         else:
             echo("Invalid choice, please try again", "yellow")
+
+    return EXIT_SUCCESS
 
 
 # =============================================================================
@@ -6226,7 +6234,7 @@ async def maybe_refresh_versions():
 # =============================================================================
 
 
-async def async_main():
+async def async_main() -> int:
     """Main entry point for the crawler."""
     parser = argparse.ArgumentParser(
         description="Crawl version information from Mastodon instances.",
@@ -6345,60 +6353,57 @@ async def async_main():
                 pass
         _ = gc.collect()
 
-    # Handle fetch subcommand
-    if args.command == "fetch":
-        try:
-            await run_fetch_mode(args)
-        except KeyboardInterrupt:
-            echo(f"\n{appname} interrupted by user", "yellow")
-        finally:
-            await cleanup_connections()
-        return
-
-    # Handle manage subcommand (unified DNI and nightly management)
-    if args.command == "manage":
-        try:
-            await run_manage_mode(args)
-        except KeyboardInterrupt:
-            echo(f"\n{appname} interrupted by user", "yellow")
-        finally:
-            await cleanup_connections()
-        return
-
-    # Default crawl behavior (no subcommand or 'crawl' subcommand)
-    if args.command == "crawl" or args.command is None:
-        if args.db:
-            if args.file or args.target or args.new:
-                echo(
-                    "You cannot combine --db with --file, --target, or --new",
-                    "red",
-                )
-                sys.exit(1)
-            display_domain_search(args.db)
-            await cleanup_connections()
-            return
-
-        if (
-            hasattr(args, "file")
-            and hasattr(args, "target")
-            and args.file
-            and args.target
-        ):
-            echo("You cannot set both file and target arguments", "red")
-            sys.exit(1)
-
-    # Main crawl loop - runs continuously in headless mode, once in interactive mode
-    echo(f"{appname} v{appversion} ({current_filename})", "bold")
-    if _is_running_headless():
-        echo("Running in headless mode", "cyan")
-
-    # Determine if we should loop (headless without one-shot flags)
-    should_loop = _is_running_headless() and not (args.file or args.target or args.new)
-    filter_cache_ttl = int(os.getenv("VMCRAWL_FILTER_CACHE_SECONDS", "300"))
-    filter_data_cache: dict[str, Any] | None = None
-    filter_data_loaded_at = 0.0
-
     try:
+        # Handle fetch subcommand
+        if args.command == "fetch":
+            try:
+                return await run_fetch_mode(args)
+            except KeyboardInterrupt:
+                echo(f"\n{appname} interrupted by user", "yellow")
+                return EXIT_INTERRUPTED
+
+        # Handle manage subcommand (unified DNI and nightly management)
+        if args.command == "manage":
+            try:
+                return await run_manage_mode(args)
+            except KeyboardInterrupt:
+                echo(f"\n{appname} interrupted by user", "yellow")
+                return EXIT_INTERRUPTED
+
+        # Default crawl behavior (no subcommand or 'crawl' subcommand)
+        if args.command == "crawl" or args.command is None:
+            if args.db:
+                if args.file or args.target or args.new:
+                    echo(
+                        "You cannot combine --db with --file, --target, or --new",
+                        "red",
+                    )
+                    return EXIT_FAILURE
+                display_domain_search(args.db)
+                return EXIT_SUCCESS
+
+            if (
+                hasattr(args, "file")
+                and hasattr(args, "target")
+                and args.file
+                and args.target
+            ):
+                echo("You cannot set both file and target arguments", "red")
+                return EXIT_FAILURE
+
+        # Main crawl loop - runs continuously in headless mode, once in interactive mode
+        echo(f"{appname} v{appversion} ({current_filename})", "bold")
+        if _is_running_headless():
+            echo("Running in headless mode", "cyan")
+
+        # Determine if we should loop (headless without one-shot flags)
+        should_loop = _is_running_headless() and not (
+            args.file or args.target or args.new
+        )
+        filter_cache_ttl = int(os.getenv("VMCRAWL_FILTER_CACHE_SECONDS", "300"))
+        filter_data_cache: dict[str, Any] | None = None
+        filter_data_loaded_at = 0.0
+
         while True:
             try:
                 # Reload version info from database on each loop iteration
@@ -6454,10 +6459,10 @@ async def async_main():
 
                 except FileNotFoundError:
                     echo(f"File not found: {domain_list_file}", "red")
-                    sys.exit(1)
+                    return EXIT_FAILURE
                 except psycopg.Error as exception:
                     echo(f"Database error: {exception}", "red")
-                    sys.exit(1)
+                    return EXIT_FAILURE
 
                 now = time.monotonic()
                 if (
@@ -6484,7 +6489,7 @@ async def async_main():
 
                 # Exit loop if not in continuous headless mode
                 if not should_loop:
-                    break
+                    return EXIT_SUCCESS
 
                 # Brief pause before next cycle to avoid tight loop
                 echo("Restarting crawl cycle...", "cyan")
@@ -6492,7 +6497,7 @@ async def async_main():
 
             except KeyboardInterrupt:
                 echo(f"\n{appname} interrupted by user", "yellow")
-                break
+                return EXIT_INTERRUPTED
 
     finally:
         await cleanup_connections()
@@ -6506,10 +6511,10 @@ async def async_main():
 def main():
     """Sync entry point that runs the async main function."""
     try:
-        asyncio.run(async_main())
+        raise SystemExit(asyncio.run(async_main()))
     except KeyboardInterrupt:
         # Handles interrupts that occur during asyncio shutdown.
-        pass
+        raise SystemExit(EXIT_INTERRUPTED)
 
 
 if __name__ == "__main__":
