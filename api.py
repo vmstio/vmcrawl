@@ -9,6 +9,7 @@ version information, and domain data.
 
 import getpass
 import json
+import logging
 import os
 import socket
 import threading
@@ -237,6 +238,21 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
+logger = logging.getLogger("vmcrawl.api")
+
+
+def _db_error(status_code: int = 500) -> HTTPException:
+    """Log the active exception and return a sanitized HTTPException."""
+    logger.exception("Database error")
+    return HTTPException(status_code=status_code, detail="Internal server error")
+
+
+def _chart_error(status_code: int = 502) -> HTTPException:
+    """Log the active exception and return a sanitized HTTPException."""
+    logger.exception("Chart rendering error")
+    return HTTPException(status_code=status_code, detail="Chart rendering failed")
+
+
 # Rate limiting (per client IP). Requires uvicorn --proxy-headers so
 # get_remote_address reads the real client IP from X-Forwarded-For.
 limiter = Limiter(key_func=get_remote_address, default_limits=["120/minute"])
@@ -314,7 +330,7 @@ async def health_check():
             _ = cur.fetchone()
         return {"status": "healthy", "database": "connected"}
     except Exception as e:
-        raise HTTPException(status_code=503, detail=f"Database error: {str(e)}")
+        raise _db_error(503) from None
 
 
 # =============================================================================
@@ -356,7 +372,7 @@ async def get_summary_stats(_api_key: str | None = Depends(get_api_key)):
             "last_updated": last_updated.isoformat() if last_updated else None,
         }
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Database error: {str(e)}")
+        raise _db_error() from None
 
 
 @app.get("/stats/versions", tags=["Statistics"])
@@ -388,7 +404,7 @@ async def get_version_stats(_api_key: str | None = Depends(get_api_key)):
             ]
         }
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Database error: {str(e)}")
+        raise _db_error() from None
 
 
 @app.get("/stats/branches", tags=["Statistics"])
@@ -500,7 +516,7 @@ async def get_branch_stats(_api_key: str | None = Depends(get_api_key)):
             },
         }
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Database error: {str(e)}")
+        raise _db_error() from None
 
 
 @app.get("/stats/patch-adoption", tags=["Statistics"])
@@ -599,7 +615,7 @@ async def get_patch_adoption(_api_key: str | None = Depends(get_api_key)):
             "mau_patched_percent": patched_mau_percent,
         }
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Database error: {str(e)}")
+        raise _db_error() from None
 
 
 @app.get("/stats/crawler-health", tags=["Statistics"])
@@ -747,7 +763,7 @@ async def get_crawler_health(_api_key: str | None = Depends(get_api_key)):
             "mau_issues": mau_issues,
         }
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Database error: {str(e)}")
+        raise _db_error() from None
 
 
 @app.get("/stats/domains", tags=["Statistics"])
@@ -801,7 +817,7 @@ async def get_domain_stats(_api_key: str | None = Depends(get_api_key)):
             "non_mastodon_instances": non_mastodon_instances,
         }
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Database error: {str(e)}")
+        raise _db_error() from None
 
 
 @app.get("/stats/raw-versions", tags=["Statistics"])
@@ -820,7 +836,7 @@ async def get_raw_versions(_api_key: str | None = Depends(get_api_key)):
 
         return {"raw_versions": raw_versions}
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Database error: {str(e)}")
+        raise _db_error() from None
 
 
 @app.get("/stats/most-deployed", tags=["Statistics"])
@@ -871,7 +887,7 @@ async def get_most_deployed(_api_key: str | None = Depends(get_api_key)):
             },
         }
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Database error: {str(e)}")
+        raise _db_error() from None
 
 
 # =============================================================================
@@ -957,7 +973,7 @@ async def get_instances(
             ],
         }
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Database error: {str(e)}")
+        raise _db_error() from None
 
 
 @app.get("/instances/table", tags=["Dashboard"])
@@ -1062,7 +1078,7 @@ async def get_instances_table(
             ],
         }
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Database error: {str(e)}")
+        raise _db_error() from None
 
 
 @app.get("/instances/{domain}", tags=["Instances"])
@@ -1103,7 +1119,7 @@ async def get_instance(
     except HTTPException:
         raise
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Database error: {str(e)}")
+        raise _db_error() from None
 
 
 @app.get("/instances/version/{version}", tags=["Instances"])
@@ -1159,7 +1175,7 @@ async def get_instances_by_version(
             ],
         }
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Database error: {str(e)}")
+        raise _db_error() from None
 
 
 # =============================================================================
@@ -1208,7 +1224,7 @@ async def search_instances(
             ],
         }
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Database error: {str(e)}")
+        raise _db_error() from None
 
 
 # =============================================================================
@@ -1287,7 +1303,7 @@ async def get_history_stats(
             ]
         }
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Database error: {str(e)}")
+        raise _db_error() from None
 
 
 @app.get("/stats/patch-detail", tags=["Dashboard"])
@@ -1467,7 +1483,7 @@ async def get_patch_detail(_api_key: str | None = Depends(get_api_key)):
 
         return {"branches": branches}
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Database error: {str(e)}")
+        raise _db_error() from None
 
 
 @app.get("/stats/patch-distribution", tags=["Dashboard"])
@@ -1525,7 +1541,7 @@ async def get_patch_distribution(_api_key: str | None = Depends(get_api_key)):
             ]
         }
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Database error: {str(e)}")
+        raise _db_error() from None
 
 
 @app.get("/stats/branch-distribution", tags=["Dashboard"])
@@ -1582,7 +1598,7 @@ async def get_branch_distribution(_api_key: str | None = Depends(get_api_key)):
             ]
         }
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Database error: {str(e)}")
+        raise _db_error() from None
 
 
 @app.get("/stats/eol-distribution", tags=["Dashboard"])
@@ -1625,7 +1641,7 @@ async def get_eol_distribution(_api_key: str | None = Depends(get_api_key)):
             ]
         }
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Database error: {str(e)}")
+        raise _db_error() from None
 
 
 @app.get("/stats/branch-adoption", tags=["Dashboard"])
@@ -1707,7 +1723,7 @@ async def get_branch_adoption(_api_key: str | None = Depends(get_api_key)):
             ]
         }
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Database error: {str(e)}")
+        raise _db_error() from None
 
 
 @app.get("/stats/supported-branches", tags=["Dashboard"])
@@ -1772,7 +1788,7 @@ async def get_supported_branches_coverage(
             "mau_percent": (round(float(result[1]), 1) if result and result[1] else 0),
         }
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Database error: {str(e)}")
+        raise _db_error() from None
 
 
 # =============================================================================
@@ -1918,9 +1934,9 @@ async def chart_patch_distribution(
         png = await _fetch_chart_png(chart_config)
         return Response(content=png, media_type="image/png")
     except httpx.HTTPError as e:
-        raise HTTPException(status_code=502, detail=f"Chart rendering error: {str(e)}")
+        raise _chart_error() from None
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Database error: {str(e)}")
+        raise _db_error() from None
 
 
 @app.get("/charts/branch-distribution.png", tags=["Charts"], response_class=Response)
@@ -2016,9 +2032,9 @@ async def chart_branch_distribution(
         png = await _fetch_chart_png(chart_config)
         return Response(content=png, media_type="image/png")
     except httpx.HTTPError as e:
-        raise HTTPException(status_code=502, detail=f"Chart rendering error: {str(e)}")
+        raise _chart_error() from None
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Database error: {str(e)}")
+        raise _db_error() from None
 
 
 @app.get("/charts/branch-adoption.png", tags=["Charts"], response_class=Response)
@@ -2147,9 +2163,9 @@ async def chart_branch_adoption(
         png = await _fetch_chart_png(chart_config)
         return Response(content=png, media_type="image/png")
     except httpx.HTTPError as e:
-        raise HTTPException(status_code=502, detail=f"Chart rendering error: {str(e)}")
+        raise _chart_error() from None
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Database error: {str(e)}")
+        raise _db_error() from None
 
 
 @app.get("/charts/patch-history.png", tags=["Charts"], response_class=Response)
@@ -2177,7 +2193,7 @@ async def chart_patch_history(
             rows = cur.fetchall()
 
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Database error: {str(e)}")
+        raise _db_error() from None
 
     # Reverse so oldest → newest left-to-right; take last 10 for readability
     hist = list(reversed(rows))[-10:]
@@ -2273,7 +2289,7 @@ async def chart_patch_history(
     try:
         png = await _fetch_chart_png(chart_config)
     except httpx.HTTPError as e:
-        raise HTTPException(status_code=502, detail=f"Chart rendering error: {str(e)}")
+        raise _chart_error() from None
     return Response(content=png, media_type="image/png")
 
 
@@ -2302,7 +2318,7 @@ async def chart_branch_history(
             rows = cur.fetchall()
 
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Database error: {str(e)}")
+        raise _db_error() from None
 
     hist = list(reversed(rows))[-10:]
     labels = [
@@ -2407,7 +2423,7 @@ async def chart_branch_history(
     try:
         png = await _fetch_chart_png(chart_config)
     except httpx.HTTPError as e:
-        raise HTTPException(status_code=502, detail=f"Chart rendering error: {str(e)}")
+        raise _chart_error() from None
     return Response(content=png, media_type="image/png")
 
 
