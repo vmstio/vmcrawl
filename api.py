@@ -21,7 +21,16 @@ import httpx
 import paramiko
 import toml
 from dotenv import load_dotenv
-from fastapi import Depends, FastAPI, HTTPException, Query, Response, Security, status
+from fastapi import (
+    Depends,
+    FastAPI,
+    HTTPException,
+    Path,
+    Query,
+    Response,
+    Security,
+    status,
+)
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.security import APIKeyHeader
 from fastapi.staticfiles import StaticFiles
@@ -1046,7 +1055,10 @@ async def get_instances_table(
 
 
 @app.get("/instances/{domain}", tags=["Instances"])
-async def get_instance(domain: str, _api_key: str | None = Depends(get_api_key)):
+async def get_instance(
+    domain: str = Path(..., pattern=r"^[a-zA-Z0-9.-]{1,253}$"),
+    _api_key: str | None = Depends(get_api_key),
+):
     """Get detailed information about a specific Mastodon instance."""
     try:
         with db_pool.connection() as conn, conn.cursor() as cur:
@@ -1085,7 +1097,7 @@ async def get_instance(domain: str, _api_key: str | None = Depends(get_api_key))
 
 @app.get("/instances/version/{version}", tags=["Instances"])
 async def get_instances_by_version(
-    version: str,
+    version: str = Path(..., pattern=r"^[a-zA-Z0-9.+-]{1,64}$"),
     _api_key: str | None = Depends(get_api_key),
     limit: int = Query(100, ge=1, le=1000),
     offset: int = Query(0, ge=0),
