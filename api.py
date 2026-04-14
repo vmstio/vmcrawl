@@ -36,6 +36,10 @@ from fastapi.security import APIKeyHeader
 from fastapi.staticfiles import StaticFiles
 from psycopg import sql
 from psycopg_pool import ConnectionPool
+from slowapi import Limiter, _rate_limit_exceeded_handler
+from slowapi.errors import RateLimitExceeded
+from slowapi.middleware import SlowAPIMiddleware
+from slowapi.util import get_remote_address
 
 # Mastodon-compatible software names shared with crawler logic.
 MASTODON_COMPATIBLE_SOFTWARE = ("mastodon", "hometown", "kmyblue")
@@ -232,6 +236,13 @@ app = FastAPI(
     redoc_url="/redoc",
     lifespan=lifespan,
 )
+
+# Rate limiting (per client IP). Requires uvicorn --proxy-headers so
+# get_remote_address reads the real client IP from X-Forwarded-For.
+limiter = Limiter(key_func=get_remote_address, default_limits=["120/minute"])
+app.state.limiter = limiter
+app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
+app.add_middleware(SlowAPIMiddleware)
 
 # CORS middleware for dashboard frontend
 app.add_middleware(

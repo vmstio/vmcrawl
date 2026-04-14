@@ -16,6 +16,7 @@ dependencies = [
     "uvicorn[standard]",
     "cachetools",
     "paramiko",
+    "slowapi",
 ]
 
 [tool.setuptools]
