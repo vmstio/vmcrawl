@@ -234,21 +234,22 @@ def is_mastodon_compatible_software(software_name: str | None) -> bool:
 
 
 # Pre-compiled regex patterns for version cleaning (performance optimization)
-RE_VERSION_SUFFIX_SPLIT = re.compile(r"[+~_ /@&]|patch")
+RE_VERSION_SUFFIX_SPLIT = re.compile(r"[+~_ /@&]|\bpatch\b")
 RE_VERSION_PARTS = re.compile(r"^(\d+)\.(\d+)\.(\d+)(-.+)?$")
 RE_VERSION_EXTRACT_SEMVER = re.compile(r"^(\d+\.\d+\.\d+)")
 RE_VERSION_DATE_SUFFIX = re.compile(r"-(\d{2})(\d{2})(\d{2})$")
 RE_VERSION_NIGHTLY = re.compile(
-    r"4\.[3456]\.0-nightly\.(\d{4}-\d{2}-\d{2})(-security)?"
+    r"4\.\d+\.0-nightly\.(\d{4}-\d{2}-\d{2})(-security)?"
 )
 RE_VERSION_NIGHTLY_DATE = re.compile(r"-nightly-\d{8}")
-RE_VERSION_RC = re.compile(r"rc(\d+)")
-RE_VERSION_BETA = re.compile(r"beta(\d+)")
-RE_VERSION_ALPHA = re.compile(r"alpha(\d+)")
+RE_VERSION_RC = re.compile(r"(?<![a-zA-Z])rc(\d+)")
+RE_VERSION_BETA = re.compile(r"(?<![a-zA-Z])beta(\d+)")
+RE_VERSION_ALPHA = re.compile(r"(?<![a-zA-Z])alpha(\d+)")
 RE_VERSION_ALPHA_SUFFIX = re.compile(r"-[a-zA-Z]")
 RE_VERSION_DIGIT_SUFFIX = re.compile(r"-\d")
-RE_VERSION_MALFORMED_PRERELEASE = re.compile(r"(alpha|beta|rc)\d*$")
+RE_VERSION_MALFORMED_PRERELEASE = re.compile(r"(alpha|beta|rc)\d+$")
 RE_VERSION_TRAILING_SUFFIX = re.compile(r"^(\d+\.\d+\.\d+)[a-zA-Z][a-zA-Z0-9]*$")
+RE_VERSION_MULTIPLE_DASHES = re.compile(r"-{2,}")
 
 # Pre-compiled regex patterns for domain validation (high frequency in fetch loops)
 RE_DOMAIN_FORMAT = re.compile(r"^[^\s/:@]+\.[^\s/:@]{2,}$")
@@ -1203,7 +1204,7 @@ def clean_version(
     # Phase 5: Normalize development version formats (rc, beta)
     version = RE_VERSION_RC.sub(r"-rc.\1", version)
     version = RE_VERSION_BETA.sub(r"-beta.\1", version)
-    version = version.replace("--", "-")  # Fix double dashes from Phase 5
+    version = RE_VERSION_MULTIPLE_DASHES.sub("-", version)  # Fix dashes from Phase 5
 
     # Phase 6: Map nightly versions to releases
     version = _clean_version_nightly(version, nightly_version_ranges)
@@ -1225,9 +1226,8 @@ def _clean_version_normalize(version: str) -> str:
         version.replace("-theconnector", "")
         .replace("-theatlsocial", "")
         .replace("mastau", "alpha")
-        .replace("--", "-")
-        .rstrip("-")
     )
+    version = RE_VERSION_MULTIPLE_DASHES.sub("-", version).rstrip("-")
 
     # Truncate versions with extra components (e.g., "4.5.4.0.5" -> "4.5.4")
     # Only truncates if remainder starts with "." (extra version components)
@@ -1254,6 +1254,10 @@ def _clean_version_date(version: str) -> str:
     match = RE_VERSION_DATE_SUFFIX.search(version)
     if match:
         yy, mm, dd = match.groups()
+        try:
+            datetime.strptime(f"20{yy}-{mm}-{dd}", "%Y-%m-%d")
+        except ValueError:
+            return version
         return RE_VERSION_DATE_SUFFIX.sub(f"-nightly.20{yy}-{mm}-{dd}", version)
     return version
 
@@ -1280,9 +1284,12 @@ def _clean_version_nightly(
     match = RE_VERSION_NIGHTLY.match(version)
     if match:
         nightly_date_str, is_security = match.groups()
-        nightly_date = datetime.strptime(nightly_date_str, "%Y-%m-%d").replace(
-            tzinfo=UTC
-        )
+        try:
+            nightly_date = datetime.strptime(nightly_date_str, "%Y-%m-%d").replace(
+                tzinfo=UTC
+            )
+        except ValueError:
+            return version
 
         if is_security:
             nightly_date += timedelta(days=1)
