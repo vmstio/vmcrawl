@@ -12,6 +12,18 @@ RUN uv sync --no-dev
 COPY api.py crawler.py ./
 COPY web/ ./web/
 
+# Drop privileges: create an unprivileged user, hand it ownership of /app,
+# and run uvicorn as that user. Avoids running the public API process as
+# root inside the container.
+RUN useradd --system --no-create-home --shell /usr/sbin/nologin vmcrawl \
+    && chown -R vmcrawl:vmcrawl /app
+USER vmcrawl
+
+# Don't write .pyc files into a read-only-friendly tree.
+ENV PYTHONDONTWRITEBYTECODE=1
+
 EXPOSE 8080
 
-CMD ["uv", "run", "uvicorn", "api:app", "--host", "0.0.0.0", "--port", "8080", "--proxy-headers", "--forwarded-allow-ips=*"]
+# Invoke uvicorn directly from the venv that `uv sync` created, so the
+# runtime user doesn't need a home directory or a writable uv cache.
+CMD [".venv/bin/uvicorn", "api:app", "--host", "0.0.0.0", "--port", "8080", "--proxy-headers", "--forwarded-allow-ips=*"]
