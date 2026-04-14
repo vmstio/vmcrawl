@@ -191,8 +191,21 @@ ERROR_TYPE_TO_BAD_COLUMN: dict[str, str] = {
 }
 BAD_COLUMNS = tuple(ERROR_TYPE_TO_BAD_COLUMN.values())
 MASTODON_COMPATIBLE_SOFTWARE = ("mastodon", "hometown", "kmyblue")
-MASTODON_COMPATIBLE_SOFTWARE_SQL = ", ".join(
-    f"'{software}'" for software in MASTODON_COMPATIBLE_SOFTWARE
+
+# Precomposed psycopg.sql fragments so call sites never interpolate values
+# or identifiers into SQL text directly. Built once at import time from
+# hardcoded module constants.
+_MASTODON_COMPATIBLE_IN_CLAUSE = sql.SQL("({})").format(
+    sql.SQL(", ").join(sql.Literal(s) for s in MASTODON_COMPATIBLE_SOFTWARE)
+)
+_BAD_COL_IDENTIFIERS = [sql.Identifier(col) for col in BAD_COLUMNS]
+_BAD_COL_LIST = sql.SQL(", ").join(_BAD_COL_IDENTIFIERS)
+_BAD_COL_ANY_TRUE = sql.SQL(" OR ").join(
+    sql.SQL("{} = TRUE").format(c) for c in _BAD_COL_IDENTIFIERS
+)
+_BAD_COL_ALL_NULL_OR_FALSE = sql.SQL(" AND ").join(
+    sql.SQL("({c} IS NULL OR {c} = FALSE)").format(c=c)
+    for c in _BAD_COL_IDENTIFIERS
 )
 
 # Menu choice to status column mapping for preserve mechanism
@@ -2152,11 +2165,10 @@ def get_not_masto_domains():
     """Get list of domains where nodeinfo is not Mastodon-compatible."""
     with db_pool.connection() as conn, conn.cursor() as cursor:
         try:
-            query = (
+            query = sql.SQL(
                 "SELECT domain FROM raw_domains "
-                "WHERE nodeinfo IS NOT NULL "
-                f"AND nodeinfo NOT IN ({MASTODON_COMPATIBLE_SOFTWARE_SQL})"
-            )
+                "WHERE nodeinfo IS NOT NULL AND nodeinfo NOT IN {clause}"
+            ).format(clause=_MASTODON_COMPATIBLE_IN_CLAUSE)
             _ = cursor.execute(query)
             # Use set for O(1) lookup, stream results
             return {row[0].strip() for row in cursor if row[0] and row[0].strip()}
@@ -2172,16 +2184,13 @@ def get_all_bad_domains() -> dict[str, set[str]]:
     Returns a dict mapping bad_* column name to the set of domains with that flag.
     Uses a single query for efficiency.
     """
-    bad_col_conditions = " OR ".join(f"{col} = TRUE" for col in BAD_COLUMNS)
-    bad_col_list = ", ".join(BAD_COLUMNS)
     result: dict[str, set[str]] = {col: set() for col in BAD_COLUMNS}
 
     with db_pool.connection() as conn, conn.cursor() as cursor:
         try:
-            bad_query: Any = (
-                f"SELECT domain, {bad_col_list} FROM raw_domains"
-                f" WHERE {bad_col_conditions}"
-            )
+            bad_query = sql.SQL(
+                "SELECT domain, {cols} FROM raw_domains WHERE {conditions}"
+            ).format(cols=_BAD_COL_LIST, conditions=_BAD_COL_ANY_TRUE)
             _ = cursor.execute(bad_query)
             for row in cursor:
                 domain = row[0]
@@ -5890,18 +5899,20 @@ def load_from_database(user_choice):
             + no_alias
             + "ORDER BY LENGTH(DOMAIN)"
         ),
-        "1": (
-            "SELECT domain FROM raw_domains WHERE "
-            + " AND ".join(f"({col} IS NULL OR {col} = FALSE)" for col in BAD_COLUMNS)
-            + " AND "
-            f"(nodeinfo IN ({MASTODON_COMPATIBLE_SOFTWARE_SQL}) OR nodeinfo IS NULL) "
-            + no_alias
-            + "ORDER BY domain"
+        "1": sql.SQL(
+            "SELECT domain FROM raw_domains "
+            "WHERE {bad_conditions} "
+            "AND (nodeinfo IN {masto_clause} OR nodeinfo IS NULL) "
+            "AND (alias IS NULL OR alias = FALSE) "
+            "ORDER BY domain"
+        ).format(
+            bad_conditions=_BAD_COL_ALL_NULL_OR_FALSE,
+            masto_clause=_MASTODON_COMPATIBLE_IN_CLAUSE,
         ),
-        "4": (
+        "4": sql.SQL(
             "SELECT DISTINCT rd.domain "
             "FROM raw_domains rd "
-            f"WHERE rd.nodeinfo IN ({MASTODON_COMPATIBLE_SOFTWARE_SQL}) "
+            "WHERE rd.nodeinfo IN {masto_clause} "
             "  AND rd.reason IS NOT NULL "
             "  AND (rd.alias IS NULL OR rd.alias = FALSE) "
             "  AND NOT EXISTS ( "
@@ -5909,7 +5920,7 @@ def load_from_database(user_choice):
             "    FROM mastodon_domains md "
             "    WHERE md.domain = rd.domain "
             "  )"
-        ),
+        ).format(masto_clause=_MASTODON_COMPATIBLE_IN_CLAUSE),
         "5": (
             "SELECT DISTINCT rd.domain "
             "FROM raw_domains rd "
@@ -5917,11 +5928,12 @@ def load_from_database(user_choice):
             "WHERE rd.reason IS NOT NULL "
             "AND (rd.alias IS NULL OR rd.alias = FALSE)"
         ),
-        "10": (
-            f"SELECT domain FROM raw_domains WHERE nodeinfo NOT IN ({MASTODON_COMPATIBLE_SOFTWARE_SQL}) "
-            + no_alias
-            + "ORDER BY domain"
-        ),
+        "10": sql.SQL(
+            "SELECT domain FROM raw_domains "
+            "WHERE nodeinfo NOT IN {masto_clause} "
+            "AND (alias IS NULL OR alias = FALSE) "
+            "ORDER BY domain"
+        ).format(masto_clause=_MASTODON_COMPATIBLE_IN_CLAUSE),
         "60": f"SELECT domain FROM raw_domains WHERE bad_dns = TRUE {no_alias}ORDER BY domain",
         "61": f"SELECT domain FROM raw_domains WHERE bad_ssl = TRUE {no_alias}ORDER BY domain",
         "62": f"SELECT domain FROM raw_domains WHERE bad_tcp = TRUE {no_alias}ORDER BY domain",
@@ -6012,11 +6024,12 @@ def load_from_database(user_choice):
         "52": (
             "SELECT domain FROM mastodon_domains ORDER BY active_users_monthly DESC"
         ),
-        "53": (
-            f"SELECT domain FROM raw_domains WHERE nodeinfo IN ({MASTODON_COMPATIBLE_SOFTWARE_SQL}) "
-            + no_alias
-            + "ORDER BY domain"
-        ),
+        "53": sql.SQL(
+            "SELECT domain FROM raw_domains "
+            "WHERE nodeinfo IN {masto_clause} "
+            "AND (alias IS NULL OR alias = FALSE) "
+            "ORDER BY domain"
+        ).format(masto_clause=_MASTODON_COMPATIBLE_IN_CLAUSE),
     }
 
     params = None
