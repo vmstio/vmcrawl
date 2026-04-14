@@ -33,6 +33,7 @@ from fastapi import (
     status,
 )
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 from fastapi.security import APIKeyHeader
 from fastapi.staticfiles import StaticFiles
 from psycopg import sql
@@ -323,14 +324,20 @@ async def root():
 
 @app.get("/health", tags=["Health"])
 async def health_check():
-    """Health check endpoint to verify database connectivity."""
+    """Unauthenticated liveness probe.
+
+    Returns 200 {"status": "healthy"} when the database is reachable,
+    503 {"status": "unhealthy"} otherwise. The detailed failure reason
+    is logged server-side and never included in the response body.
+    """
     try:
         with db_pool.connection() as conn, conn.cursor() as cur:
             _ = cur.execute("SELECT 1")
             _ = cur.fetchone()
-        return {"status": "healthy", "database": "connected"}
-    except Exception as e:
-        raise _db_error(503) from None
+        return {"status": "healthy"}
+    except Exception:
+        logger.exception("Health check failed")
+        return JSONResponse(status_code=503, content={"status": "unhealthy"})
 
 
 # =============================================================================
