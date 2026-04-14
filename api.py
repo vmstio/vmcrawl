@@ -34,6 +34,9 @@ from fastapi import (
 )
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
+from starlette.middleware.base import BaseHTTPMiddleware
+from starlette.requests import Request
+from starlette.responses import Response as StarletteResponse
 from fastapi.security import APIKeyHeader
 from fastapi.staticfiles import StaticFiles
 from psycopg import sql
@@ -260,6 +263,62 @@ limiter = Limiter(key_func=get_remote_address, default_limits=["120/minute"])
 app.state.limiter = limiter
 app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 app.add_middleware(SlowAPIMiddleware)
+
+
+# Strict CSP for the dashboard. Chart.js is loaded from jsdelivr with SRI.
+# Inline style attributes on a couple of table headers require
+# 'unsafe-inline' for style-src; script-src stays strict.
+_DASHBOARD_CSP = (
+    "default-src 'self'; "
+    "script-src 'self' https://cdn.jsdelivr.net; "
+    "style-src 'self' 'unsafe-inline'; "
+    "img-src 'self' data:; "
+    "font-src 'self'; "
+    "connect-src 'self'; "
+    "object-src 'none'; "
+    "base-uri 'self'; "
+    "frame-ancestors 'none'; "
+    "form-action 'self'"
+)
+
+# Swagger UI and ReDoc pull assets from a CDN and use inline bootstrap
+# scripts, so they need a relaxed CSP to function.
+_DOCS_CSP = (
+    "default-src 'self'; "
+    "script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; "
+    "style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; "
+    "img-src 'self' data: https://fastapi.tiangolo.com; "
+    "font-src 'self' data:; "
+    "connect-src 'self'; "
+    "object-src 'none'; "
+    "base-uri 'self'; "
+    "frame-ancestors 'none'"
+)
+
+_DOCS_PATHS = ("/docs", "/redoc", "/docs/oauth2-redirect")
+
+
+class SecurityHeadersMiddleware(BaseHTTPMiddleware):
+    async def dispatch(self, request: Request, call_next) -> StarletteResponse:
+        response = await call_next(request)
+        path = request.url.path
+        if path in _DOCS_PATHS:
+            response.headers.setdefault("Content-Security-Policy", _DOCS_CSP)
+        else:
+            response.headers.setdefault("Content-Security-Policy", _DASHBOARD_CSP)
+        response.headers.setdefault("X-Content-Type-Options", "nosniff")
+        response.headers.setdefault("X-Frame-Options", "DENY")
+        response.headers.setdefault("Referrer-Policy", "no-referrer")
+        response.headers.setdefault(
+            "Permissions-Policy",
+            "geolocation=(), microphone=(), camera=(), payment=(), usb=()",
+        )
+        response.headers.setdefault("Cross-Origin-Opener-Policy", "same-origin")
+        response.headers.setdefault("Cross-Origin-Resource-Policy", "same-origin")
+        return response
+
+
+app.add_middleware(SecurityHeadersMiddleware)
 
 # CORS is only needed if the dashboard is served from a different origin
 # than the API. The default deployment mounts web/ on this same app, so
