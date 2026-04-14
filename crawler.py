@@ -508,6 +508,88 @@ ssl_context.minimum_version = ssl.TLSVersion.TLSv1_2
 # Disable MLKEM post-quantum key exchange (SSL_OP_NO_MLKEM)
 ssl_context.options |= 0x800000
 
+# SSRF guard: block requests whose hostname resolves to a private, loopback,
+# link-local (includes 169.254.169.254 cloud metadata), multicast, reserved,
+# or unspecified address. Applied to every request including redirects, since
+# httpx invokes the transport per hop.
+_allow_private_ips = os.getenv("VMCRAWL_ALLOW_PRIVATE_IPS", "").lower() in (
+    "1",
+    "true",
+    "yes",
+)
+
+
+def _is_blocked_ip(addr: ipaddress.IPv4Address | ipaddress.IPv6Address) -> bool:
+    return (
+        addr.is_private
+        or addr.is_loopback
+        or addr.is_link_local
+        or addr.is_multicast
+        or addr.is_reserved
+        or addr.is_unspecified
+    )
+
+
+class SSRFGuardTransport(httpx.AsyncHTTPTransport):
+    """httpx transport that refuses to connect to non-public addresses.
+
+    Validates the destination on every request (including every redirect
+    hop) before delegating to the real transport. Raises httpx.ConnectError
+    on block, which existing error handlers treat as an unreachable host.
+    """
+
+    async def handle_async_request(
+        self, request: httpx.Request
+    ) -> httpx.Response:
+        host = request.url.host
+        if not host:
+            raise httpx.ConnectError("Missing host in URL")
+
+        # Hostname may already be an IP literal (common SSRF vector).
+        try:
+            literal = ipaddress.ip_address(host)
+        except ValueError:
+            literal = None
+        if literal is not None:
+            if _is_blocked_ip(literal):
+                raise httpx.ConnectError(
+                    f"SSRF guard: blocked non-public address {host}"
+                )
+            return await super().handle_async_request(request)
+
+        # Otherwise resolve DNS and check every returned address.
+        try:
+            infos = await asyncio.get_running_loop().getaddrinfo(
+                host, None, type=socket.SOCK_STREAM
+            )
+        except socket.gaierror as e:
+            raise httpx.ConnectError(f"DNS resolution failed for {host}: {e}") from e
+
+        for info in infos:
+            sockaddr = info[4]
+            ip_str = sockaddr[0]
+            try:
+                resolved = ipaddress.ip_address(ip_str)
+            except ValueError:
+                continue
+            if _is_blocked_ip(resolved):
+                raise httpx.ConnectError(
+                    f"SSRF guard: {host} resolves to non-public address {ip_str}"
+                )
+
+        return await super().handle_async_request(request)
+
+
+def _build_transport(http2: bool) -> httpx.AsyncHTTPTransport:
+    cls = httpx.AsyncHTTPTransport if _allow_private_ips else SSRFGuardTransport
+    return cls(
+        http1=True,
+        http2=http2,
+        verify=ssl_context,
+        limits=limits,
+    )
+
+
 # Async HTTP client - initialized lazily to work with asyncio event loop
 # Use get_http_client() to access
 _http_client: httpx.AsyncClient | None = None
@@ -519,13 +601,11 @@ def get_http_client() -> httpx.AsyncClient:
     global _http_client
     if _http_client is None:
         _http_client = httpx.AsyncClient(
-            http2=True,
+            transport=_build_transport(http2=True),
             follow_redirects=True,
             headers=http_custom_headers,
             timeout=http_timeout,
-            limits=limits,
             max_redirects=http_redirect,
-            verify=ssl_context,
         )
     return _http_client
 
@@ -535,13 +615,11 @@ def get_http1_client() -> httpx.AsyncClient:
     global _http1_client
     if _http1_client is None:
         _http1_client = httpx.AsyncClient(
-            http2=False,
+            transport=_build_transport(http2=False),
             follow_redirects=True,
             headers=http_custom_headers,
             timeout=http_timeout,
-            limits=limits,
             max_redirects=http_redirect,
-            verify=ssl_context,
         )
     return _http1_client
 
