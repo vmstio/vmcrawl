@@ -17,6 +17,7 @@ dependencies = [
     "cachetools",
     "paramiko",
     "slowapi",
+    "defusedxml",
 ]
 
 [tool.setuptools]

@@ -4206,8 +4206,10 @@ async def check_host_meta(domain):
                 return None
 
             try:
-                # Parse XML to extract the webfinger template URL
-                import xml.etree.ElementTree as ET
+                # Parse XML to extract the webfinger template URL.
+                # defusedxml neutralizes billion-laughs / quadratic blowup
+                # attacks in untrusted host-meta payloads.
+                from defusedxml import ElementTree as ET
 
                 root = ET.fromstring(response.content)
 
