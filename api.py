@@ -261,13 +261,19 @@ app.state.limiter = limiter
 app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 app.add_middleware(SlowAPIMiddleware)
 
-# CORS middleware for dashboard frontend
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],
-    allow_methods=["GET"],
-    allow_headers=["*"],
-)
+# CORS is only needed if the dashboard is served from a different origin
+# than the API. The default deployment mounts web/ on this same app, so
+# cross-origin requests are unnecessary and disabled by default. Set
+# VMCRAWL_CORS_ORIGINS to a comma-separated list (or "*") to opt in.
+_cors_origins_env = os.getenv("VMCRAWL_CORS_ORIGINS", "").strip()
+if _cors_origins_env:
+    _cors_origins = [o.strip() for o in _cors_origins_env.split(",") if o.strip()]
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=_cors_origins,
+        allow_methods=["GET"],
+        allow_headers=["X-API-Key"],
+    )
 
 
 # =============================================================================
