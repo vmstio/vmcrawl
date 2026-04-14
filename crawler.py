@@ -500,6 +500,26 @@ limits = httpx.Limits(
     keepalive_expiry=30.0,
 )
 
+# Per-host outbound concurrency cap. Prevents the worker pool from piling
+# onto a single victim host (either a slow instance or a redirect chain
+# pointed at one target), which would otherwise turn the crawler into a
+# reflected DoS tool. A value of 2 lets parallel discovery checks
+# (host-meta + webfinger) run without serialization while still capping
+# concurrent pressure on any one host.
+_max_concurrent_per_host = max(
+    1, int(os.getenv("VMCRAWL_MAX_CONCURRENT_PER_HOST", "2"))
+)
+_host_semaphores: dict[str, asyncio.Semaphore] = {}
+
+
+def _get_host_semaphore(host: str) -> asyncio.Semaphore:
+    """Return the per-host semaphore, creating it on first use."""
+    sem = _host_semaphores.get(host)
+    if sem is None:
+        sem = asyncio.Semaphore(_max_concurrent_per_host)
+        _host_semaphores[host] = sem
+    return sem
+
 # Create SSL context with TLS 1.2+ and disable post-quantum key exchange
 # Some servers reject MLKEM (post-quantum crypto) with "tlsv1 alert internal error"
 # This is a known issue with OpenSSL 3.6.0+ and certain server configurations
@@ -813,29 +833,38 @@ async def get_httpx(url: str, timeout: float | None = None) -> httpx.Response:
 
             return final_response
 
-    total_backoff = 0.0
-    for attempt in range(dns_retry_attempts):
-        try:
+    host = urlparse(url).hostname or ""
+    semaphore = _get_host_semaphore(host) if host else None
+
+    async def _run() -> httpx.Response:
+        total_backoff = 0.0
+        for attempt in range(dns_retry_attempts):
             try:
-                return await _stream_get_with_size_limit(get_http_client())
-            except httpx.RemoteProtocolError:
-                # Some servers advertise HTTP/2 but terminate h2 sessions.
-                # Retry once with HTTP/1.1 for this request.
-                return await _stream_get_with_size_limit(get_http1_client())
-        except httpx.RequestError as exception:
-            if attempt >= dns_retry_attempts - 1 or not _is_retryable_dns_error(
-                exception
-            ):
-                raise
+                try:
+                    return await _stream_get_with_size_limit(get_http_client())
+                except httpx.RemoteProtocolError:
+                    # Some servers advertise HTTP/2 but terminate h2 sessions.
+                    # Retry once with HTTP/1.1 for this request.
+                    return await _stream_get_with_size_limit(get_http1_client())
+            except httpx.RequestError as exception:
+                if attempt >= dns_retry_attempts - 1 or not _is_retryable_dns_error(
+                    exception
+                ):
+                    raise
 
-            retry_delay = _compute_retry_delay_seconds(attempt, total_backoff)
-            if retry_delay > 0:
-                await asyncio.sleep(retry_delay)
-                total_backoff += retry_delay
+                retry_delay = _compute_retry_delay_seconds(attempt, total_backoff)
+                if retry_delay > 0:
+                    await asyncio.sleep(retry_delay)
+                    total_backoff += retry_delay
 
-    # Defensive fallback: loop should always return or raise.
-    msg = f"Failed to fetch URL after {dns_retry_attempts} attempts: {url}"
-    raise RuntimeError(msg)
+        # Defensive fallback: loop should always return or raise.
+        msg = f"Failed to fetch URL after {dns_retry_attempts} attempts: {url}"
+        raise RuntimeError(msg)
+
+    if semaphore is None:
+        return await _run()
+    async with semaphore:
+        return await _run()
 
 
 async def get_domain_endings() -> set[str]:
