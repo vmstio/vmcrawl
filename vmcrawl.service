@@ -13,6 +13,10 @@ WorkingDirectory=/opt/vmcrawl
 # Use the shell script to handle virtualenv activation
 ExecStart=/opt/vmcrawl/vmcrawl.sh
 
+# Systemd-managed cache directory: /var/cache/vmcrawl (exported as $CACHE_DIRECTORY)
+CacheDirectory=vmcrawl
+CacheDirectoryMode=0700
+
 # Restart policy
 Restart=on-failure
 RestartSec=30

@@ -572,9 +572,15 @@ def _is_running_headless():
 
 def _get_cache_file_path(url: str) -> str:
     """Create a unique cache file path based on the URL hash."""
-    url_hash = hashlib.md5(url.encode()).hexdigest()
-    cache_dir = "/tmp/vmcrawl_cache"
-    os.makedirs(cache_dir, exist_ok=True)
+    url_hash = hashlib.sha256(url.encode()).hexdigest()
+    systemd_cache = os.environ.get("CACHE_DIRECTORY")
+    if systemd_cache:
+        cache_dir = systemd_cache
+    else:
+        xdg_cache = os.environ.get("XDG_CACHE_HOME")
+        base = xdg_cache if xdg_cache else os.path.expanduser("~/.cache")
+        cache_dir = os.path.join(base, "vmcrawl")
+    os.makedirs(cache_dir, mode=0o700, exist_ok=True)
     return os.path.join(cache_dir, f"{url_hash}.cache")
 
 
