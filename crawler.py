@@ -234,7 +234,10 @@ def is_mastodon_compatible_software(software_name: str | None) -> bool:
 
 
 # Pre-compiled regex patterns for version cleaning (performance optimization)
-RE_VERSION_SUFFIX_SPLIT = re.compile(r"[+~_ /@&]|\bpatch\b")
+RE_VERSION_SUFFIX_SPLIT = re.compile(r"[+~_ /@&(]|\bpatch\b")
+RE_VERSION_HAS_PRERELEASE = re.compile(
+    r"(?<![a-zA-Z])(?:alpha|beta|rc|nightly)(?![a-zA-Z])"
+)
 RE_VERSION_PARTS = re.compile(r"^(\d+)\.(\d+)\.(\d+)(-.+)?$")
 RE_VERSION_EXTRACT_SEMVER = re.compile(r"^(\d+\.\d+\.\d+)")
 RE_VERSION_DATE_SUFFIX = re.compile(r"-(\d{2})(\d{2})(\d{2})$")
@@ -1264,8 +1267,7 @@ def _clean_version_date(version: str) -> str:
 
 def _clean_version_suffix_conditional(version: str) -> str:
     """Remove additional suffixes unless they are valid prerelease identifiers."""
-    has_prerelease = any(tag in version for tag in ("alpha", "beta", "rc", "nightly"))
-    if not has_prerelease:
+    if not RE_VERSION_HAS_PRERELEASE.search(version):
         version = RE_VERSION_ALPHA_SUFFIX.split(version, maxsplit=1)[0]
     if "nightly" not in version:
         version = RE_VERSION_DIGIT_SUFFIX.split(version, maxsplit=1)[0]
