@@ -4742,16 +4742,21 @@ def mark_as_non_mastodon(domain, other_platform):
     delete_domain_if_known(domain)
 
 
-async def get_instance_uri(backend_domain: str) -> tuple[str | None, bool]:
+async def get_instance_uri(
+    backend_domain: str, domain: str, preserve_status=None
+) -> tuple[str | None, bool, bool]:
     """Fetch the instance API and extract the domain/uri field.
 
     First tries v2 instance API for 'domain' field, then falls back to
     v1 instance API for 'uri' field if v2 fails.
 
     Returns:
-        tuple: (domain/uri string or None, is_401 boolean)
+        tuple: (domain/uri string or None, is_401 boolean, is_hardfail boolean)
             - First element is the domain/uri if successful, None otherwise
             - Second element is True if a 401 response was encountered, False otherwise
+            - Third element is True if a hard-fail code (410/418/451/999) was
+              encountered, in which case _handle_http_failed has already been
+              invoked and the caller should return early
     """
     # Try v2 API first
     instance_api_v2_url = f"https://{backend_domain}/api/v2/instance"
@@ -4760,7 +4765,12 @@ async def get_instance_uri(backend_domain: str) -> tuple[str | None, bool]:
     try:
         response = await get_httpx(instance_api_v2_url)
         if response.status_code == 401:
-            return (None, True)
+            return (None, True, False)
+        if response.status_code in http_codes_to_hardfail:
+            await asyncio.to_thread(
+                _handle_http_failed, domain, target_v2, response, preserve_status
+            )
+            return (None, False, True)
         if response.status_code == 200:
             content_type = response.headers.get("Content-Type", "")
             if "json" in content_type and response.content:
@@ -4768,10 +4778,10 @@ async def get_instance_uri(backend_domain: str) -> tuple[str | None, bool]:
                     response, backend_domain, target_v2
                 )
                 if instance_data and isinstance(instance_data, dict):
-                    domain = instance_data.get("domain")
+                    v2_domain = instance_data.get("domain")
                     # Normalize domain to lowercase for consistent comparison
-                    if domain:
-                        return (domain.strip().lower(), False)
+                    if v2_domain:
+                        return (v2_domain.strip().lower(), False, False)
     except (httpx.RequestError, json.JSONDecodeError):
         pass  # Fall through to v1 API
 
@@ -4782,19 +4792,24 @@ async def get_instance_uri(backend_domain: str) -> tuple[str | None, bool]:
     try:
         response = await get_httpx(instance_api_v1_url)
         if response.status_code == 401:
-            return (None, True)
+            return (None, True, False)
+        if response.status_code in http_codes_to_hardfail:
+            await asyncio.to_thread(
+                _handle_http_failed, domain, target_v1, response, preserve_status
+            )
+            return (None, False, True)
         if response.status_code == 200:
             content_type = response.headers.get("Content-Type", "")
             if "json" not in content_type:
-                return (None, False)
+                return (None, False, False)
             if not response.content:
-                return (None, False)
+                return (None, False, False)
 
             instance_data = await parse_json_with_fallback(
                 response, backend_domain, target_v1
             )
             if instance_data is False or not instance_data:
-                return (None, False)
+                return (None, False, False)
 
             if isinstance(instance_data, dict):
                 uri = instance_data.get("uri")
@@ -4803,14 +4818,14 @@ async def get_instance_uri(backend_domain: str) -> tuple[str | None, bool]:
                 if uri:
                     parsed = urlparse(uri if "://" in uri else f"https://{uri}")
                     hostname = (parsed.hostname or "").strip().lower()
-                    return (hostname or None, False)
-                return (None, False)
-            return (None, False)
-        return (None, False)
+                    return (hostname or None, False, False)
+                return (None, False, False)
+            return (None, False, False)
+        return (None, False, False)
     except httpx.RequestError:
-        return (None, False)
+        return (None, False, False)
     except json.JSONDecodeError:
-        return (None, False)
+        return (None, False, False)
 
 
 def process_mastodon_instance(
@@ -5029,7 +5044,14 @@ async def process_domain(domain, nightly_version_ranges, user_choice=None):
 
     if _is_mastodon_instance(nodeinfo_20_result):
         # Get the actual domain from the instance API
-        instance_uri, is_401 = await get_instance_uri(backend_domain)
+        instance_uri, is_401, is_hardfail = await get_instance_uri(
+            backend_domain, domain, preserve_status
+        )
+
+        if is_hardfail:
+            # Instance API returned a hard-fail code (410/418/451/999);
+            # _handle_http_failed already recorded the error.
+            return
 
         if is_401:
             # Instance API requires authentication (401 Unauthorized)
