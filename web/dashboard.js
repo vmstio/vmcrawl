@@ -245,37 +245,21 @@
     });
   }
 
-  // Cache of CanvasPattern objects keyed by base color so we only build each once.
-  const stripePatternCache = new Map();
-
-  function stripePattern(color) {
-    if (stripePatternCache.has(color)) return stripePatternCache.get(color);
-    const size = 8;
-    const c = document.createElement("canvas");
-    c.width = size;
-    c.height = size;
-    const pctx = c.getContext("2d");
-    pctx.fillStyle = color;
-    pctx.fillRect(0, 0, size, size);
-    pctx.strokeStyle = "rgba(255, 255, 255, 0.55)";
-    pctx.lineWidth = 2;
-    pctx.beginPath();
-    pctx.moveTo(-2, size + 2);
-    pctx.lineTo(size + 2, -2);
-    pctx.moveTo(-2, size / 2 + 2);
-    pctx.lineTo(size / 2 + 2, -2);
-    pctx.moveTo(size / 2 - 2, size + 2);
-    pctx.lineTo(size + 2, size / 2 - 2);
-    pctx.stroke();
-    const pattern = pctx.createPattern(c, "repeat");
-    stripePatternCache.set(color, pattern);
-    return pattern;
+  function fadeColor(color, alpha) {
+    const m = /^#([0-9a-f]{3}|[0-9a-f]{6})$/i.exec(color || "");
+    if (!m) return color;
+    let hex = m[1];
+    if (hex.length === 3) hex = hex.split("").map((c) => c + c).join("");
+    const r = parseInt(hex.slice(0, 2), 16);
+    const g = parseInt(hex.slice(2, 4), 16);
+    const b = parseInt(hex.slice(4, 6), 16);
+    return `rgba(${r}, ${g}, ${b}, ${alpha})`;
   }
 
   function backgroundForDataset(color, flags) {
     if (!flags || !flags.some(Boolean)) return color;
-    const stripes = stripePattern(color);
-    return flags.map((f) => (f ? stripes : color));
+    const faded = fadeColor(color, 0.25);
+    return flags.map((f) => (f ? faded : color));
   }
 
   function createStackedBar(canvasId, labels, datasets, options = {}) {
