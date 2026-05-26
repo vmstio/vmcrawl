@@ -73,8 +73,16 @@ CREATE TABLE IF NOT EXISTS statistics (
     main_patched_mau INTEGER,
     latest_patched_mau INTEGER,
     previous_patched_mau INTEGER,
-    deprecated_patched_mau INTEGER
+    deprecated_patched_mau INTEGER,
+    invalid BOOLEAN NOT NULL DEFAULT FALSE,
+    invalid_reason TEXT
   );
+
+-- Upgrade path: add invalid flag columns to existing statistics tables.
+ALTER TABLE statistics
+  ADD COLUMN IF NOT EXISTS invalid BOOLEAN NOT NULL DEFAULT FALSE;
+ALTER TABLE statistics
+  ADD COLUMN IF NOT EXISTS invalid_reason TEXT;
 
 
 CREATE TABLE IF NOT EXISTS nightly_versions (

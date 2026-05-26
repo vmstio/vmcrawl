@@ -3343,6 +3343,62 @@ def run_nightly_mode(args):
 # =============================================================================
 
 
+def list_flagged_statistics() -> None:
+    """Display statistics rows currently flagged as invalid."""
+    try:
+        with db_pool.connection() as conn, conn.cursor() as cur:
+            _ = cur.execute(
+                """
+                SELECT date, invalid_reason, updated_at
+                FROM statistics
+                WHERE invalid = TRUE
+                ORDER BY date DESC
+                """
+            )
+            rows = cur.fetchall()
+        if not rows:
+            echo("\nNo statistics days are flagged as invalid.", "cyan")
+            return
+        echo("\nFlagged Statistics Days:", "cyan")
+        echo("-" * 70, "cyan")
+        echo(f"{'Date':<12} {'Updated At':<26} Reason", "bold")
+        echo("-" * 70, "cyan")
+        for d, reason, updated in rows:
+            updated_str = updated.isoformat(sep=" ", timespec="seconds") if updated else "-"
+            echo(f"{str(d):<12} {updated_str:<26} {reason or '(no reason)'}", "white")
+    except Exception as e:
+        echo(f"Error listing flagged statistics: {e}", "red")
+
+
+def set_statistics_invalid(target: date, invalid: bool, reason: str | None) -> bool:
+    """Set the invalid flag on the statistics row for `target`. Returns True on success."""
+    try:
+        with db_pool.connection() as conn, conn.cursor() as cur:
+            _ = cur.execute(
+                """
+                UPDATE statistics
+                SET invalid = %s, invalid_reason = %s
+                WHERE date = %s
+                RETURNING date
+                """,
+                (invalid, reason if invalid else None, target),
+            )
+            row = cur.fetchone()
+            conn.commit()
+        if row is None:
+            echo(f"No statistics row found for {target.isoformat()}", "yellow")
+            return False
+        if invalid:
+            suffix = f" (reason: {reason})" if reason else ""
+            echo(f"Flagged {target.isoformat()} as invalid{suffix}", "green")
+        else:
+            echo(f"Cleared invalid flag on {target.isoformat()}", "green")
+        return True
+    except Exception as e:
+        echo(f"Error updating statistics row: {e}", "red")
+        return False
+
+
 def print_manage_menu():
     """Print the management menu options."""
     echo("", "white")
@@ -3373,6 +3429,11 @@ def print_manage_menu():
     echo("", "white")
     echo("Domain Search:", "yellow")
     echo("  15. Search domain details", "white")
+    echo("", "white")
+    echo("Statistics Management:", "yellow")
+    echo("  16. List flagged statistics days", "white")
+    echo("  17. Flag statistics day as invalid", "white")
+    echo("  18. Unflag statistics day", "white")
     echo("", "white")
     echo("   q. Quit", "white")
     echo("", "white")
@@ -3937,6 +3998,51 @@ async def run_manage_mode(args: argparse.Namespace) -> int:
                 input("Press Enter to continue...")
                 continue
             display_domain_search(domain)
+            echo("", "white")
+            input("Press Enter to continue...")
+
+        # Statistics Management
+        elif choice == "16":
+            list_flagged_statistics()
+            echo("", "white")
+            input("Press Enter to continue...")
+
+        elif choice == "17":
+            echo("", "white")
+            date_str = input("Enter date to flag (YYYY-MM-DD): ").strip()
+            if not date_str:
+                echo("Date cannot be empty", "yellow")
+                echo("", "white")
+                input("Press Enter to continue...")
+                continue
+            try:
+                target = date.fromisoformat(date_str)
+            except ValueError:
+                echo("Invalid date format, expected YYYY-MM-DD", "yellow")
+                echo("", "white")
+                input("Press Enter to continue...")
+                continue
+            reason = input("Enter reason (optional): ").strip() or None
+            _ = set_statistics_invalid(target, True, reason)
+            echo("", "white")
+            input("Press Enter to continue...")
+
+        elif choice == "18":
+            echo("", "white")
+            date_str = input("Enter date to unflag (YYYY-MM-DD): ").strip()
+            if not date_str:
+                echo("Date cannot be empty", "yellow")
+                echo("", "white")
+                input("Press Enter to continue...")
+                continue
+            try:
+                target = date.fromisoformat(date_str)
+            except ValueError:
+                echo("Invalid date format, expected YYYY-MM-DD", "yellow")
+                echo("", "white")
+                input("Press Enter to continue...")
+                continue
+            _ = set_statistics_invalid(target, False, None)
             echo("", "white")
             input("Press Enter to continue...")
 

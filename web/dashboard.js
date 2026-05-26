@@ -245,12 +245,51 @@
     });
   }
 
-  function createStackedBar(canvasId, labels, datasets) {
+  // Cache of CanvasPattern objects keyed by base color so we only build each once.
+  const stripePatternCache = new Map();
+
+  function stripePattern(color) {
+    if (stripePatternCache.has(color)) return stripePatternCache.get(color);
+    const size = 8;
+    const c = document.createElement("canvas");
+    c.width = size;
+    c.height = size;
+    const pctx = c.getContext("2d");
+    pctx.fillStyle = color;
+    pctx.fillRect(0, 0, size, size);
+    pctx.strokeStyle = "rgba(255, 255, 255, 0.55)";
+    pctx.lineWidth = 2;
+    pctx.beginPath();
+    pctx.moveTo(-2, size + 2);
+    pctx.lineTo(size + 2, -2);
+    pctx.moveTo(-2, size / 2 + 2);
+    pctx.lineTo(size / 2 + 2, -2);
+    pctx.moveTo(size / 2 - 2, size + 2);
+    pctx.lineTo(size + 2, size / 2 - 2);
+    pctx.stroke();
+    const pattern = pctx.createPattern(c, "repeat");
+    stripePatternCache.set(color, pattern);
+    return pattern;
+  }
+
+  function backgroundForDataset(color, flags) {
+    if (!flags || !flags.some(Boolean)) return color;
+    const stripes = stripePattern(color);
+    return flags.map((f) => (f ? stripes : color));
+  }
+
+  function createStackedBar(canvasId, labels, datasets, options = {}) {
     const ctx = document.getElementById(canvasId);
     if (!ctx) return;
+    const flags = options.flags || [];
+    const reasons = options.reasons || [];
+    const decorated = datasets.map((d) => ({
+      ...d,
+      backgroundColor: backgroundForDataset(d.backgroundColor, flags),
+    }));
     new Chart(ctx, {
       type: "bar",
-      data: { labels: labels, datasets: datasets },
+      data: { labels: labels, datasets: decorated },
       options: {
         indexAxis: "y",
         responsive: true,
@@ -273,6 +312,14 @@
           tooltip: {
             callbacks: {
               label: (ctx) => ctx.dataset.label + ": " + fmt(ctx.parsed.x),
+              afterBody: (items) => {
+                if (!items.length) return "";
+                const idx = items[0].dataIndex;
+                if (!flags[idx]) return "";
+                return reasons[idx]
+                  ? `⚠ Data flagged invalid: ${reasons[idx]}`
+                  : "⚠ Data flagged invalid";
+              },
             },
           },
         },
@@ -538,6 +585,9 @@
       const d = new Date(h.date);
       return d.toLocaleDateString("en-US", { day: "2-digit", month: "short" });
     });
+    const histFlags = histSlice.map((h) => Boolean(h.invalid));
+    const histReasons = histSlice.map((h) => h.invalid_reason || "");
+    const histOptions = { flags: histFlags, reasons: histReasons };
 
     const histBranchNames = [
       "Main Branch",
@@ -548,110 +598,130 @@
     const histColors = [BLUE, GREEN, PURPLE, ORANGE];
 
     // Patch adoption by instance
-    createStackedBar("chart-hist-patch-instances", histLabels, [
-      {
-        label: histBranchNames[0],
-        data: histSlice.map((h) => h.main_patched_instances),
-        backgroundColor: histColors[0],
-      },
-      {
-        label: histBranchNames[1],
-        data: histSlice.map((h) => h.latest_patched_instances),
-        backgroundColor: histColors[1],
-      },
-      {
-        label: histBranchNames[2],
-        data: histSlice.map((h) => h.previous_patched_instances),
-        backgroundColor: histColors[2],
-      },
-      {
-        label: histBranchNames[3],
-        data: histSlice.map((h) => h.deprecated_patched_instances),
-        backgroundColor: histColors[3],
-      },
-    ]);
+    createStackedBar(
+      "chart-hist-patch-instances",
+      histLabels,
+      [
+        {
+          label: histBranchNames[0],
+          data: histSlice.map((h) => h.main_patched_instances),
+          backgroundColor: histColors[0],
+        },
+        {
+          label: histBranchNames[1],
+          data: histSlice.map((h) => h.latest_patched_instances),
+          backgroundColor: histColors[1],
+        },
+        {
+          label: histBranchNames[2],
+          data: histSlice.map((h) => h.previous_patched_instances),
+          backgroundColor: histColors[2],
+        },
+        {
+          label: histBranchNames[3],
+          data: histSlice.map((h) => h.deprecated_patched_instances),
+          backgroundColor: histColors[3],
+        },
+      ],
+      histOptions,
+    );
 
     // Patch adoption by MAU
-    createStackedBar("chart-hist-patch-mau", histLabels, [
-      {
-        label: histBranchNames[0],
-        data: histSlice.map((h) => h.main_patched_mau),
-        backgroundColor: histColors[0],
-      },
-      {
-        label: histBranchNames[1],
-        data: histSlice.map((h) => h.latest_patched_mau),
-        backgroundColor: histColors[1],
-      },
-      {
-        label: histBranchNames[2],
-        data: histSlice.map((h) => h.previous_patched_mau),
-        backgroundColor: histColors[2],
-      },
-      {
-        label: histBranchNames[3],
-        data: histSlice.map((h) => h.deprecated_patched_mau),
-        backgroundColor: histColors[3],
-      },
-    ]);
+    createStackedBar(
+      "chart-hist-patch-mau",
+      histLabels,
+      [
+        {
+          label: histBranchNames[0],
+          data: histSlice.map((h) => h.main_patched_mau),
+          backgroundColor: histColors[0],
+        },
+        {
+          label: histBranchNames[1],
+          data: histSlice.map((h) => h.latest_patched_mau),
+          backgroundColor: histColors[1],
+        },
+        {
+          label: histBranchNames[2],
+          data: histSlice.map((h) => h.previous_patched_mau),
+          backgroundColor: histColors[2],
+        },
+        {
+          label: histBranchNames[3],
+          data: histSlice.map((h) => h.deprecated_patched_mau),
+          backgroundColor: histColors[3],
+        },
+      ],
+      histOptions,
+    );
 
     // Branch deployments by instance
-    createStackedBar("chart-hist-branch-instances", histLabels, [
-      {
-        label: histBranchNames[0],
-        data: histSlice.map((h) => h.main_instances),
-        backgroundColor: histColors[0],
-      },
-      {
-        label: histBranchNames[1],
-        data: histSlice.map((h) => h.latest_instances),
-        backgroundColor: histColors[1],
-      },
-      {
-        label: histBranchNames[2],
-        data: histSlice.map((h) => h.previous_instances),
-        backgroundColor: histColors[2],
-      },
-      {
-        label: histBranchNames[3],
-        data: histSlice.map((h) => h.deprecated_instances),
-        backgroundColor: histColors[3],
-      },
-      {
-        label: "EOL Branches",
-        data: histSlice.map((h) => h.eol_instances),
-        backgroundColor: RED,
-      },
-    ]);
+    createStackedBar(
+      "chart-hist-branch-instances",
+      histLabels,
+      [
+        {
+          label: histBranchNames[0],
+          data: histSlice.map((h) => h.main_instances),
+          backgroundColor: histColors[0],
+        },
+        {
+          label: histBranchNames[1],
+          data: histSlice.map((h) => h.latest_instances),
+          backgroundColor: histColors[1],
+        },
+        {
+          label: histBranchNames[2],
+          data: histSlice.map((h) => h.previous_instances),
+          backgroundColor: histColors[2],
+        },
+        {
+          label: histBranchNames[3],
+          data: histSlice.map((h) => h.deprecated_instances),
+          backgroundColor: histColors[3],
+        },
+        {
+          label: "EOL Branches",
+          data: histSlice.map((h) => h.eol_instances),
+          backgroundColor: RED,
+        },
+      ],
+      histOptions,
+    );
 
     // Branch deployments by MAU
-    createStackedBar("chart-hist-branch-mau", histLabels, [
-      {
-        label: histBranchNames[0],
-        data: histSlice.map((h) => h.main_branch_mau),
-        backgroundColor: histColors[0],
-      },
-      {
-        label: histBranchNames[1],
-        data: histSlice.map((h) => h.latest_branch_mau),
-        backgroundColor: histColors[1],
-      },
-      {
-        label: histBranchNames[2],
-        data: histSlice.map((h) => h.previous_branch_mau),
-        backgroundColor: histColors[2],
-      },
-      {
-        label: histBranchNames[3],
-        data: histSlice.map((h) => h.deprecated_branch_mau),
-        backgroundColor: histColors[3],
-      },
-      {
-        label: "EOL Branches",
-        data: histSlice.map((h) => h.eol_branch_mau),
-        backgroundColor: RED,
-      },
-    ]);
+    createStackedBar(
+      "chart-hist-branch-mau",
+      histLabels,
+      [
+        {
+          label: histBranchNames[0],
+          data: histSlice.map((h) => h.main_branch_mau),
+          backgroundColor: histColors[0],
+        },
+        {
+          label: histBranchNames[1],
+          data: histSlice.map((h) => h.latest_branch_mau),
+          backgroundColor: histColors[1],
+        },
+        {
+          label: histBranchNames[2],
+          data: histSlice.map((h) => h.previous_branch_mau),
+          backgroundColor: histColors[2],
+        },
+        {
+          label: histBranchNames[3],
+          data: histSlice.map((h) => h.deprecated_branch_mau),
+          backgroundColor: histColors[3],
+        },
+        {
+          label: "EOL Branches",
+          data: histSlice.map((h) => h.eol_branch_mau),
+          backgroundColor: RED,
+        },
+      ],
+      histOptions,
+    );
 
     // Load table
     await loadTable().catch(handleTableError);

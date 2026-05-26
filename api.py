@@ -15,7 +15,7 @@ import socket
 import threading
 import time
 from contextlib import asynccontextmanager
-from datetime import datetime, timezone
+from datetime import date as _date, datetime, timezone
 from typing import Any
 
 import httpx
@@ -23,6 +23,7 @@ import paramiko
 import toml
 from dotenv import load_dotenv
 from fastapi import (
+    Body,
     Depends,
     FastAPI,
     HTTPException,
@@ -1336,7 +1337,9 @@ async def get_history_stats(
                     main_patched_mau,
                     latest_patched_mau,
                     previous_patched_mau,
-                    deprecated_patched_mau
+                    deprecated_patched_mau,
+                    invalid,
+                    invalid_reason
                 FROM statistics
                 ORDER BY date DESC
                 LIMIT %s
@@ -1370,11 +1373,65 @@ async def get_history_stats(
                     "latest_patched_mau": row[19] or 0,
                     "previous_patched_mau": row[20] or 0,
                     "deprecated_patched_mau": row[21] or 0,
+                    "invalid": bool(row[22]),
+                    "invalid_reason": row[23],
                 }
                 for row in results
             ]
         }
     except Exception as e:
+        raise _db_error() from None
+
+
+@app.patch("/stats/history/{date}", tags=["Dashboard"])
+async def flag_history_date(
+    _api_key: str | None = Depends(get_api_key),
+    date: str = Path(
+        ...,
+        description="ISO date (YYYY-MM-DD) of the statistics row to update.",
+    ),
+    invalid: bool = Body(..., embed=True),
+    invalid_reason: str | None = Body(None, embed=True),
+):
+    """Mark a historical statistics row as invalid (or clear the flag).
+
+    Pass `invalid: false` to clear; `invalid_reason` is stored verbatim and
+    surfaced in chart tooltips. Returns 404 if no row exists for `date`.
+    """
+    try:
+        parsed = _date.fromisoformat(date)
+    except ValueError:
+        raise HTTPException(
+            status_code=400,
+            detail="Invalid date format. Expected YYYY-MM-DD.",
+        ) from None
+
+    reason = invalid_reason if invalid else None
+    try:
+        with db_pool.connection() as conn, conn.cursor() as cur:
+            _ = cur.execute(
+                """
+                UPDATE statistics
+                SET invalid = %s, invalid_reason = %s
+                WHERE date = %s
+                RETURNING date, invalid, invalid_reason
+                """,
+                (invalid, reason, parsed),
+            )
+            row = cur.fetchone()
+        if row is None:
+            raise HTTPException(
+                status_code=404,
+                detail=f"No statistics row for date {parsed.isoformat()}.",
+            )
+        return {
+            "date": str(row[0]),
+            "invalid": bool(row[1]),
+            "invalid_reason": row[2],
+        }
+    except HTTPException:
+        raise
+    except Exception:
         raise _db_error() from None
 
 
