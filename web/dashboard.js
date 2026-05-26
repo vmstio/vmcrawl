@@ -582,7 +582,8 @@
     // Historical charts
     const histSlice = hist.slice(-10);
     const histLabels = histSlice.map((h) => {
-      const d = new Date(h.date);
+      const [y, m, day] = h.date.split("-").map(Number);
+      const d = new Date(y, m - 1, day);
       return d.toLocaleDateString("en-US", { day: "2-digit", month: "short" });
     });
     const histFlags = histSlice.map((h) => Boolean(h.invalid));
