@@ -1941,6 +1941,25 @@ PURPLE = "#9b59b6"
 GREEN = "#2ecc71"
 
 
+def _fade_hex(color: str, alpha: float) -> str:
+    """Convert ``#RRGGBB`` to ``rgba(r, g, b, alpha)``; return color unchanged otherwise."""
+    if not isinstance(color, str) or len(color) != 7 or not color.startswith("#"):
+        return color
+    try:
+        r, g, b = int(color[1:3], 16), int(color[3:5], 16), int(color[5:7], 16)
+    except ValueError:
+        return color
+    return f"rgba({r}, {g}, {b}, {alpha})"
+
+
+def _bar_colors(color: str, flags: list[bool], alpha: float = 0.25):
+    """Per-bar color list: faded at flagged indices, base color otherwise."""
+    if not any(flags):
+        return color
+    faded = _fade_hex(color, alpha)
+    return [faded if f else color for f in flags]
+
+
 async def _fetch_chart_png(chart_config: dict) -> bytes:
     now = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M UTC")
     plugins = chart_config.setdefault("options", {}).setdefault("plugins", {})
@@ -2312,7 +2331,8 @@ async def chart_patch_history(
                        main_patched_instances, latest_patched_instances,
                        previous_patched_instances, deprecated_patched_instances,
                        main_patched_mau, latest_patched_mau,
-                       previous_patched_mau, deprecated_patched_mau
+                       previous_patched_mau, deprecated_patched_mau,
+                       invalid
                 FROM statistics
                 ORDER BY date DESC
                 LIMIT %s
@@ -2330,28 +2350,29 @@ async def chart_patch_history(
         row[0].strftime("%d %b") if hasattr(row[0], "strftime") else str(row[0])
         for row in hist
     ]
+    flags = [bool(r[9]) for r in hist]
 
     if metric == "instances":
         datasets = [
             {
                 "label": "Main Branch",
                 "data": [r[1] for r in hist],
-                "backgroundColor": "#3498db",
+                "backgroundColor": _bar_colors("#3498db", flags),
             },
             {
                 "label": "Latest Branch",
                 "data": [r[2] for r in hist],
-                "backgroundColor": "#2ecc71",
+                "backgroundColor": _bar_colors("#2ecc71", flags),
             },
             {
                 "label": "Previous Branch",
                 "data": [r[3] for r in hist],
-                "backgroundColor": "#9b59b6",
+                "backgroundColor": _bar_colors("#9b59b6", flags),
             },
             {
                 "label": "Deprecated Branch",
                 "data": [r[4] for r in hist],
-                "backgroundColor": "#f39c12",
+                "backgroundColor": _bar_colors("#f39c12", flags),
             },
         ]
     else:
@@ -2359,22 +2380,22 @@ async def chart_patch_history(
             {
                 "label": "Main Branch",
                 "data": [r[5] for r in hist],
-                "backgroundColor": "#3498db",
+                "backgroundColor": _bar_colors("#3498db", flags),
             },
             {
                 "label": "Latest Branch",
                 "data": [r[6] for r in hist],
-                "backgroundColor": "#2ecc71",
+                "backgroundColor": _bar_colors("#2ecc71", flags),
             },
             {
                 "label": "Previous Branch",
                 "data": [r[7] for r in hist],
-                "backgroundColor": "#9b59b6",
+                "backgroundColor": _bar_colors("#9b59b6", flags),
             },
             {
                 "label": "Deprecated Branch",
                 "data": [r[8] for r in hist],
-                "backgroundColor": "#f39c12",
+                "backgroundColor": _bar_colors("#f39c12", flags),
             },
         ]
 
@@ -2437,7 +2458,8 @@ async def chart_branch_history(
                        main_instances, latest_instances,
                        previous_instances, deprecated_instances, eol_instances,
                        main_branch_mau, latest_branch_mau,
-                       previous_branch_mau, deprecated_branch_mau, eol_branch_mau
+                       previous_branch_mau, deprecated_branch_mau, eol_branch_mau,
+                       invalid
                 FROM statistics
                 ORDER BY date DESC
                 LIMIT %s
@@ -2454,33 +2476,34 @@ async def chart_branch_history(
         row[0].strftime("%d %b") if hasattr(row[0], "strftime") else str(row[0])
         for row in hist
     ]
+    flags = [bool(r[11]) for r in hist]
 
     if metric == "instances":
         datasets = [
             {
                 "label": "Main Branch",
                 "data": [r[1] for r in hist],
-                "backgroundColor": "#3498db",
+                "backgroundColor": _bar_colors("#3498db", flags),
             },
             {
                 "label": "Latest Branch",
                 "data": [r[2] for r in hist],
-                "backgroundColor": "#2ecc71",
+                "backgroundColor": _bar_colors("#2ecc71", flags),
             },
             {
                 "label": "Previous Branch",
                 "data": [r[3] for r in hist],
-                "backgroundColor": "#9b59b6",
+                "backgroundColor": _bar_colors("#9b59b6", flags),
             },
             {
                 "label": "Deprecated Branch",
                 "data": [r[4] for r in hist],
-                "backgroundColor": "#f39c12",
+                "backgroundColor": _bar_colors("#f39c12", flags),
             },
             {
                 "label": "EOL Branches",
                 "data": [r[5] for r in hist],
-                "backgroundColor": "#e74c3c",
+                "backgroundColor": _bar_colors("#e74c3c", flags),
             },
         ]
     else:
@@ -2488,27 +2511,27 @@ async def chart_branch_history(
             {
                 "label": "Main Branch",
                 "data": [r[6] for r in hist],
-                "backgroundColor": "#3498db",
+                "backgroundColor": _bar_colors("#3498db", flags),
             },
             {
                 "label": "Latest Branch",
                 "data": [r[7] for r in hist],
-                "backgroundColor": "#2ecc71",
+                "backgroundColor": _bar_colors("#2ecc71", flags),
             },
             {
                 "label": "Previous Branch",
                 "data": [r[8] for r in hist],
-                "backgroundColor": "#9b59b6",
+                "backgroundColor": _bar_colors("#9b59b6", flags),
             },
             {
                 "label": "Deprecated Branch",
                 "data": [r[9] for r in hist],
-                "backgroundColor": "#f39c12",
+                "backgroundColor": _bar_colors("#f39c12", flags),
             },
             {
                 "label": "EOL Branches",
                 "data": [r[10] for r in hist],
-                "backgroundColor": "#e74c3c",
+                "backgroundColor": _bar_colors("#e74c3c", flags),
             },
         ]
 
