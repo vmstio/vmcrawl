@@ -33,6 +33,7 @@
       redDark: cssVar("--red-dark", "#922b21"),
       blue,
       chartColors: [purple, blue, green, orange, "#1abc9c", "#e67e22", "#95a5a6"],
+      text: cssVar("--text", "#e0e0e8"),
       textMuted: cssVar("--text-muted", "#8888a0"),
       border: cssVar("--border", "#2a2a3a"),
       bgCard: cssVar("--bg-card", "#1a1a24"),
@@ -53,6 +54,19 @@
 
   Chart.defaults.color = theme.textMuted;
   Chart.defaults.borderColor = theme.border;
+
+  // Match the bar/pie chart tooltips to the sparkline's HTML tooltip styling.
+  const tooltipDefaults = Chart.defaults.plugins.tooltip;
+  tooltipDefaults.backgroundColor = theme.bgCard;
+  tooltipDefaults.borderColor = theme.border;
+  tooltipDefaults.borderWidth = 1;
+  tooltipDefaults.cornerRadius = 4;
+  tooltipDefaults.padding = { top: 6, bottom: 6, left: 10, right: 10 };
+  tooltipDefaults.titleColor = theme.textMuted;
+  tooltipDefaults.titleFont = { size: 11, weight: "500" };
+  tooltipDefaults.bodyColor = theme.text;
+  tooltipDefaults.bodyFont = { size: 12, weight: "600" };
+  tooltipDefaults.boxPadding = 4;
 
   function fmt(n) {
     if (n == null) return "--";
@@ -126,13 +140,45 @@
     });
   }
 
-  function createSparkline(canvasId, data, color) {
+  function ensureSparklineTooltip() {
+    let el = document.getElementById("spark-tooltip");
+    if (el) return el;
+    el = document.createElement("div");
+    el.id = "spark-tooltip";
+    el.className = "spark-tooltip";
+    document.body.appendChild(el);
+    return el;
+  }
+
+  function sparklineExternalTooltip(context) {
+    const el = ensureSparklineTooltip();
+    const t = context.tooltip;
+    if (!t || t.opacity === 0) {
+      el.style.opacity = 0;
+      return;
+    }
+    const dp = t.dataPoints && t.dataPoints[0];
+    if (!dp) {
+      el.style.opacity = 0;
+      return;
+    }
+    el.innerHTML =
+      `<div class="spark-tooltip-title">${esc(dp.label)}</div>` +
+      `<div class="spark-tooltip-value">${esc(fmt(dp.parsed.y))}</div>`;
+    const canvas = context.chart.canvas;
+    const rect = canvas.getBoundingClientRect();
+    el.style.left = rect.left + window.scrollX + t.caretX + "px";
+    el.style.top = rect.top + window.scrollY - 6 + "px";
+    el.style.opacity = 1;
+  }
+
+  function createSparkline(canvasId, labels, data, color) {
     const ctx = document.getElementById(canvasId);
     if (!ctx) return;
     new Chart(ctx, {
       type: "line",
       data: {
-        labels: data.map((_, i) => i),
+        labels: labels,
         datasets: [
           {
             data: data,
@@ -141,6 +187,7 @@
             fill: true,
             borderWidth: 1.5,
             pointRadius: 0,
+            pointHoverRadius: 3,
             tension: 0.4,
           },
         ],
@@ -148,8 +195,15 @@
       options: {
         responsive: true,
         maintainAspectRatio: false,
+        interaction: { intersect: false, mode: "index" },
         scales: { x: { display: false }, y: { display: false } },
-        plugins: { legend: { display: false }, tooltip: { enabled: false } },
+        plugins: {
+          legend: { display: false },
+          tooltip: {
+            enabled: false,
+            external: sparklineExternalTooltip,
+          },
+        },
         layout: { padding: 0 },
       },
     });
@@ -445,7 +499,7 @@
       api("/stats/branch-distribution"),
       api("/stats/eol-distribution"),
       api("/stats/branch-adoption"),
-      api("/stats/history?days=30"),
+      api("/stats/history?days=365"),
     ]);
 
     // Big numbers
@@ -471,6 +525,15 @@
     // Sparklines from history
     const hist = history.history.slice().reverse();
     if (hist.length > 1) {
+      const sparkLabels = hist.map((h) => {
+        const [y, m, day] = h.date.split("-").map(Number);
+        const d = new Date(y, m - 1, day);
+        return d.toLocaleDateString("en-US", {
+          day: "2-digit",
+          month: "short",
+          year: "numeric",
+        });
+      });
       const instanceTotals = hist.map(
         (h) =>
           h.main_instances +
@@ -480,8 +543,8 @@
           h.eol_instances,
       );
       const mauTotals = hist.map((h) => h.mau);
-      createSparkline("spark-instances", instanceTotals, PURPLE);
-      createSparkline("spark-mau", mauTotals, PURPLE);
+      createSparkline("spark-instances", sparkLabels, instanceTotals, PURPLE);
+      createSparkline("spark-mau", sparkLabels, mauTotals, PURPLE);
     }
 
     // Gauges
