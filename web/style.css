@@ -66,14 +66,14 @@ body {
 header {
     background: var(--bg-card);
     border-bottom: 1px solid var(--border);
-    padding: 1.5rem 2rem;
 }
 
 .header-content {
     max-width: 1400px;
     margin: 0 auto;
+    padding: 1.5rem;
     display: flex;
-    align-items: baseline;
+    align-items: center;
     gap: 1.5rem;
     flex-wrap: wrap;
 }
@@ -90,17 +90,41 @@ header h1 {
     flex: 1;
 }
 
-nav { display: flex; gap: 1rem; }
+nav { display: flex; gap: 0.5rem; align-items: center; }
 
-nav a {
-    color: var(--purple-light);
+nav a,
+.theme-toggle {
+    color: var(--text-muted);
     text-decoration: none;
-    font-size: 0.85rem;
-    opacity: 0.8;
-    transition: opacity 0.2s;
+    background: transparent;
+    border: 0;
+    padding: 0;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 32px;
+    height: 32px;
+    border-radius: 6px;
+    transition: color 0.2s, background-color 0.2s;
+    transform: translateZ(0);
+    font: inherit;
 }
 
-nav a:hover { opacity: 1; }
+nav a:hover,
+.theme-toggle:hover {
+    color: var(--purple-light);
+    background-color: var(--bg-card-hover);
+}
+
+nav a svg,
+.theme-toggle svg { width: 18px; height: 18px; }
+
+.theme-icon { display: none; }
+
+.theme-toggle[data-mode="auto"] .theme-icon-auto,
+.theme-toggle[data-mode="light"] .theme-icon-light,
+.theme-toggle[data-mode="dark"] .theme-icon-dark { display: inline-block; }
 
 main {
     max-width: 1400px;

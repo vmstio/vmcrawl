@@ -4,13 +4,28 @@
   const API_BASE =
     (window.VMCRAWL_API || "").replace(/\/$/, "") || window.location.origin;
   const colorSchemeQuery = window.matchMedia("(prefers-color-scheme: dark)");
+  const THEME_KEY = "vmcrawl-theme";
+  const THEME_MODES = ["auto", "light", "dark"];
+
+  function getStoredTheme() {
+    const stored = localStorage.getItem(THEME_KEY);
+    return THEME_MODES.includes(stored) ? stored : "auto";
+  }
 
   function applySystemTheme() {
     const themeName = colorSchemeQuery.matches ? "dark" : "light";
     document.documentElement.setAttribute("data-theme", themeName);
   }
 
-  applySystemTheme();
+  function applyTheme(mode) {
+    if (mode === "auto") {
+      applySystemTheme();
+    } else {
+      document.documentElement.setAttribute("data-theme", mode);
+    }
+  }
+
+  applyTheme(getStoredTheme());
 
   function cssVar(name, fallback) {
     const value = getComputedStyle(document.documentElement)
@@ -779,10 +794,25 @@
     console.error("Dashboard load error:", err);
   });
 
+  const themeToggle = document.querySelector(".theme-toggle");
+  if (themeToggle) {
+    const current = getStoredTheme();
+    themeToggle.dataset.mode = current;
+    themeToggle.title =
+      "Theme: " + current.charAt(0).toUpperCase() + current.slice(1);
+    themeToggle.addEventListener("click", () => {
+      const next =
+        THEME_MODES[(THEME_MODES.indexOf(getStoredTheme()) + 1) % THEME_MODES.length];
+      localStorage.setItem(THEME_KEY, next);
+      window.location.reload();
+    });
+  }
+
   if (typeof colorSchemeQuery.addEventListener === "function") {
     colorSchemeQuery.addEventListener("change", () => {
-      applySystemTheme();
-      window.location.reload();
+      if (getStoredTheme() === "auto") {
+        window.location.reload();
+      }
     });
   }
 })();
