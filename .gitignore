@@ -213,6 +213,9 @@ __marimo__/
 uv.lock
 .uv-cache
 
+# Node
+node_modules/
+
 # Zed
 .claude
 CLAUDE.md

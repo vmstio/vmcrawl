@@ -266,12 +266,12 @@ app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 app.add_middleware(SlowAPIMiddleware)
 
 
-# Strict CSP for the dashboard. Chart.js is loaded from jsdelivr with SRI.
-# Inline style attributes on a couple of table headers require
-# 'unsafe-inline' for style-src; script-src stays strict.
+# Strict CSP for the dashboard. Chart.js is vendored under /vendor/, so the
+# script-src is locked to 'self'. Inline style attributes on a couple of
+# table headers require 'unsafe-inline' for style-src.
 _DASHBOARD_CSP = (
     "default-src 'self'; "
-    "script-src 'self' https://cdn.jsdelivr.net; "
+    "script-src 'self'; "
     "style-src 'self' 'unsafe-inline'; "
     "img-src 'self' data:; "
     "font-src 'self'; "

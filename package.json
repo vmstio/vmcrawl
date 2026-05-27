@@ -1,0 +1,12 @@
+{
+  "name": "vmcrawl-web",
+  "private": true,
+  "description": "Vendored frontend dependencies for the vmcrawl dashboard.",
+  "dependencies": {
+    "chart.js": "4.5.1"
+  },
+  "scripts": {
+    "vendor": "mkdir -p web/vendor && cp node_modules/chart.js/dist/chart.umd.js web/vendor/chart.umd.js",
+    "postinstall": "npm run vendor"
+  }
+}
