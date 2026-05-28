@@ -63,7 +63,6 @@
   const GREEN = theme.green;
   const ORANGE = theme.orange;
   const RED = theme.red;
-  const RED_DARK = theme.redDark;
   const BLUE = theme.blue;
   const CHART_COLORS = theme.chartColors;
 
@@ -263,7 +262,7 @@
     });
   }
 
-  function createPieChart(canvasId, labels, values, colors) {
+  function createPieChart(canvasId, labels, values, colors, opts = {}) {
     const ctx = document.getElementById(canvasId);
     if (!ctx) return;
     const bgColors = labels.map((l, i) => {
@@ -307,6 +306,7 @@
                   ctx.label + ": " + fmt(ctx.parsed) + " (" + pctVal + "%)"
                 );
               },
+              afterBody: opts.afterBody,
             },
           },
         },
@@ -505,6 +505,7 @@
       eolDist,
       branchAdoption,
       history,
+      versionsData,
     ] = await Promise.all([
       api("/stats/summary"),
       api("/stats/patch-adoption"),
@@ -515,6 +516,7 @@
       api("/stats/eol-distribution"),
       api("/stats/branch-adoption"),
       api("/stats/history?days=365"),
+      api("/stats/versions"),
     ]);
 
     // Big numbers
@@ -597,58 +599,128 @@
       adoption.map((a) => a.mau_percent),
     );
 
-    // Patch distribution pies
+    // Patch distribution pies. The "EOL" slice gets an expanded tooltip
+    // listing the top individual EOL versions (point-release granularity
+    // from /stats/versions, filtered to versions whose branch is EOL).
     const pd = patchDist.distribution.sort((a, b) => b.instances - a.instances);
     const pdColors = pd.map((d) => {
       if (d.version === "EOL") return RED;
       if (d.version === "Unpatched") return ORANGE;
       return PURPLE;
     });
+
+    const eolBranchPrefixes = eolDist.distribution.map((d) => d.branch);
+    function isEolVersion(v) {
+      return eolBranchPrefixes.some((b) => v.startsWith(b + "."));
+    }
+    // The aggregated slice labels in patchDist are everything that isn't a
+    // literal version — i.e. "EOL" and "Unpatched". Any literal version in
+    // patchDist is by definition the current latest of its branch.
+    const supportedLatestVersions = new Set(
+      patchDist.distribution
+        .filter((d) => d.version !== "EOL" && d.version !== "Unpatched")
+        .map((d) => d.version),
+    );
+    function isUnpatchedVersion(v) {
+      return !supportedLatestVersions.has(v) && !isEolVersion(v);
+    }
+
+    function detailedFor(predicate) {
+      return (versionsData.versions || [])
+        .filter((v) => predicate(v.version))
+        .map((v) => ({
+          version: v.version,
+          instances: v.instances,
+          mau: v.monthly_active_users || 0,
+        }));
+    }
+    const eolDetailed = detailedFor(isEolVersion);
+    const unpatchedDetailed = detailedFor(isUnpatchedVersion);
+
+    const PATCH_EXPAND_TOP_N = 10;
+    const expandableSlices = {
+      EOL: { pool: eolDetailed, title: "Top EOL versions:" },
+      Unpatched: { pool: unpatchedDetailed, title: "Top Unpatched versions:" },
+    };
+
+    function patchExpandAfterBody(field) {
+      return (items) => {
+        if (!items.length) return undefined;
+        const config = expandableSlices[items[0].label];
+        if (!config) return undefined;
+        const sliceTotal = items[0].parsed || 0;
+        if (!sliceTotal) return undefined;
+        const sorted = config.pool
+          .filter((v) => v[field] > 0)
+          .sort((a, b) => b[field] - a[field]);
+        if (!sorted.length) return undefined;
+        const top = sorted.slice(0, PATCH_EXPAND_TOP_N);
+        const lines = ["", config.title];
+        for (const v of top) {
+          const pctVal = ((v[field] / sliceTotal) * 100).toFixed(1);
+          lines.push(`  ${v.version}: ${fmt(v[field])} (${pctVal}%)`);
+        }
+        if (sorted.length > PATCH_EXPAND_TOP_N) {
+          lines.push(`  + ${sorted.length - PATCH_EXPAND_TOP_N} more`);
+        }
+        return lines;
+      };
+    }
+
     createPieChart(
       "pie-patch-instances",
       pd.map((d) => d.version),
       pd.map((d) => d.instances),
       pdColors,
+      { afterBody: patchExpandAfterBody("instances") },
     );
     createPieChart(
       "pie-patch-mau",
       pd.map((d) => d.version),
       pd.map((d) => d.mau),
       pdColors,
+      { afterBody: patchExpandAfterBody("mau") },
     );
 
-    // Branch distribution pies
+    // Branch distribution donuts — single aggregated EOL slice, with the
+    // per-version EOL breakdown surfaced inside the EOL slice's tooltip.
     const bd = branchDist.distribution;
     const bdColors = bd.map((d) => (d.branch === "EOL" ? RED : GREEN));
+    const eolVersions = eolDist.distribution
+      .filter((d) => d.instances > 0)
+      .slice();
+
+    function eolBreakdownAfterBody(field) {
+      return (items) => {
+        if (!items.length || items[0].label !== "EOL") return undefined;
+        const eolTotal = items[0].parsed || 0;
+        if (!eolTotal) return undefined;
+        const sorted = eolVersions
+          .filter((d) => d[field] > 0)
+          .sort((a, b) => b[field] - a[field]);
+        if (!sorted.length) return undefined;
+        const lines = ["", "Breakdown:"];
+        for (const d of sorted) {
+          const pctVal = ((d[field] / eolTotal) * 100).toFixed(1);
+          lines.push(`  ${d.branch}: ${fmt(d[field])} (${pctVal}%)`);
+        }
+        return lines;
+      };
+    }
+
     createPieChart(
       "pie-branch-instances",
       bd.map((d) => d.branch),
       bd.map((d) => d.instances),
       bdColors,
+      { afterBody: eolBreakdownAfterBody("instances") },
     );
     createPieChart(
       "pie-branch-mau",
       bd.map((d) => d.branch),
       bd.map((d) => d.mau),
       bdColors,
-    );
-
-    // EOL distribution pies
-    const eol = eolDist.distribution.filter((d) => d.instances > 0);
-    const eolColors = eol.map((d) =>
-      d.branch.startsWith("3") ? RED_DARK : RED,
-    );
-    createPieChart(
-      "pie-eol-instances",
-      eol.map((d) => d.branch),
-      eol.map((d) => d.instances),
-      eolColors,
-    );
-    createPieChart(
-      "pie-eol-mau",
-      eol.map((d) => d.branch),
-      eol.map((d) => d.mau),
-      eolColors,
+      { afterBody: eolBreakdownAfterBody("mau") },
     );
 
     // Historical charts
