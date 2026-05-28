@@ -297,6 +297,7 @@
           },
           tooltip: {
             callbacks: {
+              title: () => "",
               label: function (ctx) {
                 const total = ctx.dataset.data.reduce((a, b) => a + b, 0);
                 const pctVal = total
