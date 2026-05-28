@@ -566,10 +566,20 @@
     const branches = patchDetail.branches;
     for (const branch of ["main", "latest", "previous", "deprecated"]) {
       const b = branches[branch];
-      if (b.version) {
-        const titleEl = document.getElementById(`gauge-title-${branch}`);
-        if (titleEl) titleEl.textContent = b.version;
+      const titleEl = document.getElementById(`gauge-title-${branch}`);
+      if (!b.version) {
+        const pair = titleEl && titleEl.parentElement
+          ? titleEl.parentElement.querySelector(".gauge-pair")
+          : null;
+        if (pair) {
+          pair.innerHTML =
+            '<div class="gauge-empty">There are no supported versions in this branch at this time.' +
+            '<br><a href="https://mastoreqs.com/lifecycle" target="_blank" rel="noopener">' +
+            "Learn about the Mastodon version lifecycle</a></div>";
+        }
+        continue;
       }
+      if (titleEl) titleEl.textContent = b.version;
       createGauge(`gauge-${branch}-instances`, b.patched, b.total);
       createGauge(`gauge-${branch}-mau`, b.mau_patched, b.mau_total);
     }

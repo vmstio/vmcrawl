@@ -259,6 +259,24 @@ main {
     margin-top: 0.25rem;
 }
 
+.gauge-empty {
+    grid-column: 1 / -1;
+    color: var(--text-muted);
+    font-size: 0.85rem;
+    text-align: center;
+    padding: 2.25rem 0.5rem;
+    line-height: 1.4;
+}
+
+.gauge-empty a {
+    color: var(--purple-light);
+    text-decoration: none;
+    display: inline-block;
+    margin-top: 0.5rem;
+}
+
+.gauge-empty a:hover { text-decoration: underline; }
+
 /* Chart Row */
 .chart-row {
     display: grid;
