@@ -326,6 +326,27 @@
     return `rgba(${r}, ${g}, ${b}, ${alpha})`;
   }
 
+  function darkenHex(hex, factor) {
+    const m = /^#([0-9a-f]{6})$/i.exec(hex || "");
+    if (!m) return hex;
+    const v = parseInt(m[1], 16);
+    const r = Math.round(((v >> 16) & 0xff) * (1 - factor));
+    const g = Math.round(((v >> 8) & 0xff) * (1 - factor));
+    const b = Math.round((v & 0xff) * (1 - factor));
+    return (
+      "#" + [r, g, b].map((x) => x.toString(16).padStart(2, "0")).join("")
+    );
+  }
+
+  // Generate `count` shades darkening from the base color (0% darken at i=0)
+  // through `maxDarken` (default 55%) at i=count-1. Used to differentiate
+  // branches within a single-family stacked chart.
+  function makeShades(base, count, maxDarken = 0.55) {
+    if (count <= 1) return [base];
+    const step = maxDarken / (count - 1);
+    return Array.from({ length: count }, (_, i) => darkenHex(base, i * step));
+  }
+
   function backgroundForDataset(color, flags) {
     if (!flags || !flags.some(Boolean)) return color;
     const faded = fadeColor(color, 0.25);
@@ -337,7 +358,12 @@
     if (!ctx) return;
     const flags = options.flags || [];
     const reasons = options.reasons || [];
-    const decorated = datasets.map((d) => ({
+    // Drop datasets that have no data across the entire range so they don't
+    // clutter the legend with empty entries.
+    const populated = datasets.filter((d) =>
+      (d.data || []).some((v) => Number(v) > 0),
+    );
+    const decorated = populated.map((d) => ({
       ...d,
       backgroundColor: backgroundForDataset(d.backgroundColor, flags),
     }));
@@ -603,11 +629,41 @@
     // Patch distribution pies. The "EOL" slice gets an expanded tooltip
     // listing the top individual EOL versions (point-release granularity
     // from /stats/versions, filtered to versions whose branch is EOL).
-    const pd = patchDist.distribution.sort((a, b) => b.instances - a.instances);
+    // Order slices by version number (highest first), with the aggregated
+    // "Unpatched" and "EOL" buckets always pinned to the end.
+    function compareVersionDesc(a, b) {
+      const pa = String(a).split(".").map(Number);
+      const pb = String(b).split(".").map(Number);
+      for (let i = 0; i < Math.max(pa.length, pb.length); i++) {
+        const da = pa[i] || 0;
+        const db = pb[i] || 0;
+        if (da !== db) return db - da;
+      }
+      return 0;
+    }
+    const aggregateRank = (label) =>
+      label === "EOL" ? 2 : label === "Unpatched" ? 1 : 0;
+    const pd = patchDist.distribution.slice().sort((a, b) => {
+      const ra = aggregateRank(a.version);
+      const rb = aggregateRank(b.version);
+      if (ra !== rb) return ra - rb;
+      if (ra !== 0) return 0;
+      return compareVersionDesc(a.version, b.version);
+    });
+    // Shade the per-version slices by semantic version (newest = brightest
+    // purple). EOL stays RED, Unpatched stays ORANGE.
+    const pdVersionEntries = pd
+      .filter((d) => d.version !== "EOL" && d.version !== "Unpatched")
+      .slice()
+      .sort((a, b) => compareVersionDesc(a.version, b.version));
+    const pdShades = makeShades(PURPLE, pdVersionEntries.length);
+    const pdVersionColors = new Map(
+      pdVersionEntries.map((d, i) => [d.version, pdShades[i]]),
+    );
     const pdColors = pd.map((d) => {
       if (d.version === "EOL") return RED;
       if (d.version === "Unpatched") return ORANGE;
-      return PURPLE;
+      return pdVersionColors.get(d.version) || PURPLE;
     });
 
     const eolBranchPrefixes = eolDist.distribution.map((d) => d.branch);
@@ -685,8 +741,25 @@
 
     // Branch distribution donuts — single aggregated EOL slice, with the
     // per-version EOL breakdown surfaced inside the EOL slice's tooltip.
-    const bd = branchDist.distribution;
-    const bdColors = bd.map((d) => (d.branch === "EOL" ? RED : GREEN));
+    // Supported branches shaded by branch (newest = brightest green).
+    const bd = branchDist.distribution.slice().sort((a, b) => {
+      const ra = aggregateRank(a.branch);
+      const rb = aggregateRank(b.branch);
+      if (ra !== rb) return ra - rb;
+      if (ra !== 0) return 0;
+      return compareVersionDesc(a.branch, b.branch);
+    });
+    const bdSupportedDesc = bd
+      .filter((d) => d.branch !== "EOL")
+      .slice()
+      .sort((a, b) => compareVersionDesc(a.branch, b.branch));
+    const bdShades = makeShades(GREEN, bdSupportedDesc.length);
+    const bdBranchColors = new Map(
+      bdSupportedDesc.map((d, i) => [d.branch, bdShades[i]]),
+    );
+    const bdColors = bd.map((d) =>
+      d.branch === "EOL" ? RED : bdBranchColors.get(d.branch) || GREEN,
+    );
     const eolVersions = eolDist.distribution
       .filter((d) => d.instances > 0)
       .slice();
@@ -741,7 +814,11 @@
       "Previous Branch",
       "Deprecated Branch",
     ];
-    const histColors = [BLUE, GREEN, PURPLE, ORANGE];
+    // Historical Trends palette: shaded BLUE for Main/Latest/Previous so the
+    // section reads as its own visual unit, then ORANGE for Deprecated to
+    // echo the "Unpatched" slice in the Patch Distribution donut, and RED for
+    // EOL throughout.
+    const histShades = [...makeShades(BLUE, 3), ORANGE];
 
     // Patch adoption by instance
     createStackedBar(
@@ -751,22 +828,22 @@
         {
           label: histBranchNames[0],
           data: histSlice.map((h) => h.main_patched_instances),
-          backgroundColor: histColors[0],
+          backgroundColor: histShades[0],
         },
         {
           label: histBranchNames[1],
           data: histSlice.map((h) => h.latest_patched_instances),
-          backgroundColor: histColors[1],
+          backgroundColor: histShades[1],
         },
         {
           label: histBranchNames[2],
           data: histSlice.map((h) => h.previous_patched_instances),
-          backgroundColor: histColors[2],
+          backgroundColor: histShades[2],
         },
         {
           label: histBranchNames[3],
           data: histSlice.map((h) => h.deprecated_patched_instances),
-          backgroundColor: histColors[3],
+          backgroundColor: histShades[3],
         },
       ],
       histOptions,
@@ -780,22 +857,22 @@
         {
           label: histBranchNames[0],
           data: histSlice.map((h) => h.main_patched_mau),
-          backgroundColor: histColors[0],
+          backgroundColor: histShades[0],
         },
         {
           label: histBranchNames[1],
           data: histSlice.map((h) => h.latest_patched_mau),
-          backgroundColor: histColors[1],
+          backgroundColor: histShades[1],
         },
         {
           label: histBranchNames[2],
           data: histSlice.map((h) => h.previous_patched_mau),
-          backgroundColor: histColors[2],
+          backgroundColor: histShades[2],
         },
         {
           label: histBranchNames[3],
           data: histSlice.map((h) => h.deprecated_patched_mau),
-          backgroundColor: histColors[3],
+          backgroundColor: histShades[3],
         },
       ],
       histOptions,
@@ -809,22 +886,22 @@
         {
           label: histBranchNames[0],
           data: histSlice.map((h) => h.main_instances),
-          backgroundColor: histColors[0],
+          backgroundColor: histShades[0],
         },
         {
           label: histBranchNames[1],
           data: histSlice.map((h) => h.latest_instances),
-          backgroundColor: histColors[1],
+          backgroundColor: histShades[1],
         },
         {
           label: histBranchNames[2],
           data: histSlice.map((h) => h.previous_instances),
-          backgroundColor: histColors[2],
+          backgroundColor: histShades[2],
         },
         {
           label: histBranchNames[3],
           data: histSlice.map((h) => h.deprecated_instances),
-          backgroundColor: histColors[3],
+          backgroundColor: histShades[3],
         },
         {
           label: "EOL Branches",
@@ -843,22 +920,22 @@
         {
           label: histBranchNames[0],
           data: histSlice.map((h) => h.main_branch_mau),
-          backgroundColor: histColors[0],
+          backgroundColor: histShades[0],
         },
         {
           label: histBranchNames[1],
           data: histSlice.map((h) => h.latest_branch_mau),
-          backgroundColor: histColors[1],
+          backgroundColor: histShades[1],
         },
         {
           label: histBranchNames[2],
           data: histSlice.map((h) => h.previous_branch_mau),
-          backgroundColor: histColors[2],
+          backgroundColor: histShades[2],
         },
         {
           label: histBranchNames[3],
           data: histSlice.map((h) => h.deprecated_branch_mau),
-          backgroundColor: histColors[3],
+          backgroundColor: histShades[3],
         },
         {
           label: "EOL Branches",
