@@ -29,6 +29,7 @@ py-modules = [
 [dependency-groups]
 dev = [
     "types-cachetools>=6.2.0.20251022",
+    "watchfiles>=1.1.1",
 ]
 
 [tool.pyright]
