@@ -4342,6 +4342,19 @@ async def check_robots_txt(domain, preserve_status=None):
             preserve_status,
         )
         return False
+    except (ValueError, RuntimeError) as exception:
+        # get_httpx raises ValueError for oversized/malformed responses and
+        # RuntimeError when retries are exhausted; attribute them to this
+        # endpoint instead of letting them bubble to the worker's generic
+        # "shutdown" handler.
+        await asyncio.to_thread(
+            _handle_tcp_exception,
+            domain,
+            target,
+            exception,
+            preserve_status,
+        )
+        return False
     return True
 
 
@@ -4393,8 +4406,11 @@ async def check_host_meta(domain):
         # host-meta not available or failed
         return None
 
-    except httpx.RequestError:
-        # Connection errors are expected when host-meta isn't available
+    except (httpx.RequestError, ValueError, RuntimeError):
+        # Connection errors are expected when host-meta isn't available.
+        # ValueError/RuntimeError cover oversized/malformed responses and
+        # exhausted retries from get_httpx; this is a silent discovery probe,
+        # so the real error is recorded later by the nodeinfo fallback path.
         return None
 
 
@@ -4462,6 +4478,11 @@ async def check_webfinger(domain):
         return None
     except json.JSONDecodeError:
         # JSON errors are silent (fallback behavior)
+        return None
+    except (ValueError, RuntimeError):
+        # Oversized/malformed responses or exhausted retries from get_httpx;
+        # silent like other webfinger fallback failures. JSONDecodeError (a
+        # ValueError subclass) is handled by the clause above.
         return None
 
 
@@ -4744,6 +4765,22 @@ async def check_nodeinfo(
             exception,
             preserve_status,
         )
+    except (ValueError, RuntimeError) as exception:
+        # Oversized/malformed responses (ValueError) or exhausted retries
+        # (RuntimeError) from get_httpx; classify like other transport errors.
+        # JSONDecodeError (a ValueError subclass) is handled by the clause above.
+        if suppress_errors:
+            return {
+                "suppressed_error": exception,
+                "suppressed_error_type": _classify_request_exception(exception).lower(),
+            }
+        await asyncio.to_thread(
+            _handle_tcp_exception,
+            domain,
+            target,
+            exception,
+            preserve_status,
+        )
     return None
 
 
@@ -4808,6 +4845,18 @@ async def check_nodeinfo_20(
     except json.JSONDecodeError as exception:
         await asyncio.to_thread(
             _handle_json_exception,
+            domain,
+            target,
+            exception,
+            preserve_status,
+        )
+        return False
+    except (ValueError, RuntimeError) as exception:
+        # Oversized/malformed responses (ValueError) or exhausted retries
+        # (RuntimeError) from get_httpx; classify like other transport errors.
+        # JSONDecodeError (a ValueError subclass) is handled by the clause above.
+        await asyncio.to_thread(
+            _handle_tcp_exception,
             domain,
             target,
             exception,
@@ -4888,7 +4937,9 @@ async def get_instance_uri(
                     # Normalize domain to lowercase for consistent comparison
                     if v2_domain:
                         return (v2_domain.strip().lower(), False, False)
-    except (httpx.RequestError, json.JSONDecodeError):
+    except (httpx.RequestError, ValueError, RuntimeError):
+        # ValueError covers JSON decode errors plus oversized/malformed
+        # responses from get_httpx; RuntimeError covers exhausted retries.
         pass  # Fall through to v1 API
 
     # Fallback to v1 API
@@ -4931,6 +4982,10 @@ async def get_instance_uri(
     except httpx.RequestError:
         return (None, False, False)
     except json.JSONDecodeError:
+        return (None, False, False)
+    except (ValueError, RuntimeError):
+        # Oversized/malformed responses or exhausted retries from get_httpx;
+        # caller (process_domain) records the API error when uri is None.
         return (None, False, False)
 
 
