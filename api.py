@@ -2018,7 +2018,42 @@ def _bar_colors(color: str, flags: list[bool], alpha: float = 0.25):
     return [faded if f else color for f in flags]
 
 
-async def _fetch_chart_png(chart_config: dict) -> bytes:
+# When a dataset's backgroundColor is a per-bar array (flagged days faded), the
+# legend swatch otherwise resolves the first bar's color — showing the faded
+# shade if day one is flagged. QuickChart's sandbox can't pass a chart-aware
+# generateLabels the chart, so we bake the legend entries (label + base color)
+# at request time and inject them as a static generateLabels function.
+_LEGEND_FN_SENTINEL = "__GENERATE_LABELS__"
+
+
+def _base_color_legend_fn(datasets: list[dict]) -> str:
+    """Build a static ``generateLabels`` returning each series' base ``#RRGGBB``
+    color (faded bars are ``rgba(...)``), so the legend never shows a faded shade."""
+    items = []
+    for i, d in enumerate(datasets):
+        bg = d["backgroundColor"]
+        if isinstance(bg, list):
+            base = next(
+                (c for c in bg if isinstance(c, str) and c.startswith("#")),
+                bg[0] if bg else None,
+            )
+        else:
+            base = bg
+        items.append(
+            {
+                "text": d["label"],
+                "fillStyle": base,
+                "strokeStyle": base,
+                "fontColor": "#8888a0",
+                "pointStyle": "circle",
+                "lineWidth": 0,
+                "datasetIndex": i,
+            }
+        )
+    return "function(){return " + json.dumps(items) + ";}"
+
+
+async def _fetch_chart_png(chart_config: dict, functions: dict | None = None) -> bytes:
     now = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M UTC")
     plugins = chart_config.setdefault("options", {}).setdefault("plugins", {})
     plugins["subtitle"] = {
@@ -2028,15 +2063,29 @@ async def _fetch_chart_png(chart_config: dict) -> bytes:
         "font": {"size": 11},
         "padding": {"bottom": 8},
     }
-    params = {
-        "c": json.dumps(chart_config),
-        "w": 600,
-        "h": 400,
-        "bkg": "#1a1a24",
-        "v": "4",
-    }
+    config_str = json.dumps(chart_config)
     async with httpx.AsyncClient(timeout=15) as client:
-        resp = await client.get(QUICKCHART_URL, params=params)
+        if functions:
+            # QuickChart only evaluates JS functions when they appear unquoted in
+            # the config, which requires the POST endpoint. Splice each function's
+            # code in place of its quoted sentinel string.
+            for sentinel, code in functions.items():
+                config_str = config_str.replace(json.dumps(sentinel), code)
+            resp = await client.post(
+                QUICKCHART_URL,
+                json={
+                    "chart": config_str,
+                    "width": 600,
+                    "height": 400,
+                    "backgroundColor": "#1a1a24",
+                    "version": "4",
+                },
+            )
+        else:
+            resp = await client.get(
+                QUICKCHART_URL,
+                params={"c": config_str, "w": 600, "h": 400, "bkg": "#1a1a24", "v": "4"},
+            )
         resp.raise_for_status()
         return resp.content
 
@@ -2518,8 +2567,17 @@ async def chart_patch_history(
         },
     }
 
+    # Flagged days fade their bars; bake base-color legend entries so the legend
+    # swatch never shows a faded shade when the first day is flagged.
+    functions = None
+    if any(flags):
+        chart_config["options"]["plugins"]["legend"]["labels"][
+            "generateLabels"
+        ] = _LEGEND_FN_SENTINEL
+        functions = {_LEGEND_FN_SENTINEL: _base_color_legend_fn(datasets)}
+
     try:
-        png = await _fetch_chart_png(chart_config)
+        png = await _fetch_chart_png(chart_config, functions)
     except httpx.HTTPError as e:
         raise _chart_error() from None
     return Response(content=png, media_type="image/png")
@@ -2655,8 +2713,17 @@ async def chart_branch_history(
         },
     }
 
+    # Flagged days fade their bars; bake base-color legend entries so the legend
+    # swatch never shows a faded shade when the first day is flagged.
+    functions = None
+    if any(flags):
+        chart_config["options"]["plugins"]["legend"]["labels"][
+            "generateLabels"
+        ] = _LEGEND_FN_SENTINEL
+        functions = {_LEGEND_FN_SENTINEL: _base_color_legend_fn(datasets)}
+
     try:
-        png = await _fetch_chart_png(chart_config)
+        png = await _fetch_chart_png(chart_config, functions)
     except httpx.HTTPError as e:
         raise _chart_error() from None
     return Response(content=png, media_type="image/png")
