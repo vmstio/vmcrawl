@@ -973,7 +973,9 @@ async def read_main_version_info(url: str) -> dict[str, str] | None:
                     value = lines[i + 1].strip()
                     if value.isnumeric() or RE_QUOTED_STRING.match(value):
                         version_info[key] = value.replace("'", "")
-    except httpx.HTTPError as exception:
+    except (httpx.HTTPError, ValueError, RuntimeError) as exception:
+        # ValueError/RuntimeError cover oversized/malformed responses and
+        # exhausted retries from get_httpx, which are not httpx.HTTPError.
         echo(f"Failed to retrieve Mastodon main version: {exception}", "red")
         return None
 
@@ -997,7 +999,11 @@ async def get_highest_mastodon_version() -> str | None:
                     release_version,
                 ) > version.parse(highest_version):
                     highest_version = release_version
-    except httpx.HTTPError as exception:
+    except (httpx.HTTPError, ValueError, RuntimeError) as exception:
+        # ValueError/RuntimeError cover oversized/malformed responses and
+        # exhausted retries from get_httpx; ValueError also covers a malformed
+        # response.json() (JSONDecodeError) and an unparseable release tag
+        # (packaging's InvalidVersion) — all of which were previously uncaught.
         echo(f"Failed to retrieve Mastodon release version: {exception}", "red")
         return None
 
@@ -1049,21 +1055,30 @@ async def get_all_tracked_mastodon_versions():
     except (subprocess.CalledProcessError, FileNotFoundError, json.JSONDecodeError):
         # If gh fails, fall back to HTTP API
         echo("gh CLI failed, falling back to HTTP API", "yellow")
-        url = "https://api.github.com/repos/mastodon/mastodon/releases"
-        response = await get_httpx(url)
-        _ = response.raise_for_status()
-        releases = response.json()
+        try:
+            url = "https://api.github.com/repos/mastodon/mastodon/releases"
+            response = await get_httpx(url)
+            _ = response.raise_for_status()
+            releases = response.json()
 
-        for release in releases:
-            release_version = release["tag_name"].lstrip("v")
+            for release in releases:
+                release_version = release["tag_name"].lstrip("v")
 
-            for branch in branches:
-                if release_version.startswith(branch):
-                    if not tracked_versions[branch] or (
-                        version.parse(release_version)
-                        > version.parse(tracked_versions[branch] or "0.0.0")
-                    ):
-                        tracked_versions[branch] = release_version
+                for branch in branches:
+                    if release_version.startswith(branch):
+                        if not tracked_versions[branch] or (
+                            version.parse(release_version)
+                            > version.parse(tracked_versions[branch] or "0.0.0")
+                        ):
+                            tracked_versions[branch] = release_version
+        except (httpx.HTTPError, ValueError, RuntimeError) as exception:
+            # get_httpx/raise_for_status/response.json() or version parsing
+            # failed; return whatever was gathered (possibly empty) so callers
+            # preserve existing DB values instead of crashing the run.
+            echo(
+                f"Failed to retrieve tracked versions from GitHub: {exception}",
+                "red",
+            )
 
     # Only return branches that were actually found in GitHub releases
     # This prevents overwriting old EOL versions with placeholder values
