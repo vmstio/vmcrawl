@@ -1057,6 +1057,11 @@ async def get_instances_table(
     sort_by: str = Query("mau", description="Sort: mau, domain, version"),
     order: str = Query("desc", description="Sort order: asc or desc"),
     q: str = Query("", description="Search query for domain"),
+    instance_filter: str = Query(
+        "",
+        alias="filter",
+        description="Filter by status: eol, unpatched, or main",
+    ),
 ):
     """Get instances table with DNI filtering (for public dashboard)."""
     valid_sort_cols = {
@@ -1074,6 +1079,28 @@ async def get_instances_table(
     if order not in ["asc", "desc"]:
         raise HTTPException(status_code=400, detail="Order must be 'asc' or 'desc'")
 
+    # Status filters mirror the patch/branch distribution donut classifications.
+    # Each is a self-contained predicate (no bound params) so it composes into
+    # both the page query and the count query. `%%` escapes to a literal `%`.
+    filter_clauses = {
+        "eol": sql.SQL(
+            " AND EXISTS (SELECT 1 FROM release_versions rv"
+            " WHERE rv.status = 'eol' AND md.software_version LIKE rv.branch || '.%%')"
+        ),
+        "unpatched": sql.SQL(
+            " AND md.software_version NOT IN"
+            " (SELECT latest FROM release_versions WHERE status IN ('release', 'main'))"
+            " AND NOT EXISTS (SELECT 1 FROM release_versions rv"
+            " WHERE rv.status = 'eol' AND md.software_version LIKE rv.branch || '.%%')"
+        ),
+        "main": sql.SQL(
+            " AND EXISTS (SELECT 1 FROM release_versions rv"
+            " WHERE rv.status = 'main' AND md.software_version LIKE rv.branch || '.%%')"
+        ),
+    }
+    if instance_filter and instance_filter not in filter_clauses:
+        raise HTTPException(status_code=400, detail="Invalid filter")
+
     try:
         with db_pool.connection() as conn, conn.cursor() as cur:
             sort_table, sort_col = valid_sort_cols[sort_by]
@@ -1089,6 +1116,8 @@ async def get_instances_table(
             if q:
                 where_clause = sql.SQL(" AND md.domain ILIKE %s")
                 params.append(f"%{q}%")
+            if instance_filter:
+                where_clause = where_clause + filter_clauses[instance_filter]
 
             query = sql.SQL(
                 """

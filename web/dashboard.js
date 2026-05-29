@@ -414,6 +414,7 @@
     sort_by: "mau",
     order: "desc",
     q: "",
+    filter: "",
     total: 0,
   };
 
@@ -426,6 +427,7 @@
       order: s.order,
     });
     if (s.q) params.set("q", s.q);
+    if (s.filter) params.set("filter", s.filter);
 
     const data = await api("/instances/table?" + params);
     s.total = data.total;
@@ -478,6 +480,12 @@
       tableState.offset = 0;
       loadTable().catch(handleTableError);
     }
+  });
+
+  document.getElementById("filter-select").addEventListener("change", (e) => {
+    tableState.filter = e.target.value;
+    tableState.offset = 0;
+    loadTable().catch(handleTableError);
   });
 
   document.getElementById("prev-btn").addEventListener("click", () => {

@@ -330,6 +330,16 @@ main {
 
 .table-controls input::placeholder { color: var(--text-muted); }
 
+.table-controls select {
+    padding: 0.5rem 0.75rem;
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    color: var(--text);
+    font-size: 0.9rem;
+    cursor: pointer;
+}
+
 .table-controls button,
 .pagination button {
     padding: 0.5rem 1rem;

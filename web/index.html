@@ -326,6 +326,12 @@
             placeholder="Search by domain..."
           />
           <button id="search-btn">Search</button>
+          <select id="filter-select" aria-label="Filter instances">
+            <option value="">All Instances</option>
+            <option value="eol">End of Life Instances</option>
+            <option value="unpatched">Unpatched Instances</option>
+            <option value="main">Main Branch Instances</option>
+          </select>
         </div>
         <div class="table-wrapper">
           <table id="instances-table">
