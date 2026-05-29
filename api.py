@@ -1939,6 +1939,7 @@ RED = "#e74c3c"
 ORANGE = "#f39c12"
 PURPLE = "#9b59b6"
 GREEN = "#2ecc71"
+BLUE = "#3498db"
 
 
 def _fade_hex(color: str, alpha: float) -> str:
@@ -1950,6 +1951,63 @@ def _fade_hex(color: str, alpha: float) -> str:
     except ValueError:
         return color
     return f"rgba({r}, {g}, {b}, {alpha})"
+
+
+def _darken_hex(hex_color: str, factor: float) -> str:
+    """Darken ``#RRGGBB`` by ``factor`` (0..1)."""
+    if not isinstance(hex_color, str) or len(hex_color) != 7 or not hex_color.startswith("#"):
+        return hex_color
+    try:
+        r = int(hex_color[1:3], 16)
+        g = int(hex_color[3:5], 16)
+        b = int(hex_color[5:7], 16)
+    except ValueError:
+        return hex_color
+    r = round(r * (1 - factor))
+    g = round(g * (1 - factor))
+    b = round(b * (1 - factor))
+    return f"#{r:02x}{g:02x}{b:02x}"
+
+
+def _make_shades(base: str, count: int, max_darken: float = 0.55) -> list[str]:
+    """Generate `count` shades from `base` (no darken) through `max_darken`."""
+    if count <= 1:
+        return [base]
+    step = max_darken / (count - 1)
+    return [_darken_hex(base, i * step) for i in range(count)]
+
+
+def _version_parts(value: str) -> list[int]:
+    """Split a dotted version/branch string into integer parts (non-numeric -> 0)."""
+    parts = []
+    for chunk in str(value).split("."):
+        try:
+            parts.append(int(chunk))
+        except ValueError:
+            parts.append(0)
+    return parts
+
+
+def _aggregate_rank(label: str) -> int:
+    """Pin the aggregated buckets last: versions (0), then Unpatched (1), EOL (2)."""
+    return 2 if label == "EOL" else 1 if label == "Unpatched" else 0
+
+
+def _sort_distribution(distribution: list[dict], key_field: str) -> list[dict]:
+    """Order donut slices by version number (highest first), Unpatched/EOL pinned last."""
+    return sorted(
+        distribution,
+        key=lambda d: (
+            _aggregate_rank(d[key_field]),
+            [-p for p in _version_parts(d[key_field])],
+        ),
+    )
+
+
+# Mirror the dashboard's Historical Trends palette: shaded BLUE for
+# main/latest/previous, ORANGE for deprecated (matches the "Unpatched" slice
+# on the patch distribution donut), RED for EOL.
+HIST_SHADES = [*_make_shades(BLUE, 3), ORANGE]
 
 
 def _bar_colors(color: str, flags: list[bool], alpha: float = 0.25):
@@ -2034,12 +2092,24 @@ async def chart_patch_distribution(
         distribution = [
             {"version": r[0], "instances": r[1], "mau": r[2] or 0} for r in rows
         ]
-        distribution.sort(key=lambda d: d["instances"], reverse=True)
+        # Order slices by version number (highest first), with the aggregated
+        # "Unpatched" and "EOL" buckets always pinned to the end.
+        distribution = _sort_distribution(distribution, "version")
 
         raw_labels = [d["version"] for d in distribution]
         values = [d[metric] for d in distribution]
+        # Shade the per-version slices by semantic version (newest = brightest).
+        version_entries = [
+            d for d in distribution if d["version"] not in ("EOL", "Unpatched")
+        ]
+        purple_shades = _make_shades(PURPLE, len(version_entries))
+        version_color_map = {
+            d["version"]: purple_shades[i] for i, d in enumerate(version_entries)
+        }
         colors = [
-            RED if lbl == "EOL" else ORANGE if lbl == "Unpatched" else PURPLE
+            RED if lbl == "EOL"
+            else ORANGE if lbl == "Unpatched"
+            else version_color_map.get(lbl, PURPLE)
             for lbl in raw_labels
         ]
         metric_label = "Instances" if metric == "instances" else "Monthly Active Users"
@@ -2136,10 +2206,21 @@ async def chart_branch_distribution(
         distribution = [
             {"branch": r[0], "instances": r[1], "mau": r[2] or 0} for r in rows
         ]
+        # Order slices by branch number (highest first), with EOL pinned last.
+        distribution = _sort_distribution(distribution, "branch")
 
         raw_labels = [d["branch"] for d in distribution]
         values = [d[metric] for d in distribution]
-        colors = [RED if lbl == "EOL" else GREEN for lbl in raw_labels]
+        # Shade the supported branch slices (newest = brightest green). EOL stays RED.
+        supported = [d for d in distribution if d["branch"] != "EOL"]
+        green_shades = _make_shades(GREEN, len(supported))
+        branch_color_map = {
+            d["branch"]: green_shades[i] for i, d in enumerate(supported)
+        }
+        colors = [
+            RED if lbl == "EOL" else branch_color_map.get(lbl, GREEN)
+            for lbl in raw_labels
+        ]
         metric_label = "Instances" if metric == "instances" else "Monthly Active Users"
         labels = [f"{lbl} ({v:,})" for lbl, v in zip(raw_labels, values)]
 
@@ -2357,22 +2438,22 @@ async def chart_patch_history(
             {
                 "label": "Main Branch",
                 "data": [r[1] for r in hist],
-                "backgroundColor": _bar_colors("#3498db", flags),
+                "backgroundColor": _bar_colors(HIST_SHADES[0], flags),
             },
             {
                 "label": "Latest Branch",
                 "data": [r[2] for r in hist],
-                "backgroundColor": _bar_colors("#2ecc71", flags),
+                "backgroundColor": _bar_colors(HIST_SHADES[1], flags),
             },
             {
                 "label": "Previous Branch",
                 "data": [r[3] for r in hist],
-                "backgroundColor": _bar_colors("#9b59b6", flags),
+                "backgroundColor": _bar_colors(HIST_SHADES[2], flags),
             },
             {
                 "label": "Deprecated Branch",
                 "data": [r[4] for r in hist],
-                "backgroundColor": _bar_colors("#f39c12", flags),
+                "backgroundColor": _bar_colors(HIST_SHADES[3], flags),
             },
         ]
     else:
@@ -2380,24 +2461,25 @@ async def chart_patch_history(
             {
                 "label": "Main Branch",
                 "data": [r[5] for r in hist],
-                "backgroundColor": _bar_colors("#3498db", flags),
+                "backgroundColor": _bar_colors(HIST_SHADES[0], flags),
             },
             {
                 "label": "Latest Branch",
                 "data": [r[6] for r in hist],
-                "backgroundColor": _bar_colors("#2ecc71", flags),
+                "backgroundColor": _bar_colors(HIST_SHADES[1], flags),
             },
             {
                 "label": "Previous Branch",
                 "data": [r[7] for r in hist],
-                "backgroundColor": _bar_colors("#9b59b6", flags),
+                "backgroundColor": _bar_colors(HIST_SHADES[2], flags),
             },
             {
                 "label": "Deprecated Branch",
                 "data": [r[8] for r in hist],
-                "backgroundColor": _bar_colors("#f39c12", flags),
+                "backgroundColor": _bar_colors(HIST_SHADES[3], flags),
             },
         ]
+    datasets = [d for d in datasets if any(v for v in d["data"])]
 
     metric_label = "Instances" if metric == "instances" else "Monthly Active Users"
     chart_config = {
@@ -2483,27 +2565,27 @@ async def chart_branch_history(
             {
                 "label": "Main Branch",
                 "data": [r[1] for r in hist],
-                "backgroundColor": _bar_colors("#3498db", flags),
+                "backgroundColor": _bar_colors(HIST_SHADES[0], flags),
             },
             {
                 "label": "Latest Branch",
                 "data": [r[2] for r in hist],
-                "backgroundColor": _bar_colors("#2ecc71", flags),
+                "backgroundColor": _bar_colors(HIST_SHADES[1], flags),
             },
             {
                 "label": "Previous Branch",
                 "data": [r[3] for r in hist],
-                "backgroundColor": _bar_colors("#9b59b6", flags),
+                "backgroundColor": _bar_colors(HIST_SHADES[2], flags),
             },
             {
                 "label": "Deprecated Branch",
                 "data": [r[4] for r in hist],
-                "backgroundColor": _bar_colors("#f39c12", flags),
+                "backgroundColor": _bar_colors(HIST_SHADES[3], flags),
             },
             {
                 "label": "EOL Branches",
                 "data": [r[5] for r in hist],
-                "backgroundColor": _bar_colors("#e74c3c", flags),
+                "backgroundColor": _bar_colors(RED, flags),
             },
         ]
     else:
@@ -2511,29 +2593,30 @@ async def chart_branch_history(
             {
                 "label": "Main Branch",
                 "data": [r[6] for r in hist],
-                "backgroundColor": _bar_colors("#3498db", flags),
+                "backgroundColor": _bar_colors(HIST_SHADES[0], flags),
             },
             {
                 "label": "Latest Branch",
                 "data": [r[7] for r in hist],
-                "backgroundColor": _bar_colors("#2ecc71", flags),
+                "backgroundColor": _bar_colors(HIST_SHADES[1], flags),
             },
             {
                 "label": "Previous Branch",
                 "data": [r[8] for r in hist],
-                "backgroundColor": _bar_colors("#9b59b6", flags),
+                "backgroundColor": _bar_colors(HIST_SHADES[2], flags),
             },
             {
                 "label": "Deprecated Branch",
                 "data": [r[9] for r in hist],
-                "backgroundColor": _bar_colors("#f39c12", flags),
+                "backgroundColor": _bar_colors(HIST_SHADES[3], flags),
             },
             {
                 "label": "EOL Branches",
                 "data": [r[10] for r in hist],
-                "backgroundColor": _bar_colors("#e74c3c", flags),
+                "backgroundColor": _bar_colors(RED, flags),
             },
         ]
+    datasets = [d for d in datasets if any(v for v in d["data"])]
 
     metric_label = "Instances" if metric == "instances" else "Monthly Active Users"
     chart_config = {
