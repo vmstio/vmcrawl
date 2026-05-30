@@ -363,6 +363,10 @@
     const populated = datasets.filter((d) =>
       (d.data || []).some((v) => Number(v) > 0),
     );
+    // Capture each series' base color before fading so the legend swatch can
+    // use it. Otherwise Chart.js resolves the swatch from the first bar, which
+    // shows the faded shade when day one is flagged.
+    const baseColors = populated.map((d) => d.backgroundColor);
     const decorated = populated.map((d) => ({
       ...d,
       backgroundColor: backgroundForDataset(d.backgroundColor, flags),
@@ -387,7 +391,22 @@
         plugins: {
           legend: {
             position: "bottom",
-            labels: { usePointStyle: true, font: { size: 11 } },
+            labels: {
+              usePointStyle: true,
+              font: { size: 11 },
+              generateLabels: (chart) => {
+                const items =
+                  Chart.defaults.plugins.legend.labels.generateLabels(chart);
+                items.forEach((item) => {
+                  const base = baseColors[item.datasetIndex];
+                  if (base != null) {
+                    item.fillStyle = base;
+                    item.strokeStyle = base;
+                  }
+                });
+                return items;
+              },
+            },
           },
           tooltip: {
             callbacks: {
