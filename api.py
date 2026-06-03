@@ -963,6 +963,63 @@ async def get_most_deployed(_api_key: str | None = Depends(get_api_key)):
         raise _db_error() from None
 
 
+@app.get("/stats/nodeinfo", tags=["Statistics"])
+async def get_nodeinfo_breakdown(_api_key: str | None = Depends(get_api_key)):
+    """Breakdown of detected server software from raw_domains.nodeinfo.
+
+    Returns the count of each unique nodeinfo value (case-normalized) along with
+    totals that let the web interface compare online Mastodon instances against
+    all detected instances:
+
+    - total_detected: every domain we received a nodeinfo response from
+    - detected_mastodon: detected Mastodon-compatible instances (any state)
+    - online_mastodon: Mastodon instances currently tracked as live
+    - software: per-software counts, highest first
+    """
+    try:
+        with db_pool.connection() as conn, conn.cursor() as cur:
+            # Per-software counts (case-normalized)
+            _ = cur.execute(
+                """
+                SELECT LOWER(nodeinfo) AS software, COUNT(*) AS count
+                FROM raw_domains
+                WHERE nodeinfo IS NOT NULL
+                GROUP BY LOWER(nodeinfo)
+                ORDER BY count DESC, software ASC
+            """
+            )
+            software = [
+                {"software": row[0], "count": row[1]} for row in cur.fetchall()
+            ]
+
+            # All detected Mastodon-compatible instances (any state)
+            _ = cur.execute(
+                """
+                SELECT COUNT(*)
+                FROM raw_domains
+                WHERE nodeinfo IS NOT NULL
+                  AND LOWER(nodeinfo) = ANY(%s::text[])
+            """,
+                (list(MASTODON_COMPATIBLE_SOFTWARE),),
+            )
+            result = cur.fetchone()
+            detected_mastodon = result[0] if result else 0
+
+            # Online Mastodon instances (currently tracked as live)
+            _ = cur.execute("SELECT COUNT(*) FROM mastodon_domains")
+            result = cur.fetchone()
+            online_mastodon = result[0] if result else 0
+
+        return {
+            "total_detected": sum(item["count"] for item in software),
+            "detected_mastodon": detected_mastodon,
+            "online_mastodon": online_mastodon,
+            "software": software,
+        }
+    except Exception as e:
+        raise _db_error() from None
+
+
 # =============================================================================
 # INSTANCE ENDPOINTS
 # =============================================================================
@@ -1060,7 +1117,7 @@ async def get_instances_table(
     instance_filter: str = Query(
         "",
         alias="filter",
-        description="Filter by status: eol, unpatched, or main",
+        description="Filter by status: eol, unpatched, main, or modified-nodeinfo",
     ),
 ):
     """Get instances table with DNI filtering (for public dashboard)."""
@@ -1096,6 +1153,11 @@ async def get_instances_table(
         "main": sql.SQL(
             " AND EXISTS (SELECT 1 FROM release_versions rv"
             " WHERE rv.status = 'main' AND md.software_version LIKE rv.branch || '.%%')"
+        ),
+        "modified-nodeinfo": sql.SQL(
+            " AND EXISTS (SELECT 1 FROM raw_domains rd2"
+            " WHERE rd2.domain = md.domain AND rd2.nodeinfo IS NOT NULL"
+            " AND LOWER(rd2.nodeinfo) <> 'mastodon')"
         ),
     }
     if instance_filter and instance_filter not in filter_clauses:

@@ -315,6 +315,60 @@
     });
   }
 
+  // Treemap of categorical counts. `items` is [{ [key]: label, value }, ...];
+  // `total` is used for tooltip percentages. Fills its sized container.
+  function createTreemap(canvasId, items, total, key = "label", colorFor) {
+    const ctx = document.getElementById(canvasId);
+    if (!ctx) return;
+    new Chart(ctx, {
+      type: "treemap",
+      data: {
+        datasets: [
+          {
+            tree: items,
+            key: "value",
+            groups: [key],
+            spacing: 1,
+            borderWidth: 1,
+            borderColor: theme.bgCard,
+            backgroundColor(c) {
+              if (c.type !== "data") return "transparent";
+              const name = (c.raw && c.raw.g) || "";
+              return colorFor
+                ? colorFor(name, c.dataIndex)
+                : CHART_COLORS[c.dataIndex % CHART_COLORS.length];
+            },
+            labels: {
+              display: true,
+              overflow: "hidden",
+              color: "#fff",
+              font: { size: 11 },
+              formatter: (c) => [c.raw.g, fmt(c.raw.v)],
+            },
+          },
+        ],
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+          legend: { display: false },
+          tooltip: {
+            displayColors: false,
+            callbacks: {
+              title: () => "",
+              label(c) {
+                const v = c.raw.v;
+                const p = total ? ((v / total) * 100).toFixed(1) : "0";
+                return `${c.raw.g}: ${fmt(v)} (${p}%)`;
+              },
+            },
+          },
+        },
+      },
+    });
+  }
+
   function fadeColor(color, alpha) {
     const m = /^#([0-9a-f]{3}|[0-9a-f]{6})$/i.exec(color || "");
     if (!m) return color;
@@ -560,6 +614,7 @@
       branchAdoption,
       history,
       versionsData,
+      nodeinfo,
     ] = await Promise.all([
       api("/stats/summary"),
       api("/stats/patch-adoption"),
@@ -571,6 +626,7 @@
       api("/stats/branch-adoption"),
       api("/stats/history?days=365"),
       api("/stats/versions"),
+      api("/stats/nodeinfo"),
     ]);
 
     // Big numbers
@@ -822,6 +878,39 @@
       bd.map((d) => d.mau),
       bdColors,
       { afterBody: eolBreakdownAfterBody("mau") },
+    );
+
+    // Nodeinfo: top detected software as a treemap, long tail collapsed into "Other".
+    const NODEINFO_TOP_N = 12;
+    const sw = (nodeinfo.software || []).filter((s) => s.software);
+    const swItems = sw
+      .slice(0, NODEINFO_TOP_N)
+      .map((s) => ({ software: s.software, value: s.count }));
+    const otherTotal = sw
+      .slice(NODEINFO_TOP_N)
+      .reduce((sum, s) => sum + (s.count || 0), 0);
+    if (otherTotal > 0) {
+      swItems.push({ software: "Other", value: otherTotal });
+    }
+    // Mastodon = purple, Other = orange, everything else cool shades.
+    const coolGreens = makeShades(GREEN, 4);
+    const coolTeals = makeShades("#1abc9c", 4);
+    const coolBlues = makeShades(BLUE, 4);
+    const coolShades = [];
+    for (let i = 0; i < 4; i++) {
+      coolShades.push(coolGreens[i], coolTeals[i], coolBlues[i]);
+    }
+    const softwareColor = (name, idx) => {
+      if ((name || "").toLowerCase() === "mastodon") return PURPLE;
+      if (name === "Other") return ORANGE;
+      return coolShades[idx % coolShades.length];
+    };
+    createTreemap(
+      "treemap-nodeinfo-software",
+      swItems,
+      nodeinfo.total_detected || 0,
+      "software",
+      softwareColor,
     );
 
     // Historical charts
