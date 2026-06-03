@@ -409,6 +409,10 @@ try:
         timeout=30,
         max_waiting=max_workers
         * 3,  # Allow more queuing since we have fewer connections
+        # Validate connections before handing them out. When the SSH tunnel
+        # drops mid-crawl the pool fills with dead sockets; without this check
+        # workers receive them and fail with "ssl error: unexpected eof".
+        check=ConnectionPool.check_connection,
     )
 
     # Register cleanup handler to prevent threading errors on early exit
@@ -2092,44 +2096,50 @@ def cleanup_old_domains():
     # Use a fixed advisory lock ID for cleanup operations
     CLEANUP_LOCK_ID = 999999999
 
-    with db_pool.connection() as conn, conn.cursor() as cursor:
-        try:
-            # Try to acquire cleanup lock (non-blocking). Transaction-scoped lock
-            # auto-releases on commit/rollback, which is safer with pooled connections.
-            _ = cursor.execute(
-                "SELECT pg_try_advisory_xact_lock(%s)", (CLEANUP_LOCK_ID,)
-            )
-            result = cursor.fetchone()
-            lock_acquired = result[0] if result else False
-
-            if not lock_acquired:
-                # Another instance is already running cleanup, skip
-                echo(
-                    "cleanup_old_domains: skipped (advisory lock held by another session)",
-                    "yellow",
+    try:
+        with db_pool.connection() as conn, conn.cursor() as cursor:
+            try:
+                # Try to acquire cleanup lock (non-blocking). Transaction-scoped lock
+                # auto-releases on commit/rollback, which is safer with pooled connections.
+                _ = cursor.execute(
+                    "SELECT pg_try_advisory_xact_lock(%s)", (CLEANUP_LOCK_ID,)
                 )
-                return
+                result = cursor.fetchone()
+                lock_acquired = result[0] if result else False
 
-            _ = cursor.execute(
-                """
-                    DELETE FROM mastodon_domains
-                    WHERE timestamp <=
-                        (CURRENT_TIMESTAMP - INTERVAL '72 hours')::timestamp
-                    RETURNING domain
-                    """,
-            )
-            deleted_domains = [row[0] for row in cursor.fetchall()]
-            if deleted_domains:
-                for d in deleted_domains:
+                if not lock_acquired:
+                    # Another instance is already running cleanup, skip
                     echo(
-                        f"{d}: Removed from active instance list",
+                        "cleanup_old_domains: skipped (advisory lock held by another session)",
                         "yellow",
-                        use_tqdm=True,
                     )
-            conn.commit()
-        except Exception as exception:
-            echo(f"Failed to clean up old domains: {exception}", "red")
-            conn.rollback()
+                    return
+
+                _ = cursor.execute(
+                    """
+                        DELETE FROM mastodon_domains
+                        WHERE timestamp <=
+                            (CURRENT_TIMESTAMP - INTERVAL '72 hours')::timestamp
+                        RETURNING domain
+                        """,
+                )
+                deleted_domains = [row[0] for row in cursor.fetchall()]
+                if deleted_domains:
+                    for d in deleted_domains:
+                        echo(
+                            f"{d}: Removed from active instance list",
+                            "yellow",
+                            use_tqdm=True,
+                        )
+                conn.commit()
+            except Exception as exception:
+                echo(f"Failed to clean up old domains: {exception}", "red")
+                conn.rollback()
+    except psycopg.Error as exception:
+        # Couldn't even acquire a connection (pool exhausted or backend
+        # unreachable, e.g. a dropped SSH tunnel). Skip cleanup this cycle
+        # rather than crashing the crawler.
+        echo(f"Failed to clean up old domains: {exception}", "red")
 
 
 # =============================================================================
@@ -6850,6 +6860,20 @@ async def async_main() -> int:
             except KeyboardInterrupt:
                 echo(f"\n{appname} interrupted by user", "yellow")
                 return EXIT_INTERRUPTED
+
+            except psycopg.Error as exception:
+                # Database became unreachable mid-cycle (pool exhausted, backend
+                # closed the connection, dropped SSH tunnel, etc.). Don't crash
+                # with a traceback. Retry after a backoff in continuous mode;
+                # exit cleanly with a failure code for one-shot runs.
+                echo(f"Database connection error: {exception}", "red")
+                if not should_loop:
+                    return EXIT_FAILURE
+                echo("Waiting 30s before retrying crawl cycle...", "yellow")
+                try:
+                    await asyncio.sleep(30)
+                except KeyboardInterrupt:
+                    return EXIT_INTERRUPTED
 
     finally:
         await cleanup_connections()
