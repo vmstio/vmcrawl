@@ -86,16 +86,24 @@ ALTER TABLE statistics
 
 
 CREATE TABLE IF NOT EXISTS nightly_versions (
-    version VARCHAR(50) PRIMARY KEY,
+    version VARCHAR(50),
     start_date DATE,
-    end_date DATE
+    end_date DATE,
+    -- TRUE rows pin a dedicated "-security" release (start_date = end_date =
+    -- the build date) to a specific version, independent of the regular ranges.
+    is_security BOOLEAN NOT NULL DEFAULT FALSE,
+    PRIMARY KEY (version, is_security)
   );
 
--- Upgrade path for older databases: ensure one row per nightly version
--- before enforcing a primary key on nightly_versions.version.
+-- Upgrade path for older databases: add the is_security column if missing.
+ALTER TABLE nightly_versions
+  ADD COLUMN IF NOT EXISTS is_security BOOLEAN NOT NULL DEFAULT FALSE;
+
+-- Ensure one row per (version, is_security) before (re)enforcing the key.
 DELETE FROM nightly_versions nv
 USING nightly_versions other
 WHERE nv.version = other.version
+  AND nv.is_security = other.is_security
   AND (
     nv.start_date < other.start_date
     OR (
@@ -109,16 +117,25 @@ WHERE nv.version = other.version
     )
   );
 
+-- Migrate the primary key to (version, is_security), replacing the older
+-- (version)-only key if present.
 DO $$
+DECLARE
+  pk_cols text;
 BEGIN
-  IF NOT EXISTS (
-    SELECT 1
-    FROM pg_constraint
-    WHERE conrelid = 'nightly_versions'::regclass
-      AND contype = 'p'
-  ) THEN
+  SELECT string_agg(a.attname, ',' ORDER BY array_position(c.conkey, a.attnum))
+    INTO pk_cols
+  FROM pg_constraint c
+  JOIN pg_attribute a ON a.attrelid = c.conrelid AND a.attnum = ANY (c.conkey)
+  WHERE c.conrelid = 'nightly_versions'::regclass
+    AND c.contype = 'p';
+
+  IF pk_cols IS DISTINCT FROM 'version,is_security' THEN
+    IF pk_cols IS NOT NULL THEN
+      ALTER TABLE nightly_versions DROP CONSTRAINT nightly_versions_pkey;
+    END IF;
     ALTER TABLE nightly_versions
-      ADD CONSTRAINT nightly_versions_pkey PRIMARY KEY (version);
+      ADD CONSTRAINT nightly_versions_pkey PRIMARY KEY (version, is_security);
   END IF;
 END $$;
 

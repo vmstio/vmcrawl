@@ -1155,7 +1155,9 @@ async def get_main_version_branch():
     return obtained_main_branch
 
 
-def get_nightly_version_ranges() -> list[tuple[str, datetime | None, datetime | None]]:
+def get_nightly_version_ranges() -> (
+    list[tuple[str, datetime | None, datetime | None, bool]]
+):
     """Get nightly version ranges from the database."""
 
     def _to_utc_datetime(value: date | datetime | None) -> datetime | None:
@@ -1169,19 +1171,22 @@ def get_nightly_version_ranges() -> list[tuple[str, datetime | None, datetime | 
     with db_pool.connection() as conn, conn.cursor() as cur:
         _ = cur.execute(
             """
-            SELECT version, start_date, end_date
+            SELECT version, start_date, end_date, is_security
             FROM nightly_versions
             ORDER BY start_date DESC
         """,
         )
-        nightly_version_ranges = [(row[0], row[1], row[2]) for row in cur.fetchall()]
+        nightly_version_ranges = [
+            (row[0], row[1], row[2], row[3]) for row in cur.fetchall()
+        ]
         nightly_version_ranges = [
             (
                 version,
                 _to_utc_datetime(start_date),
                 _to_utc_datetime(end_date),
+                bool(is_security),
             )
-            for version, start_date, end_date in nightly_version_ranges
+            for version, start_date, end_date, is_security in nightly_version_ranges
         ]
     return nightly_version_ranges
 
@@ -1204,7 +1209,7 @@ def _parse_version(version: str) -> tuple[int, int, int, str | None] | None:
 
 def clean_version(
     software_version_full: str,
-    nightly_version_ranges: list[tuple[str, datetime | None, datetime | None]],
+    nightly_version_ranges: list[tuple[str, datetime | None, datetime | None, bool]],
 ) -> str:
     """Apply all version cleaning transformations.
 
@@ -1295,7 +1300,7 @@ def _clean_version_suffix_conditional(version: str) -> str:
 
 def _clean_version_nightly(
     version: str,
-    nightly_version_ranges: list[tuple[str, datetime | None, datetime | None]],
+    nightly_version_ranges: list[tuple[str, datetime | None, datetime | None, bool]],
 ) -> str:
     """Map nightly versions to their corresponding release versions."""
     # Remove simple nightly date format
@@ -1313,11 +1318,21 @@ def _clean_version_nightly(
             return version
 
         if is_security:
+            # A "-security" build is a dedicated release image. If it has an
+            # explicit security pin (start_date = the build's labelled date),
+            # use it directly so it stays mapped regardless of how the regular
+            # nightly stream moves around it.
+            for ver, start_date, _end_date, sec in nightly_version_ranges:
+                if sec and start_date is not None and start_date == nightly_date:
+                    return ver
+            # No pin: fall back to legacy behavior. The "-security" image is
+            # labelled with the next nightly's date, so shift forward a day.
             nightly_date += timedelta(days=1)
 
-        for ver, start_date, end_date in nightly_version_ranges:
+        for ver, start_date, end_date, sec in nightly_version_ranges:
             if (
-                start_date is not None
+                not sec
+                and start_date is not None
                 and end_date is not None
                 and start_date <= nightly_date <= end_date
             ):
@@ -3107,9 +3122,9 @@ def display_nightly_versions():
         with db_pool.connection() as conn, conn.cursor() as cur:
             _ = cur.execute(
                 """
-                    SELECT version, start_date, end_date
+                    SELECT version, start_date, end_date, is_security
                     FROM nightly_versions
-                    ORDER BY start_date DESC
+                    ORDER BY is_security, start_date DESC
                 """,
             )
             versions = cur.fetchall()
@@ -3121,13 +3136,17 @@ def display_nightly_versions():
             echo("\nCurrent Nightly Versions:", "cyan")
             echo("-" * 70, "cyan")
             echo(
-                f"{'Version':<20} {'Start Date':<15} {'End Date':<15}",
+                f"{'Version':<20} {'Start Date':<15} {'End Date':<15} {'Type':<10}",
                 "bold",
             )
             echo("-" * 70, "cyan")
 
-            for version, start_date, end_date in versions:
-                echo(f"{version:<20} {start_date} {end_date}", "white")
+            for version, start_date, end_date, is_security in versions:
+                kind = "security" if is_security else "range"
+                echo(
+                    f"{version:<20} {start_date} {end_date} {kind:<10}",
+                    "white",
+                )
             echo("", "white")
     except Exception as e:
         echo(f"Error fetching nightly versions: {e}", "red")
@@ -3143,6 +3162,7 @@ def get_active_nightly_version():
                     SELECT version, start_date, end_date
                     FROM nightly_versions
                     WHERE end_date = '2099-12-31'
+                      AND is_security = FALSE
                     ORDER BY start_date DESC
                     LIMIT 1
                 """,
@@ -3185,7 +3205,8 @@ def add_nightly_version(
         with db_pool.connection() as conn, conn.cursor() as cur:
             _ = cur.execute(
                 """
-                    SELECT version FROM nightly_versions WHERE version = %s
+                    SELECT version FROM nightly_versions
+                    WHERE version = %s AND is_security = FALSE
                 """,
                 (nightly_version,),
             )
@@ -3344,6 +3365,77 @@ def interactive_add_nightly():
     add_nightly_version(nightly_version, start_date, end_date)
 
 
+def add_security_nightly_version(version, release_date):
+    """Pin a dedicated "-security" nightly build to a specific version.
+
+    Args:
+        version: Version the security build maps to (e.g., '4.6.0-alpha.9')
+        release_date: The "-security" build's labelled date (YYYY-MM-DD)
+    """
+    if not _validate_nightly_date(release_date):
+        echo(f"Invalid date format: {release_date}. Use YYYY-MM-DD", "red")
+        return False
+
+    try:
+        with db_pool.connection() as conn, conn.cursor() as cur:
+            _ = cur.execute(
+                """
+                    SELECT version FROM nightly_versions
+                    WHERE version = %s AND is_security = TRUE
+                """,
+                (version,),
+            )
+            if cur.fetchone():
+                echo(
+                    f"Security mapping for {version} already exists",
+                    "yellow",
+                )
+                return False
+
+            # A security pin is a point entry: start_date == end_date == the date.
+            _ = cur.execute(
+                """
+                    INSERT INTO nightly_versions
+                        (version, start_date, end_date, is_security)
+                    VALUES (%s, %s, %s, TRUE)
+                """,
+                (version, release_date, release_date),
+            )
+            conn.commit()
+
+        echo(
+            f"Pinned security build {release_date} -> {version}",
+            "green",
+        )
+        return True
+
+    except Exception as e:
+        echo(f"Error adding security mapping: {e}", "red")
+        return False
+
+
+def interactive_add_security_nightly():
+    """Interactive mode for pinning a "-security" build to a version."""
+    echo("\n=== Add Security Version Mapping ===", "bold")
+
+    # Show current versions
+    display_nightly_versions()
+
+    version = input(
+        "Enter version this -security build maps to (e.g., 4.6.0-alpha.9): "
+    ).strip()
+    if not version:
+        echo("Version cannot be empty", "yellow")
+        return
+
+    release_date = input("Enter the -security build date (YYYY-MM-DD): ").strip()
+    if not release_date:
+        echo("Date cannot be empty", "yellow")
+        return
+
+    add_security_nightly_version(version, release_date)
+
+
 def run_nightly_mode(args):
     """Run the nightly version management mode."""
     echo(f"{appname} v{appversion} (nightly mode)", "bold")
@@ -3453,6 +3545,7 @@ def print_manage_menu():
     echo("   6. List all nightly versions", "white")
     echo("   7. Add a new nightly version", "white")
     echo("   8. Update nightly version end date", "white")
+    echo("   s. Add a security version mapping", "white")
     echo("", "white")
     echo("Mastodon Version Management:", "yellow")
     echo("   9. Update latest Mastodon versions", "white")
@@ -3613,6 +3706,12 @@ async def run_manage_mode(args: argparse.Namespace) -> int:
                 _ = update_nightly_end_date(version_to_update, new_end_date)
             else:
                 echo("Invalid input, operation cancelled", "yellow")
+            echo("", "white")
+            input("Press Enter to continue...")
+
+        elif choice == "s":
+            # Add a security version mapping (interactive)
+            interactive_add_security_nightly()
             echo("", "white")
             input("Press Enter to continue...")
 
