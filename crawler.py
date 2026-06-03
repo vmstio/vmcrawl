@@ -3284,8 +3284,20 @@ def interactive_add_nightly():
     # Show current versions
     display_nightly_versions()
 
-    # Get version
-    nightly_version = input("Enter version (e.g., 4.9.0-alpha.7): ").strip()
+    # Get version (default to the current main branch version)
+    default_version = version_main_release
+    if not default_version:
+        _ = load_versions_from_db()
+        default_version = version_main_release
+
+    if default_version:
+        version_input = input(
+            f"Enter version [default: {default_version}]: ",
+        ).strip()
+        nightly_version = version_input if version_input else default_version
+    else:
+        nightly_version = input("Enter version (e.g., 4.9.0-alpha.7): ").strip()
+
     if not nightly_version:
         echo("Version cannot be empty", "yellow")
         return
