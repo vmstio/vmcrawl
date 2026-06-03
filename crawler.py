@@ -276,44 +276,89 @@ RE_JSON_DOUBLE_QUOTED_VALUE = re.compile(r':\s*""([^"\r\n]*)""')
 _ssh_transport: paramiko.Transport | None = None
 _ssh_tunnel_port: int | None = None
 _ssh_host = os.getenv("VMCRAWL_SSH_HOST")
+_ssh_lock = threading.Lock()
 
 if _ssh_host:
     _db_host = os.getenv("VMCRAWL_POSTGRES_HOST", "localhost")
     _db_port = int(os.getenv("VMCRAWL_POSTGRES_PORT", "5432"))
-    try:
-        _ssh_transport = paramiko.Transport(
-            (_ssh_host, int(os.getenv("VMCRAWL_SSH_PORT", "22")))
-        )
-        _ssh_key_path = os.path.expanduser(
-            os.getenv("VMCRAWL_SSH_KEY", "~/.ssh/id_rsa")
-        )
-        _ssh_key_pass = os.getenv("VMCRAWL_SSH_KEY_PASS")
-        _ssh_pkey: paramiko.PKey | None = None
-        for _key_class in (paramiko.Ed25519Key, paramiko.ECDSAKey, paramiko.RSAKey):
+    _ssh_port = int(os.getenv("VMCRAWL_SSH_PORT", "22"))
+    _ssh_user = os.getenv("VMCRAWL_SSH_USER") or getpass.getuser()
+    _ssh_key_path = os.path.expanduser(os.getenv("VMCRAWL_SSH_KEY", "~/.ssh/id_rsa"))
+    _ssh_key_pass = os.getenv("VMCRAWL_SSH_KEY_PASS")
+
+    def _load_ssh_key() -> paramiko.PKey:
+        for key_class in (paramiko.Ed25519Key, paramiko.ECDSAKey, paramiko.RSAKey):
             try:
-                _ssh_pkey = _key_class.from_private_key_file(
+                return key_class.from_private_key_file(
                     _ssh_key_path, password=_ssh_key_pass
                 )
-                break
             except (paramiko.SSHException, ValueError):
                 continue
-        if _ssh_pkey is None:
-            raise paramiko.SSHException(f"Unable to load SSH key: {_ssh_key_path}")
-        _ssh_transport.connect(
-            username=os.getenv("VMCRAWL_SSH_USER") or getpass.getuser(),
-            pkey=_ssh_pkey,
-        )
+        raise paramiko.SSHException(f"Unable to load SSH key: {_ssh_key_path}")
 
-        # Bind a local listening socket for the tunnel
+    _ssh_pkey = _load_ssh_key()
+
+    def _ensure_ssh_transport() -> paramiko.Transport | None:
+        """Return a live SSH transport, rebuilding it if the previous one died.
+
+        Invoked for every new tunneled connection, so a dropped tunnel is
+        transparently re-established on demand (e.g. when the database pool
+        reconnects) without restarting the crawler. The local listening port is
+        preserved across reconnects, so the connection string never changes.
+        """
+        global _ssh_transport
+        with _ssh_lock:
+            if _ssh_transport is not None and _ssh_transport.is_active():
+                return _ssh_transport
+            if _ssh_transport is not None:
+                try:
+                    _ssh_transport.close()
+                except Exception:
+                    pass
+                _ssh_transport = None
+            try:
+                transport = paramiko.Transport((_ssh_host, _ssh_port))
+                transport.set_keepalive(30)  # detect drops promptly
+                transport.connect(username=_ssh_user, pkey=_ssh_pkey)
+                _ssh_transport = transport
+                echo(
+                    f"SSH tunnel connected: 127.0.0.1:{_ssh_tunnel_port}"
+                    f" -> {_db_host}:{_db_port} via {_ssh_host}",
+                    "cyan",
+                )
+            except Exception as exc:
+                echo(f"SSH tunnel connection failed: {exc}", "yellow")
+                _ssh_transport = None
+            return _ssh_transport
+
+    def _invalidate_ssh_transport(dead: paramiko.Transport) -> None:
+        """Drop a transport that failed mid-use so the next call rebuilds it."""
+        global _ssh_transport
+        with _ssh_lock:
+            if _ssh_transport is dead:
+                try:
+                    _ssh_transport.close()
+                except Exception:
+                    pass
+                _ssh_transport = None
+
+    try:
+        # Bind a persistent local listening socket first so the forwarded port
+        # stays stable across tunnel reconnects (the conn string never changes).
         _tunnel_sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         _tunnel_sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
         _tunnel_sock.bind(("127.0.0.1", 0))
         _ssh_tunnel_port = _tunnel_sock.getsockname()[1]
         _tunnel_sock.listen(20)
 
+        # Fail fast at startup if the tunnel can't be established at all.
+        if _ensure_ssh_transport() is None:
+            raise RuntimeError(f"Unable to establish SSH tunnel via {_ssh_host}")
+
         def _ssh_tunnel_accept_loop() -> None:
-            """Accept local connections and forward them through the SSH tunnel."""
-            while _ssh_transport and _ssh_transport.is_active():
+            """Forward local connections through the tunnel, reconnecting it on
+            demand if it has dropped."""
+            while True:
                 try:
                     _tunnel_sock.settimeout(1.0)
                     client_sock, _ = _tunnel_sock.accept()
@@ -321,13 +366,22 @@ if _ssh_host:
                     continue
                 except OSError:
                     break
+
+                transport = _ensure_ssh_transport()
+                if transport is None:
+                    client_sock.close()
+                    continue
                 try:
-                    channel = _ssh_transport.open_channel(
+                    channel = transport.open_channel(
                         "direct-tcpip",
                         (_db_host, _db_port),
                         client_sock.getpeername(),
+                        timeout=10,
                     )
                 except Exception:
+                    # The tunnel may have dropped before is_active() noticed.
+                    # Tear it down so the next connection rebuilds it.
+                    _invalidate_ssh_transport(transport)
                     client_sock.close()
                     continue
 
@@ -359,12 +413,6 @@ if _ssh_host:
 
         _tunnel_thread = threading.Thread(target=_ssh_tunnel_accept_loop, daemon=True)
         _tunnel_thread.start()
-
-        echo(
-            f"SSH tunnel established: 127.0.0.1:{_ssh_tunnel_port}"
-            f" -> {_db_host}:{_db_port} via {_ssh_host}",
-            "cyan",
-        )
     except Exception as exception:
         echo(f"Error establishing SSH tunnel: {exception}", "red")
         if _ssh_transport is not None:
