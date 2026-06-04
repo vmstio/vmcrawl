@@ -880,26 +880,25 @@
       { afterBody: eolBreakdownAfterBody("mau") },
     );
 
-    // Nodeinfo: detected software as a treemap. Show as many platforms as
-    // needed so the collapsed "Other" tail is no larger than the smallest
-    // platform still shown individually — i.e. Other is the smallest section.
+    // Nodeinfo: detected software as a treemap. Any platform that makes up less
+    // than 0.1% of all detected nodeinfo is folded into "Other"; the rest are
+    // shown individually. Threshold uses the same total as the tooltip %.
     const sw = (nodeinfo.software || []).filter((s) => s.software);
-    const tailTotal = (from) =>
-      sw.slice(from).reduce((sum, s) => sum + (s.count || 0), 0);
-    // Scan from the full list down; the highest N whose tail still exceeds the
-    // smallest shown platform is the last one to fold away, so show N+1.
-    let topN = sw.length;
-    for (let n = sw.length; n >= 1; n--) {
-      if (tailTotal(n) > (sw[n - 1].count || 0)) {
-        topN = Math.min(n + 1, sw.length);
-        break;
+    const swTotal = nodeinfo.total_detected || 0;
+    const minShare = swTotal * 0.001; // 0.1%
+    const swItems = [];
+    let otherTotal = 0;
+    for (const s of sw) {
+      const count = s.count || 0;
+      if (count >= minShare) {
+        swItems.push({
+          software: s.software.charAt(0).toUpperCase() + s.software.slice(1),
+          value: count,
+        });
+      } else {
+        otherTotal += count;
       }
     }
-    const swItems = sw.slice(0, topN).map((s) => ({
-      software: s.software.charAt(0).toUpperCase() + s.software.slice(1),
-      value: s.count,
-    }));
-    const otherTotal = tailTotal(topN);
     if (otherTotal > 0) {
       swItems.push({ software: "Other", value: otherTotal });
     }
