@@ -589,6 +589,36 @@ def _get_host_semaphore(host: str) -> asyncio.Semaphore:
         _host_semaphores[host] = sem
     return sem
 
+
+# =============================================================================
+# DURABLE CRAWL QUEUE CONFIGURATION (see docs/durable-queue.md)
+# =============================================================================
+
+# Opt in to the Postgres lease-queue daemon. When false, the crawler keeps its
+# existing menu / file / target / whole-batch headless behavior unchanged.
+queue_mode = os.getenv("VMCRAWL_QUEUE_MODE", "false").strip().lower() in {
+    "1",
+    "true",
+    "yes",
+    "on",
+}
+# Domains claimed per round, lease TTL before a claim is reclaimable, and how
+# long to sleep when nothing is due.
+queue_batch = max(1, int(os.getenv("VMCRAWL_QUEUE_BATCH", "100")))
+queue_lease_seconds = max(1, int(os.getenv("VMCRAWL_QUEUE_LEASE_SECONDS", "900")))
+queue_poll_seconds = max(1, int(os.getenv("VMCRAWL_QUEUE_POLL_SECONDS", "15")))
+# Recrawl cadences and transient-failure backoff, all expressed in hours.
+recrawl_hours = max(1, int(os.getenv("VMCRAWL_RECRAWL_HOURS", "1")))
+recrawl_nonmasto_hours = max(1, int(os.getenv("VMCRAWL_RECRAWL_NONMASTO_HOURS", "168")))
+retry_base_hours = max(1, int(os.getenv("VMCRAWL_RETRY_BASE_HOURS", "1")))
+retry_cap_hours = max(retry_base_hours, int(os.getenv("VMCRAWL_RETRY_CAP_HOURS", "168")))
+dead_hours = max(1, int(os.getenv("VMCRAWL_DEAD_HOURS", "720")))
+
+
+def _worker_id() -> str:
+    """Identity recorded in raw_domains.claimed_by for observability."""
+    return f"{socket.gethostname()}:{os.getpid()}"
+
 # Create SSL context with TLS 1.2+ and disable post-quantum key exchange
 # Some servers reject MLKEM (post-quantum crypto) with "tlsv1 alert internal error"
 # This is a known issue with OpenSSL 3.6.0+ and certain server configurations
@@ -5461,8 +5491,13 @@ async def check_and_record_domains(
     domain_endings,
     nightly_version_ranges,
     bad_domain_sets,
+    reschedule: bool = False,
 ):
     """Process a list of domains concurrently with progress tracking.
+
+    When ``reschedule`` is True (durable queue daemon), each worker clears the
+    domain's lease and sets its next due time after processing, via
+    ``reschedule_domain``. See docs/durable-queue.md.
 
     Uses asyncio worker queues for bounded cross-domain concurrency.
     """
@@ -5572,6 +5607,12 @@ async def check_and_record_domains(
                         "orange",
                         use_tqdm=True,
                     )
+                # Durable queue: clear the lease and set the next due time from
+                # the row's resulting state. On shutdown we deliberately skip
+                # this so the domain isn't pushed forward without being crawled;
+                # its lease simply expires and is reclaimed.
+                if reschedule and not shutdown_event.is_set():
+                    await asyncio.to_thread(reschedule_domain, domain)
                 queue.task_done()
 
     try:
@@ -5604,6 +5645,102 @@ async def check_and_record_domains(
         raise
     finally:
         pbar.close()
+
+
+async def run_queue_daemon() -> int:
+    """Durable crawl queue daemon (see docs/durable-queue.md).
+
+    Replaces the headless whole-batch re-select with a claim -> process ->
+    reschedule loop over ``raw_domains`` as a Postgres lease queue. Each round
+    claims a batch of due, unclaimed domains, runs them through the existing
+    ``check_and_record_domains`` worker pool (which reschedules each on
+    completion), and sleeps when nothing is due. Crash-safe via lease expiry.
+    """
+    echo(f"{appname} v{appversion} ({current_filename})", "bold")
+    echo(
+        f"Durable queue daemon: batch={queue_batch} lease={queue_lease_seconds}s "
+        f"poll={queue_poll_seconds}s worker={_worker_id()}",
+        "cyan",
+    )
+
+    # Release leases left behind by a previously crashed process so their
+    # domains don't show as claimed until the lease ages out.
+    reclaimed = await asyncio.to_thread(reclaim_stale_leases, queue_lease_seconds)
+    if reclaimed:
+        echo(f"Reclaimed {reclaimed} stale lease(s) from a prior run", "yellow")
+
+    filter_cache_ttl = int(os.getenv("VMCRAWL_FILTER_CACHE_SECONDS", "300"))
+    maintenance_interval = max(
+        60, int(os.getenv("VMCRAWL_QUEUE_MAINTENANCE_SECONDS", "3600"))
+    )
+    filter_data_cache: dict[str, Any] | None = None
+    filter_data_loaded_at = 0.0
+    last_maintenance = 0.0
+
+    # Teardown is handled by async_main's cleanup_connections().
+    while True:
+        try:
+            # Pick up version changes made by other instances each cycle.
+            if _version_last_refresh is not None:
+                _ = load_versions_from_db()
+            else:
+                await maybe_refresh_versions()
+
+            now = time.monotonic()
+            if (
+                filter_data_cache is None
+                or (now - filter_data_loaded_at) >= filter_cache_ttl
+            ):
+                filter_data_cache = await load_domain_filter_data()
+                filter_data_loaded_at = now
+            filter_data = filter_data_cache
+            domain_endings = await get_domain_endings()
+
+            domain_list = await asyncio.to_thread(
+                claim_due_domains,
+                queue_batch,
+                queue_lease_seconds,
+                _worker_id(),
+            )
+
+            if not domain_list:
+                # Nothing due: run periodic maintenance, then back off
+                # instead of hammering the table.
+                if (now - last_maintenance) >= maintenance_interval:
+                    cleanup_old_domains()
+                    save_statistics()
+                    last_maintenance = now
+                await asyncio.sleep(queue_poll_seconds)
+                continue
+
+            await check_and_record_domains(
+                domain_list,
+                filter_data["not_masto_domains"],
+                "1",
+                filter_data["dni_domains"],
+                domain_endings,
+                filter_data["nightly_version_ranges"],
+                filter_data["bad_domain_sets"],
+                reschedule=True,
+            )
+
+            if (now - last_maintenance) >= maintenance_interval:
+                cleanup_old_domains()
+                save_statistics()
+                last_maintenance = now
+
+        except KeyboardInterrupt:
+            echo(f"\n{appname} interrupted by user", "yellow")
+            return EXIT_INTERRUPTED
+        except psycopg.Error as exception:
+            # DB became unreachable mid-cycle (pool exhausted, dropped SSH
+            # tunnel, etc.). Don't crash; back off and retry.
+            echo(f"Database connection error: {exception}", "red")
+            echo("Waiting 30s before retrying queue cycle...", "yellow")
+            try:
+                await asyncio.sleep(30)
+            except KeyboardInterrupt:
+                return EXIT_INTERRUPTED
 
 
 # =============================================================================
@@ -6264,6 +6401,136 @@ def write_statistics_to_database(stats_values):
 # =============================================================================
 
 
+def claim_due_domains(batch: int, lease_seconds: int, worker: str) -> list[str]:
+    """Atomically lease a batch of due, unclaimed, non-alias domains.
+
+    Uses SELECT ... FOR UPDATE SKIP LOCKED so concurrent workers never claim the
+    same row. The lease-expiry clause makes this self-healing: a crashed worker's
+    domains become re-claimable once their lease ages past ``lease_seconds``.
+
+    Known non-Mastodon domains are still claimed on their long recrawl cadence
+    (see ``reschedule_domain``) so that a domain migrating to Mastodon from other
+    software is eventually re-detected.
+
+    ``bad_hard`` domains are never claimed. That flag marks the permanent
+    "gone" hard-fail codes (HTTP 410/451/418/999); unlike transient/DNS terminal
+    states, which still revive after the dead interval, a hard-fail is treated as
+    a permanent exclusion.
+
+    Hard-DNI domains (dni.force = 'hard') are never claimed. The NOT EXISTS
+    clause mirrors the worker-side substring match in ``_is_dni_domain``
+    (``any(dni in domain)``) via ``strpos``, so a hard-DNI entry that is a
+    substring of the domain excludes it. See docs/durable-queue.md.
+    """
+    query = (
+        "WITH due AS ("
+        "  SELECT domain FROM raw_domains"
+        "  WHERE (next_crawl_at IS NULL OR next_crawl_at <= now())"
+        "    AND (claimed_at IS NULL"
+        "         OR claimed_at <= now() - make_interval(secs => %(lease)s))"
+        "    AND (alias IS NULL OR alias = FALSE)"
+        "    AND (bad_hard IS NULL OR bad_hard = FALSE)"
+        "    AND NOT EXISTS ("
+        "      SELECT 1 FROM dni d"
+        "      WHERE d.force = 'hard'"
+        "        AND strpos(raw_domains.domain, d.domain) > 0"
+        "    )"
+        "  ORDER BY next_crawl_at ASC NULLS FIRST"
+        "  LIMIT %(batch)s"
+        "  FOR UPDATE SKIP LOCKED"
+        ") "
+        "UPDATE raw_domains r SET claimed_at = now(), claimed_by = %(worker)s "
+        "FROM due WHERE r.domain = due.domain "
+        "RETURNING r.domain"
+    )
+    with db_pool.connection() as conn, conn.cursor() as cursor:
+        try:
+            _ = cursor.execute(
+                query,
+                {"lease": lease_seconds, "batch": batch, "worker": worker},
+            )
+            rows = cursor.fetchall()
+            conn.commit()
+            return [row[0] for row in rows if row[0]]
+        except Exception as exception:
+            echo(f"Failed to claim due domains: {exception}", "red", use_tqdm=True)
+            conn.rollback()
+            return []
+
+
+def reschedule_domain(domain: str) -> None:
+    """Clear a domain's lease and set its next due time from its resulting state.
+
+    Deriving the interval from the row's own columns (rather than from the Python
+    code path that processed it) keeps scheduling correct regardless of which
+    branch set the flags:
+      * any terminal bad_* flag        -> dead interval (auto-revival, default 30d)
+      * a transient error this pass    -> bounded exponential backoff on attempts
+      * known non-Mastodon software    -> long non-Mastodon cadence (default 7d)
+      * healthy                        -> normal recrawl cadence (default 1h)
+    ``attempts`` is incremented on a transient failure and reset to 0 on success;
+    the SET expressions read the pre-update row, so backoff uses the old count.
+    """
+    query = sql.SQL(
+        "UPDATE raw_domains SET "
+        "claimed_at = NULL, claimed_by = NULL, "
+        "attempts = CASE WHEN reason IS NOT NULL THEN attempts + 1 ELSE 0 END, "
+        "next_crawl_at = now() + (CASE "
+        "  WHEN ({any_bad}) THEN %(dead)s * INTERVAL '1 hour' "
+        "  WHEN reason IS NOT NULL "
+        "    THEN least(power(2, attempts) * %(base)s, %(cap)s) * INTERVAL '1 hour' "
+        "  WHEN nodeinfo IS NOT NULL AND nodeinfo NOT IN {masto} "
+        "    THEN %(nonmasto)s * INTERVAL '1 hour' "
+        "  ELSE %(recrawl)s * INTERVAL '1 hour' "
+        "END) "
+        "WHERE domain = %(domain)s"
+    ).format(any_bad=_BAD_COL_ANY_TRUE, masto=_MASTODON_COMPATIBLE_IN_CLAUSE)
+    with db_pool.connection() as conn, conn.cursor() as cursor:
+        try:
+            _ = cursor.execute(
+                query,
+                {
+                    "dead": dead_hours,
+                    "base": retry_base_hours,
+                    "cap": retry_cap_hours,
+                    "nonmasto": recrawl_nonmasto_hours,
+                    "recrawl": recrawl_hours,
+                    "domain": domain,
+                },
+            )
+            conn.commit()
+        except Exception as exception:
+            echo(
+                f"{domain}: Failed to reschedule {exception}",
+                "red",
+                use_tqdm=True,
+            )
+            conn.rollback()
+
+
+def reclaim_stale_leases(lease_seconds: int) -> int:
+    """Clear leases left behind by a crashed process; returns rows reclaimed.
+
+    The claim query already self-heals via lease expiry; this is startup/periodic
+    housekeeping so stale claimed_by values don't linger in the table.
+    """
+    query = (
+        "UPDATE raw_domains SET claimed_at = NULL, claimed_by = NULL "
+        "WHERE claimed_at IS NOT NULL "
+        "  AND claimed_at <= now() - make_interval(secs => %(lease)s)"
+    )
+    with db_pool.connection() as conn, conn.cursor() as cursor:
+        try:
+            _ = cursor.execute(query, {"lease": lease_seconds})
+            count = cursor.rowcount
+            conn.commit()
+            return count if count and count > 0 else 0
+        except Exception as exception:
+            echo(f"Failed to reclaim stale leases: {exception}", "red", use_tqdm=True)
+            conn.rollback()
+            return 0
+
+
 def load_from_database(user_choice):
     """Load domain list from database based on user menu selection."""
     # Common filter to exclude alias domains from all raw_domains queries
@@ -6899,6 +7166,16 @@ async def async_main() -> int:
             ):
                 echo("You cannot set both file and target arguments", "red")
                 return EXIT_FAILURE
+
+            # Durable crawl queue daemon (opt-in via VMCRAWL_QUEUE_MODE). Engages
+            # only for continuous crawling; one-shot --file/--target/--new runs
+            # keep the existing whole-batch behavior. See docs/durable-queue.md.
+            if queue_mode and not (args.file or args.target or args.new):
+                try:
+                    return await run_queue_daemon()
+                except KeyboardInterrupt:
+                    echo(f"\n{appname} interrupted by user", "yellow")
+                    return EXIT_INTERRUPTED
 
         # Main crawl loop - runs continuously in headless mode, once in interactive mode
         echo(f"{appname} v{appversion} ({current_filename})", "bold")

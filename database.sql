@@ -51,6 +51,42 @@ CREATE TABLE IF NOT EXISTS
     alias BOOLEAN DEFAULT NULL
   );
 
+-- Durable crawl queue columns (see docs/durable-queue.md).
+-- raw_domains doubles as the work ledger; these columns add queue discipline
+-- (due time, lease, backoff) so the crawler can run as a crash-safe,
+-- self-scheduling daemon without an external broker. Idempotent upgrade path.
+ALTER TABLE raw_domains
+  ADD COLUMN IF NOT EXISTS next_crawl_at TIMESTAMPTZ DEFAULT NULL;
+ALTER TABLE raw_domains
+  ADD COLUMN IF NOT EXISTS claimed_at TIMESTAMPTZ DEFAULT NULL;
+ALTER TABLE raw_domains
+  ADD COLUMN IF NOT EXISTS claimed_by TEXT DEFAULT NULL;
+ALTER TABLE raw_domains
+  ADD COLUMN IF NOT EXISTS attempts INTEGER NOT NULL DEFAULT 0;
+
+-- One-time backfill so the first daemon start does not stampede every row at
+-- once. Only touches rows that have not yet been scheduled (next_crawl_at IS
+-- NULL); re-running this file after the daemon is live is a no-op.
+--   * uncrawled (errors = 0)      -> due immediately
+--   * terminal/dead (any bad_*)   -> spread across the dead interval (~30d)
+--   * everything else             -> spread across the recrawl interval (~1h)
+UPDATE raw_domains
+SET next_crawl_at = now()
+WHERE next_crawl_at IS NULL AND errors = 0;
+
+UPDATE raw_domains
+SET next_crawl_at = now() + random() * INTERVAL '30 days'
+WHERE next_crawl_at IS NULL
+  AND (
+    bad_dns OR bad_ssl OR bad_tcp OR bad_type OR bad_file OR bad_api
+    OR bad_json OR bad_http2xx OR bad_http3xx OR bad_http4xx OR bad_http5xx
+    OR bad_hard OR bad_robot
+  );
+
+UPDATE raw_domains
+SET next_crawl_at = now() + random() * INTERVAL '1 hour'
+WHERE next_crawl_at IS NULL;
+
 CREATE TABLE IF NOT EXISTS statistics (
     date DATE PRIMARY KEY,
     updated_at TIMESTAMPTZ,
@@ -341,6 +377,17 @@ CREATE INDEX IF NOT EXISTS idx_raw_domains_errors
 -- Used by: SELECT domain FROM raw_domains WHERE errors = 0 ORDER BY LENGTH(DOMAIN)
 CREATE INDEX IF NOT EXISTS idx_raw_domains_uncrawled
     ON raw_domains ((LENGTH(domain))) WHERE errors = 0 AND (alias IS NULL OR alias = FALSE);
+
+-- Index for the durable queue claim query (see docs/durable-queue.md)
+-- Used by: claim_due_domains() -- ORDER BY next_crawl_at NULLS FIRST over due,
+-- non-alias, non-(hard-fail) rows. The partial predicate mirrors the claim
+-- filter's immutable conditions to keep the index small. The hard-DNI exclusion
+-- is applied during the scan (it references another table and can't live in the
+-- predicate).
+CREATE INDEX IF NOT EXISTS idx_raw_domains_due
+    ON raw_domains (next_crawl_at NULLS FIRST)
+    WHERE (alias IS NULL OR alias = FALSE)
+      AND (bad_hard IS NULL OR bad_hard = FALSE);
 
 -- =============================================================================
 -- mastodon_domains table indexes
