@@ -880,18 +880,26 @@
       { afterBody: eolBreakdownAfterBody("mau") },
     );
 
-    // Nodeinfo: top detected software as a treemap, long tail collapsed into "Other".
-    const NODEINFO_TOP_N = 12;
+    // Nodeinfo: detected software as a treemap. Show as many platforms as
+    // needed so the collapsed "Other" tail is no larger than the smallest
+    // platform still shown individually — i.e. Other is the smallest section.
     const sw = (nodeinfo.software || []).filter((s) => s.software);
-    const swItems = sw
-      .slice(0, NODEINFO_TOP_N)
-      .map((s) => ({
-        software: s.software.charAt(0).toUpperCase() + s.software.slice(1),
-        value: s.count,
-      }));
-    const otherTotal = sw
-      .slice(NODEINFO_TOP_N)
-      .reduce((sum, s) => sum + (s.count || 0), 0);
+    const tailTotal = (from) =>
+      sw.slice(from).reduce((sum, s) => sum + (s.count || 0), 0);
+    // Scan from the full list down; the highest N whose tail still exceeds the
+    // smallest shown platform is the last one to fold away, so show N+1.
+    let topN = sw.length;
+    for (let n = sw.length; n >= 1; n--) {
+      if (tailTotal(n) > (sw[n - 1].count || 0)) {
+        topN = Math.min(n + 1, sw.length);
+        break;
+      }
+    }
+    const swItems = sw.slice(0, topN).map((s) => ({
+      software: s.software.charAt(0).toUpperCase() + s.software.slice(1),
+      value: s.count,
+    }));
+    const otherTotal = tailTotal(topN);
     if (otherTotal > 0) {
       swItems.push({ software: "Other", value: otherTotal });
     }
