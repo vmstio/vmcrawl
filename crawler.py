@@ -4435,8 +4435,24 @@ def _should_skip_domain(
     not_masto_domains,
     bad_domain_sets,
     user_choice,
+    bypass_skip_filters=False,
 ):
-    """Check if a domain should be skipped based on its status."""
+    """Check if a domain should be skipped based on its status.
+
+    When ``bypass_skip_filters`` is True (durable queue daemon), no domain is
+    skipped on its recorded state — neither bad_* terminal states nor a known
+    not-Mastodon platform. The claim query is the authoritative filter in queue
+    mode, so every domain it hands back is meant to be (re)crawled:
+
+    * Re-applying the bad_* skip here would claim a revived failure domain only
+      to skip it and reschedule it untouched, silently breaking the auto-revival
+      the queue is designed to perform.
+    * Re-applying the not-Mastodon skip would prevent a domain that has *migrated*
+      to Mastodon from ever being re-detected, even though the claim query
+      deliberately re-claims it on the long non-Mastodon cadence for exactly that.
+    """
+    if bypass_skip_filters:
+        return False
     if user_choice != "10" and domain in not_masto_domains:
         echo(f"{domain}: Other Platform", "cyan", use_tqdm=True)
         return True
@@ -5492,6 +5508,7 @@ async def check_and_record_domains(
     nightly_version_ranges,
     bad_domain_sets,
     reschedule: bool = False,
+    bypass_skip_filters: bool = False,
 ):
     """Process a list of domains concurrently with progress tracking.
 
@@ -5558,6 +5575,7 @@ async def check_and_record_domains(
                     not_masto_domains,
                     bad_domain_sets,
                     user_choice,
+                    bypass_skip_filters,
                 ):
                     continue
 
@@ -5722,6 +5740,7 @@ async def run_queue_daemon() -> int:
                 filter_data["nightly_version_ranges"],
                 filter_data["bad_domain_sets"],
                 reschedule=True,
+                bypass_skip_filters=True,
             )
 
             if (now - last_maintenance) >= maintenance_interval:
@@ -6412,10 +6431,11 @@ def claim_due_domains(batch: int, lease_seconds: int, worker: str) -> list[str]:
     (see ``reschedule_domain``) so that a domain migrating to Mastodon from other
     software is eventually re-detected.
 
-    ``bad_hard`` domains are never claimed. That flag marks the permanent
-    "gone" hard-fail codes (HTTP 410/451/418/999); unlike transient/DNS terminal
-    states, which still revive after the dead interval, a hard-fail is treated as
-    a permanent exclusion.
+    Known failure domains are NOT excluded in queue mode: every bad_* terminal
+    state, including ``bad_hard`` (the permanent "gone" codes HTTP 410/451/418/
+    999), is claimed once due so the queue actually attempts a recrawl. They
+    revive on the long dead interval (see ``reschedule_domain``) rather than
+    being hammered. The only permanent exclusions left are aliases and hard-DNI.
 
     Hard-DNI domains (dni.force = 'hard') are never claimed. The NOT EXISTS
     clause mirrors the worker-side substring match in ``_is_dni_domain``
@@ -6429,7 +6449,6 @@ def claim_due_domains(batch: int, lease_seconds: int, worker: str) -> list[str]:
         "    AND (claimed_at IS NULL"
         "         OR claimed_at <= now() - make_interval(secs => %(lease)s))"
         "    AND (alias IS NULL OR alias = FALSE)"
-        "    AND (bad_hard IS NULL OR bad_hard = FALSE)"
         "    AND NOT EXISTS ("
         "      SELECT 1 FROM dni d"
         "      WHERE d.force = 'hard'"
