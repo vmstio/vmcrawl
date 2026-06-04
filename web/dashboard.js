@@ -885,7 +885,10 @@
     const sw = (nodeinfo.software || []).filter((s) => s.software);
     const swItems = sw
       .slice(0, NODEINFO_TOP_N)
-      .map((s) => ({ software: s.software, value: s.count }));
+      .map((s) => ({
+        software: s.software.charAt(0).toUpperCase() + s.software.slice(1),
+        value: s.count,
+      }));
     const otherTotal = sw
       .slice(NODEINFO_TOP_N)
       .reduce((sum, s) => sum + (s.count || 0), 0);
