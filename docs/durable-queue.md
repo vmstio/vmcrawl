@@ -83,7 +83,6 @@ WITH due AS (
     WHERE (next_crawl_at IS NULL OR next_crawl_at <= now())
       AND (claimed_at IS NULL OR claimed_at <= now() - make_interval(secs => %(lease)s))
       AND (alias IS NULL OR alias = FALSE)
-      AND (bad_hard IS NULL OR bad_hard = FALSE)  -- permanent hard-fail, never claimed
       AND NOT EXISTS (                       -- hard-DNI domains are never claimed
           SELECT 1 FROM dni d
           WHERE d.force = 'hard'
@@ -102,14 +101,24 @@ RETURNING r.domain;
 
 - `FOR UPDATE SKIP LOCKED` is the same safe concurrent-dequeue primitive Sidekiq gets
   from Redis, but transactional in the DB we already have.
-- **Known non-Mastodon domains are still re-loaded** on the long `nonmasto` cadence
-  (default 7d) rather than being excluded, so a domain that *migrates* to Mastodon from
-  other software is eventually re-detected. The cost is cheap: a non-Mastodon recrawl
-  is a single nodeinfo fetch.
-- **`bad_hard` domains are never claimed.** That flag marks the permanent "gone"
-  hard-fail codes (HTTP 410/451/418/999). Other terminal `bad_*` states (DNS, TCP,
-  SSL, …) still revive after the dead interval (default 30d), but a hard-fail is a
-  permanent exclusion. Mirrored in the partial index predicate.
+- **Known non-Mastodon domains are still claimed and rechecked** on the long
+  `nonmasto` cadence (default 7d) rather than being excluded, so a domain that
+  *migrates* to Mastodon from other software is eventually re-detected. The cost
+  is cheap: a non-Mastodon recrawl is a single nodeinfo fetch.
+- **Known failure domains are still claimed and recrawled.** Every terminal
+  `bad_*` state — DNS, TCP, SSL, … *and* `bad_hard` (the permanent "gone" codes
+  HTTP 410/451/418/999) — is claimed once it comes due and actually re-attempted,
+  rather than being excluded from the queue. They revive on the long dead
+  interval (default 30d, see *Reschedule policy*) so they are retried periodically
+  rather than hammered.
+- **The worker skips no domain on its recorded state in queue mode**
+  (`bypass_skip_filters=True`), because the claim query above is the
+  authoritative filter — every domain it hands back is meant to be (re)crawled.
+  Without this, a revived failure domain or a re-claimed not-Mastodon domain
+  would be claimed only to be skipped by the in-process state filter and
+  rescheduled untouched, silently defeating both the failure revival and
+  migration re-detection. The only permanent exclusions left are aliases and
+  hard-DNI.
 - **Hard-DNI domains are never claimed.** The `NOT EXISTS` clause mirrors the
   worker-side substring match in `_is_dni_domain` (`any(dni in domain)`) using
   `strpos`, so a `dni` entry with `force = 'hard'` that is a substring of the domain

@@ -380,14 +380,19 @@ CREATE INDEX IF NOT EXISTS idx_raw_domains_uncrawled
 
 -- Index for the durable queue claim query (see docs/durable-queue.md)
 -- Used by: claim_due_domains() -- ORDER BY next_crawl_at NULLS FIRST over due,
--- non-alias, non-(hard-fail) rows. The partial predicate mirrors the claim
--- filter's immutable conditions to keep the index small. The hard-DNI exclusion
--- is applied during the scan (it references another table and can't live in the
--- predicate).
+-- non-alias rows. The partial predicate mirrors the claim filter's immutable
+-- conditions to keep the index small. Known failure domains (every bad_* state,
+-- including bad_hard) are deliberately NOT excluded here: queue mode recrawls
+-- them once due so it actually re-attempts known failures. The hard-DNI
+-- exclusion is applied during the scan (it references another table and can't
+-- live in the predicate).
+-- Drop first so the predicate change (dropping the old bad_hard exclusion)
+-- applies on existing deployments; CREATE ... IF NOT EXISTS alone would keep
+-- the stale narrower index.
+DROP INDEX IF EXISTS idx_raw_domains_due;
 CREATE INDEX IF NOT EXISTS idx_raw_domains_due
     ON raw_domains (next_crawl_at NULLS FIRST)
-    WHERE (alias IS NULL OR alias = FALSE)
-      AND (bad_hard IS NULL OR bad_hard = FALSE);
+    WHERE (alias IS NULL OR alias = FALSE);
 
 -- =============================================================================
 -- mastodon_domains table indexes
