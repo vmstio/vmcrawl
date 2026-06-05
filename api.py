@@ -1117,7 +1117,7 @@ async def get_instances_table(
     instance_filter: str = Query(
         "",
         alias="filter",
-        description="Filter by status: eol, unpatched, main, or modified-nodeinfo",
+        description="Filter by status: eol, unpatched, main, modified-nodeinfo, or failing",
     ),
 ):
     """Get instances table with DNI filtering (for public dashboard)."""
@@ -1158,6 +1158,9 @@ async def get_instances_table(
             " AND EXISTS (SELECT 1 FROM raw_domains rd2"
             " WHERE rd2.domain = md.domain AND rd2.nodeinfo IS NOT NULL"
             " AND LOWER(rd2.nodeinfo) <> 'mastodon')"
+        ),
+        "failing": sql.SQL(
+            " AND (md.timestamp IS NULL OR md.timestamp < NOW() - INTERVAL '24 hours')"
         ),
     }
     if instance_filter and instance_filter not in filter_clauses:
