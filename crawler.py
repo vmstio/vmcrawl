@@ -3606,6 +3606,121 @@ def set_statistics_invalid(target: date, invalid: bool, reason: str | None) -> b
         return False
 
 
+def get_queue_status() -> dict[str, Any]:
+    """Return a snapshot of crawl-queue metrics from the database."""
+    query = """
+        SELECT
+            COUNT(*) FILTER (WHERE alias IS NULL OR alias = FALSE)
+                AS total,
+            COUNT(*) FILTER (
+                WHERE (alias IS NULL OR alias = FALSE)
+                  AND (next_crawl_at IS NULL OR next_crawl_at <= now())
+                  AND (claimed_at IS NULL
+                       OR claimed_at <= now() - make_interval(secs => %(lease)s))
+            ) AS due_now,
+            COUNT(*) FILTER (
+                WHERE claimed_at IS NOT NULL
+                  AND claimed_at > now() - make_interval(secs => %(lease)s)
+            ) AS in_progress,
+            COUNT(*) FILTER (
+                WHERE (alias IS NULL OR alias = FALSE)
+                  AND next_crawl_at > now()
+                  AND (claimed_at IS NULL
+                       OR claimed_at <= now() - make_interval(secs => %(lease)s))
+            ) AS scheduled,
+            COUNT(*) FILTER (
+                WHERE claimed_at IS NOT NULL
+                  AND claimed_at <= now() - make_interval(secs => %(lease)s)
+            ) AS stale_leases,
+            COUNT(DISTINCT claimed_by) FILTER (
+                WHERE claimed_at IS NOT NULL
+                  AND claimed_at > now() - make_interval(secs => %(lease)s)
+            ) AS active_workers,
+            MIN(next_crawl_at) FILTER (
+                WHERE (alias IS NULL OR alias = FALSE)
+                  AND next_crawl_at > now()
+                  AND claimed_at IS NULL
+            ) AS next_due_at
+        FROM raw_domains
+    """
+    worker_query = """
+        SELECT claimed_by, COUNT(*) AS domains
+        FROM raw_domains
+        WHERE claimed_at IS NOT NULL
+          AND claimed_at > now() - make_interval(secs => %(lease)s)
+          AND claimed_by IS NOT NULL
+        GROUP BY claimed_by
+        ORDER BY domains DESC, claimed_by
+    """
+    with db_pool.connection() as conn, conn.cursor() as cursor:
+        _ = cursor.execute(query, {"lease": queue_lease_seconds})
+        row = cursor.fetchone()
+        if not row:
+            return {}
+        cols = [
+            "total",
+            "due_now",
+            "in_progress",
+            "scheduled",
+            "stale_leases",
+            "active_workers",
+            "next_due_at",
+        ]
+        result = dict(zip(cols, row, strict=False))
+        _ = cursor.execute(worker_query, {"lease": queue_lease_seconds})
+        result["workers"] = cursor.fetchall()
+        return result
+
+
+def display_queue_status() -> None:
+    """Print queue status metrics to stdout."""
+    try:
+        stats = get_queue_status()
+    except Exception as e:
+        echo(f"Failed to retrieve queue status: {e}", "red")
+        return
+
+    now = datetime.now(UTC)
+    echo(f"Queue Status  [{now.strftime('%Y-%m-%d %H:%M:%S UTC')}]", "bold")
+    echo("-" * 50, "cyan")
+    echo("", "white")
+    total = stats.get("total", 0) or 0
+    due_now = stats.get("due_now", 0) or 0
+    in_progress = stats.get("in_progress", 0) or 0
+    scheduled = stats.get("scheduled", 0) or 0
+    stale = stats.get("stale_leases", 0) or 0
+    workers = stats.get("active_workers", 0) or 0
+    next_due_at = stats.get("next_due_at")
+
+    echo(f"  Total domains:    {total:>10,}", "white")
+    echo(f"  Due now:          {due_now:>10,}", "yellow" if due_now > 0 else "white")
+    echo(f"  In progress:      {in_progress:>10,}", "green" if in_progress > 0 else "white")
+    echo(f"  Scheduled:        {scheduled:>10,}", "white")
+    echo(f"  Stale leases:     {stale:>10,}", "red" if stale > 0 else "white")
+    echo("", "white")
+    echo(f"  Active workers:   {workers:>10}", "cyan" if workers > 0 else "white")
+    worker_rows = stats.get("workers", [])
+    hostnames = [w.split(":")[0] for w, _ in worker_rows]
+    duplicate_hosts = {h for h in hostnames if hostnames.count(h) > 1}
+    for worker_name, worker_count in worker_rows:
+        host = worker_name.split(":")[0]
+        label = worker_name if host in duplicate_hosts else host
+        echo(f"    {label:<30} {worker_count:>6,}", "cyan")
+
+    if next_due_at is not None:
+        diff = next_due_at - now
+        secs = max(0, int(diff.total_seconds()))
+        if secs < 60:
+            eta = f"{secs}s"
+        elif secs < 3600:
+            eta = f"{secs // 60}m {secs % 60}s"
+        else:
+            eta = f"{secs // 3600}h {(secs % 3600) // 60}m"
+        echo(f"  Next scheduled:   {eta:>10} from now", "white")
+
+    echo("", "white")
+
+
 def print_manage_menu():
     """Print the management menu options."""
     echo("", "white")
@@ -3642,6 +3757,9 @@ def print_manage_menu():
     echo("  16. List flagged statistics days", "white")
     echo("  17. Flag statistics day as invalid", "white")
     echo("  18. Unflag statistics day", "white")
+    echo("", "white")
+    echo("Queue Status:", "yellow")
+    echo("  19. Show live queue status", "white")
     echo("", "white")
     echo("   q. Quit", "white")
     echo("", "white")
@@ -4259,6 +4377,20 @@ async def run_manage_mode(args: argparse.Namespace) -> int:
             _ = set_statistics_invalid(target, False, None)
             echo("", "white")
             input("Press Enter to continue...")
+
+        # Queue Status
+        elif choice == "19":
+            echo("", "white")
+            echo("Live queue status — refreshing every 5s. Ctrl+C to return.", "cyan")
+            try:
+                while True:
+                    _ = os.system("clear")
+                    echo(f"{appname} v{appversion} (manage mode)", "bold")
+                    display_queue_status()
+                    echo("Ctrl+C to return to menu", "cyan")
+                    await asyncio.sleep(5)
+            except KeyboardInterrupt:
+                pass
 
         else:
             echo("Invalid choice, please try again", "yellow")
@@ -6499,12 +6631,12 @@ def reschedule_domain(domain: str) -> None:
         "claimed_at = NULL, claimed_by = NULL, "
         "attempts = CASE WHEN reason IS NOT NULL THEN attempts + 1 ELSE 0 END, "
         "next_crawl_at = now() + (CASE "
-        "  WHEN ({any_bad}) THEN %(dead)s * INTERVAL '1 hour' "
+        "  WHEN ({any_bad}) THEN %(dead)s * (0.9 + random() * 0.2) * INTERVAL '1 hour' "
         "  WHEN reason IS NOT NULL "
-        "    THEN least(power(2, attempts) * %(base)s, %(cap)s) * INTERVAL '1 hour' "
+        "    THEN least(power(2, attempts) * %(base)s, %(cap)s) * (0.9 + random() * 0.2) * INTERVAL '1 hour' "
         "  WHEN nodeinfo IS NOT NULL AND nodeinfo NOT IN {masto} "
-        "    THEN %(nonmasto)s * INTERVAL '1 hour' "
-        "  ELSE %(recrawl)s * INTERVAL '1 hour' "
+        "    THEN %(nonmasto)s * (0.9 + random() * 0.2) * INTERVAL '1 hour' "
+        "  ELSE %(recrawl)s * (0.9 + random() * 0.2) * INTERVAL '1 hour' "
         "END) "
         "WHERE domain = %(domain)s"
     ).format(any_bad=_BAD_COL_ANY_TRUE, masto=_MASTODON_COMPATIBLE_IN_CLAUSE)
