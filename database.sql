@@ -38,11 +38,16 @@ CREATE TABLE IF NOT EXISTS
 CREATE TABLE IF NOT EXISTS
   raw_domains (
     domain TEXT PRIMARY KEY CHECK (domain = LOWER(domain)),
-    errors INTEGER DEFAULT NULL,
     reason TEXT DEFAULT NULL,
     nodeinfo TEXT DEFAULT NULL,
     alias BOOLEAN DEFAULT NULL
   );
+
+-- The errors counter was a batch-era diagnostic (consecutive same-type failures
+-- before going terminal). With no terminal state it drives nothing, so drop it;
+-- the latest failure classification lives in reason and scheduling is derived
+-- from it (see reschedule_domain). Idempotent.
+ALTER TABLE raw_domains DROP COLUMN IF EXISTS errors;
 
 -- The bad_* terminal flags were a batch-era throttle: a domain that failed
 -- ERROR_BUFFER times was marked terminal and excluded from re-scans. The
@@ -82,11 +87,12 @@ ALTER TABLE raw_domains
 -- once. Only touches rows that have not yet been scheduled (next_crawl_at IS
 -- NULL); re-running this file after the daemon is live is a no-op. The queue
 -- reschedules each row precisely on its next claim; this is just initial jitter.
---   * never-failed (reason IS NULL) -> due now (errors = 0) or within ~1h
---   * has a failure (reason set)     -> spread across the cap interval (~30d)
+--   * never crawled (reason IS NULL AND nodeinfo IS NULL) -> due now
+--   * has a failure (reason set)                          -> spread over ~30d
+--   * everything else (crawled, healthy)                  -> spread over ~1h
 UPDATE raw_domains
 SET next_crawl_at = now()
-WHERE next_crawl_at IS NULL AND reason IS NULL AND errors = 0;
+WHERE next_crawl_at IS NULL AND reason IS NULL AND nodeinfo IS NULL;
 
 UPDATE raw_domains
 SET next_crawl_at = now() + random() * INTERVAL '30 days'
@@ -341,16 +347,19 @@ CREATE INDEX IF NOT EXISTS idx_raw_domains_nodeinfo_domain_not_alias
 CREATE INDEX IF NOT EXISTS idx_raw_domains_reason
     ON raw_domains (reason) WHERE reason IS NOT NULL;
 
--- Composite reason/errors index for non-alias retries
--- Used by: menu options 20-32 (WHERE reason LIKE/regex ... ORDER BY errors)
-CREATE INDEX IF NOT EXISTS idx_raw_domains_reason_errors_not_alias
-    ON raw_domains (reason text_pattern_ops, errors)
+-- Composite reason index for non-alias retries (menu options 20-32, now ordered
+-- by domain). The old _errors variant referenced the dropped errors column; it is
+-- auto-removed with the column, but drop the name explicitly for re-runs.
+DROP INDEX IF EXISTS idx_raw_domains_reason_errors_not_alias;
+CREATE INDEX IF NOT EXISTS idx_raw_domains_reason_not_alias
+    ON raw_domains (reason text_pattern_ops)
     WHERE reason IS NOT NULL AND (alias IS NULL OR alias = FALSE);
 
 -- Expression index for HTTP class regex filters (^2xx/^3xx/^4xx/^5xx)
 -- Used by: menu options 27-30 and health/report style queries
-CREATE INDEX IF NOT EXISTS idx_raw_domains_reason_leading_digit_errors_not_alias
-    ON raw_domains ((left(reason, 1)), errors)
+DROP INDEX IF EXISTS idx_raw_domains_reason_leading_digit_errors_not_alias;
+CREATE INDEX IF NOT EXISTS idx_raw_domains_reason_leading_digit_not_alias
+    ON raw_domains ((left(reason, 1)))
     WHERE reason IS NOT NULL AND (alias IS NULL OR alias = FALSE);
 
 -- Health/report index for mastodon + reason filters
@@ -359,15 +368,15 @@ CREATE INDEX IF NOT EXISTS idx_raw_domains_mastodon_reason
     ON raw_domains (reason)
     WHERE nodeinfo = 'mastodon' AND reason IS NOT NULL;
 
--- Index for error count ordering (used in error report queries)
--- Used by: menu options 20-32 ORDER BY errors
-CREATE INDEX IF NOT EXISTS idx_raw_domains_errors
-    ON raw_domains (errors) WHERE errors IS NOT NULL;
+-- The errors column was dropped; its ordering index is obsolete.
+DROP INDEX IF EXISTS idx_raw_domains_errors;
 
 -- Index for uncrawled domain selection (menu option 0)
--- Used by: SELECT domain FROM raw_domains WHERE errors = 0 ORDER BY LENGTH(DOMAIN)
+-- Used by: SELECT domain WHERE reason IS NULL AND nodeinfo IS NULL ORDER BY LENGTH(domain)
+DROP INDEX IF EXISTS idx_raw_domains_uncrawled;
 CREATE INDEX IF NOT EXISTS idx_raw_domains_uncrawled
-    ON raw_domains ((LENGTH(domain))) WHERE errors = 0 AND (alias IS NULL OR alias = FALSE);
+    ON raw_domains ((LENGTH(domain)))
+    WHERE reason IS NULL AND nodeinfo IS NULL AND (alias IS NULL OR alias = FALSE);
 
 -- Index for the durable queue claim query (see docs/durable-queue.md)
 -- Used by: claim_due_domains() -- ORDER BY next_crawl_at NULLS FIRST over due,

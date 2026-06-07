@@ -1704,13 +1704,11 @@ def get_error_type(reason: str | None) -> str | None:
 
 
 def increment_domain_error(domain: str, error_reason: str) -> None:
-    """Record a crawl failure: store the reason and update the diagnostic counter.
+    """Record a crawl failure's classification in ``reason``.
 
-    There are no terminal bad_* flags. Scheduling is derived from ``reason`` by
-    the queue (see ``reschedule_domain``); this function only records the latest
-    failure and maintains ``errors``, a diagnostic counter that increments on
-    consecutive same-type failures, resets to 1 on a type change, and is left
-    null for Mastodon-compatible or unclassified failures.
+    There are no terminal bad_* flags and no error counter. Scheduling is derived
+    from ``reason`` by the queue (see ``reschedule_domain``); this function just
+    records the latest failure reason.
 
     HARD (gone: 410/451/418/999) and ROBOT (robots.txt disallow) are definitive,
     so on detection the domain is purged from the published mastodon_domains list
@@ -1722,51 +1720,23 @@ def increment_domain_error(domain: str, error_reason: str) -> None:
     with db_pool.connection() as conn, conn.cursor() as cursor:
         try:
             _ = cursor.execute(
-                "SELECT errors, reason, nodeinfo, alias"
-                " FROM raw_domains WHERE domain = %s",
+                "SELECT alias FROM raw_domains WHERE domain = %s",
                 (domain,),
             )
             result = cursor.fetchone()
-
-            if result:
-                current_errors = result[0] or 0
-                previous_reason = result[1] or ""
-                nodeinfo = result[2]
-                is_alias = result[3] or False
-                # Aliases are canonicalized elsewhere; never record errors on them.
-                if is_alias:
-                    return
-            else:
-                current_errors = 0
-                previous_reason = ""
-                nodeinfo = None
-
-            error_type = get_error_type(error_reason)
-            previous_type = get_error_type(previous_reason)
+            # Aliases are canonicalized elsewhere; never record errors on them.
+            if result and result[0]:
+                return
 
             # Definitive "gone"/disallowed: drop from the published list at detection.
-            if error_type in PURGE_ON_DETECTION_TYPES:
+            if get_error_type(error_reason) in PURGE_ON_DETECTION_TYPES:
                 delete_domain_if_known(domain)
 
-            # Diagnostic counter (errors): not used for scheduling, but surfaced by
-            # the reason-based retry menus (ORDER BY errors). Null for healthy
-            # Mastodon software and for unclassified reasons.
-            if is_mastodon_compatible_software(nodeinfo):
-                new_errors = None
-            elif error_type and error_type == previous_type:
-                new_errors = current_errors + 1
-            elif error_type:
-                new_errors = 1
-            else:
-                new_errors = None
-
             _ = cursor.execute(
-                "INSERT INTO raw_domains (domain, errors, reason)"
-                " VALUES (%s, %s, %s)"
-                " ON CONFLICT(domain) DO UPDATE SET"
-                " errors = EXCLUDED.errors,"
-                " reason = EXCLUDED.reason",
-                (domain, new_errors, error_reason),
+                "INSERT INTO raw_domains (domain, reason)"
+                " VALUES (%s, %s)"
+                " ON CONFLICT(domain) DO UPDATE SET reason = EXCLUDED.reason",
+                (domain, error_reason),
             )
             conn.commit()
         except Exception as exception:
@@ -1779,18 +1749,16 @@ def increment_domain_error(domain: str, error_reason: str) -> None:
 
 
 def clear_domain_error(domain: str) -> None:
-    """Clear a domain's recorded error state (errors + reason).
+    """Clear a domain's recorded error reason.
 
     Note: Domain is expected to be pre-normalized to lowercase by caller.
     """
     with db_pool.connection() as conn, conn.cursor() as cursor:
         try:
             _ = cursor.execute(
-                "INSERT INTO raw_domains (domain, errors, reason)"
-                " VALUES (%s, NULL, NULL)"
-                " ON CONFLICT(domain) DO UPDATE SET"
-                " errors = excluded.errors,"
-                " reason = excluded.reason",
+                "INSERT INTO raw_domains (domain, reason)"
+                " VALUES (%s, NULL)"
+                " ON CONFLICT(domain) DO UPDATE SET reason = excluded.reason",
                 (domain,),
             )
             conn.commit()
@@ -1812,14 +1780,13 @@ def _save_matrix_nodeinfo(domain: str) -> None:
         try:
             _ = cursor.execute(
                 """
-                    INSERT INTO raw_domains (domain, nodeinfo, errors, reason)
-                    VALUES (%s, %s, %s, %s)
+                    INSERT INTO raw_domains (domain, nodeinfo, reason)
+                    VALUES (%s, %s, %s)
                     ON CONFLICT(domain) DO UPDATE SET
                     nodeinfo = excluded.nodeinfo,
-                    errors = excluded.errors,
                     reason = excluded.reason
                 """,
-                (domain, "matrix", None, None),
+                (domain, "matrix", None),
             )
             conn.commit()
         except Exception as exception:
@@ -1867,7 +1834,7 @@ def mark_domain_as_alias(domain: str) -> None:
         domain: The domain to mark as an alias (should be pre-normalized to lowercase)
     """
     # Build list of all state columns to clear
-    state_columns = ["errors", "reason", "nodeinfo"]
+    state_columns = ["reason", "nodeinfo"]
 
     # Build SET clause: alias = TRUE, col1 = NULL, col2 = NULL, ...
     set_clause = sql.SQL("alias = TRUE, ") + sql.SQL(", ").join(
@@ -1917,8 +1884,7 @@ def save_nodeinfo_software(domain: str, software_data: dict[str, Any]) -> None:
     """Save software name from nodeinfo to raw_domains.nodeinfo for the domain.
 
     When nodeinfo is set to non-Mastodon-compatible software, also clears
-    errors and reason since this is not an error condition - it's just a
-    different platform.
+    reason since this is not an error condition - it's just a different platform.
 
     Args:
         domain: The domain being processed
@@ -1932,18 +1898,17 @@ def save_nodeinfo_software(domain: str, software_data: dict[str, Any]) -> None:
     with db_pool.connection() as conn, conn.cursor() as cursor:
         try:
             if not is_mastodon_compatible_software(software_name):
-                # For non-Mastodon platforms, clear errors and reason
+                # For non-Mastodon platforms, clear reason
                 _ = cursor.execute(
                     """
                         INSERT INTO raw_domains
-                        (domain, nodeinfo, errors, reason)
-                        VALUES (%s, %s, %s, %s)
+                        (domain, nodeinfo, reason)
+                        VALUES (%s, %s, %s)
                         ON CONFLICT(domain) DO UPDATE SET
                         nodeinfo = excluded.nodeinfo,
-                        errors = excluded.errors,
                         reason = excluded.reason
                         """,
-                    (domain, software_name, None, None),
+                    (domain, software_name, None),
                 )
             else:
                 # For Mastodon-compatible software, just update nodeinfo
@@ -2236,10 +2201,10 @@ def disable_peer_fetch(domain, use_tqdm=False):
             return
 
 
-# Each row contributes 2 bind params (domain, errors); Postgres caps a single
-# statement at 65535 params, so chunk well under that. A peers list can be tens
-# of thousands of domains (a large instance returns 30k+), which would otherwise
-# blow the limit in one multi-row INSERT.
+# Each row contributes 1 bind param (domain); Postgres caps a single statement at
+# 65535 params, so chunk well under that. A peers list can be tens of thousands of
+# domains (a large instance returns 30k+), which would otherwise blow the limit in
+# one multi-row INSERT.
 _IMPORT_CHUNK = 1000
 
 
@@ -2253,13 +2218,12 @@ def import_domains(domains, use_tqdm=False):
         try:
             for start in range(0, len(unique), _IMPORT_CHUNK):
                 chunk = unique[start : start + _IMPORT_CHUNK]
-                placeholders = sql.SQL(",").join(sql.SQL("(%s,%s)") for _ in chunk)
-                flattened_values = [item for d in chunk for item in (d, 0)]
+                placeholders = sql.SQL(",").join(sql.SQL("(%s)") for _ in chunk)
                 query = sql.SQL(
-                    "INSERT INTO raw_domains (domain, errors) VALUES {} "
+                    "INSERT INTO raw_domains (domain) VALUES {} "
                     "ON CONFLICT (domain) DO NOTHING"
                 ).format(placeholders)
-                _ = cursor.execute(query, flattened_values)
+                _ = cursor.execute(query, chunk)
             conn.commit()
         except Exception as e:
             echo(f"Failed to import domain list: {e}", "red", use_tqdm=use_tqdm)
@@ -6508,107 +6472,12 @@ def load_from_database(user_choice):
     no_alias = "AND (alias IS NULL OR alias = FALSE) "
 
     query_map = {
+        # --new one-shot flag: brand-new, never-crawled domains.
         "0": (
-            "SELECT domain FROM raw_domains WHERE errors = 0 "
+            "SELECT domain FROM raw_domains "
+            "WHERE reason IS NULL AND nodeinfo IS NULL "
             + no_alias
             + "ORDER BY LENGTH(DOMAIN)"
-        ),
-        "1": sql.SQL(
-            "SELECT domain FROM raw_domains "
-            "WHERE reason IS NULL "
-            "AND (nodeinfo IN {masto_clause} OR nodeinfo IS NULL) "
-            "AND (alias IS NULL OR alias = FALSE) "
-            "ORDER BY domain"
-        ).format(masto_clause=_MASTODON_COMPATIBLE_IN_CLAUSE),
-        "4": sql.SQL(
-            "SELECT DISTINCT rd.domain "
-            "FROM raw_domains rd "
-            "WHERE rd.nodeinfo IN {masto_clause} "
-            "  AND rd.reason IS NOT NULL "
-            "  AND (rd.alias IS NULL OR rd.alias = FALSE) "
-            "  AND NOT EXISTS ( "
-            "    SELECT 1 "
-            "    FROM mastodon_domains md "
-            "    WHERE md.domain = rd.domain "
-            "  )"
-        ).format(masto_clause=_MASTODON_COMPATIBLE_IN_CLAUSE),
-        "5": (
-            "SELECT DISTINCT rd.domain "
-            "FROM raw_domains rd "
-            "INNER JOIN mastodon_domains md ON rd.domain = md.domain "
-            "WHERE rd.reason IS NOT NULL "
-            "AND (rd.alias IS NULL OR rd.alias = FALSE)"
-        ),
-        "10": sql.SQL(
-            "SELECT domain FROM raw_domains "
-            "WHERE nodeinfo NOT IN {masto_clause} "
-            "AND (alias IS NULL OR alias = FALSE) "
-            "ORDER BY domain"
-        ).format(masto_clause=_MASTODON_COMPATIBLE_IN_CLAUSE),
-        "20": (
-            "SELECT domain FROM raw_domains WHERE reason LIKE 'DNS%' "
-            + no_alias
-            + "ORDER BY errors"
-        ),
-        "21": (
-            "SELECT domain FROM raw_domains WHERE reason LIKE 'SSL%' "
-            + no_alias
-            + "ORDER BY errors"
-        ),
-        "22": (
-            "SELECT domain FROM raw_domains WHERE reason LIKE 'TCP%' "
-            + no_alias
-            + "ORDER BY errors"
-        ),
-        "23": (
-            "SELECT domain FROM raw_domains WHERE reason LIKE 'TYPE%' "
-            + no_alias
-            + "ORDER BY errors"
-        ),
-        "24": (
-            "SELECT domain FROM raw_domains WHERE reason LIKE 'FILE%' "
-            + no_alias
-            + "ORDER BY errors"
-        ),
-        "25": (
-            "SELECT domain FROM raw_domains WHERE reason LIKE 'API%' "
-            + no_alias
-            + "ORDER BY errors"
-        ),
-        "26": (
-            "SELECT domain FROM raw_domains WHERE reason LIKE 'JSON%' "
-            + no_alias
-            + "ORDER BY errors"
-        ),
-        "27": (
-            "SELECT domain FROM raw_domains WHERE reason ~ '^2[0-9]{2}.*' "
-            + no_alias
-            + "ORDER BY errors"
-        ),
-        "28": (
-            "SELECT domain FROM raw_domains WHERE reason ~ '^3[0-9]{2}.*' "
-            + no_alias
-            + "ORDER BY errors"
-        ),
-        "29": (
-            "SELECT domain FROM raw_domains WHERE reason ~ '^4[0-9]{2}.*' "
-            + no_alias
-            + "ORDER BY errors"
-        ),
-        "30": (
-            "SELECT domain FROM raw_domains WHERE reason ~ '^5[0-9]{2}.*' "
-            + no_alias
-            + "ORDER BY errors"
-        ),
-        "31": (
-            "SELECT domain FROM raw_domains WHERE reason LIKE 'HARD%' "
-            + no_alias
-            + "ORDER BY errors"
-        ),
-        "32": (
-            "SELECT domain FROM raw_domains WHERE reason LIKE 'ROBOT%' "
-            + no_alias
-            + "ORDER BY errors"
         ),
         "50": (
             "SELECT domain FROM mastodon_domains WHERE "
@@ -6631,24 +6500,20 @@ def load_from_database(user_choice):
     }
 
     params = None
+    query = query_map.get(user_choice)
 
-    if user_choice in ["2", "3"]:
-        query = query_map["1"]
-    else:
-        query = query_map.get(user_choice)
-
-        if user_choice == "50":
-            patched_versions = all_patched_versions or []
-            params = {"versions": patched_versions}
-            echo("Excluding versions:", "cyan")
-            for ver in patched_versions:
-                echo(f" - {ver}", "cyan")
-        elif user_choice == "51":
-            params = [f"{version_main_branch or ''}%"]
+    if user_choice == "50":
+        patched_versions = all_patched_versions or []
+        params = {"versions": patched_versions}
+        echo("Excluding versions:", "cyan")
+        for ver in patched_versions:
+            echo(f" - {ver}", "cyan")
+    elif user_choice == "51":
+        params = [f"{version_main_branch or ''}%"]
 
     if not query:
         echo(f"Choice {user_choice} is invalid, using default query", "yellow")
-        query = query_map["1"]
+        query = query_map["53"]
 
     # Use server-side cursor for large result sets to avoid loading all into memory
     with db_pool.connection() as conn, conn.cursor(name="domain_loader") as cursor:
@@ -6693,8 +6558,8 @@ def load_from_file(file_name):
 
             if not exists:
                 _ = cursor.execute(
-                    "INSERT INTO raw_domains (domain, errors) VALUES (%s, %s)",
-                    (domain, None),
+                    "INSERT INTO raw_domains (domain) VALUES (%s)",
+                    (domain,),
                 )
             conn.commit()
     return domain_list
@@ -6706,37 +6571,23 @@ def load_from_file(file_name):
 
 
 def get_menu_options() -> dict[str, dict[str, str]]:
-    """Return the menu options dictionary."""
+    """Return the menu options dictionary.
+
+    The per-domain raw_domains workloads (uncrawled, errors-by-type, fatal,
+    offline/issues) are now handled automatically by the durable queue daemon, so
+    the interactive launcher only offers targeted re-scans of known instances plus
+    entry points to join the queue or open manage mode.
+    """
     return {
-        "Process new domains": {"0": "Uncrawled"},
-        "Change process direction": {"1": "Standard", "2": "Reverse", "3": "Random"},
-        "Retry known Mastodon": {
-            "4": "Offline",
-            "5": "Issues",
-        },
-        "Retry fatal errors": {
-            "10": "Other Nodeinfo",
-        },
-        "Retry errors by type": {
-            "20": "DNS",
-            "21": "SSL",
-            "22": "TCP",
-            "23": "Type",
-            "24": "File",
-            "25": "API",
-            "26": "JSON",
-            "27": "HTTP 2xx",
-            "28": "HTTP 3xx",
-            "29": "HTTP 4xx",
-            "30": "HTTP 5xx",
-            "31": "Hard Fail",
-            "32": "Robots",
-        },
         "Retry known instances": {
             "50": "Unpatched",
             "51": f"{version_main_branch}",
             "52": "Active",
             "53": "All",
+        },
+        "Daemon": {
+            "90": "Join crawl queue",
+            "91": "Manage DNI / versions",
         },
     }
 
@@ -7006,7 +6857,7 @@ async def async_main() -> int:
         "-r",
         "--new",
         action="store_true",
-        help="only process new domains added to the database (same as menu item 0)",
+        help="only process new, never-crawled domains, then exit (one-shot)",
     )
     _ = crawl_parser.add_argument(
         "-t",
@@ -7036,7 +6887,7 @@ async def async_main() -> int:
         "-r",
         "--new",
         action="store_true",
-        help="only process new domains added to the database (same as menu item 0)",
+        help="only process new, never-crawled domains, then exit (one-shot)",
     )
     _ = parser.add_argument(
         "-t",
@@ -7107,10 +6958,13 @@ async def async_main() -> int:
                 echo("You cannot set both file and target arguments", "red")
                 return EXIT_FAILURE
 
-            # Durable crawl queue daemon (opt-in via VMCRAWL_QUEUE_MODE). Engages
-            # only for continuous crawling; one-shot --file/--target/--new runs
-            # keep the existing whole-batch behavior. See docs/durable-queue.md.
-            if queue_mode and not (args.file or args.target or args.new):
+            # Durable crawl queue daemon. Headless runs always join the queue;
+            # interactive runs can also opt in via VMCRAWL_QUEUE_MODE (or the
+            # menu's "Join crawl queue" option below). One-shot --file/--target/
+            # --new runs keep the whole-batch behavior. See docs/durable-queue.md.
+            if (queue_mode or _is_running_headless()) and not (
+                args.file or args.target or args.new
+            ):
                 try:
                     return await run_queue_daemon()
                 except KeyboardInterrupt:
@@ -7157,10 +7011,10 @@ async def async_main() -> int:
                             "cyan",
                         )
                     else:
+                        # Headless always joins the queue daemon above, so this
+                        # branch is interactive (or the explicit --new one-shot).
                         if args.new:
                             user_choice = "0"
-                        elif _is_running_headless():
-                            user_choice = "3"
                         else:
                             menu_options = get_menu_options()
                             selection = interactive_select_menu(menu_options)
@@ -7172,16 +7026,17 @@ async def async_main() -> int:
                             else:
                                 user_choice = selection
 
+                        # Daemon menu entries: join the queue or open manage mode.
+                        if user_choice == "90":
+                            return await run_queue_daemon()
+                        if user_choice == "91":
+                            return await run_manage_mode(args)
+
                         echo(
                             f"Crawling domains from database choice {user_choice}",
                             "cyan",
                         )
                         domain_list = load_from_database(user_choice)
-
-                    if user_choice == "2":
-                        _ = domain_list.reverse()
-                    elif user_choice == "3":
-                        random.shuffle(domain_list)
 
                 except FileNotFoundError:
                     echo(f"File not found: {domain_list_file}", "red")

@@ -54,10 +54,9 @@ Added to `raw_domains` (all idempotent `ADD COLUMN IF NOT EXISTS`):
 | `claimed_by`    | `TEXT`        | Worker identity holding the lease (host/pid) — observability   |
 | `attempts`      | `INTEGER`     | Consecutive transient failures; drives backoff. Reset on success |
 
-`attempts` is intentionally separate from the existing `errors` column: `errors` is
-a diagnostic counter (and is nulled for Mastodon-compatible domains), whereas
-`attempts` is purely the scheduling concern. Keeping them separate avoids coupling
-backoff to display semantics.
+`attempts` is the sole consecutive-failure counter — it drives backoff and resets on
+success. (The old batch-era `errors` diagnostic counter has been dropped; the latest
+failure classification lives in `reason`, which is what scheduling reads.)
 
 Index supporting the claim query:
 
@@ -238,16 +237,26 @@ self-feeding, the same property joinmastodon-api gets from `GetPeersWorker`.
 | `VMCRAWL_RETRY_ROBOT_HOURS`      | `720`   | Per-type base: robots disallow (flat 30d) |
 | `VMCRAWL_RETRY_HARD_HOURS`       | `2160`  | Per-type base: gone 410/451/418/999 (90d) |
 
+## How it's engaged
+
+The queue daemon is now the default crawl path:
+
+- **Headless runs always join the queue** (any non-interactive invocation of the
+  crawl command, e.g. cron/systemd), regardless of `VMCRAWL_QUEUE_MODE`.
+- **Interactive runs** can join it via the launcher menu's **Join crawl queue**
+  option, or by setting `VMCRAWL_QUEUE_MODE=true` (which skips the menu).
+- One-shot `--file` / `--target` / `--new` runs still do a single whole-batch pass.
+
+The interactive launcher no longer offers the per-domain `raw_domains` workloads
+(uncrawled, errors-by-type, fatal, offline/issues) — the queue handles those
+automatically from `reason`. It only offers targeted re-scans of known instances
+(**Retry known instances** 50–53) plus **Join crawl queue** and **Manage DNI /
+versions**.
+
 ## Rollout
 
 1. Apply `database.sql` (idempotent — adds queue columns, **drops the obsolete
-   `bad_*` columns/indexes**, adds the reason index, backfill).
-2. Deploy code; queue daemon stays **off** by default.
-3. Turn on for one worker via `VMCRAWL_QUEUE_MODE=true`; watch `claimed_by`,
-   `next_crawl_at` distribution, and throughput.
-4. Once happy, make it the default headless path and retire the whole-batch re-select.
-
-The reason-based menu/batch/retry tooling (options 4/5/20–32) keeps working
-throughout — it reads and writes the same `raw_domains` rows, just without lease
-discipline. The old `bad_*`-based retry menu (60–72) is removed; options 20–32
-cover the same classifications via `reason`.
+   `bad_*` and `errors` columns/indexes**, adds the reason index, backfill).
+2. Deploy code. Headless workers join the queue automatically; interactive use can
+   opt in via the menu or `VMCRAWL_QUEUE_MODE=true`.
+3. Watch `claimed_by`, `next_crawl_at` distribution, and throughput.
