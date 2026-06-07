@@ -328,6 +328,7 @@ main {
 
 .table-controls {
     display: flex;
+    flex-wrap: wrap;
     gap: 0.5rem;
     margin-bottom: 1rem;
 }
@@ -458,6 +459,7 @@ footer a {
     .stats-row { grid-template-columns: 1fr 1fr; }
     .gauge-grid { grid-template-columns: 1fr 1fr; }
     main { padding: 1rem; }
+    .table-controls select { width: 100%; }
 }
 
 @media (max-width: 480px) {
