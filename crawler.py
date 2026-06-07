@@ -3509,7 +3509,8 @@ def display_queue_status() -> None:
 
 _MANAGE_CHOICES = frozenset(
     {"1", "2", "3", "4", "5", "6", "7", "8", "s",
-     "9", "10", "11", "12", "13", "14", "15", "16", "17", "18", "19"}
+     "9", "10", "11", "12", "13", "14", "15", "16", "17", "18", "19",
+     "20", "21"}
 )
 
 
@@ -4074,6 +4075,58 @@ async def _handle_manage_action(args: argparse.Namespace, choice: str) -> None:
                     pass
         finally:
             loop.remove_signal_handler(signal.SIGINT)
+
+    elif choice == "20":
+        echo("", "white")
+        target = input("Enter domain(s) to crawl (comma-separated): ").strip().lower()
+        if not target:
+            echo("Domain cannot be empty", "yellow")
+            echo("", "white")
+            input("Press Enter to continue...")
+            return
+        domain_list = [d.strip() for d in target.split(",") if d.strip()]
+        domain_word = "s" if len(domain_list) > 1 else ""
+        echo(f"Crawling {len(domain_list)} domain{domain_word}…", "cyan")
+        filter_data = await load_domain_filter_data()
+        domain_endings = await get_domain_endings()
+        await check_and_record_domains(
+            domain_list,
+            filter_data["not_masto_domains"],
+            "1",
+            filter_data["dni_domains"],
+            domain_endings,
+            filter_data["nightly_version_ranges"],
+        )
+        cleanup_old_domains()
+        save_statistics()
+        echo("", "white")
+        input("Press Enter to continue...")
+
+    elif choice == "21":
+        echo("", "white")
+        target = input("Enter domain to fetch peers from: ").strip().lower()
+        if not target:
+            echo("Domain cannot be empty", "yellow")
+            echo("", "white")
+            input("Press Enter to continue...")
+            return
+        target = target.removeprefix("https://").removeprefix("http://").rstrip("/")
+        filter_data = await load_domain_filter_data()
+        domain_endings = await get_domain_endings()
+        api_url = f"https://{target}/api/v1/instance/peers"
+        echo(f"Fetching peers from {target}…", "cyan")
+        domains, error_type = await fetch_peer_domains(
+            api_url, target, domain_endings, filter_data["dni_domains"]
+        )
+        if domains:
+            await asyncio.to_thread(import_domains, domains)
+            echo(f"Imported {len(domains)} peer domains", "green")
+        elif error_type == "no_peers":
+            echo("No peers returned (endpoint disabled or unavailable)", "yellow")
+        else:
+            echo("Failed to fetch peers (transient error)", "red")
+        echo("", "white")
+        input("Press Enter to continue...")
 
     else:
         echo("Invalid choice, please try again", "yellow")
@@ -6563,6 +6616,8 @@ def get_menu_options() -> dict[str, dict[str, str]]:
         },
         "Domain": {
             "15": "Search domain details",
+            "20": "Crawl specific domain",
+            "21": "Fetch peers from domain",
         },
         "Statistics": {
             "16": "List flagged days",
