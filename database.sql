@@ -139,6 +139,17 @@ ALTER TABLE statistics
 ALTER TABLE statistics
   ADD COLUMN IF NOT EXISTS invalid_reason TEXT;
 
+-- Single-row ledger that elects one queue-daemon worker to run periodic
+-- maintenance (stats refresh + stale-domain cleanup) per interval. The id CHECK
+-- enforces exactly one row; claim_maintenance_slot() flips last_run_at via a
+-- conditional UPDATE so the work runs once per interval regardless of how many
+-- workers are running. See docs/durable-queue.md.
+CREATE TABLE IF NOT EXISTS maintenance_state (
+    id BOOLEAN PRIMARY KEY DEFAULT TRUE CHECK (id),
+    last_run_at TIMESTAMPTZ
+);
+INSERT INTO maintenance_state (id) VALUES (TRUE) ON CONFLICT (id) DO NOTHING;
+
 
 CREATE TABLE IF NOT EXISTS nightly_versions (
     version VARCHAR(50),

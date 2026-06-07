@@ -5605,7 +5605,6 @@ async def run_queue_daemon() -> int:
     )
     filter_data_cache: dict[str, Any] | None = None
     filter_data_loaded_at = 0.0
-    last_maintenance = 0.0
 
     # Teardown is handled by async_main's cleanup_connections().
     while True:
@@ -5636,10 +5635,11 @@ async def run_queue_daemon() -> int:
             if not domain_list:
                 # Nothing due: run periodic maintenance, then back off
                 # instead of hammering the table.
-                if (now - last_maintenance) >= maintenance_interval:
+                if await asyncio.to_thread(
+                    claim_maintenance_slot, maintenance_interval
+                ):
                     cleanup_old_domains()
                     save_statistics()
-                    last_maintenance = now
                 await asyncio.sleep(queue_poll_seconds)
                 continue
 
@@ -5655,10 +5655,9 @@ async def run_queue_daemon() -> int:
                 fetch_peers=queue_peers_enabled,
             )
 
-            if (now - last_maintenance) >= maintenance_interval:
+            if await asyncio.to_thread(claim_maintenance_slot, maintenance_interval):
                 cleanup_old_domains()
                 save_statistics()
-                last_maintenance = now
 
         except KeyboardInterrupt:
             echo(f"\n{appname} interrupted by user", "yellow")
@@ -6482,6 +6481,35 @@ def reclaim_stale_leases(lease_seconds: int) -> int:
             echo(f"Failed to reclaim stale leases: {exception}", "red", use_tqdm=True)
             conn.rollback()
             return 0
+
+
+def claim_maintenance_slot(interval_seconds: int) -> bool:
+    """Elect a single worker to run periodic maintenance this interval.
+
+    A conditional UPDATE on the one-row ``maintenance_state`` ledger: exactly one
+    worker can flip ``last_run_at`` forward per interval (the row lock serializes
+    concurrent attempts), so with any number of queue-daemon workers the stats
+    refresh and stale-domain cleanup run **once per interval**, not once per
+    worker. Returns True only for the worker that won the slot. Durable across
+    restarts (the timer lives in the DB, so a fresh fleet doesn't stampede) and
+    self-healing (if the winner dies mid-cycle the next interval re-opens).
+    """
+    with db_pool.connection() as conn, conn.cursor() as cursor:
+        try:
+            _ = cursor.execute(
+                "UPDATE maintenance_state SET last_run_at = now() "
+                "WHERE last_run_at IS NULL "
+                "   OR last_run_at <= now() - make_interval(secs => %s) "
+                "RETURNING last_run_at",
+                (interval_seconds,),
+            )
+            won = cursor.fetchone() is not None
+            conn.commit()
+            return won
+        except Exception as exception:
+            echo(f"Failed to claim maintenance slot: {exception}", "red", use_tqdm=True)
+            conn.rollback()
+            return False
 
 
 def load_from_database(user_choice):

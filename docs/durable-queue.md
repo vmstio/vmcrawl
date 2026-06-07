@@ -197,11 +197,24 @@ loop:
     process each domain via existing process_domain() pipeline (N workers)
     reschedule_domain(domain)       # in each worker's finally, after processing
     maybe_fetch_peers(domain)       # inline peer discovery (see below)
-    periodically: cleanup_old_domains(); save_statistics()
+    if claim_maintenance_slot():    # one worker per interval, DB-elected
+        cleanup_old_domains(); save_statistics()
 ```
 
 `process_domain()` and all its error handling are reused unchanged — the queue only
 changes *which* domains are selected and *that they are leased and rescheduled*.
+
+### Periodic maintenance (single runner across workers)
+
+Stale-domain cleanup and the statistics refresh must run **once per interval, not
+once per worker**. Each daemon process calls `claim_maintenance_slot()` before
+running them: a conditional `UPDATE` on the one-row `maintenance_state` ledger that
+flips `last_run_at` forward only if the interval has elapsed. The row lock serializes
+concurrent attempts, so exactly one worker wins per interval and the rest skip —
+regardless of how many workers run. Because the timer lives in the DB (not in each
+process), a freshly-deployed fleet doesn't stampede the maintenance at startup, and
+if the winner dies mid-cycle the next interval simply re-opens. Interval is
+`VMCRAWL_QUEUE_MAINTENANCE_SECONDS` (default 3600).
 
 ### Inline peer discovery (self-feeding)
 
