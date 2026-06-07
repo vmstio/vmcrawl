@@ -1719,15 +1719,6 @@ def increment_domain_error(domain: str, error_reason: str) -> None:
     """
     with db_pool.connection() as conn, conn.cursor() as cursor:
         try:
-            _ = cursor.execute(
-                "SELECT alias FROM raw_domains WHERE domain = %s",
-                (domain,),
-            )
-            result = cursor.fetchone()
-            # Aliases are canonicalized elsewhere; never record errors on them.
-            if result and result[0]:
-                return
-
             # Definitive "gone"/disallowed: drop from the published list at detection.
             if get_error_type(error_reason) in PURGE_ON_DETECTION_TYPES:
                 delete_domain_if_known(domain)
@@ -1758,7 +1749,7 @@ def clear_domain_error(domain: str) -> None:
             _ = cursor.execute(
                 "INSERT INTO raw_domains (domain, reason)"
                 " VALUES (%s, NULL)"
-                " ON CONFLICT(domain) DO UPDATE SET reason = excluded.reason",
+                " ON CONFLICT(domain) DO UPDATE SET reason = excluded.reason, alias = NULL",
                 (domain,),
             )
             conn.commit()
@@ -3408,11 +3399,9 @@ def get_queue_status() -> dict[str, Any]:
     """Return a snapshot of crawl-queue metrics from the database."""
     query = """
         SELECT
-            COUNT(*) FILTER (WHERE alias IS NULL OR alias = FALSE)
-                AS total,
+            COUNT(*) AS total,
             COUNT(*) FILTER (
-                WHERE (alias IS NULL OR alias = FALSE)
-                  AND (next_crawl_at IS NULL OR next_crawl_at <= now())
+                WHERE (next_crawl_at IS NULL OR next_crawl_at <= now())
                   AND (claimed_at IS NULL
                        OR claimed_at <= now() - make_interval(secs => %(lease)s))
             ) AS due_now,
@@ -3421,8 +3410,7 @@ def get_queue_status() -> dict[str, Any]:
                   AND claimed_at > now() - make_interval(secs => %(lease)s)
             ) AS in_progress,
             COUNT(*) FILTER (
-                WHERE (alias IS NULL OR alias = FALSE)
-                  AND next_crawl_at > now()
+                WHERE next_crawl_at > now()
                   AND (claimed_at IS NULL
                        OR claimed_at <= now() - make_interval(secs => %(lease)s))
             ) AS scheduled,
@@ -3435,8 +3423,7 @@ def get_queue_status() -> dict[str, Any]:
                   AND claimed_at > now() - make_interval(secs => %(lease)s)
             ) AS active_workers,
             MIN(next_crawl_at) FILTER (
-                WHERE (alias IS NULL OR alias = FALSE)
-                  AND next_crawl_at > now()
+                WHERE next_crawl_at > now()
                   AND claimed_at IS NULL
             ) AS next_due_at
         FROM raw_domains
@@ -6332,7 +6319,7 @@ def write_statistics_to_database(stats_values):
 
 
 def claim_due_domains(batch: int, lease_seconds: int, worker: str) -> list[str]:
-    """Atomically lease a batch of due, unclaimed, non-alias domains.
+    """Atomically lease a batch of due, unclaimed domains.
 
     Uses SELECT ... FOR UPDATE SKIP LOCKED so concurrent workers never claim the
     same row. The lease-expiry clause makes this self-healing: a crashed worker's
@@ -6347,7 +6334,9 @@ def claim_due_domains(batch: int, lease_seconds: int, worker: str) -> list[str]:
     per-type cadence derived from ``reason`` (see ``reschedule_domain``) — a 5xx
     in hours, a DNS failure backing off toward 30d, a gone/disallowed domain on a
     long flat interval — so revived servers are eventually re-counted rather than
-    hammered. The only permanent exclusions are aliases and hard-DNI.
+    hammered. Alias domains are reclaimed at the non-Mastodon cadence so a domain
+    that stops aliasing is eventually re-detected. The only permanent exclusion is
+    hard-DNI.
 
     Hard-DNI domains (dni.force = 'hard') are never claimed. The NOT EXISTS
     clause mirrors the worker-side label-boundary match in ``_is_dni_domain``,
@@ -6369,7 +6358,6 @@ def claim_due_domains(batch: int, lease_seconds: int, worker: str) -> list[str]:
         "  WHERE (next_crawl_at IS NULL OR next_crawl_at <= now())"
         "    AND (claimed_at IS NULL"
         "         OR claimed_at <= now() - make_interval(secs => %(lease)s))"
-        "    AND (alias IS NULL OR alias = FALSE)"
         "    AND NOT EXISTS ("
         "      SELECT 1 FROM dni d"
         "      WHERE d.force = 'hard'"
@@ -6411,7 +6399,8 @@ def reschedule_domain(domain: str, response_time: float | None = None) -> None:
         at greatest(base, cap). Transient types (DNS/SSL/TCP/HTTP/content) back
         off up to the cap (default 30d); ROBOT/HARD bases already exceed the cap
         so they stay flat at their long interval (default 30d / 90d).
-      * known non-Mastodon software     -> long non-Mastodon cadence (default 7d)
+      * alias domain (alias = TRUE)     -> non-Mastodon cadence (default 7d)
+      * known non-Mastodon software     -> non-Mastodon cadence (default 7d)
       * healthy                         -> normal recrawl cadence (default 1h)
     The per-type base is selected from ``reason`` by ``_REASON_BASE_HOURS_CASE``.
     Using greatest(base, cap) as the ceiling means a long flat type is unaffected
@@ -6432,6 +6421,8 @@ def reschedule_domain(domain: str, response_time: float | None = None) -> None:
         "  WHEN reason IS NOT NULL "
         "    THEN least(({base}) * power(2, attempts), greatest(({base}), %(cap)s)) "
         "         * (0.9 + random() * 0.2) * INTERVAL '1 hour' "
+        "  WHEN alias = TRUE "
+        "    THEN %(nonmasto)s * (0.9 + random() * 0.2) * INTERVAL '1 hour' "
         "  WHEN nodeinfo IS NOT NULL AND nodeinfo NOT IN {masto} "
         "    THEN %(nonmasto)s * (0.9 + random() * 0.2) * INTERVAL '1 hour' "
         "  ELSE %(recrawl)s * (0.9 + random() * 0.2) * INTERVAL '1 hour' "
