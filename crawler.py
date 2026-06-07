@@ -173,57 +173,79 @@ def echo(text: str, color: str, use_tqdm: bool = False, **kwargs: Any) -> None:
 # HTTP status codes for special handling
 http_codes_to_hardfail = [999, 451, 418, 410]  # gone
 
-# Error type to bad_* column mapping (single source of truth)
-ERROR_TYPE_TO_BAD_COLUMN: dict[str, str] = {
-    "DNS": "bad_dns",
-    "SSL": "bad_ssl",
-    "TCP": "bad_tcp",
-    "TYPE": "bad_type",
-    "FILE": "bad_file",
-    "API": "bad_api",
-    "JSON": "bad_json",
-    "HTTP2XX": "bad_http2xx",
-    "HTTP3XX": "bad_http3xx",
-    "HTTP4XX": "bad_http4xx",
-    "HTTP5XX": "bad_http5xx",
-    "HARD": "bad_hard",
-    "ROBOT": "bad_robot",
-}
-BAD_COLUMNS = tuple(ERROR_TYPE_TO_BAD_COLUMN.values())
 MASTODON_COMPATIBLE_SOFTWARE = ("mastodon", "hometown", "kmyblue")
 
+# Failure classifications parsed from the leading token of raw_domains.reason.
+# Scheduling and pruning are driven entirely by reason; there are no terminal
+# bad_* columns. HARD (gone: 410/451/418/999) and ROBOT (robots.txt disallow)
+# are the only classifications that purge a domain from the published
+# mastodon_domains list at detection. Every other type only reschedules.
+PURGE_ON_DETECTION_TYPES = ("HARD", "ROBOT")
+TRACKED_ERROR_TYPES = (
+    "DNS",
+    "SSL",
+    "TCP",
+    "TYPE",
+    "FILE",
+    "API",
+    "JSON",
+    "HARD",
+    "ROBOT",
+)
+
+# Per-error-type base reschedule cadence in hours (env-overridable). The queue
+# reschedules a failed domain at base * 2**attempts, ceilinged per the cap in
+# reschedule_domain. Transient types use short bases and back off; ROBOT/HARD
+# use long flat intervals (base >= cap, so the backoff is a no-op for them).
+RETRY_BASE_HOURS: dict[str, int] = {
+    "DNS": max(1, int(os.getenv("VMCRAWL_RETRY_DNS_HOURS", "24"))),
+    "SSL": max(1, int(os.getenv("VMCRAWL_RETRY_SSL_HOURS", "24"))),
+    "TCP": max(1, int(os.getenv("VMCRAWL_RETRY_TCP_HOURS", "12"))),
+    "CONTENT": max(1, int(os.getenv("VMCRAWL_RETRY_CONTENT_HOURS", "24"))),
+    "HTTP2XX": max(1, int(os.getenv("VMCRAWL_RETRY_HTTP2XX_HOURS", "48"))),
+    "HTTP3XX": max(1, int(os.getenv("VMCRAWL_RETRY_HTTP3XX_HOURS", "48"))),
+    "HTTP4XX": max(1, int(os.getenv("VMCRAWL_RETRY_HTTP4XX_HOURS", "48"))),
+    "HTTP5XX": max(1, int(os.getenv("VMCRAWL_RETRY_HTTP5XX_HOURS", "6"))),
+    "ROBOT": max(1, int(os.getenv("VMCRAWL_RETRY_ROBOT_HOURS", "720"))),
+    "HARD": max(1, int(os.getenv("VMCRAWL_RETRY_HARD_HOURS", "2160"))),
+}
+
 # Precomposed psycopg.sql fragments so call sites never interpolate values
-# or identifiers into SQL text directly. Built once at import time from
-# hardcoded module constants.
+# or identifiers into SQL text directly. Built once at import time.
 _MASTODON_COMPATIBLE_IN_CLAUSE = sql.SQL("({})").format(
     sql.SQL(", ").join(sql.Literal(s) for s in MASTODON_COMPATIBLE_SOFTWARE)
 )
-_BAD_COL_IDENTIFIERS = [sql.Identifier(col) for col in BAD_COLUMNS]
-_BAD_COL_LIST = sql.SQL(", ").join(_BAD_COL_IDENTIFIERS)
-_BAD_COL_ANY_TRUE = sql.SQL(" OR ").join(
-    sql.SQL("{} = TRUE").format(c) for c in _BAD_COL_IDENTIFIERS
-)
-_BAD_COL_ALL_NULL_OR_FALSE = sql.SQL(" AND ").join(
-    sql.SQL("({c} IS NULL OR {c} = FALSE)").format(c=c)
-    for c in _BAD_COL_IDENTIFIERS
-)
 
-# Menu choice to status column mapping for preserve mechanism
-MENU_CHOICE_TO_STATUS_COLUMN: dict[str, str] = {
-    "60": "bad_dns",
-    "61": "bad_ssl",
-    "62": "bad_tcp",
-    "63": "bad_type",
-    "64": "bad_file",
-    "65": "bad_api",
-    "66": "bad_json",
-    "67": "bad_http2xx",
-    "68": "bad_http3xx",
-    "69": "bad_http4xx",
-    "70": "bad_http5xx",
-    "71": "bad_hard",
-    "72": "bad_robot",
-}
+# Maps the leading token of reason -> base cadence hours. Mirrors the prefix
+# logic of get_error_type(): explicit DNS/SSL/TCP/HARD/ROBOT tokens, HTTP status
+# codes keyed by leading digit (2xx/3xx/4xx/5xx), and TYPE/FILE/JSON/API (plus
+# any unknown reason) falling to the CONTENT base via ELSE. The doubled %% in the
+# LIKE patterns survives psycopg's parameter substitution in reschedule_domain.
+_REASON_BASE_HOURS_CASE = sql.SQL(
+    "CASE"
+    "  WHEN reason LIKE 'DNS%%' THEN {dns}"
+    "  WHEN reason LIKE 'SSL%%' THEN {ssl}"
+    "  WHEN reason LIKE 'TCP%%' THEN {tcp}"
+    "  WHEN reason LIKE 'HARD%%' THEN {hard}"
+    "  WHEN reason LIKE 'ROBOT%%' THEN {robot}"
+    "  WHEN reason ~ '^5[0-9][0-9]' THEN {http5xx}"
+    "  WHEN reason ~ '^4[0-9][0-9]' THEN {http4xx}"
+    "  WHEN reason ~ '^3[0-9][0-9]' THEN {http3xx}"
+    "  WHEN reason ~ '^2[0-9][0-9]' THEN {http2xx}"
+    "  ELSE {content} "
+    "END"
+).format(
+    dns=sql.Literal(RETRY_BASE_HOURS["DNS"]),
+    ssl=sql.Literal(RETRY_BASE_HOURS["SSL"]),
+    tcp=sql.Literal(RETRY_BASE_HOURS["TCP"]),
+    hard=sql.Literal(RETRY_BASE_HOURS["HARD"]),
+    robot=sql.Literal(RETRY_BASE_HOURS["ROBOT"]),
+    http5xx=sql.Literal(RETRY_BASE_HOURS["HTTP5XX"]),
+    http4xx=sql.Literal(RETRY_BASE_HOURS["HTTP4XX"]),
+    http3xx=sql.Literal(RETRY_BASE_HOURS["HTTP3XX"]),
+    http2xx=sql.Literal(RETRY_BASE_HOURS["HTTP2XX"]),
+    content=sql.Literal(RETRY_BASE_HOURS["CONTENT"]),
+)
 
 
 def is_mastodon_compatible_software(software_name: str | None) -> bool:
@@ -610,9 +632,11 @@ queue_poll_seconds = max(1, int(os.getenv("VMCRAWL_QUEUE_POLL_SECONDS", "15")))
 # Recrawl cadences and transient-failure backoff, all expressed in hours.
 recrawl_hours = max(1, int(os.getenv("VMCRAWL_RECRAWL_HOURS", "1")))
 recrawl_nonmasto_hours = max(1, int(os.getenv("VMCRAWL_RECRAWL_NONMASTO_HOURS", "168")))
-retry_base_hours = max(1, int(os.getenv("VMCRAWL_RETRY_BASE_HOURS", "1")))
-retry_cap_hours = max(retry_base_hours, int(os.getenv("VMCRAWL_RETRY_CAP_HOURS", "168")))
-dead_hours = max(1, int(os.getenv("VMCRAWL_DEAD_HOURS", "720")))
+# Global ceiling for the per-type exponential backoff (base * 2**attempts). A
+# transient type backs off up to this cap; ROBOT/HARD bases already exceed it so
+# they stay flat. Default 720h (30d) keeps even persistently-dead domains on a
+# monthly revival check rather than abandoning them.
+retry_cap_hours = max(1, int(os.getenv("VMCRAWL_RETRY_CAP_HOURS", "720")))
 
 
 def _worker_id() -> str:
@@ -798,7 +822,6 @@ async def parse_json_with_fallback(
     response: httpx.Response,
     domain: str,
     target: str,
-    preserve_status: str | None = None,
     suppress_errors: bool = False,
 ) -> Any | bool:
     """Parse JSON from response with fallback decoder for malformed JSON.
@@ -807,7 +830,6 @@ async def parse_json_with_fallback(
         response: httpx Response object
         domain: Domain being processed (for error reporting)
         target: Target endpoint name (for error reporting)
-        preserve_status: Column name to preserve when recording errors
 
     Returns:
         Parsed JSON data or False on error
@@ -842,7 +864,6 @@ async def parse_json_with_fallback(
                     domain,
                     target,
                     exception,
-                    preserve_status,
                 )
                 return False
 
@@ -1628,19 +1649,6 @@ def get_release_versions_from_db() -> dict[str, Any]:
 
 
 # =============================================================================
-# DATABASE FUNCTIONS - Preserve Status Helper
-# =============================================================================
-
-
-def _get_preserve_status(user_choice: str | None) -> str | None:
-    """Map a menu choice to the status column to preserve during error recording.
-
-    Returns the column name if the user is retrying domains in a specific
-    terminal state, or None for normal operation.
-    """
-    if user_choice is None:
-        return None
-    return MENU_CHOICE_TO_STATUS_COLUMN.get(user_choice)
 
 
 # =============================================================================
@@ -1669,71 +1677,44 @@ def log_error(domain: str, error_to_print: str) -> None:
             conn.rollback()
 
 
-def increment_domain_error(
-    domain: str,
-    error_reason: str,
-    preserve_status: str | None = None,
-) -> None:
-    """Increment error count for a domain and record the error reason.
+def get_error_type(reason: str | None) -> str | None:
+    """Classify a reason string by its leading token.
 
-    Only increments error count if the previous error reason started with
-    DNS, SSL, TCP, TYPE, FILE, API, JSON, or HTTP 2xx/3xx/4xx/5xx, AND the domain's nodeinfo
-    is NOT set to 'mastodon'. For other error types, the count is set to null
-    while still recording the error reason. Counter resets to 1 when switching
-    between error types.
+    HTTP status codes map to HTTP{2,3,4,5}XX; the explicit prefixes map to
+    themselves. Mirrors the SQL classification in ``_REASON_BASE_HOURS_CASE`` so
+    Python-side decisions (error counting, purge-at-detection) agree with the
+    reschedule cadence the queue derives from the same reason.
+    """
+    if not reason or len(reason) < 3:
+        return None
+    if reason[0] in "2345" and reason[1:3].isdigit():
+        return f"HTTP{reason[0]}XX"
+    return next((t for t in TRACKED_ERROR_TYPES if reason.startswith(t)), None)
 
-    After ERROR_THRESHOLD consecutive errors, the domain is marked with the
-    corresponding bad_* column (e.g., bad_dns, bad_ssl, bad_tcp, etc.).
-    ROBOT and HARD error types are immediately terminal on first occurrence,
-    bypassing the Mastodon nodeinfo check.
 
-    Args:
-        domain: The domain to update
-        error_reason: The error reason string
-        preserve_status: Column name to preserve when recording errors (e.g.,
-            "bad_ssl", "bad_dns"). Used when retrying domains that are already
-            in a terminal state.
+def increment_domain_error(domain: str, error_reason: str) -> None:
+    """Record a crawl failure: store the reason and update the diagnostic counter.
+
+    There are no terminal bad_* flags. Scheduling is derived from ``reason`` by
+    the queue (see ``reschedule_domain``); this function only records the latest
+    failure and maintains ``errors``, a diagnostic counter that increments on
+    consecutive same-type failures, resets to 1 on a type change, and is left
+    null for Mastodon-compatible or unclassified failures.
+
+    HARD (gone: 410/451/418/999) and ROBOT (robots.txt disallow) are definitive,
+    so on detection the domain is purged from the published mastodon_domains list
+    immediately; it still records its reason and reschedules on its long interval.
+    All other failure types leave the published row untouched (last-known-good).
 
     Note: Domain is expected to be pre-normalized to lowercase by caller.
     """
-    ERROR_THRESHOLD = int(os.getenv("VMCRAWL_ERROR_BUFFER", "24"))
-    IMMEDIATE_TERMINAL_TYPES = ("ROBOT", "HARD")
-    TRACKED_ERROR_TYPES = (
-        "DNS",
-        "SSL",
-        "TCP",
-        "TYPE",
-        "FILE",
-        "API",
-        "JSON",
-        "HARD",
-        "ROBOT",
-    )
-
-    # Helper function to get error type from reason string
-    def get_error_type(reason: str) -> str | None:
-        """Get error type category from error reason string."""
-        if not reason or len(reason) < 3:
-            return None
-        # Check for HTTP status codes
-        if reason[0] in "2345" and reason[1:3].isdigit():
-            return f"HTTP{reason[0]}XX"
-        # Check for other tracked error types
-        return next(
-            (t for t in TRACKED_ERROR_TYPES if reason.startswith(t)),
-            None,
-        )
-
     with db_pool.connection() as conn, conn.cursor() as cursor:
         try:
-            # First, check if domain exists and is in terminal state (read-only query)
-            # This avoids unnecessary writes for domains we won't process
-            bad_col_list = ", ".join(BAD_COLUMNS)
-            select_query: Any = (
-                f"SELECT errors, reason, nodeinfo, alias, {bad_col_list}"
-                f" FROM raw_domains WHERE domain = %s"
+            _ = cursor.execute(
+                "SELECT errors, reason, nodeinfo, alias"
+                " FROM raw_domains WHERE domain = %s",
+                (domain,),
             )
-            _ = cursor.execute(select_query, (domain,))
             result = cursor.fetchone()
 
             if result:
@@ -1741,128 +1722,40 @@ def increment_domain_error(
                 previous_reason = result[1] or ""
                 nodeinfo = result[2]
                 is_alias = result[3] or False
-
-                # If domain is marked as an alias, skip error tracking entirely
+                # Aliases are canonicalized elsewhere; never record errors on them.
                 if is_alias:
                     return
-
-                # bad_* columns start at index 4
-                current_bad = {
-                    col: (result[4 + i] or False) for i, col in enumerate(BAD_COLUMNS)
-                }
-
-                # If domain is already in a terminal state, skip entirely
-                # unless the user is retrying that specific terminal state
-                active_terminal = any(current_bad.values()) or (
-                    nodeinfo and not is_mastodon_compatible_software(nodeinfo)
-                )
-                if active_terminal:
-                    if preserve_status and current_bad.get(preserve_status):
-                        pass  # Continue processing — user is retrying this state
-                    else:
-                        return
             else:
-                # Row doesn't exist - set defaults
                 current_errors = 0
                 previous_reason = ""
                 nodeinfo = None
-                current_bad = {col: False for col in BAD_COLUMNS}
 
-            # Determine error type first to check for immediate terminal types
             error_type = get_error_type(error_reason)
             previous_type = get_error_type(previous_reason)
-            error_status = (
-                ERROR_TYPE_TO_BAD_COLUMN.get(error_type) if error_type else None
-            )
 
-            # Preserve the retried bad_* flag only when the failure type is unchanged.
-            # If the failure type changed, clear old bad_* flags so state can transition.
-            preserve_current_status = (
-                preserve_status
-                and current_bad.get(preserve_status)
-                and error_status == preserve_status
-            )
+            # Definitive "gone"/disallowed: drop from the published list at detection.
+            if error_type in PURGE_ON_DETECTION_TYPES:
+                delete_domain_if_known(domain)
 
-            # Determine flag values for upsert
-            bad_values = {
-                col: (
-                    True
-                    if (preserve_current_status and preserve_status == col)
-                    else None
-                )
-                for col in BAD_COLUMNS
-            }
-
-            # During explicit bad_* rescans (menu 60-72), do not rewrite
-            # errors/reason when the domain still fails with that same bad_* type.
-            if preserve_current_status:
-                return
-
-            # Immediate terminal types (ROBOT/HARD) bypass the Mastodon nodeinfo check
-            # and mark the domain as bad if error count is 1 or higher
-            if error_type in IMMEDIATE_TERMINAL_TYPES:
-                # Calculate new error count
-                if error_type == previous_type:
-                    new_errors = current_errors + 1
-                else:
-                    new_errors = 1
-
-                # Mark as bad if 1 or higher
-                if new_errors >= 1:
-                    status = ERROR_TYPE_TO_BAD_COLUMN.get(error_type)
-                    if status:
-                        mark_domain_status(domain, status)
-                        delete_domain_if_known(domain)
-                        return
-            # Skip error counting for Mastodon-compatible software.
-            # We still record the reason but clear the counter.
-            elif is_mastodon_compatible_software(nodeinfo):
+            # Diagnostic counter (errors): not used for scheduling, but surfaced by
+            # the reason-based retry menus (ORDER BY errors). Null for healthy
+            # Mastodon software and for unclassified reasons.
+            if is_mastodon_compatible_software(nodeinfo):
                 new_errors = None
+            elif error_type and error_type == previous_type:
+                new_errors = current_errors + 1
+            elif error_type:
+                new_errors = 1
             else:
-                # Calculate new error count for non-Mastodon, non-immediate-terminal errors
-                if error_type and error_type == previous_type:
-                    # Same error type - increment
-                    new_errors = current_errors + 1
+                new_errors = None
 
-                    # Check if threshold reached
-                    if new_errors >= ERROR_THRESHOLD:
-                        status = ERROR_TYPE_TO_BAD_COLUMN.get(error_type)
-                        if status:
-                            mark_domain_status(domain, status)
-                            delete_domain_if_known(domain)
-                            return
-                elif error_type:
-                    # Different tracked error type or first occurrence - reset to 1
-                    new_errors = 1
-                else:
-                    # Non-tracked error types - set count to null
-                    new_errors = None
-
-            # Build column lists for the upsert
-            bad_col_names = ", ".join(BAD_COLUMNS)
-            bad_col_placeholders = ", ".join(["%s"] * len(BAD_COLUMNS))
-            bad_col_updates = ", ".join(
-                f"{col} = EXCLUDED.{col}" for col in BAD_COLUMNS
-            )
-
-            # Single atomic upsert to update/insert the error record
-            upsert_query: Any = (
-                f"INSERT INTO raw_domains"
-                f" (domain, errors, reason, {bad_col_names})"
-                f" VALUES (%s, %s, %s, {bad_col_placeholders})"
-                f" ON CONFLICT(domain) DO UPDATE SET"
-                f" errors = EXCLUDED.errors,"
-                f" reason = EXCLUDED.reason,"
-                f" {bad_col_updates}"
-            )
             _ = cursor.execute(
-                upsert_query,
-                (
-                    domain,
-                    new_errors,
-                    error_reason,
-                    *[bad_values[col] for col in BAD_COLUMNS],
-                ),
+                "INSERT INTO raw_domains (domain, errors, reason)"
+                " VALUES (%s, %s, %s)"
+                " ON CONFLICT(domain) DO UPDATE SET"
+                " errors = EXCLUDED.errors,"
+                " reason = EXCLUDED.reason",
+                (domain, new_errors, error_reason),
             )
             conn.commit()
         except Exception as exception:
@@ -1875,33 +1768,19 @@ def increment_domain_error(
 
 
 def clear_domain_error(domain: str) -> None:
-    """Clear all error flags for a domain.
+    """Clear a domain's recorded error state (errors + reason).
 
     Note: Domain is expected to be pre-normalized to lowercase by caller.
     """
-    bad_col_names = ", ".join(BAD_COLUMNS)
-    bad_col_placeholders = ", ".join(["%s"] * len(BAD_COLUMNS))
-    bad_col_updates = ", ".join(f"{col} = excluded.{col}" for col in BAD_COLUMNS)
-
     with db_pool.connection() as conn, conn.cursor() as cursor:
         try:
-            clear_query: Any = (
-                f"INSERT INTO raw_domains"
-                f" (domain, errors, reason, {bad_col_names})"
-                f" VALUES (%s, %s, %s, {bad_col_placeholders})"
-                f" ON CONFLICT(domain) DO UPDATE SET"
-                f" errors = excluded.errors,"
-                f" reason = excluded.reason,"
-                f" {bad_col_updates}"
-            )
             _ = cursor.execute(
-                clear_query,
-                (
-                    domain,
-                    None,
-                    None,
-                    *[None] * len(BAD_COLUMNS),
-                ),
+                "INSERT INTO raw_domains (domain, errors, reason)"
+                " VALUES (%s, NULL, NULL)"
+                " ON CONFLICT(domain) DO UPDATE SET"
+                " errors = excluded.errors,"
+                " reason = excluded.reason",
+                (domain,),
             )
             conn.commit()
         except Exception as exception:
@@ -1942,61 +1821,6 @@ def _save_matrix_nodeinfo(domain: str) -> None:
 
 
 # =============================================================================
-# DATABASE FUNCTIONS - Domain Status Marking
-# =============================================================================
-
-
-def mark_domain_status(domain: str, status_type: str) -> None:
-    """Mark a domain with a specific bad_* status flag.
-
-    Args:
-        domain: The domain to mark
-        status_type: Any bad_* column name (e.g. 'bad_dns', 'bad_ssl', etc.)
-
-    Note: Domain is expected to be pre-normalized to lowercase by caller.
-    """
-    # Build status map dynamically from BAD_COLUMNS
-    status_map: dict[str, tuple[dict[str, Any], str]] = {}
-    for col_name in BAD_COLUMNS:
-        status_map[col_name] = ({col_name: True}, col_name)
-
-    if status_type not in status_map:
-        echo(f"Invalid status type: {status_type}", "red")
-        return
-
-    overrides, label = status_map[status_type]
-
-    # Build complete column set with defaults
-    all_columns = [
-        "errors",
-        "reason",
-        "nodeinfo",
-    ] + list(BAD_COLUMNS)
-    values = {col: None for col in all_columns}
-    values.update(overrides)
-
-    col_names = ", ".join(all_columns)
-    placeholders = ", ".join(["%s"] * len(all_columns))
-    updates = ", ".join(f"{col} = excluded.{col}" for col in all_columns)
-
-    with db_pool.connection() as conn, conn.cursor() as cursor:
-        try:
-            status_query: Any = (
-                f"INSERT INTO raw_domains (domain, {col_names})"
-                f" VALUES (%s, {placeholders})"
-                f" ON CONFLICT(domain) DO UPDATE SET {updates}"
-            )
-            _ = cursor.execute(
-                status_query,
-                (domain, *[values[col] for col in all_columns]),
-            )
-            conn.commit()
-        except Exception as exception:
-            echo(f"Failed to mark domain {label}: {exception}", "red")
-            conn.rollback()
-
-
-# =============================================================================
 # DATABASE FUNCTIONS - Domain CRUD Operations
 # =============================================================================
 
@@ -2032,7 +1856,7 @@ def mark_domain_as_alias(domain: str) -> None:
         domain: The domain to mark as an alias (should be pre-normalized to lowercase)
     """
     # Build list of all state columns to clear
-    state_columns = ["errors", "reason", "nodeinfo"] + list(BAD_COLUMNS)
+    state_columns = ["errors", "reason", "nodeinfo"]
 
     # Build SET clause: alias = TRUE, col1 = NULL, col2 = NULL, ...
     set_clause = sql.SQL("alias = TRUE, ") + sql.SQL(", ").join(
@@ -2257,37 +2081,6 @@ def get_dni_domains():
     return set()
 
 
-def get_domains_by_status(status_column):
-    """Get list of domains filtered by status column.
-
-    Args:
-        status_column: Any bad_* column name
-
-    Returns:
-        Set of domain strings
-    """
-    valid_columns = list(BAD_COLUMNS)
-    if status_column not in valid_columns:
-        echo(f"Invalid status column: {status_column}", "red")
-        return set()
-
-    with db_pool.connection() as conn, conn.cursor() as cursor:
-        try:
-            query = sql.SQL("SELECT domain FROM raw_domains WHERE {} = TRUE").format(
-                sql.Identifier(status_column)
-            )
-            _ = cursor.execute(query)
-            # Use set for O(1) lookup, stream results
-            return {row[0].strip() for row in cursor if row[0] and row[0].strip()}
-        except Exception as exception:
-            echo(
-                f"Failed to obtain {status_column} domains: {exception}",
-                "red",
-            )
-            conn.rollback()
-    return set()
-
-
 def get_not_masto_domains():
     """Get list of domains where nodeinfo is not Mastodon-compatible."""
     with db_pool.connection() as conn, conn.cursor() as cursor:
@@ -2305,34 +2098,6 @@ def get_not_masto_domains():
     return set()
 
 
-def get_all_bad_domains() -> dict[str, set[str]]:
-    """Get all domains in bad_* terminal states.
-
-    Returns a dict mapping bad_* column name to the set of domains with that flag.
-    Uses a single query for efficiency.
-    """
-    result: dict[str, set[str]] = {col: set() for col in BAD_COLUMNS}
-
-    with db_pool.connection() as conn, conn.cursor() as cursor:
-        try:
-            bad_query = sql.SQL(
-                "SELECT domain, {cols} FROM raw_domains WHERE {conditions}"
-            ).format(cols=_BAD_COL_LIST, conditions=_BAD_COL_ANY_TRUE)
-            _ = cursor.execute(bad_query)
-            for row in cursor:
-                domain = row[0]
-                if not domain or not domain.strip():
-                    continue
-                domain = domain.strip()
-                for i, col in enumerate(BAD_COLUMNS):
-                    if row[1 + i]:
-                        result[col].add(domain)
-        except Exception as exception:
-            echo(f"Failed to obtain bad domains: {exception}", "red")
-            conn.rollback()
-    return result
-
-
 async def load_domain_filter_data():
     """Load all domain filter data in parallel.
 
@@ -2343,19 +2108,16 @@ async def load_domain_filter_data():
         dni_domains,
         not_masto_domains,
         nightly_version_ranges,
-        bad_domain_sets,
     ) = await asyncio.gather(
         asyncio.to_thread(get_dni_domains),
         asyncio.to_thread(get_not_masto_domains),
         asyncio.to_thread(get_nightly_version_ranges),
-        asyncio.to_thread(get_all_bad_domains),
     )
 
     return {
         "dni_domains": dni_domains,
         "not_masto_domains": not_masto_domains,
         "nightly_version_ranges": nightly_version_ranges,
-        "bad_domain_sets": bad_domain_sets,
     }
 
 
@@ -2809,7 +2571,6 @@ async def run_fetch_mode(args: argparse.Namespace) -> int:
             filter_data["dni_domains"],
             domain_endings,
             filter_data["nightly_version_ranges"],
-            filter_data["bad_domain_sets"],
         )
 
         echo("Crawling of new domains complete!", "bold")
@@ -4403,7 +4164,7 @@ async def run_manage_mode(args: argparse.Namespace) -> int:
 # =============================================================================
 
 
-def _handle_incorrect_file_type(domain, target, content_type, preserve_status=None):
+def _handle_incorrect_file_type(domain, target, content_type):
     """Handle responses with incorrect content type."""
     if content_type == "" or content_type is None:
         content_type = "missing Content-Type"
@@ -4411,25 +4172,25 @@ def _handle_incorrect_file_type(domain, target, content_type, preserve_status=No
     error_message = f"{target} is {clean_content_type}"
     echo(f"{domain}: {error_message}", "yellow", use_tqdm=True)
     log_error(domain, error_message)
-    increment_domain_error(domain, f"TYPE+{target}", preserve_status)
+    increment_domain_error(domain, f"TYPE+{target}")
 
 
-def _handle_http_status_code(domain, target, response, preserve_status=None):
+def _handle_http_status_code(domain, target, response):
     """Handle non-fatal HTTP status codes."""
     code = response.status_code
     error_message = f"HTTP {code} on {target}"
     echo(f"{domain}: {error_message}", "yellow", use_tqdm=True)
     log_error(domain, error_message)
-    increment_domain_error(domain, f"{code}+{target}", preserve_status)
+    increment_domain_error(domain, f"{code}+{target}")
 
 
-def _handle_http_failed(domain, target, response, preserve_status=None):
+def _handle_http_failed(domain, target, response):
     """Handle HTTP 410/418/451/999 hard-fail codes via error counting."""
     code = response.status_code
     error_message = f"HTTP {code} on {target}"
     echo(f"{domain}: {error_message}", "yellow", use_tqdm=True)
     log_error(domain, error_message)
-    increment_domain_error(domain, f"HARD+{target}", preserve_status)
+    increment_domain_error(domain, f"HARD+{target}")
 
 
 def _clean_exception_message(error_message: str, default: str) -> str:
@@ -4498,7 +4259,7 @@ def _classify_request_exception(exception: Exception) -> str:
     return "TCP"
 
 
-def _handle_tcp_exception(domain, target, exception, preserve_status=None):
+def _handle_tcp_exception(domain, target, exception):
     """Handle TCP/connection exceptions with appropriate categorization."""
     error_message = str(exception)
     error_reason = _classify_request_exception(exception)
@@ -4510,17 +4271,17 @@ def _handle_tcp_exception(domain, target, exception, preserve_status=None):
         ):
             echo(f"{domain}: Response too large", "orange", use_tqdm=True)
             log_error(domain, "Response exceeds size limit")
-            increment_domain_error(domain, f"{error_reason}+{target}", preserve_status)
+            increment_domain_error(domain, f"{error_reason}+{target}")
             return
         if "bad file descriptor" in error_message.casefold():
             echo(f"{domain}: Connection closed unexpectedly", "orange", use_tqdm=True)
             log_error(domain, "Bad file descriptor")
-            increment_domain_error(domain, f"{error_reason}+{target}", preserve_status)
+            increment_domain_error(domain, f"{error_reason}+{target}")
             return
         cleaned_message = _clean_exception_message(error_message, "File/stream error")
         echo(f"{domain}: {cleaned_message}", "orange", use_tqdm=True)
         log_error(domain, cleaned_message)
-        increment_domain_error(domain, f"{error_reason}+{target}", preserve_status)
+        increment_domain_error(domain, f"{error_reason}+{target}")
         return
 
     if error_reason == "SSL":
@@ -4529,7 +4290,7 @@ def _handle_tcp_exception(domain, target, exception, preserve_status=None):
         )
         echo(f"{domain}: {cleaned_message}", "orange", use_tqdm=True)
         log_error(domain, cleaned_message)
-        increment_domain_error(domain, f"{error_reason}+{target}", preserve_status)
+        increment_domain_error(domain, f"{error_reason}+{target}")
         return
 
     if error_reason == "DNS":
@@ -4538,23 +4299,23 @@ def _handle_tcp_exception(domain, target, exception, preserve_status=None):
         )
         echo(f"{domain}: {cleaned_message}", "orange", use_tqdm=True)
         log_error(domain, cleaned_message)
-        increment_domain_error(domain, f"{error_reason}+{target}", preserve_status)
+        increment_domain_error(domain, f"{error_reason}+{target}")
         return
 
     # All remaining transport failures are categorized as TCP.
     cleaned_message = _clean_exception_message(error_message, "TCP error")
     echo(f"{domain}: {cleaned_message}", "orange", use_tqdm=True)
     log_error(domain, cleaned_message)
-    increment_domain_error(domain, f"{error_reason}+{target}", preserve_status)
+    increment_domain_error(domain, f"{error_reason}+{target}")
 
 
-def _handle_json_exception(domain, target, exception, preserve_status=None):
+def _handle_json_exception(domain, target, exception):
     """Handle JSON parsing exceptions."""
     error_message = str(exception)
     error_reason = f"JSON+{target}"
     echo(f"{domain}: {target} {error_message}", "yellow", use_tqdm=True)
     log_error(domain, error_message)
-    increment_domain_error(domain, f"{error_reason}", preserve_status)
+    increment_domain_error(domain, f"{error_reason}")
 
 
 # =============================================================================
@@ -4565,36 +4326,26 @@ def _handle_json_exception(domain, target, exception, preserve_status=None):
 def _should_skip_domain(
     domain,
     not_masto_domains,
-    bad_domain_sets,
     user_choice,
     bypass_skip_filters=False,
 ):
     """Check if a domain should be skipped based on its status.
 
     When ``bypass_skip_filters`` is True (durable queue daemon), no domain is
-    skipped on its recorded state — neither bad_* terminal states nor a known
-    not-Mastodon platform. The claim query is the authoritative filter in queue
-    mode, so every domain it hands back is meant to be (re)crawled:
+    skipped on its recorded state, so a domain that has *migrated* to Mastodon
+    from other software can be re-detected. The claim query is the authoritative
+    filter in queue mode; every domain it hands back is meant to be (re)crawled.
 
-    * Re-applying the bad_* skip here would claim a revived failure domain only
-      to skip it and reschedule it untouched, silently breaking the auto-revival
-      the queue is designed to perform.
-    * Re-applying the not-Mastodon skip would prevent a domain that has *migrated*
-      to Mastodon from ever being re-detected, even though the claim query
-      deliberately re-claims it on the long non-Mastodon cadence for exactly that.
+    In the non-queue (menu/file/target) paths, the only recorded-state skip is a
+    known not-Mastodon platform. There are no terminal failure flags: a failing
+    domain is simply rescheduled on its per-type cadence by the queue, never
+    excluded here.
     """
     if bypass_skip_filters:
         return False
     if user_choice != "10" and domain in not_masto_domains:
         echo(f"{domain}: Other Platform", "cyan", use_tqdm=True)
         return True
-    # Check bad_* terminal states
-    preserve_col = MENU_CHOICE_TO_STATUS_COLUMN.get(user_choice or "")
-    for col_name, domain_set in bad_domain_sets.items():
-        if domain in domain_set and preserve_col != col_name:
-            label = col_name.replace("_", " ").title()
-            echo(f"{domain}: {label}", "cyan", use_tqdm=True)
-            return True
     return False
 
 
@@ -4646,7 +4397,7 @@ def _is_dni_or_invalid_tld(domain, dni_domains, domain_endings):
 # =============================================================================
 
 
-async def check_robots_txt(domain, preserve_status=None):
+async def check_robots_txt(domain):
     """Check robots.txt to ensure crawling is allowed.
 
     This is the first HTTP request to each domain.
@@ -4669,7 +4420,6 @@ async def check_robots_txt(domain, preserve_status=None):
                     domain,
                     target,
                     content_type,
-                    preserve_status,
                 )
                 return False
             robots_txt = response.text
@@ -4695,12 +4445,11 @@ async def check_robots_txt(domain, preserve_status=None):
                             increment_domain_error,
                             domain,
                             "ROBOT+robots_txt",
-                            preserve_status,
                         )
                         return False
         elif response.status_code in http_codes_to_hardfail:
             await asyncio.to_thread(
-                _handle_http_failed, domain, target, response, preserve_status
+                _handle_http_failed, domain, target, response
             )
             return False
         # Missing robots.txt (404 or other non-200 status) - allow crawling
@@ -4710,7 +4459,6 @@ async def check_robots_txt(domain, preserve_status=None):
             domain,
             target,
             exception,
-            preserve_status,
         )
         return False
     except (ValueError, RuntimeError) as exception:
@@ -4723,7 +4471,6 @@ async def check_robots_txt(domain, preserve_status=None):
             domain,
             target,
             exception,
-            preserve_status,
         )
         return False
     return True
@@ -4930,7 +4677,6 @@ def _sanitize_nodeinfo_url(url: str) -> str:
 async def check_nodeinfo(
     domain,
     backend_domain,
-    preserve_status=None,
     suppress_errors=False,
 ):
     """Check NodeInfo well-known endpoint for NodeInfo 2.0 URL.
@@ -4957,7 +4703,6 @@ async def check_nodeinfo(
                         domain,
                         target,
                         content_type,
-                        preserve_status,
                     )
                 return None if suppress_errors else False
             if not response.content:
@@ -4973,14 +4718,12 @@ async def check_nodeinfo(
                         domain,
                         target,
                         exception,
-                        preserve_status,
                     )
                 return None if suppress_errors else False
             data = await parse_json_with_fallback(
                 response,
                 domain,
                 target,
-                preserve_status,
                 suppress_errors=suppress_errors,
             )
             if data is False:
@@ -5049,7 +4792,6 @@ async def check_nodeinfo(
                         domain,
                         target,
                         exception,
-                        preserve_status,
                     )
                 return None if suppress_errors else False
             if links:
@@ -5091,7 +4833,6 @@ async def check_nodeinfo(
                     domain,
                     target,
                     exception,
-                    preserve_status,
                 )
             elif suppress_errors:
                 return {
@@ -5101,7 +4842,7 @@ async def check_nodeinfo(
             return None if suppress_errors else False
         if response.status_code in http_codes_to_hardfail:
             await asyncio.to_thread(
-                _handle_http_failed, domain, target, response, preserve_status
+                _handle_http_failed, domain, target, response
             )
             return False
         if suppress_errors:
@@ -5111,7 +4852,6 @@ async def check_nodeinfo(
             domain,
             target,
             response,
-            preserve_status,
         )
     except httpx.RequestError as exception:
         if suppress_errors:
@@ -5124,7 +4864,6 @@ async def check_nodeinfo(
             domain,
             target,
             exception,
-            preserve_status,
         )
     except json.JSONDecodeError as exception:
         if suppress_errors:
@@ -5134,7 +4873,6 @@ async def check_nodeinfo(
             domain,
             target,
             exception,
-            preserve_status,
         )
     except (ValueError, RuntimeError) as exception:
         # Oversized/malformed responses (ValueError) or exhausted retries
@@ -5150,7 +4888,6 @@ async def check_nodeinfo(
             domain,
             target,
             exception,
-            preserve_status,
         )
     return None
 
@@ -5159,7 +4896,6 @@ async def check_nodeinfo_20(
     domain,
     nodeinfo_20_url,
     from_cache=False,
-    preserve_status=None,
 ):
     """Fetch and parse NodeInfo 2.0 data."""
     target = "nodeinfo_20" if not from_cache else "nodeinfo_20 (cached)"
@@ -5173,7 +4909,6 @@ async def check_nodeinfo_20(
                     domain,
                     target,
                     content_type,
-                    preserve_status,
                 )
                 return False
             if not response.content:
@@ -5183,18 +4918,17 @@ async def check_nodeinfo_20(
                     domain,
                     target,
                     exception,
-                    preserve_status,
                 )
                 return False
             nodeinfo_20_result = await parse_json_with_fallback(
-                response, domain, target, preserve_status
+                response, domain, target
             )
             if nodeinfo_20_result is False:
                 return False
             return nodeinfo_20_result
         if response.status_code in http_codes_to_hardfail:
             await asyncio.to_thread(
-                _handle_http_failed, domain, target, response, preserve_status
+                _handle_http_failed, domain, target, response
             )
             return False
         await asyncio.to_thread(
@@ -5202,7 +4936,6 @@ async def check_nodeinfo_20(
             domain,
             target,
             response,
-            preserve_status,
         )
     except httpx.RequestError as exception:
         await asyncio.to_thread(
@@ -5210,7 +4943,6 @@ async def check_nodeinfo_20(
             domain,
             target,
             exception,
-            preserve_status,
         )
         return False
     except json.JSONDecodeError as exception:
@@ -5219,7 +4951,6 @@ async def check_nodeinfo_20(
             domain,
             target,
             exception,
-            preserve_status,
         )
         return False
     except (ValueError, RuntimeError) as exception:
@@ -5231,7 +4962,6 @@ async def check_nodeinfo_20(
             domain,
             target,
             exception,
-            preserve_status,
         )
         return False
     return None
@@ -5269,7 +4999,7 @@ def mark_as_non_mastodon(domain, other_platform):
 
 
 async def get_instance_uri(
-    backend_domain: str, domain: str, preserve_status=None
+    backend_domain: str, domain: str
 ) -> tuple[str | None, bool, bool]:
     """Fetch the instance API and extract the domain/uri field.
 
@@ -5294,7 +5024,7 @@ async def get_instance_uri(
             return (None, True, False)
         if response.status_code in http_codes_to_hardfail:
             await asyncio.to_thread(
-                _handle_http_failed, domain, target_v2, response, preserve_status
+                _handle_http_failed, domain, target_v2, response
             )
             return (None, False, True)
         if response.status_code == 200:
@@ -5323,7 +5053,7 @@ async def get_instance_uri(
             return (None, True, False)
         if response.status_code in http_codes_to_hardfail:
             await asyncio.to_thread(
-                _handle_http_failed, domain, target_v1, response, preserve_status
+                _handle_http_failed, domain, target_v1, response
             )
             return (None, False, True)
         if response.status_code == 200:
@@ -5365,7 +5095,6 @@ def process_mastodon_instance(
     nodeinfo_20_result,
     nightly_version_ranges,
     actual_domain=None,
-    preserve_status=None,
 ):
     """Process a confirmed Mastodon instance and update the database.
 
@@ -5375,7 +5104,6 @@ def process_mastodon_instance(
         nightly_version_ranges: Version ranges for nightly builds
         actual_domain: The canonical domain from instance API
             (used for database updates)
-        preserve_status: Column name to preserve when recording errors
     """
     # Use actual_domain for database operations if provided,
     # otherwise fall back to domain
@@ -5397,7 +5125,7 @@ def process_mastodon_instance(
         error_to_print = "No usage data in NodeInfo"
         echo(f"{db_domain}: {error_to_print}", "yellow", use_tqdm=True)
         log_error(domain, error_to_print)
-        increment_domain_error(domain, "JSON+nodeinfo_20", preserve_status)
+        increment_domain_error(domain, "JSON+nodeinfo_20")
         return
 
     required_fields = [
@@ -5410,7 +5138,7 @@ def process_mastodon_instance(
         if field not in users or users[field] is None:
             echo(f"{db_domain}: {error_msg}", "yellow", use_tqdm=True)
             log_error(domain, error_msg)
-            increment_domain_error(domain, "JSON+nodeinfo_20", preserve_status)
+            increment_domain_error(domain, "JSON+nodeinfo_20")
             return
 
     active_month_users = users["activeMonth"]
@@ -5421,7 +5149,7 @@ def process_mastodon_instance(
         error_to_print = "Mastodon version invalid"
         echo(f"{db_domain}: {error_to_print}", "yellow", use_tqdm=True)
         log_error(domain, error_to_print)
-        increment_domain_error(domain, "JSON+nodeinfo_20", preserve_status)
+        increment_domain_error(domain, "JSON+nodeinfo_20")
         return
 
     # Use db_domain (actual_domain if available) for database updates
@@ -5451,13 +5179,12 @@ async def process_domain(domain, nightly_version_ranges, user_choice=None):
     Args:
         domain: The domain to process (will be normalized to lowercase)
         nightly_version_ranges: Version ranges for nightly builds
-        user_choice: The user's menu choice (used to determine preserve_status for retries)
+        user_choice: The user's menu choice (selects which domains to load)
     """
     # Normalize domain once at entry point - all downstream functions assume lowercase
     domain = domain.lower()
-    preserve_status = _get_preserve_status(user_choice)
 
-    if not await check_robots_txt(domain, preserve_status):
+    if not await check_robots_txt(domain):
         return
 
     # Try nodeinfo at the original domain first (suppress errors since this is a
@@ -5466,7 +5193,7 @@ async def process_domain(domain, nightly_version_ranges, user_choice=None):
     backend_domain = domain
     nodeinfo_probe_error = None
     nodeinfo_result = await check_nodeinfo(
-        domain, domain, preserve_status, suppress_errors=True
+        domain, domain, suppress_errors=True
     )
     if nodeinfo_result is False:
         return
@@ -5494,7 +5221,6 @@ async def process_domain(domain, nightly_version_ranges, user_choice=None):
                         domain,
                         target,
                         error,
-                        preserve_status,
                     )
                 elif error_type == "http":
                     await asyncio.to_thread(
@@ -5502,7 +5228,6 @@ async def process_domain(domain, nightly_version_ranges, user_choice=None):
                         domain,
                         target,
                         error,
-                        preserve_status,
                     )
                 elif error_type == "type":
                     await asyncio.to_thread(
@@ -5510,7 +5235,6 @@ async def process_domain(domain, nightly_version_ranges, user_choice=None):
                         domain,
                         target,
                         error,
-                        preserve_status,
                     )
                 else:
                     await asyncio.to_thread(
@@ -5518,7 +5242,6 @@ async def process_domain(domain, nightly_version_ranges, user_choice=None):
                         domain,
                         target,
                         error,
-                        preserve_status,
                     )
             else:
                 error_to_print = "Both host-meta and webfinger failed"
@@ -5532,7 +5255,6 @@ async def process_domain(domain, nightly_version_ranges, user_choice=None):
                     increment_domain_error,
                     domain,
                     "TCP+nodeinfo",
-                    preserve_status,
                 )
             return
         else:
@@ -5543,7 +5265,7 @@ async def process_domain(domain, nightly_version_ranges, user_choice=None):
             )
 
         # Retry nodeinfo at the discovered backend domain
-        nodeinfo_result = await check_nodeinfo(domain, backend_domain, preserve_status)
+        nodeinfo_result = await check_nodeinfo(domain, backend_domain)
         if nodeinfo_result is False:
             return
         if not nodeinfo_result:
@@ -5567,7 +5289,6 @@ async def process_domain(domain, nightly_version_ranges, user_choice=None):
         nodeinfo_20_result = await check_nodeinfo_20(
             domain,
             nodeinfo_20_url,
-            preserve_status=preserve_status,
         )
         if nodeinfo_20_result is False:
             return
@@ -5577,7 +5298,7 @@ async def process_domain(domain, nightly_version_ranges, user_choice=None):
     if _is_mastodon_instance(nodeinfo_20_result):
         # Get the actual domain from the instance API
         instance_uri, is_401, is_hardfail = await get_instance_uri(
-            backend_domain, domain, preserve_status
+            backend_domain, domain
         )
 
         if is_hardfail:
@@ -5591,7 +5312,7 @@ async def process_domain(domain, nightly_version_ranges, user_choice=None):
             echo(f"{domain}: {error_to_print}", "yellow", use_tqdm=True)
             await asyncio.to_thread(log_error, domain, error_to_print)
             await asyncio.to_thread(
-                increment_domain_error, domain, "API+instance_api", preserve_status
+                increment_domain_error, domain, "API+instance_api"
             )
             return
 
@@ -5604,7 +5325,6 @@ async def process_domain(domain, nightly_version_ranges, user_choice=None):
                 increment_domain_error,
                 domain,
                 "API",
-                preserve_status,
             )
             return
 
@@ -5619,7 +5339,6 @@ async def process_domain(domain, nightly_version_ranges, user_choice=None):
             nodeinfo_20_result,
             nightly_version_ranges,
             instance_uri,
-            preserve_status,
         )
     else:
         # Save software information for non-Mastodon platforms unconditionally
@@ -5647,7 +5366,6 @@ async def check_and_record_domains(
     dni_domains,
     domain_endings,
     nightly_version_ranges,
-    bad_domain_sets,
     reschedule: bool = False,
     bypass_skip_filters: bool = False,
 ):
@@ -5718,7 +5436,6 @@ async def check_and_record_domains(
                 if _should_skip_domain(
                     domain,
                     not_masto_domains,
-                    bad_domain_sets,
                     user_choice,
                     bypass_skip_filters,
                 ):
@@ -5736,26 +5453,22 @@ async def check_and_record_domains(
                         await process_domain(domain, nightly_version_ranges, user_choice)
                 except TimeoutError:
                     if not shutdown_event.is_set():
-                        preserve_status = _get_preserve_status(user_choice)
                         await asyncio.to_thread(
                             _handle_tcp_exception,
                             domain,
                             "timeout",
                             TimeoutError(f"Domain processing timed out after {domain_timeout}s"),
-                            preserve_status,
                         )
                 except httpx.CloseError:
                     pass
                 except Exception as exception:
                     if not shutdown_event.is_set():
                         target = "shutdown"
-                        preserve_status = _get_preserve_status(user_choice)
                         await asyncio.to_thread(
                             _handle_tcp_exception,
                             domain,
                             target,
                             exception,
-                            preserve_status,
                         )
             finally:
                 active_domains.discard(domain)
@@ -5883,7 +5596,6 @@ async def run_queue_daemon() -> int:
                 filter_data["dni_domains"],
                 domain_endings,
                 filter_data["nightly_version_ranges"],
-                filter_data["bad_domain_sets"],
                 reschedule=True,
                 bypass_skip_filters=True,
             )
@@ -6576,11 +6288,12 @@ def claim_due_domains(batch: int, lease_seconds: int, worker: str) -> list[str]:
     (see ``reschedule_domain``) so that a domain migrating to Mastodon from other
     software is eventually re-detected.
 
-    Known failure domains are NOT excluded in queue mode: every bad_* terminal
-    state, including ``bad_hard`` (the permanent "gone" codes HTTP 410/451/418/
-    999), is claimed once due so the queue actually attempts a recrawl. They
-    revive on the long dead interval (see ``reschedule_domain``) rather than
-    being hammered. The only permanent exclusions left are aliases and hard-DNI.
+    Known failure domains are NOT excluded in queue mode: there are no terminal
+    failure flags. Every failed domain is claimed once due and re-attempted on a
+    per-type cadence derived from ``reason`` (see ``reschedule_domain``) — a 5xx
+    in hours, a DNS failure backing off toward 30d, a gone/disallowed domain on a
+    long flat interval — so revived servers are eventually re-counted rather than
+    hammered. The only permanent exclusions are aliases and hard-DNI.
 
     Hard-DNI domains (dni.force = 'hard') are never claimed. The NOT EXISTS
     clause mirrors the worker-side label-boundary match in ``_is_dni_domain``,
@@ -6630,35 +6343,38 @@ def reschedule_domain(domain: str) -> None:
 
     Deriving the interval from the row's own columns (rather than from the Python
     code path that processed it) keeps scheduling correct regardless of which
-    branch set the flags:
-      * any terminal bad_* flag        -> dead interval (auto-revival, default 30d)
-      * a transient error this pass    -> bounded exponential backoff on attempts
-      * known non-Mastodon software    -> long non-Mastodon cadence (default 7d)
-      * healthy                        -> normal recrawl cadence (default 1h)
-    ``attempts`` is incremented on a transient failure and reset to 0 on success;
-    the SET expressions read the pre-update row, so backoff uses the old count.
+    branch recorded the result:
+      * a recorded failure (reason set) -> per-type base * 2**attempts, ceilinged
+        at greatest(base, cap). Transient types (DNS/SSL/TCP/HTTP/content) back
+        off up to the cap (default 30d); ROBOT/HARD bases already exceed the cap
+        so they stay flat at their long interval (default 30d / 90d).
+      * known non-Mastodon software     -> long non-Mastodon cadence (default 7d)
+      * healthy                         -> normal recrawl cadence (default 1h)
+    The per-type base is selected from ``reason`` by ``_REASON_BASE_HOURS_CASE``.
+    Using greatest(base, cap) as the ceiling means a long flat type is unaffected
+    by backoff while a short transient type still climbs toward the cap.
+    ``attempts`` is incremented on a failure and reset to 0 on success; the SET
+    expressions read the pre-update row, so backoff uses the old count.
     """
     query = sql.SQL(
         "UPDATE raw_domains SET "
         "claimed_at = NULL, claimed_by = NULL, "
         "attempts = CASE WHEN reason IS NOT NULL THEN attempts + 1 ELSE 0 END, "
         "next_crawl_at = now() + (CASE "
-        "  WHEN ({any_bad}) THEN %(dead)s * (0.9 + random() * 0.2) * INTERVAL '1 hour' "
         "  WHEN reason IS NOT NULL "
-        "    THEN least(power(2, attempts) * %(base)s, %(cap)s) * (0.9 + random() * 0.2) * INTERVAL '1 hour' "
+        "    THEN least(({base}) * power(2, attempts), greatest(({base}), %(cap)s)) "
+        "         * (0.9 + random() * 0.2) * INTERVAL '1 hour' "
         "  WHEN nodeinfo IS NOT NULL AND nodeinfo NOT IN {masto} "
         "    THEN %(nonmasto)s * (0.9 + random() * 0.2) * INTERVAL '1 hour' "
         "  ELSE %(recrawl)s * (0.9 + random() * 0.2) * INTERVAL '1 hour' "
         "END) "
         "WHERE domain = %(domain)s"
-    ).format(any_bad=_BAD_COL_ANY_TRUE, masto=_MASTODON_COMPATIBLE_IN_CLAUSE)
+    ).format(base=_REASON_BASE_HOURS_CASE, masto=_MASTODON_COMPATIBLE_IN_CLAUSE)
     with db_pool.connection() as conn, conn.cursor() as cursor:
         try:
             _ = cursor.execute(
                 query,
                 {
-                    "dead": dead_hours,
-                    "base": retry_base_hours,
                     "cap": retry_cap_hours,
                     "nonmasto": recrawl_nonmasto_hours,
                     "recrawl": recrawl_hours,
@@ -6711,14 +6427,11 @@ def load_from_database(user_choice):
         ),
         "1": sql.SQL(
             "SELECT domain FROM raw_domains "
-            "WHERE {bad_conditions} "
+            "WHERE reason IS NULL "
             "AND (nodeinfo IN {masto_clause} OR nodeinfo IS NULL) "
             "AND (alias IS NULL OR alias = FALSE) "
             "ORDER BY domain"
-        ).format(
-            bad_conditions=_BAD_COL_ALL_NULL_OR_FALSE,
-            masto_clause=_MASTODON_COMPATIBLE_IN_CLAUSE,
-        ),
+        ).format(masto_clause=_MASTODON_COMPATIBLE_IN_CLAUSE),
         "4": sql.SQL(
             "SELECT DISTINCT rd.domain "
             "FROM raw_domains rd "
@@ -6744,19 +6457,6 @@ def load_from_database(user_choice):
             "AND (alias IS NULL OR alias = FALSE) "
             "ORDER BY domain"
         ).format(masto_clause=_MASTODON_COMPATIBLE_IN_CLAUSE),
-        "60": f"SELECT domain FROM raw_domains WHERE bad_dns = TRUE {no_alias}ORDER BY domain",
-        "61": f"SELECT domain FROM raw_domains WHERE bad_ssl = TRUE {no_alias}ORDER BY domain",
-        "62": f"SELECT domain FROM raw_domains WHERE bad_tcp = TRUE {no_alias}ORDER BY domain",
-        "63": f"SELECT domain FROM raw_domains WHERE bad_type = TRUE {no_alias}ORDER BY domain",
-        "64": f"SELECT domain FROM raw_domains WHERE bad_file = TRUE {no_alias}ORDER BY domain",
-        "65": f"SELECT domain FROM raw_domains WHERE bad_api = TRUE {no_alias}ORDER BY domain",
-        "66": f"SELECT domain FROM raw_domains WHERE bad_json = TRUE {no_alias}ORDER BY domain",
-        "67": f"SELECT domain FROM raw_domains WHERE bad_http2xx = TRUE {no_alias}ORDER BY domain",
-        "68": f"SELECT domain FROM raw_domains WHERE bad_http3xx = TRUE {no_alias}ORDER BY domain",
-        "69": f"SELECT domain FROM raw_domains WHERE bad_http4xx = TRUE {no_alias}ORDER BY domain",
-        "70": f"SELECT domain FROM raw_domains WHERE bad_http5xx = TRUE {no_alias}ORDER BY domain",
-        "71": f"SELECT domain FROM raw_domains WHERE bad_hard = TRUE {no_alias}ORDER BY domain",
-        "72": f"SELECT domain FROM raw_domains WHERE bad_robot = TRUE {no_alias}ORDER BY domain",
         "20": (
             "SELECT domain FROM raw_domains WHERE reason LIKE 'DNS%' "
             + no_alias
@@ -6943,21 +6643,6 @@ def get_menu_options() -> dict[str, dict[str, str]]:
             "30": "HTTP 5xx",
             "31": "Hard Fail",
             "32": "Robots",
-        },
-        "Retry bad domains": {
-            "60": "DNS",
-            "61": "SSL",
-            "62": "TCP",
-            "63": "Type",
-            "64": "File",
-            "65": "API",
-            "66": "JSON",
-            "67": "HTTP 2xx",
-            "68": "HTTP 3xx",
-            "69": "HTTP 4xx",
-            "70": "HTTP 5xx",
-            "71": "Hard Fail",
-            "72": "Robots",
         },
         "Retry known instances": {
             "50": "Unpatched",
@@ -7434,7 +7119,6 @@ async def async_main() -> int:
                     filter_data["dni_domains"],
                     domain_endings,
                     filter_data["nightly_version_ranges"],
-                    filter_data["bad_domain_sets"],
                 )
 
                 cleanup_old_domains()

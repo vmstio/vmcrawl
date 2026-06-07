@@ -854,18 +854,12 @@ async def get_domain_stats(_api_key: str | None = Depends(get_api_key)):
             result = cur.fetchone()
             known_domains = result[0] if result else 0
 
-            # Dead Domains
+            # Dead Domains (any recorded failure reason)
             _ = cur.execute(
                 """
                 SELECT COUNT(DISTINCT domain) AS unique_domain_count
                 FROM raw_domains
-                WHERE (bad_dns IS NOT NULL OR bad_ssl IS NOT NULL
-                       OR bad_tcp IS NOT NULL OR bad_type IS NOT NULL
-                       OR bad_file IS NOT NULL OR bad_api IS NOT NULL
-                       OR bad_json IS NOT NULL OR bad_http2xx IS NOT NULL
-                       OR bad_http3xx IS NOT NULL OR bad_http4xx IS NOT NULL
-                       OR bad_http5xx IS NOT NULL
-                       OR bad_hard IS NOT NULL OR bad_robot IS NOT NULL)
+                WHERE reason IS NOT NULL
             """
             )
             result = cur.fetchone()

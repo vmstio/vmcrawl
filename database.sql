@@ -34,22 +34,30 @@ CREATE TABLE IF NOT EXISTS
     domain TEXT PRIMARY KEY CHECK (domain = LOWER(domain)),
     errors INTEGER DEFAULT NULL,
     reason TEXT DEFAULT NULL,
-    bad_dns BOOLEAN DEFAULT NULL,
-    bad_ssl BOOLEAN DEFAULT NULL,
-    bad_tcp BOOLEAN DEFAULT NULL,
-    bad_type BOOLEAN DEFAULT NULL,
-    bad_file BOOLEAN DEFAULT NULL,
-    bad_api BOOLEAN DEFAULT NULL,
-    bad_json BOOLEAN DEFAULT NULL,
-    bad_http2xx BOOLEAN DEFAULT NULL,
-    bad_http3xx BOOLEAN DEFAULT NULL,
-    bad_http4xx BOOLEAN DEFAULT NULL,
-    bad_http5xx BOOLEAN DEFAULT NULL,
-    bad_hard BOOLEAN DEFAULT NULL,
-    bad_robot BOOLEAN DEFAULT NULL,
     nodeinfo TEXT DEFAULT NULL,
     alias BOOLEAN DEFAULT NULL
   );
+
+-- The bad_* terminal flags were a batch-era throttle: a domain that failed
+-- ERROR_BUFFER times was marked terminal and excluded from re-scans. The
+-- durable queue makes them obsolete — scheduling is derived entirely from
+-- reason (see reschedule_domain), so a failing domain is simply rescheduled on
+-- a per-type cadence instead of going terminal. Drop them (idempotent); reason
+-- already holds each domain's latest classification, so the queue keeps
+-- scheduling every row correctly on next claim.
+ALTER TABLE raw_domains DROP COLUMN IF EXISTS bad_dns;
+ALTER TABLE raw_domains DROP COLUMN IF EXISTS bad_ssl;
+ALTER TABLE raw_domains DROP COLUMN IF EXISTS bad_tcp;
+ALTER TABLE raw_domains DROP COLUMN IF EXISTS bad_type;
+ALTER TABLE raw_domains DROP COLUMN IF EXISTS bad_file;
+ALTER TABLE raw_domains DROP COLUMN IF EXISTS bad_api;
+ALTER TABLE raw_domains DROP COLUMN IF EXISTS bad_json;
+ALTER TABLE raw_domains DROP COLUMN IF EXISTS bad_http2xx;
+ALTER TABLE raw_domains DROP COLUMN IF EXISTS bad_http3xx;
+ALTER TABLE raw_domains DROP COLUMN IF EXISTS bad_http4xx;
+ALTER TABLE raw_domains DROP COLUMN IF EXISTS bad_http5xx;
+ALTER TABLE raw_domains DROP COLUMN IF EXISTS bad_hard;
+ALTER TABLE raw_domains DROP COLUMN IF EXISTS bad_robot;
 
 -- Durable crawl queue columns (see docs/durable-queue.md).
 -- raw_domains doubles as the work ledger; these columns add queue discipline
@@ -66,22 +74,17 @@ ALTER TABLE raw_domains
 
 -- One-time backfill so the first daemon start does not stampede every row at
 -- once. Only touches rows that have not yet been scheduled (next_crawl_at IS
--- NULL); re-running this file after the daemon is live is a no-op.
---   * uncrawled (errors = 0)      -> due immediately
---   * terminal/dead (any bad_*)   -> spread across the dead interval (~30d)
---   * everything else             -> spread across the recrawl interval (~1h)
+-- NULL); re-running this file after the daemon is live is a no-op. The queue
+-- reschedules each row precisely on its next claim; this is just initial jitter.
+--   * never-failed (reason IS NULL) -> due now (errors = 0) or within ~1h
+--   * has a failure (reason set)     -> spread across the cap interval (~30d)
 UPDATE raw_domains
 SET next_crawl_at = now()
-WHERE next_crawl_at IS NULL AND errors = 0;
+WHERE next_crawl_at IS NULL AND reason IS NULL AND errors = 0;
 
 UPDATE raw_domains
 SET next_crawl_at = now() + random() * INTERVAL '30 days'
-WHERE next_crawl_at IS NULL
-  AND (
-    bad_dns OR bad_ssl OR bad_tcp OR bad_type OR bad_file OR bad_api
-    OR bad_json OR bad_http2xx OR bad_http3xx OR bad_http4xx OR bad_http5xx
-    OR bad_hard OR bad_robot
-  );
+WHERE next_crawl_at IS NULL AND reason IS NOT NULL;
 
 UPDATE raw_domains
 SET next_crawl_at = now() + random() * INTERVAL '1 hour'
@@ -281,47 +284,29 @@ DROP INDEX IF EXISTS idx_raw_domains_noapi;
 -- raw_domains table indexes
 -- =============================================================================
 
--- Partial indexes for bad_* terminal state flags
--- Used by: get_all_bad_domains() bulk query, menu options 60-72, api.py health endpoint
--- Partial indexes only include rows where the flag is TRUE (smaller, faster)
-CREATE INDEX IF NOT EXISTS idx_raw_domains_bad_dns
-    ON raw_domains (domain) WHERE bad_dns = TRUE;
+-- The bad_* partial indexes are obsolete (columns dropped above). Drop them
+-- idempotently; on a fresh DB they never existed, on an upgrade DROP COLUMN
+-- already removed them, so these are harmless no-ops kept for explicitness.
+DROP INDEX IF EXISTS idx_raw_domains_bad_dns;
+DROP INDEX IF EXISTS idx_raw_domains_bad_ssl;
+DROP INDEX IF EXISTS idx_raw_domains_bad_tcp;
+DROP INDEX IF EXISTS idx_raw_domains_bad_type;
+DROP INDEX IF EXISTS idx_raw_domains_bad_file;
+DROP INDEX IF EXISTS idx_raw_domains_bad_api;
+DROP INDEX IF EXISTS idx_raw_domains_bad_json;
+DROP INDEX IF EXISTS idx_raw_domains_bad_http2xx;
+DROP INDEX IF EXISTS idx_raw_domains_bad_http3xx;
+DROP INDEX IF EXISTS idx_raw_domains_bad_http4xx;
+DROP INDEX IF EXISTS idx_raw_domains_bad_http5xx;
+DROP INDEX IF EXISTS idx_raw_domains_bad_hard;
+DROP INDEX IF EXISTS idx_raw_domains_bad_robot;
 
-CREATE INDEX IF NOT EXISTS idx_raw_domains_bad_ssl
-    ON raw_domains (domain) WHERE bad_ssl = TRUE;
-
-CREATE INDEX IF NOT EXISTS idx_raw_domains_bad_tcp
-    ON raw_domains (domain) WHERE bad_tcp = TRUE;
-
-CREATE INDEX IF NOT EXISTS idx_raw_domains_bad_type
-    ON raw_domains (domain) WHERE bad_type = TRUE;
-
-CREATE INDEX IF NOT EXISTS idx_raw_domains_bad_file
-    ON raw_domains (domain) WHERE bad_file = TRUE;
-
-CREATE INDEX IF NOT EXISTS idx_raw_domains_bad_api
-    ON raw_domains (domain) WHERE bad_api = TRUE;
-
-CREATE INDEX IF NOT EXISTS idx_raw_domains_bad_json
-    ON raw_domains (domain) WHERE bad_json = TRUE;
-
-CREATE INDEX IF NOT EXISTS idx_raw_domains_bad_http2xx
-    ON raw_domains (domain) WHERE bad_http2xx = TRUE;
-
-CREATE INDEX IF NOT EXISTS idx_raw_domains_bad_http3xx
-    ON raw_domains (domain) WHERE bad_http3xx = TRUE;
-
-CREATE INDEX IF NOT EXISTS idx_raw_domains_bad_http4xx
-    ON raw_domains (domain) WHERE bad_http4xx = TRUE;
-
-CREATE INDEX IF NOT EXISTS idx_raw_domains_bad_http5xx
-    ON raw_domains (domain) WHERE bad_http5xx = TRUE;
-
-CREATE INDEX IF NOT EXISTS idx_raw_domains_bad_hard
-    ON raw_domains (domain) WHERE bad_hard = TRUE;
-
-CREATE INDEX IF NOT EXISTS idx_raw_domains_bad_robot
-    ON raw_domains (domain) WHERE bad_robot = TRUE;
+-- Index supporting reason-based scans: the dashboard "dead domains" count
+-- (reason IS NOT NULL), menu options 4/5, and the per-type prefix menus 20-32
+-- (reason LIKE 'DNS%' etc.). text_pattern_ops makes the LIKE 'PREFIX%' scans
+-- index-friendly.
+CREATE INDEX IF NOT EXISTS idx_raw_domains_reason
+    ON raw_domains (reason text_pattern_ops) WHERE reason IS NOT NULL;
 
 -- Index for alias domain filtering
 -- Used by: alias domain skip logic
@@ -380,15 +365,12 @@ CREATE INDEX IF NOT EXISTS idx_raw_domains_uncrawled
 
 -- Index for the durable queue claim query (see docs/durable-queue.md)
 -- Used by: claim_due_domains() -- ORDER BY next_crawl_at NULLS FIRST over due,
--- non-alias rows. The partial predicate mirrors the claim filter's immutable
--- conditions to keep the index small. Known failure domains (every bad_* state,
--- including bad_hard) are deliberately NOT excluded here: queue mode recrawls
--- them once due so it actually re-attempts known failures. The hard-DNI
--- exclusion is applied during the scan (it references another table and can't
--- live in the predicate).
--- Drop first so the predicate change (dropping the old bad_hard exclusion)
--- applies on existing deployments; CREATE ... IF NOT EXISTS alone would keep
--- the stale narrower index.
+-- non-alias rows. The partial predicate mirrors the claim filter's only
+-- immutable condition (non-alias) to keep the index small. Failure domains are
+-- deliberately NOT excluded: queue mode recrawls them once due, on a per-type
+-- cadence derived from reason, so it actually re-attempts known failures. The
+-- hard-DNI exclusion is applied during the scan (it references another table
+-- and can't live in the predicate).
 DROP INDEX IF EXISTS idx_raw_domains_due;
 CREATE INDEX IF NOT EXISTS idx_raw_domains_due
     ON raw_domains (next_crawl_at NULLS FIRST)

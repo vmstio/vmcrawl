@@ -22,7 +22,7 @@ Consequences:
 - **No notion of "due."** Every cycle re-crawls everything; there is no per-domain
   recrawl cadence and no way to prioritize what actually needs attention.
 - **Retries are manual.** Transient failures sit until an operator runs a retry
-  menu choice (options 4/5/20–32/60–72). There is no automatic backoff.
+  menu choice (options 4/5/20–32). There is no automatic backoff.
 
 joinmastodon-api gets all three for free because each domain is an independent,
 durable Sidekiq message with an `ignore_until` schedule and an error-count backoff.
@@ -68,8 +68,9 @@ CREATE INDEX IF NOT EXISTS idx_raw_domains_due
 ```
 
 Backfill jitters existing rows across their interval so the first daemon start does
-not stampede every row at once (uncrawled → due now; terminal → spread over the dead
-interval; everything else → spread over the recrawl interval).
+not stampede every row at once (never-failed → due now / within ~1h; rows with a
+recorded `reason` → spread over the cap interval ~30d). The queue then reschedules
+each row precisely on its next claim.
 
 ## Claim semantics
 
@@ -107,19 +108,18 @@ RETURNING r.domain;
   `nonmasto` cadence (default 7d) rather than being excluded, so a domain that
   *migrates* to Mastodon from other software is eventually re-detected. The cost
   is cheap: a non-Mastodon recrawl is a single nodeinfo fetch.
-- **Known failure domains are still claimed and recrawled.** Every terminal
-  `bad_*` state — DNS, TCP, SSL, … *and* `bad_hard` (the permanent "gone" codes
-  HTTP 410/451/418/999) — is claimed once it comes due and actually re-attempted,
-  rather than being excluded from the queue. They revive on the long dead
-  interval (default 30d, see *Reschedule policy*) so they are retried periodically
-  rather than hammered.
+- **Known failure domains are still claimed and recrawled.** There are no
+  terminal `bad_*` flags — scheduling is derived entirely from `reason` (see
+  *Reschedule policy*). Every failed domain is claimed once due and actually
+  re-attempted, on a per-type cadence (a 5xx returns in hours, a DNS failure
+  backs off toward 30d, a `HARD`/`ROBOT` domain on a long flat interval), so
+  revived servers are eventually re-counted rather than abandoned.
 - **The worker skips no domain on its recorded state in queue mode**
   (`bypass_skip_filters=True`), because the claim query above is the
   authoritative filter — every domain it hands back is meant to be (re)crawled.
-  Without this, a revived failure domain or a re-claimed not-Mastodon domain
-  would be claimed only to be skipped by the in-process state filter and
-  rescheduled untouched, silently defeating both the failure revival and
-  migration re-detection. The only permanent exclusions left are aliases and
+  Without this, a re-claimed not-Mastodon domain would be claimed only to be
+  skipped by the in-process state filter and rescheduled untouched, silently
+  defeating migration re-detection. The only permanent exclusions are aliases and
   hard-DNI.
 - **Hard-DNI domains are never claimed.** The `NOT EXISTS` clause mirrors the
   worker-side label-boundary match in `_is_dni_domain`, so a `dni` entry with
@@ -139,14 +139,14 @@ RETURNING r.domain;
 ## Reschedule policy
 
 After a domain is processed, one UPDATE clears the lease and sets the next due time,
-deriving the interval from the row's *resulting* state — so it is correct regardless
-of which Python code path set the flags:
+deriving the interval entirely from `reason` (the latest failure classification) and
+`attempts` (consecutive failures) — so it is correct regardless of which Python code
+path recorded the result. There are no terminal `bad_*` columns:
 
 ```text
 next_crawl_at = now() + CASE
-    WHEN bad_hard OR bad_robot           THEN dead_interval      -- immediate-terminal
-    WHEN (any bad_* = TRUE)              THEN dead_interval      -- error buffer exceeded
-    WHEN reason IS NOT NULL              THEN backoff(attempts)  -- transient failure
+    WHEN reason IS NOT NULL              THEN least(base(reason) * 2^attempts,
+                                                    greatest(base(reason), cap))
     WHEN nodeinfo IS NOT NULL
          AND nodeinfo NOT IN (masto set) THEN nonmasto_interval  -- known non-Mastodon
     ELSE                                      recrawl_interval   -- healthy
@@ -155,9 +155,25 @@ attempts = CASE WHEN reason IS NOT NULL THEN attempts + 1 ELSE 0 END
 claimed_at = NULL, claimed_by = NULL
 ```
 
-`backoff(attempts) = least(2^attempts * retry_base, retry_cap)` (old `attempts` used
-as the exponent, then incremented), bounded exponential — analogous to
-joinmastodon-api's `min(error_count**3 hours, 30.days)`.
+`base(reason)` is a per-type cadence selected from the leading token of `reason`
+(`_REASON_BASE_HOURS_CASE`). Transient types use short bases and back off
+exponentially with `attempts` up to `cap` (default 30d); `ROBOT` and `HARD` use
+long flat bases that already exceed the cap, so `greatest(base, cap)` pins them flat
+(backoff is a no-op). This generalizes joinmastodon-api's split — 5xx/timeouts
+recover fast, 4xx and gone/disallowed states settle far out — into a per-type table:
+
+| reason type                         | base    | behavior                          |
+| ----------------------------------- | ------- | --------------------------------- |
+| `HTTP5XX`                           | 6h      | up but erroring — recovers fast   |
+| `TCP`                               | 12h     | unreachable, maybe transient      |
+| `DNS` / `SSL` / content (`TYPE`/`FILE`/`JSON`/`API`) | 24h | daily, backs off    |
+| `HTTP2XX` / `HTTP3XX` / `HTTP4XX`   | 48h     | semi-permanent client/redirect    |
+| `ROBOT`                             | 720h    | disallowed — extended, flat       |
+| `HARD` (410/451/418/999 gone)       | 2160h   | gone — very long, flat            |
+
+`HARD` and `ROBOT` are the only classifications that also purge the domain from the
+published `mastodon_domains` list, at detection. Every other failure leaves the
+published row untouched (last-known-good).
 
 ## Daemon loop
 
@@ -188,17 +204,28 @@ changes *which* domains are selected and *that they are leased and rescheduled*.
 | `VMCRAWL_QUEUE_POLL_SECONDS`     | `15`    | Sleep when nothing is due                 |
 | `VMCRAWL_RECRAWL_HOURS`          | `1`     | Healthy Mastodon recrawl cadence          |
 | `VMCRAWL_RECRAWL_NONMASTO_HOURS` | `168`   | Known non-Mastodon recrawl cadence (7d)   |
-| `VMCRAWL_RETRY_BASE_HOURS`       | `1`     | Transient backoff base                    |
-| `VMCRAWL_RETRY_CAP_HOURS`        | `168`   | Transient backoff cap (7d)                |
-| `VMCRAWL_DEAD_HOURS`             | `720`   | Terminal/dead recrawl cadence (30d)       |
+| `VMCRAWL_RETRY_CAP_HOURS`        | `720`   | Backoff ceiling for transient types (30d) |
+| `VMCRAWL_RETRY_HTTP5XX_HOURS`    | `6`     | Per-type base: 5xx (recovers fast)        |
+| `VMCRAWL_RETRY_TCP_HOURS`        | `12`    | Per-type base: TCP                        |
+| `VMCRAWL_RETRY_DNS_HOURS`        | `24`    | Per-type base: DNS                        |
+| `VMCRAWL_RETRY_SSL_HOURS`        | `24`    | Per-type base: SSL                        |
+| `VMCRAWL_RETRY_CONTENT_HOURS`    | `24`    | Per-type base: TYPE/FILE/JSON/API         |
+| `VMCRAWL_RETRY_HTTP2XX_HOURS`    | `48`    | Per-type base: unexpected 2xx             |
+| `VMCRAWL_RETRY_HTTP3XX_HOURS`    | `48`    | Per-type base: redirect                   |
+| `VMCRAWL_RETRY_HTTP4XX_HOURS`    | `48`    | Per-type base: 4xx                        |
+| `VMCRAWL_RETRY_ROBOT_HOURS`      | `720`   | Per-type base: robots disallow (flat 30d) |
+| `VMCRAWL_RETRY_HARD_HOURS`       | `2160`  | Per-type base: gone 410/451/418/999 (90d) |
 
 ## Rollout
 
-1. Apply `database.sql` (idempotent — adds columns, index, backfill).
+1. Apply `database.sql` (idempotent — adds queue columns, **drops the obsolete
+   `bad_*` columns/indexes**, adds the reason index, backfill).
 2. Deploy code; queue daemon stays **off** by default.
 3. Turn on for one worker via `VMCRAWL_QUEUE_MODE=true`; watch `claimed_by`,
    `next_crawl_at` distribution, and throughput.
 4. Once happy, make it the default headless path and retire the whole-batch re-select.
 
-The existing menu/batch/retry tooling keeps working throughout — it reads and writes
-the same `raw_domains` rows, just without lease discipline.
+The reason-based menu/batch/retry tooling (options 4/5/20–32) keeps working
+throughout — it reads and writes the same `raw_domains` rows, just without lease
+discipline. The old `bad_*`-based retry menu (60–72) is removed; options 20–32
+cover the same classifications via `reason`.
