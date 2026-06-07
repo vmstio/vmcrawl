@@ -188,11 +188,31 @@ loop:
         continue
     process each domain via existing process_domain() pipeline (N workers)
     reschedule_domain(domain)       # in each worker's finally, after processing
+    maybe_fetch_peers(domain)       # inline peer discovery (see below)
     periodically: cleanup_old_domains(); save_statistics()
 ```
 
 `process_domain()` and all its error handling are reused unchanged — the queue only
 changes *which* domains are selected and *that they are leased and rescheduled*.
+
+### Inline peer discovery (self-feeding)
+
+Without this the queue only drains — it never grows. So in the same worker `finally`,
+after rescheduling, the daemon does what the standalone `fetch` command does, but
+per-domain: when the just-crawled domain is a healthy Mastodon instance with more than
+`VMCRAWL_PEERS_MIN_ACTIVE` (default 10) monthly users, it fetches that instance's
+`/api/v1/instance/peers` and imports any new domains into `raw_domains` (where they
+land with `next_crawl_at = NULL` and so become due immediately). This makes the queue
+self-feeding, the same property joinmastodon-api gets from `GetPeersWorker`.
+
+- Gated to big-enough instances because they carry the most complete peer lists; the
+  threshold is read from the instance's freshly-written `active_users_monthly`.
+- The `mastodon_domains.peers` flag is the throttle: `fetch_peer_domains` sets it
+  `FALSE` on a persistent 401/403/404/non-JSON response, and `maybe_fetch_peers` skips
+  instances whose flag is `FALSE` — so dead endpoints aren't re-polled every scan.
+- Imports are `INSERT … ON CONFLICT DO NOTHING`; the DNI/TLD/format filters are reused.
+- Disable entirely with `VMCRAWL_QUEUE_PEERS=false`. The standalone `fetch` command is
+  unchanged and still available for manual/bulk discovery runs.
 
 ## Configuration (env)
 
@@ -202,6 +222,8 @@ changes *which* domains are selected and *that they are leased and rescheduled*.
 | `VMCRAWL_QUEUE_BATCH`            | `100`   | Domains claimed per round                 |
 | `VMCRAWL_QUEUE_LEASE_SECONDS`    | `900`   | Lease TTL before a claim is reclaimable   |
 | `VMCRAWL_QUEUE_POLL_SECONDS`     | `15`    | Sleep when nothing is due                 |
+| `VMCRAWL_QUEUE_PEERS`            | `true`  | Inline peer discovery during crawls       |
+| `VMCRAWL_PEERS_MIN_ACTIVE`      | `10`    | Min monthly active users to poll for peers |
 | `VMCRAWL_RECRAWL_HOURS`          | `1`     | Healthy Mastodon recrawl cadence          |
 | `VMCRAWL_RECRAWL_NONMASTO_HOURS` | `168`   | Known non-Mastodon recrawl cadence (7d)   |
 | `VMCRAWL_RETRY_CAP_HOURS`        | `720`   | Backoff ceiling for transient types (30d) |

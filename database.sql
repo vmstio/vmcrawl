@@ -21,6 +21,12 @@ CREATE TABLE IF NOT EXISTS
     peers BOOLEAN DEFAULT TRUE
   );
 
+-- peers gates inline peer discovery: FALSE means the instance's /api/v1/instance/
+-- peers endpoint has failed (401/403/404/non-JSON) and is skipped. Idempotent so
+-- an existing mastodon_domains table predating the column gets it on upgrade.
+ALTER TABLE mastodon_domains
+  ADD COLUMN IF NOT EXISTS peers BOOLEAN DEFAULT TRUE;
+
 CREATE TABLE IF NOT EXISTS
   release_versions (
     branch TEXT NOT NULL,

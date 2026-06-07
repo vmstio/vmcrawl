@@ -637,6 +637,17 @@ recrawl_nonmasto_hours = max(1, int(os.getenv("VMCRAWL_RECRAWL_NONMASTO_HOURS", 
 # they stay flat. Default 720h (30d) keeps even persistently-dead domains on a
 # monthly revival check rather than abandoning them.
 retry_cap_hours = max(1, int(os.getenv("VMCRAWL_RETRY_CAP_HOURS", "720")))
+# Inline peer discovery: when the daemon crawls a healthy Mastodon instance with
+# more than peers_min_active monthly users, it also pulls that instance's peers
+# in the same pass and imports new domains, making the queue self-feeding. The
+# mastodon_domains.peers flag throttles instances whose peers endpoint has failed.
+queue_peers_enabled = os.getenv("VMCRAWL_QUEUE_PEERS", "true").strip().lower() in {
+    "1",
+    "true",
+    "yes",
+    "on",
+}
+peers_min_active = max(0, int(os.getenv("VMCRAWL_PEERS_MIN_ACTIVE", "10")))
 
 
 def _worker_id() -> str:
@@ -2225,20 +2236,31 @@ def disable_peer_fetch(domain, use_tqdm=False):
             return
 
 
+# Each row contributes 2 bind params (domain, errors); Postgres caps a single
+# statement at 65535 params, so chunk well under that. A peers list can be tens
+# of thousands of domains (a large instance returns 30k+), which would otherwise
+# blow the limit in one multi-row INSERT.
+_IMPORT_CHUNK = 1000
+
+
 def import_domains(domains, use_tqdm=False):
-    """Import new domains into raw_domains table."""
+    """Import new domains into raw_domains table (chunked, ON CONFLICT DO NOTHING)."""
+    if not domains:
+        return
+    # De-dup while normalizing so a single batch can't carry the same domain twice.
+    unique = list({d.lower() for d in domains})
     with db_pool.connection() as conn, conn.cursor() as cursor:
         try:
-            if domains:
-                values = [(domain.lower(), 0) for domain in domains]
-                placeholders = sql.SQL(",").join([sql.SQL("(%s,%s)") for _ in values])
-                flattened_values = [item for sublist in values for item in sublist]
+            for start in range(0, len(unique), _IMPORT_CHUNK):
+                chunk = unique[start : start + _IMPORT_CHUNK]
+                placeholders = sql.SQL(",").join(sql.SQL("(%s,%s)") for _ in chunk)
+                flattened_values = [item for d in chunk for item in (d, 0)]
                 query = sql.SQL(
                     "INSERT INTO raw_domains (domain, errors) VALUES {} "
-                    + "ON CONFLICT (domain) DO NOTHING"
+                    "ON CONFLICT (domain) DO NOTHING"
                 ).format(placeholders)
                 _ = cursor.execute(query, flattened_values)
-                conn.commit()
+            conn.commit()
         except Exception as e:
             echo(f"Failed to import domain list: {e}", "red", use_tqdm=use_tqdm)
             conn.rollback()
@@ -2387,6 +2409,57 @@ async def process_fetch_domain(
         status_color = "yellow"
 
     return (domain, unique_domains, status, status_color)
+
+
+def get_peers_fetch_eligibility(domain: str) -> tuple[int, bool] | None:
+    """Return (active_users_monthly, peers_enabled) for a known Mastodon instance.
+
+    Returns None when the domain is not in mastodon_domains (not a valid Mastodon
+    server, so not a peer-discovery source). ``peers`` NULL is treated as enabled.
+    Used by the queue daemon's inline peer discovery.
+    """
+    with db_pool.connection() as conn, conn.cursor() as cursor:
+        try:
+            _ = cursor.execute(
+                "SELECT active_users_monthly, peers FROM mastodon_domains "
+                "WHERE domain = %s",
+                (domain,),
+            )
+            row = cursor.fetchone()
+            if row is None:
+                return None
+            return (row[0] or 0, row[1] is not False)
+        except Exception as exception:
+            echo(
+                f"{domain}: Failed to read peer eligibility {exception}",
+                "red",
+                use_tqdm=True,
+            )
+            conn.rollback()
+            return None
+
+
+async def maybe_fetch_peers(domain: str, domain_endings, dni) -> None:
+    """Inline peer discovery for the queue daemon (see docs/durable-queue.md).
+
+    Called after a domain is crawled in queue mode. When the domain is a healthy
+    Mastodon instance with more than ``peers_min_active`` monthly users and its
+    peers endpoint has not been disabled, fetch its peers and import any new
+    domains into raw_domains (where they become due immediately). Failure
+    handling — transient vs. disabling a dead endpoint — is delegated to
+    ``fetch_peer_domains``; imports are ON CONFLICT DO NOTHING.
+    """
+    eligibility = await asyncio.to_thread(get_peers_fetch_eligibility, domain)
+    if eligibility is None:
+        return
+    active_users, peers_enabled = eligibility
+    if not peers_enabled or active_users <= peers_min_active:
+        return
+
+    api_url = f"https://{domain}/api/v1/instance/peers"
+    domains, _error_type = await fetch_peer_domains(api_url, domain, domain_endings, dni)
+    if domains:
+        await asyncio.to_thread(import_domains, domains, True)
 
 
 async def run_fetch_mode(args: argparse.Namespace) -> int:
@@ -5368,12 +5441,14 @@ async def check_and_record_domains(
     nightly_version_ranges,
     reschedule: bool = False,
     bypass_skip_filters: bool = False,
+    fetch_peers: bool = False,
 ):
     """Process a list of domains concurrently with progress tracking.
 
     When ``reschedule`` is True (durable queue daemon), each worker clears the
     domain's lease and sets its next due time after processing, via
-    ``reschedule_domain``. See docs/durable-queue.md.
+    ``reschedule_domain``. When ``fetch_peers`` is also True, each worker then
+    runs inline peer discovery (``maybe_fetch_peers``). See docs/durable-queue.md.
 
     Uses asyncio worker queues for bounded cross-domain concurrency.
     """
@@ -5489,6 +5564,11 @@ async def check_and_record_domains(
                 # its lease simply expires and is reclaimed.
                 if reschedule and not shutdown_event.is_set():
                     await asyncio.to_thread(reschedule_domain, domain)
+                # Self-feeding discovery: pull this instance's peers and import
+                # new domains. Gated to healthy, active instances inside
+                # maybe_fetch_peers; skipped on shutdown to avoid a late fetch.
+                if fetch_peers and not shutdown_event.is_set():
+                    await maybe_fetch_peers(domain, domain_endings, dni_domains)
                 queue.task_done()
 
     try:
@@ -5538,6 +5618,13 @@ async def run_queue_daemon() -> int:
         f"poll={queue_poll_seconds}s worker={_worker_id()}",
         "cyan",
     )
+    if queue_peers_enabled:
+        echo(
+            f"Inline peer discovery: on (instances with >{peers_min_active} active users)",
+            "cyan",
+        )
+        # The peers flag throttles failed endpoints; ensure the column exists.
+        _ = await asyncio.to_thread(ensure_mastodon_peers_column)
 
     # Release leases left behind by a previously crashed process so their
     # domains don't show as claimed until the lease ages out.
@@ -5598,6 +5685,7 @@ async def run_queue_daemon() -> int:
                 filter_data["nightly_version_ranges"],
                 reschedule=True,
                 bypass_skip_filters=True,
+                fetch_peers=queue_peers_enabled,
             )
 
             if (now - last_maintenance) >= maintenance_interval:
