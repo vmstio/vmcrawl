@@ -86,7 +86,9 @@ WITH due AS (
       AND NOT EXISTS (                       -- hard-DNI domains are never claimed
           SELECT 1 FROM dni d
           WHERE d.force = 'hard'
-            AND strpos(raw_domains.domain, d.domain) > 0
+            AND (raw_domains.domain = d.domain
+                 OR right(raw_domains.domain, char_length(d.domain) + 1)
+                    = '.' || d.domain)
       )
     ORDER BY next_crawl_at ASC NULLS FIRST
     LIMIT %(batch)s
@@ -120,9 +122,11 @@ RETURNING r.domain;
   migration re-detection. The only permanent exclusions left are aliases and
   hard-DNI.
 - **Hard-DNI domains are never claimed.** The `NOT EXISTS` clause mirrors the
-  worker-side substring match in `_is_dni_domain` (`any(dni in domain)`) using
-  `strpos`, so a `dni` entry with `force = 'hard'` that is a substring of the domain
-  keeps it out of the queue entirely. (Soft-DNI is recorded but not enforced, matching
+  worker-side label-boundary match in `_is_dni_domain`, so a `dni` entry with
+  `force = 'hard'` keeps out the domain itself and any subdomain of it
+  (`example.com` excludes `example.com` and `a.b.example.com`) but not an
+  unrelated domain that merely contains the string (`notexample.com`,
+  `example.community`). (Soft-DNI is recorded but not enforced, matching
   existing behavior.) Note: this means hard-DNI rows already in `raw_domains` are no
   longer crawled, but the daemon also won't *purge* them the way an in-worker
   encounter does — they simply sit unclaimed. Purge still happens via the manage/fetch

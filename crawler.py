@@ -4607,8 +4607,17 @@ def _has_valid_tld(domain: str, domain_endings: set[str]) -> bool:
 
 
 def _is_dni_domain(domain: str, dni_domains: set[str]) -> bool:
-    """Check if domain matches configured DNI entries."""
-    return any(dni in domain for dni in dni_domains)
+    """Check if a domain matches a configured DNI entry at a label boundary.
+
+    An entry matches the domain itself or any subdomain of it: DNI ``example.com``
+    matches ``example.com`` and ``a.b.example.com``, but not ``notexample.com`` or
+    ``example.community``. This mirrors the label-boundary match in the queue claim
+    query (see ``claim_due_domains``) and avoids the over-matching of a raw
+    substring test (``"evil.com" in "notevil.computer"``).
+    """
+    return any(
+        domain == dni or domain.endswith(f".{dni}") for dni in dni_domains if dni
+    )
 
 
 def _is_dni_or_invalid_tld(domain, dni_domains, domain_endings):
@@ -6574,9 +6583,10 @@ def claim_due_domains(batch: int, lease_seconds: int, worker: str) -> list[str]:
     being hammered. The only permanent exclusions left are aliases and hard-DNI.
 
     Hard-DNI domains (dni.force = 'hard') are never claimed. The NOT EXISTS
-    clause mirrors the worker-side substring match in ``_is_dni_domain``
-    (``any(dni in domain)``) via ``strpos``, so a hard-DNI entry that is a
-    substring of the domain excludes it. See docs/durable-queue.md.
+    clause mirrors the worker-side label-boundary match in ``_is_dni_domain``,
+    so a hard-DNI entry excludes the domain itself and any subdomain of it, but
+    not an unrelated domain that merely contains the string. See
+    docs/durable-queue.md.
     """
     query = (
         "WITH due AS ("
@@ -6588,7 +6598,9 @@ def claim_due_domains(batch: int, lease_seconds: int, worker: str) -> list[str]:
         "    AND NOT EXISTS ("
         "      SELECT 1 FROM dni d"
         "      WHERE d.force = 'hard'"
-        "        AND strpos(raw_domains.domain, d.domain) > 0"
+        "        AND (raw_domains.domain = d.domain"
+        "             OR right(raw_domains.domain, char_length(d.domain) + 1)"
+        "                = '.' || d.domain)"
         "    )"
         "  ORDER BY next_crawl_at ASC NULLS FIRST"
         "  LIMIT %(batch)s"
