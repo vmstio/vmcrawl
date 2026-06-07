@@ -6530,47 +6530,47 @@ def get_menu_options() -> dict[str, dict[str, str]]:
     """Return the unified menu options dictionary."""
     return {
         "Retry known instances": {
-            "50": "Unpatched",
-            "51": f"{version_main_branch}",
-            "52": "Active",
-            "53": "All",
+            "50": "Unpatched versions",
+            "51": f"{version_main_branch} branch",
+            "52": "All active instances",
+            "53": "All known instances",
         },
         "Daemon": {
             "90": "Join crawl queue",
         },
-        "DNI": {
-            "1": "Fetch IFTAS",
-            "2": "List",
-            "3": "Count",
-            "4": "Add",
-            "5": "Remove",
+        "DNI (Do Not Interact)": {
+            "1": "Import IFTAS DNI list",
+            "2": "List all DNI domains",
+            "3": "Count DNI domains",
+            "4": "Add DNI domain",
+            "5": "Remove DNI domain",
         },
         "Nightly versions": {
-            "6": "List",
-            "7": "Add",
-            "8": "End date",
-            "s": "Security",
+            "6": "List nightly versions",
+            "7": "Add nightly version",
+            "8": "Update version end date",
+            "s": "Add security version",
         },
         "Mastodon versions": {
-            "9": "Fetch",
-            "10": "Show",
-            "11": "Promote",
-            "12": "EOL",
-            "13": "Reorder",
+            "9": "Fetch latest from GitHub",
+            "10": "Show current version info",
+            "11": "Promote branch to release",
+            "12": "Mark branch as EOL",
+            "13": "Reorder release branches",
         },
         "TLD cache": {
-            "14": "Update",
+            "14": "Update TLD cache from IANA",
         },
         "Domain": {
-            "15": "Search",
+            "15": "Search domain details",
         },
         "Statistics": {
-            "16": "List flagged",
-            "17": "Flag",
-            "18": "Unflag",
+            "16": "List flagged days",
+            "17": "Flag day as invalid",
+            "18": "Unflag day",
         },
         "Queue": {
-            "19": "Live status",
+            "19": "Show live queue status",
         },
     }
 
