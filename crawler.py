@@ -17,6 +17,7 @@ try:
     import os
     import random
     import re
+    import signal
     import socket
     import ssl
     import subprocess
@@ -4167,15 +4168,21 @@ async def run_manage_mode(args: argparse.Namespace) -> int:
         elif choice == "19":
             echo("", "white")
             echo("Live queue status — refreshing every 5s. Ctrl+C to return.", "cyan")
+            stop_monitor = asyncio.Event()
+            loop = asyncio.get_running_loop()
+            loop.add_signal_handler(signal.SIGINT, stop_monitor.set)
             try:
-                while True:
+                while not stop_monitor.is_set():
                     _ = os.system("clear")
                     echo(f"{appname} v{appversion} (manage mode)", "bold")
                     display_queue_status()
                     echo("Ctrl+C to return to menu", "cyan")
-                    await asyncio.sleep(5)
-            except KeyboardInterrupt:
-                pass
+                    try:
+                        await asyncio.wait_for(stop_monitor.wait(), timeout=5.0)
+                    except asyncio.TimeoutError:
+                        pass
+            finally:
+                loop.remove_signal_handler(signal.SIGINT)
 
         else:
             echo("Invalid choice, please try again", "yellow")
