@@ -40,7 +40,8 @@ CREATE TABLE IF NOT EXISTS
     domain TEXT PRIMARY KEY CHECK (domain = LOWER(domain)),
     reason TEXT DEFAULT NULL,
     nodeinfo TEXT DEFAULT NULL,
-    alias BOOLEAN DEFAULT NULL
+    alias BOOLEAN DEFAULT NULL,
+    last_response_time DOUBLE PRECISION DEFAULT NULL
   );
 
 -- The errors counter was a batch-era diagnostic (consecutive same-type failures
@@ -82,6 +83,9 @@ ALTER TABLE raw_domains
   ADD COLUMN IF NOT EXISTS claimed_by TEXT DEFAULT NULL;
 ALTER TABLE raw_domains
   ADD COLUMN IF NOT EXISTS attempts INTEGER NOT NULL DEFAULT 0;
+-- Wall-clock seconds of the last crawl; drives claim ordering (fastest first).
+ALTER TABLE raw_domains
+  ADD COLUMN IF NOT EXISTS last_response_time DOUBLE PRECISION DEFAULT NULL;
 
 -- One-time backfill so the first daemon start does not stampede every row at
 -- once. Only touches rows that have not yet been scheduled (next_crawl_at IS
@@ -379,16 +383,18 @@ CREATE INDEX IF NOT EXISTS idx_raw_domains_uncrawled
     WHERE reason IS NULL AND nodeinfo IS NULL AND (alias IS NULL OR alias = FALSE);
 
 -- Index for the durable queue claim query (see docs/durable-queue.md)
--- Used by: claim_due_domains() -- ORDER BY next_crawl_at NULLS FIRST over due,
--- non-alias rows. The partial predicate mirrors the claim filter's only
--- immutable condition (non-alias) to keep the index small. Failure domains are
--- deliberately NOT excluded: queue mode recrawls them once due, on a per-type
--- cadence derived from reason, so it actually re-attempts known failures. The
--- hard-DNI exclusion is applied during the scan (it references another table
--- and can't live in the predicate).
+-- Used by: claim_due_domains() -- ORDER BY last_response_time NULLS FIRST,
+-- next_crawl_at NULLS FIRST over due, non-alias rows (fastest-first priority).
+-- The partial predicate mirrors the claim filter's only immutable condition
+-- (non-alias) to keep the index small. Failure domains are deliberately NOT
+-- excluded: queue mode recrawls them once due, on a per-type cadence derived
+-- from reason, so it actually re-attempts known failures. The hard-DNI exclusion
+-- is applied during the scan (it references another table and can't live in the
+-- predicate). Drop first so the leading-column change applies on existing
+-- deployments; CREATE ... IF NOT EXISTS alone would keep the stale index.
 DROP INDEX IF EXISTS idx_raw_domains_due;
 CREATE INDEX IF NOT EXISTS idx_raw_domains_due
-    ON raw_domains (next_crawl_at NULLS FIRST)
+    ON raw_domains (last_response_time NULLS FIRST, next_crawl_at NULLS FIRST)
     WHERE (alias IS NULL OR alias = FALSE);
 
 -- =============================================================================

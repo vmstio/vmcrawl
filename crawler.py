@@ -5523,11 +5523,14 @@ async def check_and_record_domains(
                         use_tqdm=True,
                     )
                 # Durable queue: clear the lease and set the next due time from
-                # the row's resulting state. On shutdown we deliberately skip
-                # this so the domain isn't pushed forward without being crawled;
-                # its lease simply expires and is reclaimed.
+                # the row's resulting state, recording this crawl's wall-clock
+                # time as last_response_time (drives claim ordering). On shutdown
+                # we deliberately skip this so the domain isn't pushed forward
+                # without being crawled; its lease simply expires and is reclaimed.
                 if reschedule and not shutdown_event.is_set():
-                    await asyncio.to_thread(reschedule_domain, domain)
+                    await asyncio.to_thread(
+                        reschedule_domain, domain, elapsed_seconds
+                    )
                 # Self-feeding discovery: pull this instance's peers and import
                 # new domains. Gated to healthy, active instances inside
                 # maybe_fetch_peers; skipped on shutdown to avoid a late fetch.
@@ -6352,6 +6355,14 @@ def claim_due_domains(batch: int, lease_seconds: int, worker: str) -> list[str]:
     so a hard-DNI entry excludes the domain itself and any subdomain of it, but
     not an unrelated domain that merely contains the string. See
     docs/durable-queue.md.
+
+    Among due rows the claim is ordered by ``last_response_time`` ascending
+    (fastest first, NULL/never-measured first) — the joinmastodon-api scheduler's
+    priority. Under backlog this biases each batch toward cheap, fast-responding
+    instances so workers clear more domains per lease window instead of stalling
+    behind a slow tail; ``next_crawl_at`` breaks ties. Slow/failing domains are
+    not starved because the per-type backoff pushes their ``next_crawl_at`` far
+    out, removing them from the due set until they are due again.
     """
     query = (
         "WITH due AS ("
@@ -6367,7 +6378,8 @@ def claim_due_domains(batch: int, lease_seconds: int, worker: str) -> list[str]:
         "             OR right(raw_domains.domain, char_length(d.domain) + 1)"
         "                = '.' || d.domain)"
         "    )"
-        "  ORDER BY next_crawl_at ASC NULLS FIRST"
+        "  ORDER BY last_response_time ASC NULLS FIRST,"
+        "           next_crawl_at ASC NULLS FIRST"
         "  LIMIT %(batch)s"
         "  FOR UPDATE SKIP LOCKED"
         ") "
@@ -6390,7 +6402,7 @@ def claim_due_domains(batch: int, lease_seconds: int, worker: str) -> list[str]:
             return []
 
 
-def reschedule_domain(domain: str) -> None:
+def reschedule_domain(domain: str, response_time: float | None = None) -> None:
     """Clear a domain's lease and set its next due time from its resulting state.
 
     Deriving the interval from the row's own columns (rather than from the Python
@@ -6407,10 +6419,15 @@ def reschedule_domain(domain: str) -> None:
     by backoff while a short transient type still climbs toward the cap.
     ``attempts`` is incremented on a failure and reset to 0 on success; the SET
     expressions read the pre-update row, so backoff uses the old count.
+
+    ``response_time`` is the wall-clock seconds the crawl took; it is recorded in
+    ``last_response_time`` (kept if None) and drives the claim-ordering priority
+    (see ``claim_due_domains``).
     """
     query = sql.SQL(
         "UPDATE raw_domains SET "
         "claimed_at = NULL, claimed_by = NULL, "
+        "last_response_time = COALESCE(%(rt)s, last_response_time), "
         "attempts = CASE WHEN reason IS NOT NULL THEN attempts + 1 ELSE 0 END, "
         "next_crawl_at = now() + (CASE "
         "  WHEN reason IS NOT NULL "
@@ -6430,6 +6447,7 @@ def reschedule_domain(domain: str) -> None:
                     "cap": retry_cap_hours,
                     "nonmasto": recrawl_nonmasto_hours,
                     "recrawl": recrawl_hours,
+                    "rt": response_time,
                     "domain": domain,
                 },
             )

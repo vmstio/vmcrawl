@@ -53,6 +53,7 @@ Added to `raw_domains` (all idempotent `ADD COLUMN IF NOT EXISTS`):
 | `claimed_at`    | `TIMESTAMPTZ` | Lease start. `NULL` = unclaimed                                |
 | `claimed_by`    | `TEXT`        | Worker identity holding the lease (host/pid) — observability   |
 | `attempts`      | `INTEGER`     | Consecutive transient failures; drives backoff. Reset on success |
+| `last_response_time` | `DOUBLE PRECISION` | Wall-clock seconds of the last crawl; orders the claim (fastest first) |
 
 `attempts` is the sole consecutive-failure counter — it drives backoff and resets on
 success. (The old batch-era `errors` diagnostic counter has been dropped; the latest
@@ -134,6 +135,14 @@ RETURNING r.domain;
   **self-heals**: a crashed worker's domains become re-claimable once the lease ages
   out. No separate janitor is strictly required; `reclaim_stale_leases()` exists only
   to tidy/observe leases left by a previous crashed process at startup.
+- Due rows are ordered `last_response_time ASC NULLS FIRST, next_crawl_at ASC NULLS
+  FIRST` — joinmastodon-api's fastest-first scheduler priority. Under backlog this
+  biases each batch toward cheap, fast-responding instances (new/never-measured rows
+  sort first), so workers clear more domains per lease window instead of stalling
+  behind a slow tail. It does not starve slow/failing domains: their per-type backoff
+  pushes `next_crawl_at` far out, so they leave the due set until they are due again.
+  `last_response_time` is written by `reschedule_domain` from the crawl's wall-clock
+  time.
 
 ## Reschedule policy
 
