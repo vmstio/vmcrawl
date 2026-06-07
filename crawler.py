@@ -1559,27 +1559,6 @@ def _clean_version_fixes(version: str) -> str:
 # =============================================================================
 
 
-def get_backport_branches() -> list[str]:
-    """Get list of active backport branches from the database.
-
-    Replaces the hardcoded backport_branches list.
-    Returns branches in order by n_level (newest first).
-    """
-    with db_pool.connection() as conn, conn.cursor() as cur:
-        try:
-            _ = cur.execute(
-                """
-                SELECT branch
-                FROM release_versions
-                WHERE status = 'release'
-                ORDER BY n_level
-                """,
-            )
-            return [row[0] for row in cur.fetchall()]
-        except Exception as e:
-            echo(f"Failed to load backport branches from database: {e}", "red")
-            return []
-
 
 def get_all_tracked_branches() -> list[str]:
     """Get list of all tracked branches (release + EOL) from the database.
@@ -3303,36 +3282,6 @@ def interactive_add_security_nightly():
 
     add_security_nightly_version(version, release_date)
 
-
-def run_nightly_mode(args):
-    """Run the nightly version management mode."""
-    echo(f"{appname} v{appversion} (nightly mode)", "bold")
-    if _is_running_headless():
-        echo("Running in headless mode", "cyan")
-
-    # List versions
-    if args.list:
-        display_nightly_versions()
-        return
-
-    # Update end date
-    if args.update_end_date:
-        nightly_version, end_date = args.update_end_date
-        _ = update_nightly_end_date(nightly_version, end_date)
-        return
-
-    # Add version (command line)
-    if args.version and args.start_date:
-        add_nightly_version(
-            args.version,
-            args.start_date,
-            args.end_date,
-            auto_update_previous=not args.no_auto_update,
-        )
-        return
-
-    # Add version (interactive) - default behavior
-    interactive_add_nightly()
 
 
 # =============================================================================
@@ -5636,17 +5585,6 @@ async def run_queue_daemon() -> int:
 # STATISTICS FUNCTIONS - Mastodon Domain Counts
 # =============================================================================
 
-
-def get_mastodon_domains():
-    """Get total count of known Mastodon domains."""
-    try:
-        with db_pool.connection() as conn, conn.cursor() as cursor:
-            _ = cursor.execute("SELECT COUNT(domain) AS domains FROM mastodon_domains;")
-            result = cursor.fetchone()
-            return result[0] if result is not None else 0
-    except Exception as e:
-        echo(f"Failed to obtain total Mastodon domains: {e}", "white")
-        return 0
 
 
 def get_unique_versions():
