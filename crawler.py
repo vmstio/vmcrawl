@@ -3507,685 +3507,597 @@ def display_queue_status() -> None:
     echo("", "white")
 
 
-def print_manage_menu():
-    """Print the management menu options."""
-    echo("", "white")
-    echo("Management Menu:", "bold")
-    echo("-" * 50, "cyan")
-    echo("", "white")
-    echo("DNI (Do Not Interact) Management:", "yellow")
-    echo("   1. Fetch and import IFTAS DNI list", "white")
-    echo("   2. List all DNI domains", "white")
-    echo("   3. Count DNI domains", "white")
-    echo("   4. Add DNI domain manually", "white")
-    echo("   5. Remove DNI domain", "white")
-    echo("", "white")
-    echo("Nightly Version Management:", "yellow")
-    echo("   6. List all nightly versions", "white")
-    echo("   7. Add a new nightly version", "white")
-    echo("   8. Update nightly version end date", "white")
-    echo("   s. Add a security version mapping", "white")
-    echo("", "white")
-    echo("Mastodon Version Management:", "yellow")
-    echo("   9. Update latest Mastodon versions", "white")
-    echo("  10. Show current version info", "white")
-    echo("  11. Promote branch to release", "white")
-    echo("  12. Mark branch as EOL", "white")
-    echo("  13. Reorder release branches", "white")
-    echo("", "white")
-    echo("TLD Cache Management:", "yellow")
-    echo("  14. Update TLD cache", "white")
-    echo("", "white")
-    echo("Domain Search:", "yellow")
-    echo("  15. Search domain details", "white")
-    echo("", "white")
-    echo("Statistics Management:", "yellow")
-    echo("  16. List flagged statistics days", "white")
-    echo("  17. Flag statistics day as invalid", "white")
-    echo("  18. Unflag statistics day", "white")
-    echo("", "white")
-    echo("Queue Status:", "yellow")
-    echo("  19. Show live queue status", "white")
-    echo("", "white")
-    echo("   q. Quit", "white")
-    echo("", "white")
+_MANAGE_CHOICES = frozenset(
+    {"1", "2", "3", "4", "5", "6", "7", "8", "s",
+     "9", "10", "11", "12", "13", "14", "15", "16", "17", "18", "19"}
+)
 
 
-def get_manage_choice():
-    """Get user's menu choice."""
-    choice = input("Enter your choice: ").strip().lower()
-    return choice
+async def _handle_manage_action(args: argparse.Namespace, choice: str) -> None:
+    """Execute a single management menu action."""
+    # DNI Management
+    if choice == "1":
+        existing_domains = get_existing_dni_domains()
+        echo("Fetching IFTAS DNI List…", "bold")
+        csv_content = await fetch_dni_csv(DNI_CSV_URL)
+        if not csv_content:
+            echo("Failed to fetch DNI CSV", "red")
+            return
 
+        domains = _parse_dni_csv(csv_content)
+        if not domains:
+            echo("No domains parsed from DNI CSV", "yellow")
+            return
 
-async def run_manage_mode(args: argparse.Namespace) -> int:
-    """Run the unified management mode with menu interface."""
-    echo(f"{appname} v{appversion} (manage mode)", "bold")
-    if _is_running_headless():
-        echo("Running in headless mode", "cyan")
+        new_domains = [d for d in domains if d not in existing_domains]
+        echo(
+            f"Found {len(new_domains)} new DNI domains (out of {len(domains)} total)",
+            "cyan",
+        )
 
-    while True:
-        print_manage_menu()
-        choice = get_manage_choice()
+        if new_domains:
+            imported = import_dni_domains(new_domains, comment="iftas-dni")
+            echo(f"Total new domains imported: {imported}", "green")
+        else:
+            echo("All DNI domains already exist in database", "yellow")
 
-        if choice in {"q", "quit", "exit"}:
-            echo("Exiting management mode", "cyan")
-            break
+        _ = count_dni_domains()
+        echo("DNI import complete!", "bold")
+        echo("", "white")
+        input("Press Enter to continue...")
 
-        # DNI Management
-        elif choice == "1":
-            # Fetch and import IFTAS DNI list
-            existing_domains = get_existing_dni_domains()
-            echo("Fetching IFTAS DNI List…", "bold")
-            csv_content = await fetch_dni_csv(DNI_CSV_URL)
-            if not csv_content:
-                echo("Failed to fetch DNI CSV", "red")
-                continue
+    elif choice == "2":
+        list_dni_domains()
+        input("Press Enter to continue...")
 
-            domains = _parse_dni_csv(csv_content)
-            if not domains:
-                echo("No domains parsed from DNI CSV", "yellow")
-                continue
+    elif choice == "3":
+        _ = count_dni_domains()
+        echo("", "white")
+        input("Press Enter to continue...")
 
-            new_domains = [d for d in domains if d not in existing_domains]
+    elif choice == "4":
+        echo("", "white")
+        domain = input("Enter the domain to add: ").strip().lower()
+        comment = input("Enter comment: ").strip()
+        force = input("Enter force (hard/soft): ").strip().lower()
+
+        if not domain:
+            echo("Domain cannot be empty", "yellow")
+            echo("", "white")
+            input("Press Enter to continue...")
+            return
+        if not comment:
+            echo("Comment cannot be empty", "yellow")
+            echo("", "white")
+            input("Press Enter to continue...")
+            return
+        if force not in {"hard", "soft"}:
+            echo("Force must be 'hard' or 'soft'", "yellow")
+            echo("", "white")
+            input("Press Enter to continue...")
+            return
+
+        imported = import_dni_domains([domain], comment=comment, force=force)
+        if imported > 0:
             echo(
-                f"Found {len(new_domains)} new DNI domains (out of {len(domains)} total)",
+                f"Added DNI domain: {domain} (comment={comment}, force={force})",
+                "green",
+            )
+        else:
+            echo(f"Domain already exists in DNI table: {domain}", "yellow")
+        echo("", "white")
+        input("Press Enter to continue...")
+
+    elif choice == "5":
+        echo("", "white")
+        domain = input("Enter the domain to remove: ").strip().lower()
+        if not domain:
+            echo("Domain cannot be empty", "yellow")
+            echo("", "white")
+            input("Press Enter to continue...")
+            return
+
+        if remove_dni_domain(domain):
+            echo(f"Removed DNI domain: {domain}", "green")
+        else:
+            echo(f"Domain not found in DNI table: {domain}", "yellow")
+        echo("", "white")
+        input("Press Enter to continue...")
+
+    # Nightly Version Management
+    elif choice == "6":
+        display_nightly_versions()
+        input("Press Enter to continue...")
+
+    elif choice == "7":
+        interactive_add_nightly()
+        echo("", "white")
+        input("Press Enter to continue...")
+
+    elif choice == "8":
+        echo("", "white")
+        version_to_update = input(
+            "Enter the version to update (e.g., 4.9.0-alpha.7): "
+        ).strip()
+        new_end_date = input("Enter the new end date (YYYY-MM-DD): ").strip()
+        if version_to_update and new_end_date:
+            _ = update_nightly_end_date(version_to_update, new_end_date)
+        else:
+            echo("Invalid input, operation cancelled", "yellow")
+        echo("", "white")
+        input("Press Enter to continue...")
+
+    elif choice == "s":
+        interactive_add_security_nightly()
+        echo("", "white")
+        input("Press Enter to continue...")
+
+    # Mastodon Version Management
+    elif choice == "9":
+        echo("Fetching latest Mastodon versions from GitHub…", "bold")
+
+        main_release = await get_main_version_release()
+        tracked_versions = await get_all_tracked_mastodon_versions()
+
+        with db_pool.connection() as conn, conn.cursor() as cur:
+            _ = cur.execute(
+                "UPDATE release_versions SET latest = %s WHERE n_level = -1",
+                (main_release,),
+            )
+            echo(f"Updated main branch to {main_release}", "white")
+            for branch, version_str in tracked_versions.items():
+                _ = cur.execute(
+                    "UPDATE release_versions SET latest = %s WHERE branch = %s AND status IN ('release', 'eol')",
+                    (version_str, branch),
+                )
+                echo(f"Updated {branch} to {version_str}", "white")
+            conn.commit()
+
+        load_versions_from_db()
+
+        echo("Version information updated successfully!", "green")
+        echo(f"Main version: {version_main_release}", "cyan")
+        if version_backport_releases:
+            echo(
+                f"Supported releases: {', '.join(version_backport_releases)}",
                 "cyan",
             )
+        echo("", "white")
+        input("Press Enter to continue...")
 
-            if new_domains:
-                imported = import_dni_domains(new_domains, comment="iftas-dni")
-                echo(f"Total new domains imported: {imported}", "green")
-            else:
-                echo("All DNI domains already exist in database", "yellow")
+    elif choice == "10":
+        db_versions = get_release_versions_from_db()
 
-            _ = count_dni_domains()
-            echo("DNI import complete!", "bold")
+        if not db_versions:
+            echo(
+                "No version information found in database. Use option 9 to fetch.",
+                "yellow",
+            )
+        else:
             echo("", "white")
-            input("Press Enter to continue...")
-
-        elif choice == "2":
-            # List all DNI domains
-            list_dni_domains()
-            input("Press Enter to continue...")
-
-        elif choice == "3":
-            # Count DNI domains
-            _ = count_dni_domains()
-            echo("", "white")
-            input("Press Enter to continue...")
-
-        elif choice == "4":
-            # Add DNI domain manually
-            echo("", "white")
-            domain = input("Enter the domain to add: ").strip().lower()
-            comment = input("Enter comment: ").strip()
-            force = input("Enter force (hard/soft): ").strip().lower()
-
-            if not domain:
-                echo("Domain cannot be empty", "yellow")
-                echo("", "white")
-                input("Press Enter to continue...")
-                continue
-            if not comment:
-                echo("Comment cannot be empty", "yellow")
-                echo("", "white")
-                input("Press Enter to continue...")
-                continue
-            if force not in {"hard", "soft"}:
-                echo("Force must be 'hard' or 'soft'", "yellow")
-                echo("", "white")
-                input("Press Enter to continue...")
-                continue
-
-            imported = import_dni_domains([domain], comment=comment, force=force)
-            if imported > 0:
-                echo(
-                    f"Added DNI domain: {domain} (comment={comment}, force={force})",
-                    "green",
-                )
-            else:
-                echo(f"Domain already exists in DNI table: {domain}", "yellow")
-            echo("", "white")
-            input("Press Enter to continue...")
-
-        elif choice == "5":
-            # Remove DNI domain
-            echo("", "white")
-            domain = input("Enter the domain to remove: ").strip().lower()
-            if not domain:
-                echo("Domain cannot be empty", "yellow")
-                echo("", "white")
-                input("Press Enter to continue...")
-                continue
-
-            if remove_dni_domain(domain):
-                echo(f"Removed DNI domain: {domain}", "green")
-            else:
-                echo(f"Domain not found in DNI table: {domain}", "yellow")
-            echo("", "white")
-            input("Press Enter to continue...")
-
-        # Nightly Version Management
-        elif choice == "6":
-            # List all nightly versions
-            display_nightly_versions()
-            input("Press Enter to continue...")
-
-        elif choice == "7":
-            # Add a new nightly version (interactive)
-            interactive_add_nightly()
-            echo("", "white")
-            input("Press Enter to continue...")
-
-        elif choice == "8":
-            # Update nightly version end date
-            echo("", "white")
-            version_to_update = input(
-                "Enter the version to update (e.g., 4.9.0-alpha.7): "
-            ).strip()
-            new_end_date = input("Enter the new end date (YYYY-MM-DD): ").strip()
-            if version_to_update and new_end_date:
-                _ = update_nightly_end_date(version_to_update, new_end_date)
-            else:
-                echo("Invalid input, operation cancelled", "yellow")
-            echo("", "white")
-            input("Press Enter to continue...")
-
-        elif choice == "s":
-            # Add a security version mapping (interactive)
-            interactive_add_security_nightly()
-            echo("", "white")
-            input("Press Enter to continue...")
-
-        # Mastodon Version Management
-        elif choice == "9":
-            # Update latest Mastodon versions (only existing branches)
-            echo("Fetching latest Mastodon versions from GitHub…", "bold")
-
-            # Fetch fresh version info from GitHub
-            main_release = await get_main_version_release()
-            tracked_versions = await get_all_tracked_mastodon_versions()
-
-            # Update only the 'latest' column for existing branches
-            with db_pool.connection() as conn, conn.cursor() as cur:
-                # Update main branch (n_level = -1)
-                _ = cur.execute(
-                    "UPDATE release_versions SET latest = %s WHERE n_level = -1",
-                    (main_release,),
-                )
-                echo(f"Updated main branch to {main_release}", "white")
-                # Update release and EOL branches (tracked_versions is a dict: branch -> version)
-                for branch, version_str in tracked_versions.items():
-                    _ = cur.execute(
-                        "UPDATE release_versions SET latest = %s WHERE branch = %s AND status IN ('release', 'eol')",
-                        (version_str, branch),
-                    )
-                    echo(f"Updated {branch} to {version_str}", "white")
-                conn.commit()
-
-            # Reload from database to update global variables
-            load_versions_from_db()
-
-            echo("Version information updated successfully!", "green")
-            echo(f"Main version: {version_main_release}", "cyan")
-            if version_backport_releases:
-                echo(
-                    f"Supported releases: {', '.join(version_backport_releases)}",
-                    "cyan",
-                )
-            echo("", "white")
-            input("Press Enter to continue...")
-
-        elif choice == "10":
-            # Show current version info (from database)
-            db_versions = get_release_versions_from_db()
-
-            if not db_versions:
-                echo(
-                    "No version information found in database. Use option 7 to fetch.",
-                    "yellow",
-                )
-            else:
-                echo("", "white")
-                echo("Current Mastodon Version Information (from database):", "bold")
-                echo("-" * 60, "cyan")
-
-                if "main_branch" in db_versions:
-                    echo(f"Main branch:       {db_versions['main_branch']}", "white")
-                if "main_release" in db_versions:
-                    echo(f"Main release:      {db_versions['main_release']}", "white")
-                if "latest_stable" in db_versions:
-                    echo(f"Latest stable:     {db_versions['latest_stable']}", "white")
-                if "backport_releases" in db_versions:
-                    echo(
-                        f"Backport releases: {', '.join(db_versions['backport_releases'])}",
-                        "white",
-                    )
-                if "all_patched" in db_versions:
-                    echo(
-                        f"All patched:       {', '.join(db_versions['all_patched'])}",
-                        "white",
-                    )
-                echo("", "white")
-            input("Press Enter to continue...")
-
-        elif choice == "11":
-            # Promote branch to release
-            echo("", "white")
-            echo("Promote Branch to Release", "bold")
+            echo("Current Mastodon Version Information (from database):", "bold")
             echo("-" * 60, "cyan")
 
-            with db_pool.connection() as conn, conn.cursor() as cur:
-                # Show main branch and any non-release branches that could be promoted
-                _ = cur.execute(
-                    """
-                    SELECT branch, status, n_level, latest
-                    FROM release_versions
-                    WHERE status = 'main'
-                    ORDER BY n_level
-                    """
+            if "main_branch" in db_versions:
+                echo(f"Main branch:       {db_versions['main_branch']}", "white")
+            if "main_release" in db_versions:
+                echo(f"Main release:      {db_versions['main_release']}", "white")
+            if "latest_stable" in db_versions:
+                echo(f"Latest stable:     {db_versions['latest_stable']}", "white")
+            if "backport_releases" in db_versions:
+                echo(
+                    f"Backport releases: {', '.join(db_versions['backport_releases'])}",
+                    "white",
                 )
-                promotable = cur.fetchall()
-
-                if not promotable:
-                    echo("No branches available to promote", "yellow")
-                    echo("", "white")
-                    input("Press Enter to continue...")
-                    continue
-
-                echo("Branches available to promote:", "white")
-                for branch, status, n_level, latest in promotable:
-                    echo(f"  {branch} (status={status}, latest={latest})", "white")
-                echo("", "white")
-                branch = input(
-                    "Enter branch to promote to release (or press Enter to cancel): "
-                ).strip()
-                if not branch:
-                    echo("Operation cancelled", "yellow")
-                    echo("", "white")
-                    input("Press Enter to continue...")
-                    continue
-
-                # Check if branch exists and can be promoted
-                _ = cur.execute(
-                    "SELECT branch, status, n_level FROM release_versions WHERE branch = %s",
-                    (branch,),
+            if "all_patched" in db_versions:
+                echo(
+                    f"All patched:       {', '.join(db_versions['all_patched'])}",
+                    "white",
                 )
-                existing = cur.fetchone()
-
-                if not existing:
-                    echo(f"Branch {branch} not found", "yellow")
-                    echo("", "white")
-                    input("Press Enter to continue...")
-                    continue
-
-                # If it's already a release or EOL, abort
-                if existing[1] != "main":
-                    echo(
-                        f"Branch {branch} has status '{existing[1]}' and cannot be promoted",
-                        "yellow",
-                    )
-                    echo("", "white")
-                    input("Press Enter to continue...")
-                    continue
-
-                # When adding a new release branch, it becomes n_level=0 (newest)
-                # and existing releases/EOL get shifted down (incremented)
-                # To avoid primary key conflicts, use a two-step update with large offset
-                # Step 1: Move to high temp values (e.g., 1000+) to avoid conflicts
-                _ = cur.execute(
-                    """
-                    UPDATE release_versions
-                    SET n_level = n_level + 10000
-                    WHERE status IN ('release', 'eol') AND n_level >= 0
-                    """
-                )
-                # Step 2: Move back down, shifted by 1 from original position
-                _ = cur.execute(
-                    """
-                    UPDATE release_versions
-                    SET n_level = n_level - 9999
-                    WHERE status IN ('release', 'eol') AND n_level >= 10000
-                    """
-                )
-
-                new_level = 0
-
-                # Fetch latest version for this branch from GitHub
-                echo(f"Fetching latest version for branch {branch}...", "cyan")
-                url = "https://api.github.com/repos/mastodon/mastodon/releases"
-                response = await get_httpx(url)
-                _ = response.raise_for_status()
-                releases = response.json()
-
-                latest_version = None
-                for release in releases:
-                    release_version = release["tag_name"].lstrip("v")
-                    if release_version.startswith(branch):
-                        latest_version = release_version
-                        break
-
-                if not latest_version:
-                    latest_version = f"{branch}.0"
-                    echo(
-                        f"No releases found for {branch}, using {latest_version}",
-                        "yellow",
-                    )
-
-                # If this is the main branch being promoted, delete and re-insert
-                # (can't UPDATE the primary key n_level if target value already exists)
-                if existing and existing[1] == "main":
-                    # Delete the main branch row
-                    _ = cur.execute(
-                        "DELETE FROM release_versions WHERE branch = %s AND status = 'main'",
-                        (branch,),
-                    )
-                    # Insert as new release branch
-                    _ = cur.execute(
-                        """
-                        INSERT INTO release_versions (branch, status, n_level, latest)
-                        VALUES (%s, %s, %s, %s)
-                        """,
-                        (branch, "release", new_level, latest_version),
-                    )
-                    echo(
-                        f"Promoted main branch {branch} to release (n_level={new_level}, latest={latest_version})",
-                        "green",
-                    )
-
-                    # Now add a new main branch (next version)
-                    # Calculate next version (e.g., 4.6 -> 4.7)
-                    parts = branch.split(".")
-                    if len(parts) < 2:
-                        echo(f"Cannot calculate next branch from malformed branch '{branch}'", "red")
-                        continue
-                    new_main_branch = f"{parts[0]}.{int(parts[1]) + 1}"
-                    new_main_version = f"{new_main_branch}.0-alpha.1"
-
-                    _ = cur.execute(
-                        """
-                        INSERT INTO release_versions (branch, status, n_level, latest)
-                        VALUES (%s, %s, %s, %s)
-                        """,
-                        (new_main_branch, "main", -1, new_main_version),
-                    )
-                    echo(
-                        f"Created new main branch {new_main_branch} ({new_main_version})",
-                        "green",
-                    )
-                else:
-                    # Insert new release branch
-                    _ = cur.execute(
-                        """
-                        INSERT INTO release_versions (branch, status, n_level, latest)
-                        VALUES (%s, %s, %s, %s)
-                        """,
-                        (branch, "release", new_level, latest_version),
-                    )
-                    echo(
-                        f"Added branch {branch} as release (n_level={new_level}, latest={latest_version})",
-                        "green",
-                    )
-
-                conn.commit()
-
-                # Reload global variables
-                load_versions_from_db()
-
             echo("", "white")
-            input("Press Enter to continue...")
+        input("Press Enter to continue...")
 
-        elif choice == "12":
-            # Mark branch as EOL
-            echo("", "white")
-            echo("Mark Branch as EOL", "bold")
-            echo("-" * 60, "cyan")
+    elif choice == "11":
+        echo("", "white")
+        echo("Promote Branch to Release", "bold")
+        echo("-" * 60, "cyan")
 
-            # Show current release branches
-            with db_pool.connection() as conn, conn.cursor() as cur:
-                _ = cur.execute(
-                    "SELECT branch, n_level, latest FROM release_versions WHERE status = 'release' ORDER BY n_level"
-                )
-                release_branches = cur.fetchall()
+        with db_pool.connection() as conn, conn.cursor() as cur:
+            _ = cur.execute(
+                """
+                SELECT branch, status, n_level, latest
+                FROM release_versions
+                WHERE status = 'main'
+                ORDER BY n_level
+                """
+            )
+            promotable = cur.fetchall()
 
-            if not release_branches:
-                echo("No release branches found", "yellow")
+            if not promotable:
+                echo("No branches available to promote", "yellow")
                 echo("", "white")
                 input("Press Enter to continue...")
-                continue
+                return
 
-            echo("Current release branches:", "white")
-            for branch, n_level, latest in release_branches:
-                echo(f"  {branch} (n_level={n_level}, latest={latest})", "white")
+            echo("Branches available to promote:", "white")
+            for branch, status, n_level, latest in promotable:
+                echo(f"  {branch} (status={status}, latest={latest})", "white")
             echo("", "white")
             branch = input(
-                "Enter branch to mark as EOL (or press Enter to cancel): "
+                "Enter branch to promote to release (or press Enter to cancel): "
             ).strip()
             if not branch:
                 echo("Operation cancelled", "yellow")
                 echo("", "white")
                 input("Press Enter to continue...")
-                continue
+                return
 
-            with db_pool.connection() as conn, conn.cursor() as cur:
-                # Check if branch exists and is a release
-                _ = cur.execute(
-                    "SELECT status, n_level FROM release_versions WHERE branch = %s",
-                    (branch,),
-                )
-                result = cur.fetchone()
-
-                if not result:
-                    echo(f"Branch {branch} not found", "yellow")
-                    echo("", "white")
-                    input("Press Enter to continue...")
-                    continue
-
-                status, n_level = result
-
-                if status != "release":
-                    echo(
-                        f"Branch {branch} is not a release (status={status})", "yellow"
-                    )
-                    echo("", "white")
-                    input("Press Enter to continue...")
-                    continue
-
-                # Update status to EOL
-                _ = cur.execute(
-                    "UPDATE release_versions SET status = 'eol' WHERE branch = %s",
-                    (branch,),
-                )
-                conn.commit()
-
-                echo(f"Marked branch {branch} as EOL", "green")
-
-                # Reload global variables
-                load_versions_from_db()
-
-            echo("", "white")
-            input("Press Enter to continue...")
-
-        elif choice == "13":
-            # Reorder release branches
-            echo("", "white")
-            echo("Reorder Release Branches", "bold")
-            echo("-" * 60, "cyan")
-
-            # Get current release branches
-            with db_pool.connection() as conn, conn.cursor() as cur:
-                _ = cur.execute(
-                    "SELECT branch, n_level, latest FROM release_versions WHERE status = 'release' ORDER BY n_level"
-                )
-                release_branches = cur.fetchall()
-
-            if not release_branches:
-                echo("No release branches found", "yellow")
-                echo("", "white")
-                input("Press Enter to continue...")
-                continue
-
-            echo("Current order (0 is latest stable):", "white")
-            for branch, n_level, latest in release_branches:
-                echo(f"  {n_level}: {branch} ({latest})", "white")
-            echo("", "white")
-            echo(
-                "Enter new order as comma-separated branches (e.g., 4.6,4.5,4.4)",
-                "cyan",
+            _ = cur.execute(
+                "SELECT branch, status, n_level FROM release_versions WHERE branch = %s",
+                (branch,),
             )
-            new_order = input("New order: ").strip()
+            existing = cur.fetchone()
 
-            if not new_order:
-                echo("Operation cancelled", "yellow")
+            if not existing:
+                echo(f"Branch {branch} not found", "yellow")
                 echo("", "white")
                 input("Press Enter to continue...")
-                continue
+                return
 
-            new_branches = [b.strip() for b in new_order.split(",")]
-
-            # Validate that all current branches are included
-            current_branches = {b[0] for b in release_branches}
-            new_branches_set = set(new_branches)
-
-            if current_branches != new_branches_set:
+            if existing[1] != "main":
                 echo(
-                    "Error: New order must include all current release branches", "red"
+                    f"Branch {branch} has status '{existing[1]}' and cannot be promoted",
+                    "yellow",
                 )
-                echo(f"Expected: {', '.join(sorted(current_branches))}", "yellow")
-                echo(f"Got: {', '.join(new_branches)}", "yellow")
                 echo("", "white")
                 input("Press Enter to continue...")
-                continue
+                return
 
-            # Update n_level for each branch
-            with db_pool.connection() as conn, conn.cursor() as cur:
-                for new_level, branch in enumerate(new_branches):
-                    _ = cur.execute(
-                        "UPDATE release_versions SET n_level = %s WHERE branch = %s AND status = 'release'",
-                        (new_level, branch),
-                    )
-                conn.commit()
+            _ = cur.execute(
+                """
+                UPDATE release_versions
+                SET n_level = n_level + 10000
+                WHERE status IN ('release', 'eol') AND n_level >= 0
+                """
+            )
+            _ = cur.execute(
+                """
+                UPDATE release_versions
+                SET n_level = n_level - 9999
+                WHERE status IN ('release', 'eol') AND n_level >= 10000
+                """
+            )
 
-                echo("Branch order updated successfully!", "green")
+            new_level = 0
 
-                # Show new order
+            echo(f"Fetching latest version for branch {branch}...", "cyan")
+            url = "https://api.github.com/repos/mastodon/mastodon/releases"
+            response = await get_httpx(url)
+            _ = response.raise_for_status()
+            releases = response.json()
+
+            latest_version = None
+            for release in releases:
+                release_version = release["tag_name"].lstrip("v")
+                if release_version.startswith(branch):
+                    latest_version = release_version
+                    break
+
+            if not latest_version:
+                latest_version = f"{branch}.0"
+                echo(
+                    f"No releases found for {branch}, using {latest_version}",
+                    "yellow",
+                )
+
+            if existing and existing[1] == "main":
                 _ = cur.execute(
-                    "SELECT branch, n_level, latest FROM release_versions WHERE status = 'release' ORDER BY n_level"
+                    "DELETE FROM release_versions WHERE branch = %s AND status = 'main'",
+                    (branch,),
                 )
-                new_release_branches = cur.fetchall()
+                _ = cur.execute(
+                    """
+                    INSERT INTO release_versions (branch, status, n_level, latest)
+                    VALUES (%s, %s, %s, %s)
+                    """,
+                    (branch, "release", new_level, latest_version),
+                )
+                echo(
+                    f"Promoted main branch {branch} to release (n_level={new_level}, latest={latest_version})",
+                    "green",
+                )
 
-                echo("\nNew order:", "white")
-                for branch, n_level, latest in new_release_branches:
-                    echo(f"  {n_level}: {branch} ({latest})", "white")
-                # Reload global variables
-                load_versions_from_db()
+                parts = branch.split(".")
+                if len(parts) < 2:
+                    echo(f"Cannot calculate next branch from malformed branch '{branch}'", "red")
+                    conn.commit()
+                    load_versions_from_db()
+                    echo("", "white")
+                    input("Press Enter to continue...")
+                    return
+                new_main_branch = f"{parts[0]}.{int(parts[1]) + 1}"
+                new_main_version = f"{new_main_branch}.0-alpha.1"
 
-            echo("", "white")
-            input("Press Enter to continue...")
-
-        elif choice == "14":
-            # Refresh TLD cache from IANA
-            echo("", "white")
-            echo("Updating TLD cache from IANA…", "bold")
-            tlds = await fetch_tlds_from_iana()
-            if not tlds:
-                echo("Failed to fetch TLD data; cache not updated", "red")
-                echo("", "white")
-                input("Press Enter to continue...")
-                continue
-
-            imported = import_tlds(tlds)
-            if imported > 0:
-                echo(f"TLD cache updated with {imported} entries", "green")
+                _ = cur.execute(
+                    """
+                    INSERT INTO release_versions (branch, status, n_level, latest)
+                    VALUES (%s, %s, %s, %s)
+                    """,
+                    (new_main_branch, "main", -1, new_main_version),
+                )
+                echo(
+                    f"Created new main branch {new_main_branch} ({new_main_version})",
+                    "green",
+                )
             else:
-                echo("TLD cache update completed with no entries", "yellow")
+                _ = cur.execute(
+                    """
+                    INSERT INTO release_versions (branch, status, n_level, latest)
+                    VALUES (%s, %s, %s, %s)
+                    """,
+                    (branch, "release", new_level, latest_version),
+                )
+                echo(
+                    f"Added branch {branch} as release (n_level={new_level}, latest={latest_version})",
+                    "green",
+                )
 
-            last_updated = get_tld_last_updated()
-            if last_updated is not None:
-                echo(f"TLD cache last_updated: {last_updated}", "cyan")
+            conn.commit()
+            load_versions_from_db()
+
+        echo("", "white")
+        input("Press Enter to continue...")
+
+    elif choice == "12":
+        echo("", "white")
+        echo("Mark Branch as EOL", "bold")
+        echo("-" * 60, "cyan")
+
+        with db_pool.connection() as conn, conn.cursor() as cur:
+            _ = cur.execute(
+                "SELECT branch, n_level, latest FROM release_versions WHERE status = 'release' ORDER BY n_level"
+            )
+            release_branches = cur.fetchall()
+
+        if not release_branches:
+            echo("No release branches found", "yellow")
             echo("", "white")
             input("Press Enter to continue...")
+            return
 
-        elif choice == "15":
-            # Search and display all known data for a domain
-            echo("", "white")
-            domain = input("Enter domain to search: ").strip().lower()
-            if not domain:
-                echo("Domain cannot be empty", "yellow")
-                echo("", "white")
-                input("Press Enter to continue...")
-                continue
-            display_domain_search(domain)
+        echo("Current release branches:", "white")
+        for branch, n_level, latest in release_branches:
+            echo(f"  {branch} (n_level={n_level}, latest={latest})", "white")
+        echo("", "white")
+        branch = input(
+            "Enter branch to mark as EOL (or press Enter to cancel): "
+        ).strip()
+        if not branch:
+            echo("Operation cancelled", "yellow")
             echo("", "white")
             input("Press Enter to continue...")
+            return
 
-        # Statistics Management
-        elif choice == "16":
-            list_flagged_statistics()
+        with db_pool.connection() as conn, conn.cursor() as cur:
+            _ = cur.execute(
+                "SELECT status, n_level FROM release_versions WHERE branch = %s",
+                (branch,),
+            )
+            result = cur.fetchone()
+
+            if not result:
+                echo(f"Branch {branch} not found", "yellow")
+                echo("", "white")
+                input("Press Enter to continue...")
+                return
+
+            status, n_level = result
+
+            if status != "release":
+                echo(
+                    f"Branch {branch} is not a release (status={status})", "yellow"
+                )
+                echo("", "white")
+                input("Press Enter to continue...")
+                return
+
+            _ = cur.execute(
+                "UPDATE release_versions SET status = 'eol' WHERE branch = %s",
+                (branch,),
+            )
+            conn.commit()
+            echo(f"Marked branch {branch} as EOL", "green")
+            load_versions_from_db()
+
+        echo("", "white")
+        input("Press Enter to continue...")
+
+    elif choice == "13":
+        echo("", "white")
+        echo("Reorder Release Branches", "bold")
+        echo("-" * 60, "cyan")
+
+        with db_pool.connection() as conn, conn.cursor() as cur:
+            _ = cur.execute(
+                "SELECT branch, n_level, latest FROM release_versions WHERE status = 'release' ORDER BY n_level"
+            )
+            release_branches = cur.fetchall()
+
+        if not release_branches:
+            echo("No release branches found", "yellow")
             echo("", "white")
             input("Press Enter to continue...")
+            return
 
-        elif choice == "17":
-            echo("", "white")
-            date_str = input("Enter date to flag (YYYY-MM-DD): ").strip()
-            if not date_str:
-                echo("Date cannot be empty", "yellow")
-                echo("", "white")
-                input("Press Enter to continue...")
-                continue
-            try:
-                target = date.fromisoformat(date_str)
-            except ValueError:
-                echo("Invalid date format, expected YYYY-MM-DD", "yellow")
-                echo("", "white")
-                input("Press Enter to continue...")
-                continue
-            reason = input("Enter reason (optional): ").strip() or None
-            _ = set_statistics_invalid(target, True, reason)
+        echo("Current order (0 is latest stable):", "white")
+        for branch, n_level, latest in release_branches:
+            echo(f"  {n_level}: {branch} ({latest})", "white")
+        echo("", "white")
+        echo(
+            "Enter new order as comma-separated branches (e.g., 4.6,4.5,4.4)",
+            "cyan",
+        )
+        new_order = input("New order: ").strip()
+
+        if not new_order:
+            echo("Operation cancelled", "yellow")
             echo("", "white")
             input("Press Enter to continue...")
+            return
 
-        elif choice == "18":
-            echo("", "white")
-            date_str = input("Enter date to unflag (YYYY-MM-DD): ").strip()
-            if not date_str:
-                echo("Date cannot be empty", "yellow")
-                echo("", "white")
-                input("Press Enter to continue...")
-                continue
-            try:
-                target = date.fromisoformat(date_str)
-            except ValueError:
-                echo("Invalid date format, expected YYYY-MM-DD", "yellow")
-                echo("", "white")
-                input("Press Enter to continue...")
-                continue
-            _ = set_statistics_invalid(target, False, None)
+        new_branches = [b.strip() for b in new_order.split(",")]
+        current_branches = {b[0] for b in release_branches}
+
+        if set(new_branches) != current_branches:
+            echo(
+                "Error: New order must include all current release branches", "red"
+            )
+            echo(f"Expected: {', '.join(sorted(current_branches))}", "yellow")
+            echo(f"Got: {', '.join(new_branches)}", "yellow")
             echo("", "white")
             input("Press Enter to continue...")
+            return
 
-        # Queue Status
-        elif choice == "19":
+        with db_pool.connection() as conn, conn.cursor() as cur:
+            for new_level, branch in enumerate(new_branches):
+                _ = cur.execute(
+                    "UPDATE release_versions SET n_level = %s WHERE branch = %s AND status = 'release'",
+                    (new_level, branch),
+                )
+            conn.commit()
+            echo("Branch order updated successfully!", "green")
+
+            _ = cur.execute(
+                "SELECT branch, n_level, latest FROM release_versions WHERE status = 'release' ORDER BY n_level"
+            )
+            echo("\nNew order:", "white")
+            for branch, n_level, latest in cur.fetchall():
+                echo(f"  {n_level}: {branch} ({latest})", "white")
+            load_versions_from_db()
+
+        echo("", "white")
+        input("Press Enter to continue...")
+
+    elif choice == "14":
+        echo("", "white")
+        echo("Updating TLD cache from IANA…", "bold")
+        tlds = await fetch_tlds_from_iana()
+        if not tlds:
+            echo("Failed to fetch TLD data; cache not updated", "red")
             echo("", "white")
-            echo("Live queue status — refreshing every 5s. Ctrl+C to return.", "cyan")
-            stop_monitor = asyncio.Event()
-            loop = asyncio.get_running_loop()
-            loop.add_signal_handler(signal.SIGINT, stop_monitor.set)
-            try:
-                while not stop_monitor.is_set():
-                    _ = os.system("clear")
-                    echo(f"{appname} v{appversion} (manage mode)", "bold")
-                    display_queue_status()
-                    echo("Ctrl+C to return to menu", "cyan")
-                    try:
-                        await asyncio.wait_for(stop_monitor.wait(), timeout=5.0)
-                    except asyncio.TimeoutError:
-                        pass
-            finally:
-                loop.remove_signal_handler(signal.SIGINT)
+            input("Press Enter to continue...")
+            return
 
+        imported = import_tlds(tlds)
+        if imported > 0:
+            echo(f"TLD cache updated with {imported} entries", "green")
         else:
-            echo("Invalid choice, please try again", "yellow")
+            echo("TLD cache update completed with no entries", "yellow")
+
+        last_updated = get_tld_last_updated()
+        if last_updated is not None:
+            echo(f"TLD cache last_updated: {last_updated}", "cyan")
+        echo("", "white")
+        input("Press Enter to continue...")
+
+    elif choice == "15":
+        echo("", "white")
+        domain = input("Enter domain to search: ").strip().lower()
+        if not domain:
+            echo("Domain cannot be empty", "yellow")
+            echo("", "white")
+            input("Press Enter to continue...")
+            return
+        display_domain_search(domain)
+        echo("", "white")
+        input("Press Enter to continue...")
+
+    elif choice == "16":
+        list_flagged_statistics()
+        echo("", "white")
+        input("Press Enter to continue...")
+
+    elif choice == "17":
+        echo("", "white")
+        date_str = input("Enter date to flag (YYYY-MM-DD): ").strip()
+        if not date_str:
+            echo("Date cannot be empty", "yellow")
+            echo("", "white")
+            input("Press Enter to continue...")
+            return
+        try:
+            target = date.fromisoformat(date_str)
+        except ValueError:
+            echo("Invalid date format, expected YYYY-MM-DD", "yellow")
+            echo("", "white")
+            input("Press Enter to continue...")
+            return
+        reason = input("Enter reason (optional): ").strip() or None
+        _ = set_statistics_invalid(target, True, reason)
+        echo("", "white")
+        input("Press Enter to continue...")
+
+    elif choice == "18":
+        echo("", "white")
+        date_str = input("Enter date to unflag (YYYY-MM-DD): ").strip()
+        if not date_str:
+            echo("Date cannot be empty", "yellow")
+            echo("", "white")
+            input("Press Enter to continue...")
+            return
+        try:
+            target = date.fromisoformat(date_str)
+        except ValueError:
+            echo("Invalid date format, expected YYYY-MM-DD", "yellow")
+            echo("", "white")
+            input("Press Enter to continue...")
+            return
+        _ = set_statistics_invalid(target, False, None)
+        echo("", "white")
+        input("Press Enter to continue...")
+
+    elif choice == "19":
+        echo("", "white")
+        echo("Live queue status — refreshing every 5s. Ctrl+C to return.", "cyan")
+        stop_monitor = asyncio.Event()
+        loop = asyncio.get_running_loop()
+        loop.add_signal_handler(signal.SIGINT, stop_monitor.set)
+        try:
+            while not stop_monitor.is_set():
+                _ = os.system("clear")
+                echo(f"{appname} v{appversion}", "bold")
+                display_queue_status()
+                echo("Ctrl+C to return to menu", "cyan")
+                try:
+                    await asyncio.wait_for(stop_monitor.wait(), timeout=5.0)
+                except asyncio.TimeoutError:
+                    pass
+        finally:
+            loop.remove_signal_handler(signal.SIGINT)
+
+    else:
+        echo("Invalid choice, please try again", "yellow")
+
+
+async def run_manage_mode(args: argparse.Namespace) -> int:
+    """Run the interactive menu via the manage subcommand."""
+    while True:
+        menu_options = get_menu_options()
+        selection = interactive_select_menu(menu_options)
+        if selection == "__quit__":
+            break
+        if selection is None:
+            print_menu(menu_options)
+            try:
+                user_choice = get_user_choice()
+            except KeyboardInterrupt:
+                break
+        else:
+            user_choice = selection
+
+        if user_choice == "90":
+            return await run_queue_daemon()
+        await _handle_manage_action(args, user_choice)
 
     return EXIT_SUCCESS
 
@@ -6615,13 +6527,7 @@ def load_from_file(file_name):
 
 
 def get_menu_options() -> dict[str, dict[str, str]]:
-    """Return the menu options dictionary.
-
-    The per-domain raw_domains workloads (uncrawled, errors-by-type, fatal,
-    offline/issues) are now handled automatically by the durable queue daemon, so
-    the interactive launcher only offers targeted re-scans of known instances plus
-    entry points to join the queue or open manage mode.
-    """
+    """Return the unified menu options dictionary."""
     return {
         "Retry known instances": {
             "50": "Unpatched",
@@ -6631,7 +6537,40 @@ def get_menu_options() -> dict[str, dict[str, str]]:
         },
         "Daemon": {
             "90": "Join crawl queue",
-            "91": "Manage DNI / versions",
+        },
+        "DNI": {
+            "1": "Fetch IFTAS",
+            "2": "List",
+            "3": "Count",
+            "4": "Add",
+            "5": "Remove",
+        },
+        "Nightly versions": {
+            "6": "List",
+            "7": "Add",
+            "8": "End date",
+            "s": "Security",
+        },
+        "Mastodon versions": {
+            "9": "Fetch",
+            "10": "Show",
+            "11": "Promote",
+            "12": "EOL",
+            "13": "Reorder",
+        },
+        "TLD cache": {
+            "14": "Update",
+        },
+        "Domain": {
+            "15": "Search",
+        },
+        "Statistics": {
+            "16": "List flagged",
+            "17": "Flag",
+            "18": "Unflag",
+        },
+        "Queue": {
+            "19": "Live status",
         },
     }
 
@@ -7070,11 +7009,11 @@ async def async_main() -> int:
                             else:
                                 user_choice = selection
 
-                        # Daemon menu entries: join the queue or open manage mode.
                         if user_choice == "90":
                             return await run_queue_daemon()
-                        if user_choice == "91":
-                            return await run_manage_mode(args)
+                        if user_choice in _MANAGE_CHOICES:
+                            await _handle_manage_action(args, user_choice)
+                            continue
 
                         echo(
                             f"Crawling domains from database choice {user_choice}",
