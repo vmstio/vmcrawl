@@ -45,7 +45,8 @@ CREATE TABLE IF NOT EXISTS
 CREATE TABLE IF NOT EXISTS
   raw_domains (
     domain TEXT PRIMARY KEY CHECK (domain = LOWER(domain)),
-    reason TEXT DEFAULT NULL,
+    error_type TEXT DEFAULT NULL,
+    error_endpoint TEXT DEFAULT NULL,
     last_response_time DOUBLE PRECISION DEFAULT NULL
   );
 
@@ -77,12 +78,30 @@ ALTER TABLE raw_domains DROP COLUMN IF EXISTS bad_hard;
 ALTER TABLE raw_domains DROP COLUMN IF EXISTS bad_robot;
 
 -- nodeinfo moved to mastodon_domains.nodeinfo; only stored for Mastodon-compatible
--- instances now. Non-Mastodon classification uses reason='OTHER+nodeinfo' instead.
+-- instances now. Non-Mastodon classification uses error_type='OTHER' instead.
 ALTER TABLE raw_domains DROP COLUMN IF EXISTS nodeinfo;
 
--- alias replaced by reason='ALIAS+*'; alias domains now back off on the same
+-- alias replaced by error_type='ALIAS'; alias domains now back off on the same
 -- 90-day flat cadence as HARD errors via the ALIAS entry in _REASON_BASE_HOURS_CASE.
 ALTER TABLE raw_domains DROP COLUMN IF EXISTS alias;
+
+-- reason split into error_type + error_endpoint. Migrate existing data by splitting
+-- on '+', then drop the old column. Idempotent: ADD COLUMN IF NOT EXISTS is safe on
+-- re-run; the UPDATE is a no-op once reason is gone; DROP COLUMN IF EXISTS is safe.
+ALTER TABLE raw_domains ADD COLUMN IF NOT EXISTS error_type TEXT DEFAULT NULL;
+ALTER TABLE raw_domains ADD COLUMN IF NOT EXISTS error_endpoint TEXT DEFAULT NULL;
+UPDATE raw_domains
+SET
+    error_type = CASE
+        WHEN reason LIKE '%+%' THEN split_part(reason, '+', 1)
+        ELSE reason
+    END,
+    error_endpoint = CASE
+        WHEN reason LIKE '%+%' THEN split_part(reason, '+', 2)
+        ELSE NULL
+    END
+WHERE reason IS NOT NULL AND error_type IS NULL;
+ALTER TABLE raw_domains DROP COLUMN IF EXISTS reason;
 
 -- Durable crawl queue columns (see docs/durable-queue.md).
 -- raw_domains doubles as the work ledger; these columns add queue discipline
@@ -104,16 +123,16 @@ ALTER TABLE raw_domains
 -- once. Only touches rows that have not yet been scheduled (next_crawl_at IS
 -- NULL); re-running this file after the daemon is live is a no-op. The queue
 -- reschedules each row precisely on its next claim; this is just initial jitter.
---   * never crawled (reason IS NULL) -> due now
---   * has a failure (reason set)     -> spread over ~30d
---   * everything else (healthy)      -> spread over ~1h
+--   * never crawled (error_type IS NULL) -> due now
+--   * has a failure (error_type set)     -> spread over ~30d
+--   * everything else (healthy)          -> spread over ~1h
 UPDATE raw_domains
 SET next_crawl_at = now()
-WHERE next_crawl_at IS NULL AND reason IS NULL;
+WHERE next_crawl_at IS NULL AND error_type IS NULL;
 
 UPDATE raw_domains
 SET next_crawl_at = now() + random() * INTERVAL '30 days'
-WHERE next_crawl_at IS NULL AND reason IS NOT NULL;
+WHERE next_crawl_at IS NULL AND error_type IS NOT NULL;
 
 UPDATE raw_domains
 SET next_crawl_at = now() + random() * INTERVAL '1 hour'
@@ -341,12 +360,12 @@ DROP INDEX IF EXISTS idx_raw_domains_bad_http5xx;
 DROP INDEX IF EXISTS idx_raw_domains_bad_hard;
 DROP INDEX IF EXISTS idx_raw_domains_bad_robot;
 
--- Index supporting reason-based scans: the dashboard "dead domains" count
--- (reason IS NOT NULL), menu options 4/5, and the per-type prefix menus 20-32
--- (reason LIKE 'DNS%' etc.). text_pattern_ops makes the LIKE 'PREFIX%' scans
--- index-friendly.
-CREATE INDEX IF NOT EXISTS idx_raw_domains_reason
-    ON raw_domains (reason text_pattern_ops) WHERE reason IS NOT NULL;
+-- Obsolete reason-based indexes (reason column dropped above). Drop idempotently.
+DROP INDEX IF EXISTS idx_raw_domains_reason;
+DROP INDEX IF EXISTS idx_raw_domains_reason_not_alias;
+DROP INDEX IF EXISTS idx_raw_domains_reason_leading_digit_not_alias;
+DROP INDEX IF EXISTS idx_raw_domains_reason_leading_digit_errors_not_alias;
+DROP INDEX IF EXISTS idx_raw_domains_reason_errors_not_alias;
 
 -- Obsolete alias/nodeinfo column indexes (columns dropped above). Drop idempotently.
 DROP INDEX IF EXISTS idx_raw_domains_alias;
@@ -355,44 +374,31 @@ DROP INDEX IF EXISTS idx_raw_domains_nodeinfo;
 DROP INDEX IF EXISTS idx_raw_domains_nodeinfo_domain_not_alias;
 DROP INDEX IF EXISTS idx_raw_domains_mastodon_reason;
 
--- Index for error reason queries (LIKE 'SSL%', 'DNS%', regex patterns, etc.)
--- Used by: menu options 20-32 (retry errors by type)
--- B-tree indexes support prefix LIKE queries
-CREATE INDEX IF NOT EXISTS idx_raw_domains_reason
-    ON raw_domains (reason) WHERE reason IS NOT NULL;
+-- Index supporting error_type-based scans: dead-domain counts (error_type IS NOT NULL)
+-- and per-type equality queries (error_type = 'DNS' etc.).
+CREATE INDEX IF NOT EXISTS idx_raw_domains_error_type
+    ON raw_domains (error_type) WHERE error_type IS NOT NULL;
 
--- Composite reason index for retries (menu options 20-32, now ordered by domain).
--- The old _errors and _not_alias variants referenced dropped columns; drop them
--- explicitly for re-runs.
-DROP INDEX IF EXISTS idx_raw_domains_reason_errors_not_alias;
-DROP INDEX IF EXISTS idx_raw_domains_reason_not_alias;
-CREATE INDEX IF NOT EXISTS idx_raw_domains_reason_not_alias
-    ON raw_domains (reason text_pattern_ops)
-    WHERE reason IS NOT NULL;
-
--- Expression index for HTTP class regex filters (^2xx/^3xx/^4xx/^5xx)
--- Used by: menu options 27-30 and health/report style queries
-DROP INDEX IF EXISTS idx_raw_domains_reason_leading_digit_errors_not_alias;
-DROP INDEX IF EXISTS idx_raw_domains_reason_leading_digit_not_alias;
-CREATE INDEX IF NOT EXISTS idx_raw_domains_reason_leading_digit_not_alias
-    ON raw_domains ((left(reason, 1)))
-    WHERE reason IS NOT NULL;
+-- Expression index for HTTP class regex filters (^2xx/^3xx/^4xx/^5xx) on error_type.
+CREATE INDEX IF NOT EXISTS idx_raw_domains_error_type_leading_digit
+    ON raw_domains ((left(error_type, 1)))
+    WHERE error_type IS NOT NULL;
 
 -- The errors column was dropped; its ordering index is obsolete.
 DROP INDEX IF EXISTS idx_raw_domains_errors;
 
 -- Index for uncrawled domain selection (menu option 0)
--- Used by: SELECT domain WHERE reason IS NULL ORDER BY LENGTH(domain)
+-- Used by: SELECT domain WHERE error_type IS NULL ORDER BY LENGTH(domain)
 DROP INDEX IF EXISTS idx_raw_domains_uncrawled;
 CREATE INDEX IF NOT EXISTS idx_raw_domains_uncrawled
     ON raw_domains ((LENGTH(domain)))
-    WHERE reason IS NULL;
+    WHERE error_type IS NULL;
 
 -- Index for the durable queue claim query (see docs/durable-queue.md)
 -- Used by: claim_due_domains() -- ORDER BY last_response_time NULLS FIRST,
 -- next_crawl_at NULLS FIRST over due rows (fastest-first priority).
 -- Failure domains are deliberately NOT excluded: queue mode recrawls them once
--- due, on a per-type cadence derived from reason, so it actually re-attempts
+-- due, on a per-type cadence derived from error_type, so it actually re-attempts
 -- known failures. The hard-DNI exclusion is applied during the scan (it
 -- references another table and can't live in the predicate). Drop first so the
 -- leading-column change applies on existing deployments; CREATE ... IF NOT

@@ -700,7 +700,7 @@ async def get_crawler_health(_api_key: str | None = Depends(get_api_key)):
                 """
                 SELECT COUNT(DISTINCT rd.domain) AS unique_domain_count
                 FROM raw_domains rd
-                WHERE rd.reason LIKE 'TCP%%'
+                WHERE rd.error_type = 'TCP'
                   AND EXISTS (
                     SELECT 1 FROM mastodon_domains md WHERE md.domain = rd.domain
                   )
@@ -714,7 +714,7 @@ async def get_crawler_health(_api_key: str | None = Depends(get_api_key)):
                 """
                 SELECT COUNT(DISTINCT rd.domain) AS unique_domain_count
                 FROM raw_domains rd
-                WHERE rd.reason LIKE 'SSL%%'
+                WHERE rd.error_type = 'SSL'
                   AND EXISTS (
                     SELECT 1 FROM mastodon_domains md WHERE md.domain = rd.domain
                   )
@@ -728,7 +728,7 @@ async def get_crawler_health(_api_key: str | None = Depends(get_api_key)):
                 """
                 SELECT COUNT(DISTINCT rd.domain) AS unique_domain_count
                 FROM raw_domains rd
-                WHERE rd.reason LIKE 'DNS%%'
+                WHERE rd.error_type = 'DNS'
                   AND EXISTS (
                     SELECT 1 FROM mastodon_domains md WHERE md.domain = rd.domain
                   )
@@ -742,7 +742,7 @@ async def get_crawler_health(_api_key: str | None = Depends(get_api_key)):
                 """
                 SELECT COUNT(DISTINCT rd.domain) AS unique_domain_count
                 FROM raw_domains rd
-                WHERE rd.reason ~ '^5[0-9]{2}'
+                WHERE rd.error_type ~ '^5[0-9]{2}'
                   AND EXISTS (
                     SELECT 1 FROM mastodon_domains md WHERE md.domain = rd.domain
                   )
@@ -756,7 +756,7 @@ async def get_crawler_health(_api_key: str | None = Depends(get_api_key)):
                 """
                 SELECT COUNT(DISTINCT rd.domain) AS unique_domain_count
                 FROM raw_domains rd
-                WHERE rd.reason ~ '^4[0-9]{2}'
+                WHERE rd.error_type ~ '^4[0-9]{2}'
                   AND EXISTS (
                     SELECT 1 FROM mastodon_domains md WHERE md.domain = rd.domain
                   )
@@ -770,7 +770,7 @@ async def get_crawler_health(_api_key: str | None = Depends(get_api_key)):
                 """
                 SELECT COUNT(DISTINCT rd.domain) AS unique_domain_count
                 FROM raw_domains rd
-                WHERE (rd.reason LIKE 'FILE%%' OR rd.reason LIKE 'TYPE%%' OR rd.reason LIKE 'JSON%%')
+                WHERE rd.error_type IN ('FILE', 'TYPE', 'JSON')
                   AND EXISTS (
                     SELECT 1 FROM mastodon_domains md WHERE md.domain = rd.domain
                   )
@@ -784,7 +784,7 @@ async def get_crawler_health(_api_key: str | None = Depends(get_api_key)):
                 """
                 SELECT COUNT(DISTINCT rd.domain) AS unique_domain_count
                 FROM raw_domains rd
-                WHERE rd.reason LIKE 'MAU%%'
+                WHERE rd.error_type = 'MAU'
                   AND EXISTS (
                     SELECT 1 FROM mastodon_domains md WHERE md.domain = rd.domain
                   )
@@ -826,7 +826,7 @@ async def get_domain_stats(_api_key: str | None = Depends(get_api_key)):
                 """
                 SELECT COUNT(DISTINCT domain) AS unique_domain_count
                 FROM raw_domains
-                WHERE reason IS NOT NULL
+                WHERE error_type IS NOT NULL
             """
             )
             result = cur.fetchone()
@@ -837,7 +837,7 @@ async def get_domain_stats(_api_key: str | None = Depends(get_api_key)):
                 """
                 SELECT COUNT(DISTINCT domain) AS unique_domain_count
                 FROM raw_domains
-                WHERE reason LIKE 'OTHER%'
+                WHERE error_type = 'OTHER'
             """
             )
             result = cur.fetchone()
