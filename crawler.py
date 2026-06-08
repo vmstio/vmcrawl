@@ -2858,6 +2858,25 @@ def display_domain_search(domain: str) -> None:
                 for column, value in zip(mastodon_columns, mastodon_row, strict=False):
                     display_value = "NULL" if value is None else str(value)
                     echo(f"  {column}: {display_value}", "white")
+
+            _ = cursor.execute(
+                """
+                SELECT timestamp, error
+                FROM error_log
+                WHERE domain = %s
+                ORDER BY event DESC
+                LIMIT 1
+                """,
+                (lookup_domain,),
+            )
+            error_row = cursor.fetchone()
+
+            echo("\nerror_log (most recent):", "yellow")
+            if error_row is None:
+                echo("  No errors logged", "white")
+            else:
+                echo(f"  timestamp: {error_row[0]}", "white")
+                echo(f"  error: {error_row[1]}", "white")
         except Exception as e:
             echo(f"Failed to search for domain {lookup_domain}: {e}", "red")
             conn.rollback()
@@ -4472,17 +4491,17 @@ def _handle_tcp_exception(domain, target, exception):
             and "too large" in error_message.casefold()
         ):
             echo(f"{domain}: Response too large", "orange", use_tqdm=True)
-            log_error(domain, "Response exceeds size limit")
+            log_error(domain, f"Response too large on {target}")
             increment_domain_error(domain, f"{error_reason}+{target}")
             return
         if "bad file descriptor" in error_message.casefold():
             echo(f"{domain}: Connection closed unexpectedly", "orange", use_tqdm=True)
-            log_error(domain, "Bad file descriptor")
+            log_error(domain, f"Connection closed unexpectedly on {target}")
             increment_domain_error(domain, f"{error_reason}+{target}")
             return
         cleaned_message = _clean_exception_message(error_message, "File/stream error")
         echo(f"{domain}: {cleaned_message}", "orange", use_tqdm=True)
-        log_error(domain, cleaned_message)
+        log_error(domain, f"{target}: {error_message}")
         increment_domain_error(domain, f"{error_reason}+{target}")
         return
 
@@ -4491,7 +4510,7 @@ def _handle_tcp_exception(domain, target, exception):
             error_message, "SSL connection error"
         )
         echo(f"{domain}: {cleaned_message}", "orange", use_tqdm=True)
-        log_error(domain, cleaned_message)
+        log_error(domain, f"{target}: {error_message}")
         increment_domain_error(domain, f"{error_reason}+{target}")
         return
 
@@ -4500,14 +4519,14 @@ def _handle_tcp_exception(domain, target, exception):
             error_message, "DNS resolution failed"
         )
         echo(f"{domain}: {cleaned_message}", "orange", use_tqdm=True)
-        log_error(domain, cleaned_message)
+        log_error(domain, f"{target}: {error_message}")
         increment_domain_error(domain, f"{error_reason}+{target}")
         return
 
     # All remaining transport failures are categorized as TCP.
     cleaned_message = _clean_exception_message(error_message, "TCP error")
     echo(f"{domain}: {cleaned_message}", "orange", use_tqdm=True)
-    log_error(domain, cleaned_message)
+    log_error(domain, f"{target}: {error_message}")
     increment_domain_error(domain, f"{error_reason}+{target}")
 
 
@@ -4516,7 +4535,7 @@ def _handle_json_exception(domain, target, exception):
     error_message = str(exception)
     error_reason = f"JSON+{target}"
     echo(f"{domain}: {target} {error_message}", "yellow", use_tqdm=True)
-    log_error(domain, error_message)
+    log_error(domain, f"{target}: {error_message}")
     increment_domain_error(domain, f"{error_reason}")
 
 
