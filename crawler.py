@@ -307,6 +307,7 @@ RE_VOWEL_PATTERN = re.compile(r"\.[aeiou]{4}")
 RE_MULTIPLE_SLASHES = re.compile(r"/+")
 RE_CLEANUP_BRACKETS = re.compile(r"\s*(\[[^\]]*\]|\([^)]*\))")
 RE_CONTENT_TYPE_CHARSET = re.compile(r";.*$")
+RE_HTML_TAGS = re.compile(r"<[^>]+>")
 RE_FUNCTION_DEF = re.compile(r"def (\w+)")
 RE_QUOTED_STRING = re.compile(r"'[^']+'")
 RE_JSON_TRAILING_COMMA = re.compile(r",(\s*[}\]])")
@@ -4285,19 +4286,73 @@ def _handle_incorrect_file_type(domain, target, content_type):
     increment_domain_error(domain, "TYPE", target)
 
 
+def _http_response_detail(response) -> str:
+    """Extract diagnostic detail from an HTTP error response.
+
+    Returns a string of zero or more context fragments joined by " — ":
+      [Server header]  Retry-After hint  Location redirect  body snippet
+
+    Empty string when nothing useful is found.
+    """
+    parts = []
+
+    server = (
+        response.headers.get("Server")
+        or response.headers.get("X-Powered-By")
+    )
+    if server:
+        parts.append(f"[{server}]")
+
+    retry_after = response.headers.get("Retry-After")
+    if retry_after:
+        parts.append(f"retry after {retry_after}s")
+
+    location = response.headers.get("Location")
+    if location:
+        parts.append(f"→ {location}")
+
+    content_type = response.headers.get("Content-Type", "")
+    if response.content:
+        if "json" in content_type:
+            try:
+                data = response.json()
+                if isinstance(data, dict):
+                    body = (
+                        data.get("error")
+                        or data.get("message")
+                        or data.get("reason")
+                        or data.get("description")
+                    )
+                    if body and isinstance(body, str):
+                        parts.append(body.strip()[:150])
+            except Exception:
+                pass
+        else:
+            raw = response.text[:300]
+            stripped = RE_HTML_TAGS.sub(" ", raw)
+            # Collapse runs of whitespace left by tag removal
+            snippet = " ".join(stripped.split())[:150].strip()
+            if snippet:
+                parts.append(snippet)
+
+    return " — ".join(parts)
+
+
 def _handle_http_status_code(domain, target, response):
     """Handle non-fatal HTTP status codes."""
     code = response.status_code
-    error_message = f"HTTP {code} on {target}"
+    detail = _http_response_detail(response)
+    error_message = f"HTTP {code} on {target}" + (f": {detail}" if detail else "")
     echo(f"{domain}: {error_message}", "yellow", use_tqdm=True)
     log_error(domain, error_message)
     increment_domain_error(domain, str(code), target)
 
 
 def _handle_http_failed(domain, target, response):
-    """Handle HTTP 410/418/451/999 hard-fail codes via error counting."""
+    """Handle HTTP 410/418/451/999 hard-fail codes."""
     code = response.status_code
-    error_message = f"HTTP {code} on {target}"
+    detail = _http_response_detail(response)
+    error_message = f"HTTP {code} on {target}" + (f": {detail}" if detail else "")
     echo(f"{domain}: {error_message}", "yellow", use_tqdm=True)
     log_error(domain, error_message)
     increment_domain_error(domain, "HARD", target)
