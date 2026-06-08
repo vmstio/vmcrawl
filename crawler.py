@@ -22,8 +22,10 @@ try:
     import ssl
     import subprocess
     import sys
+    import termios
     import threading
     import time
+    import tty
     from datetime import UTC, date, datetime, timedelta
     from io import StringIO
     from typing import Any
@@ -3375,17 +3377,35 @@ def get_queue_status() -> dict[str, Any]:
             MIN(next_crawl_at) FILTER (
                 WHERE next_crawl_at > now()
                   AND claimed_at IS NULL
-            ) AS next_due_at
+            ) AS next_due_at,
+            SUM(attempts) AS total_attempts,
+            AVG(last_response_time) FILTER (
+                WHERE last_response_time IS NOT NULL
+            ) AS avg_response_time
         FROM raw_domains
     """
     worker_query = """
-        SELECT claimed_by, COUNT(*) AS domains
+        SELECT claimed_by, COUNT(*) AS domains, MIN(claimed_at) AS since
         FROM raw_domains
         WHERE claimed_at IS NOT NULL
           AND claimed_at > now() - make_interval(secs => %(lease)s)
           AND claimed_by IS NOT NULL
         GROUP BY claimed_by
         ORDER BY domains DESC, claimed_by
+    """
+    error_summary_query = """
+        SELECT
+            COUNT(*) FILTER (WHERE timestamp > now() - interval '1 minute')   AS last_1m,
+            COUNT(*) FILTER (WHERE timestamp > now() - interval '10 minutes') AS last_10m,
+            COUNT(*) FILTER (WHERE timestamp > now() - interval '1 hour')     AS last_1h,
+            COUNT(*) FILTER (WHERE timestamp > now() - interval '24 hours')   AS last_24h
+        FROM error_log
+    """
+    recent_errors_query = """
+        SELECT timestamp, domain, error
+        FROM error_log
+        ORDER BY event DESC
+        LIMIT 20
     """
     with db_pool.connection() as conn, conn.cursor() as cursor:
         _ = cursor.execute(query, {"lease": queue_lease_seconds})
@@ -3400,11 +3420,217 @@ def get_queue_status() -> dict[str, Any]:
             "stale_leases",
             "active_workers",
             "next_due_at",
+            "total_attempts",
+            "avg_response_time",
         ]
         result = dict(zip(cols, row, strict=False))
         _ = cursor.execute(worker_query, {"lease": queue_lease_seconds})
         result["workers"] = cursor.fetchall()
+        _ = cursor.execute(error_summary_query)
+        summary_row = cursor.fetchone()
+        result["error_last_1m"]  = summary_row[0] if summary_row else 0
+        result["error_last_10m"] = summary_row[1] if summary_row else 0
+        result["error_last_1h"]  = summary_row[2] if summary_row else 0
+        result["error_last_24h"] = summary_row[3] if summary_row else 0
+        _ = cursor.execute(recent_errors_query)
+        result["recent_errors"] = cursor.fetchall()
+        _ = cursor.execute(
+            """
+            SELECT
+                COUNT(*) FILTER (WHERE timestamp > now() - interval '1 minute')   AS last_1m,
+                COUNT(*) FILTER (WHERE timestamp > now() - interval '10 minutes') AS last_10m,
+                COUNT(*) FILTER (WHERE timestamp > now() - interval '1 hour')     AS last_1h,
+                COUNT(*) FILTER (WHERE timestamp > now() - interval '24 hours')   AS last_24h
+            FROM mastodon_domains
+            """
+        )
+        update_summary = cursor.fetchone()
+        result["update_last_1m"]  = update_summary[0] if update_summary else 0
+        result["update_last_10m"] = update_summary[1] if update_summary else 0
+        result["update_last_1h"]  = update_summary[2] if update_summary else 0
+        result["update_last_24h"] = update_summary[3] if update_summary else 0
+        _ = cursor.execute(
+            """
+            SELECT domain, software_version, active_users_monthly, timestamp
+            FROM mastodon_domains
+            WHERE timestamp IS NOT NULL
+            ORDER BY timestamp DESC
+            LIMIT 20
+            """
+        )
+        result["recent_updates"] = cursor.fetchall()
         return result
+
+
+def _fmt_duration(secs: int) -> str:
+    if secs < 60:
+        return f"{secs}s"
+    if secs < 3600:
+        return f"{secs // 60}m {secs % 60}s"
+    return f"{secs // 3600}h {(secs % 3600) // 60}m"
+
+
+def render_queue_status(
+    stats: dict[str, Any],
+    *,
+    prev_stats: dict[str, Any] | None = None,
+    elapsed: float = 0.0,
+    header: str = "",
+) -> str:
+    """Render queue status as an ANSI-formatted string for the live monitor."""
+    lines: list[str] = []
+
+    def ln(text: str = "") -> None:
+        lines.append(text)
+
+    _ANSI_RE = re.compile(r"\033\[[0-9;]*m")
+
+    def _vlen(s: str) -> int:
+        return len(_ANSI_RE.sub("", s))
+
+    def _vpad(s: str, width: int) -> str:
+        return s + " " * max(0, width - _vlen(s))
+
+    def _c(text: str, color: str) -> str:
+        return f"{colors.get(color, '')}{text}{colors['reset']}"
+
+    now = datetime.now(UTC)
+    ts = now.strftime("%Y-%m-%d %H:%M:%S UTC")
+    title = f"{header}Queue Status  [{ts}]"
+    ln(_c(title, "bold"))
+    ln(_c("─" * len(title), "cyan"))
+    ln()
+
+    total = stats.get("total", 0) or 0
+    due_now = stats.get("due_now", 0) or 0
+    in_progress = stats.get("in_progress", 0) or 0
+    scheduled = stats.get("scheduled", 0) or 0
+    stale = stats.get("stale_leases", 0) or 0
+    workers = stats.get("active_workers", 0) or 0
+    next_due_at = stats.get("next_due_at")
+    total_attempts = stats.get("total_attempts") or 0
+    avg_rt = stats.get("avg_response_time")
+
+    # Queue section
+    ln(_c("  QUEUE", "bold"))
+    ln(_c("  " + "─" * 46, "cyan"))
+    ln(f"  {'Total domains:':<20} {_c(f'{total:>10,}', 'white')}")
+    ln(f"  {'Due now:':<20} {_c(f'{due_now:>10,}', 'yellow' if due_now > 0 else 'white')}")
+    ln(f"  {'In progress:':<20} {_c(f'{in_progress:>10,}', 'green' if in_progress > 0 else 'white')}")
+    ln(f"  {'Scheduled:':<20} {_c(f'{scheduled:>10,}', 'white')}")
+    ln(f"  {'Stale leases:':<20} {_c(f'{stale:>10,}', 'red' if stale > 0 else 'white')}")
+    if next_due_at is not None:
+        diff = next_due_at - now
+        eta = _fmt_duration(max(0, int(diff.total_seconds())))
+        ln(f"  {'Next scheduled:':<20} {_c(f'{eta:>10}', 'white')} from now")
+    ln()
+
+    # Performance section
+    ln(_c("  PERFORMANCE", "bold"))
+    ln(_c("  " + "─" * 46, "cyan"))
+    if avg_rt is not None:
+        ln(f"  {'Avg response time:':<20} {_c(f'{avg_rt:>9.2f}s', 'white')}")
+    if prev_stats is not None and elapsed > 0:
+        prev_attempts = prev_stats.get("total_attempts") or 0
+        delta = max(0, total_attempts - prev_attempts)
+        rate = delta / elapsed * 60
+        tput = f"{rate:.1f}/min"
+        ln(f"  {'Throughput:':<20} {_c(f'{tput:>10}', 'green' if rate > 0 else 'white')}")
+    else:
+        ln(f"  {'Throughput:':<20} {_c('        –', 'white')}")
+    ln()
+
+    # RECENT ERRORS (left) and RECENT UPDATES (right) side by side.
+    # Each section is 82 visible chars wide; 4-char gap between them (total ~168).
+    SEC_W = 82
+    SEP = "─" * (SEC_W - 2)  # 80 dashes, with 2-char indent = 82 total
+
+    error_last_1m = stats.get("error_last_1m") or 0
+    error_last_10m = stats.get("error_last_10m") or 0
+    recent_errors = stats.get("recent_errors", [])
+    recent_updates = stats.get("recent_updates", [])
+
+    # Build error column lines
+    ecol: list[str] = []
+    ecol.append(_c("  RECENT ERRORS", "bold"))
+    ecol.append(_c("  " + SEP, "cyan"))
+    error_last_1h  = stats.get("error_last_1h") or 0
+    error_last_24h = stats.get("error_last_24h") or 0
+    def _ec(n: int) -> str:
+        return _c(f"{n:,}", "red" if n > 0 else "white")
+    ecol.append(
+        f"  Last 1m: {_ec(error_last_1m)}   Last 10m: {_ec(error_last_10m)}"
+        f"   Last 1h: {_ec(error_last_1h)}   Last 24h: {_ec(error_last_24h)}"
+    )
+    if recent_errors:
+        ecol.append("")
+        for ts_e, dom, err in recent_errors:
+            t = ts_e.strftime("%H:%M:%S") if ts_e else "??:??:??"
+            ecol.append(
+                f"  {_c(t, 'gray')}  "
+                f"{_c(f'{(dom or '')[:32]:<32}', 'cyan')}  "
+                f"{(err or '')[:34]}"
+            )
+    else:
+        ecol.append("")
+        ecol.append(_c("    No recent errors", "gray"))
+
+    # Build updates column lines
+    update_last_1m = stats.get("update_last_1m") or 0
+    update_last_10m = stats.get("update_last_10m") or 0
+    ucol: list[str] = []
+    ucol.append(_c("  RECENT UPDATES", "bold"))
+    ucol.append(_c("  " + SEP, "cyan"))
+    update_last_1h  = stats.get("update_last_1h") or 0
+    update_last_24h = stats.get("update_last_24h") or 0
+    def _uc(n: int) -> str:
+        return _c(f"{n:,}", "green" if n > 0 else "white")
+    ucol.append(
+        f"  Last 1m: {_uc(update_last_1m)}   Last 10m: {_uc(update_last_10m)}"
+        f"   Last 1h: {_uc(update_last_1h)}   Last 24h: {_uc(update_last_24h)}"
+    )
+    if recent_updates:
+        ucol.append("")
+        for dom, ver, mau, ts_u in recent_updates:
+            t = ts_u.strftime("%H:%M:%S") if ts_u else "??:??:??"
+            mau_s = f"{mau:,}" if mau is not None else "–"
+            ucol.append(
+                f"  {_c(t, 'gray')}  "
+                f"{_c(f'{(dom or '')[:34]:<34}', 'green')}  "
+                f"{(ver or '')[:16]:<16}  "
+                f"{_c(f'{mau_s:>9}', 'white')}"
+            )
+    else:
+        ucol.append("")
+        ucol.append(_c("    No updates yet", "gray"))
+
+    # Zip both columns side by side
+    for i in range(max(len(ecol), len(ucol))):
+        left = ecol[i] if i < len(ecol) else ""
+        right = ucol[i] if i < len(ucol) else ""
+        ln(_vpad(left, SEC_W + 4) + right)
+    ln()
+
+    # Workers section
+    ln(_c(f"  WORKERS  ({workers} active)", "bold"))
+    ln(_c("  " + "─" * 46, "cyan"))
+    worker_rows = stats.get("workers", [])
+    if worker_rows:
+        hostnames = [w.split(":")[0] for w, _, _ in worker_rows]
+        duplicate_hosts = {h for h in hostnames if hostnames.count(h) > 1}
+        for worker_name, worker_count, worker_since in worker_rows:
+            host = worker_name.split(":")[0]
+            label = worker_name if host in duplicate_hosts else host
+            since_str = ""
+            if worker_since:
+                age = max(0, int((now - worker_since).total_seconds()))
+                since_str = f"  {_c(f'(since {_fmt_duration(age)})', 'gray')}"
+            ln(f"    {_c(f'{label:<30}', 'cyan')}{worker_count:>6,}{since_str}")
+    else:
+        ln(_c("    No active workers", "gray"))
+    ln()
+
+    return "\n".join(lines) + "\n"
 
 
 def display_queue_status() -> None:
@@ -3414,46 +3640,7 @@ def display_queue_status() -> None:
     except Exception as e:
         echo(f"Failed to retrieve queue status: {e}", "red")
         return
-
-    now = datetime.now(UTC)
-    echo(f"Queue Status  [{now.strftime('%Y-%m-%d %H:%M:%S UTC')}]", "bold")
-    echo("-" * 50, "cyan")
-    echo("", "white")
-    total = stats.get("total", 0) or 0
-    due_now = stats.get("due_now", 0) or 0
-    in_progress = stats.get("in_progress", 0) or 0
-    scheduled = stats.get("scheduled", 0) or 0
-    stale = stats.get("stale_leases", 0) or 0
-    workers = stats.get("active_workers", 0) or 0
-    next_due_at = stats.get("next_due_at")
-
-    echo(f"  Total domains:    {total:>10,}", "white")
-    echo(f"  Due now:          {due_now:>10,}", "yellow" if due_now > 0 else "white")
-    echo(f"  In progress:      {in_progress:>10,}", "green" if in_progress > 0 else "white")
-    echo(f"  Scheduled:        {scheduled:>10,}", "white")
-    echo(f"  Stale leases:     {stale:>10,}", "red" if stale > 0 else "white")
-    echo("", "white")
-    echo(f"  Active workers:   {workers:>10}", "cyan" if workers > 0 else "white")
-    worker_rows = stats.get("workers", [])
-    hostnames = [w.split(":")[0] for w, _ in worker_rows]
-    duplicate_hosts = {h for h in hostnames if hostnames.count(h) > 1}
-    for worker_name, worker_count in worker_rows:
-        host = worker_name.split(":")[0]
-        label = worker_name if host in duplicate_hosts else host
-        echo(f"    {label:<30} {worker_count:>6,}", "cyan")
-
-    if next_due_at is not None:
-        diff = next_due_at - now
-        secs = max(0, int(diff.total_seconds()))
-        if secs < 60:
-            eta = f"{secs}s"
-        elif secs < 3600:
-            eta = f"{secs // 60}m {secs % 60}s"
-        else:
-            eta = f"{secs // 3600}h {(secs % 3600) // 60}m"
-        echo(f"  Next scheduled:   {eta:>10} from now", "white")
-
-    echo("", "white")
+    print(render_queue_status(stats), end="")
 
 
 _MANAGE_CHOICES = frozenset(
@@ -4007,23 +4194,93 @@ async def _handle_manage_action(args: argparse.Namespace, choice: str) -> None:
         input("Press Enter to continue...")
 
     elif choice == "19":
-        echo("", "white")
-        echo("Live queue status — refreshing every 5s. Ctrl+C to return.", "cyan")
         stop_monitor = asyncio.Event()
+        action_event = asyncio.Event()
+        paused = [False]
         loop = asyncio.get_running_loop()
-        loop.add_signal_handler(signal.SIGINT, stop_monitor.set)
+
+        def _on_stop() -> None:
+            stop_monitor.set()
+            action_event.set()
+
+        def _on_keypress() -> None:
+            ch = sys.stdin.read(1)
+            if ch.lower() == "q":
+                _on_stop()
+            elif ch.lower() == "p" and not paused[0]:
+                paused[0] = True
+                action_event.set()
+            elif ch.lower() == "r" and paused[0]:
+                paused[0] = False
+                action_event.set()
+
+        loop.add_signal_handler(signal.SIGINT, _on_stop)
+        prev_stats: dict[str, Any] | None = None
+        prev_time: float | None = None
+        prev_line_count = 0
+        last_stats: dict[str, Any] = {}
+        fd = sys.stdin.fileno()
+        old_term = termios.tcgetattr(fd)
         try:
+            tty.setcbreak(fd)
+            loop.add_reader(fd, _on_keypress)
+            _ = os.system("clear")
             while not stop_monitor.is_set():
-                _ = os.system("clear")
-                echo(f"{appname} v{appversion}", "bold")
-                display_queue_status()
-                echo("Ctrl+C to return to menu", "cyan")
+                if not paused[0]:
+                    now_mono = time.monotonic()
+                    elapsed = (now_mono - prev_time) if prev_time is not None else 0.0
+                    fetch_error: str | None = None
+                    try:
+                        last_stats = get_queue_status()
+                    except Exception as e:
+                        last_stats = {}
+                        fetch_error = str(e)
+                    render_prev = prev_stats
+                    prev_stats = last_stats
+                    prev_time = now_mono
+                else:
+                    elapsed = 0.0
+                    fetch_error = None
+                    render_prev = None
+                output = render_queue_status(
+                    last_stats,
+                    prev_stats=render_prev,
+                    elapsed=elapsed,
+                    header=f"{appname} v{appversion} — ",
+                )
+                if fetch_error:
+                    output += f"{colors['red']}Error: {fetch_error}{colors['reset']}\n"
+                content_lines = output.count("\n")
                 try:
-                    await asyncio.wait_for(stop_monitor.wait(), timeout=5.0)
+                    term_rows = os.get_terminal_size().lines
+                except OSError:
+                    term_rows = 24
+                padding = max(0, term_rows - content_lines - 1)
+                output += "\n" * padding
+                if paused[0]:
+                    output += f"{colors['yellow']}PAUSED{colors['reset']}  r to resume  q to quit"
+                else:
+                    output += f"{colors['cyan']}p to pause  q to quit{colors['reset']}"
+                # +1 accounts for the footer line which has no trailing newline
+                line_count = output.count("\n") + 1
+                if prev_line_count > 0:
+                    sys.stdout.write(f"\033[{prev_line_count}A\r\033[J")
+                sys.stdout.write(output)
+                sys.stdout.flush()
+                prev_line_count = line_count
+                action_event.clear()
+                try:
+                    await asyncio.wait_for(
+                        action_event.wait(),
+                        timeout=600.0 if paused[0] else 5.0,
+                    )
                 except asyncio.TimeoutError:
                     pass
         finally:
+            loop.remove_reader(fd)
+            termios.tcsetattr(fd, termios.TCSADRAIN, old_term)
             loop.remove_signal_handler(signal.SIGINT)
+            print()
 
     elif choice == "20":
         echo("", "white")
