@@ -1976,7 +1976,7 @@ def update_mastodon_domain(
 
 
 def cleanup_old_domains():
-    """Delete known domains older than 3 days.
+    """Delete known domains older than 7 days.
 
     Uses a transaction-scoped advisory lock to ensure only one crawler instance
     performs cleanup at a time, preventing race conditions where multiple
@@ -2008,7 +2008,7 @@ def cleanup_old_domains():
                     """
                         DELETE FROM mastodon_domains
                         WHERE timestamp <=
-                            (CURRENT_TIMESTAMP - INTERVAL '72 hours')::timestamp
+                            (CURRENT_TIMESTAMP - INTERVAL '7 days')::timestamp
                         RETURNING domain
                         """,
                 )
