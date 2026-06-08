@@ -687,6 +687,14 @@ _ssrf_allowlist: frozenset[str] = frozenset(
     if h.strip()
 )
 
+# Domains this worker will never claim from the queue. Useful when a domain
+# runs on the same host/network as a worker and would yield skewed results.
+_worker_skip_domains: frozenset[str] = frozenset(
+    d.strip().lower()
+    for d in os.getenv("VMCRAWL_SKIP_DOMAINS", "").split(",")
+    if d.strip()
+)
+
 
 def _is_blocked_ip(addr: ipaddress.IPv4Address | ipaddress.IPv6Address) -> bool:
     return (
@@ -6562,6 +6570,11 @@ def claim_due_domains(batch: int, lease_seconds: int, worker: str) -> list[str]:
     not starved because the per-type backoff pushes their ``next_crawl_at`` far
     out, removing them from the due set until they are due again.
     """
+    skip_clause = (
+        "    AND domain != ALL(%(skip)s)"
+        if _worker_skip_domains
+        else ""
+    )
     query = (
         "WITH due AS ("
         "  SELECT domain FROM raw_domains"
@@ -6575,6 +6588,7 @@ def claim_due_domains(batch: int, lease_seconds: int, worker: str) -> list[str]:
         "             OR right(raw_domains.domain, char_length(d.domain) + 1)"
         "                = '.' || d.domain)"
         "    )"
+        f"{skip_clause}"
         "  ORDER BY last_response_time ASC NULLS FIRST,"
         "           next_crawl_at ASC NULLS FIRST"
         "  LIMIT %(batch)s"
@@ -6584,11 +6598,14 @@ def claim_due_domains(batch: int, lease_seconds: int, worker: str) -> list[str]:
         "FROM due WHERE r.domain = due.domain "
         "RETURNING r.domain"
     )
+    params: dict = {"lease": lease_seconds, "batch": batch, "worker": worker}
+    if _worker_skip_domains:
+        params["skip"] = list(_worker_skip_domains)
     with db_pool.connection() as conn, conn.cursor() as cursor:
         try:
             _ = cursor.execute(
                 query,
-                {"lease": lease_seconds, "batch": batch, "worker": worker},
+                params,
             )
             rows = cursor.fetchall()
             conn.commit()
