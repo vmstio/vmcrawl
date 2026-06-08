@@ -8,6 +8,7 @@ try:
     import asyncio
     import atexit
     import csv
+    import errno
     import gc
     import getpass
     import hashlib
@@ -188,6 +189,8 @@ TRACKED_ERROR_TYPES = (
     "DNS",
     "SSL",
     "TCP",
+    "TIMEOUT",
+    "REDIRECT",
     "SSRF",
     "OTHER",
     "TYPE",
@@ -207,6 +210,8 @@ RETRY_BASE_HOURS: dict[str, int] = {
     "DNS": max(1, int(os.getenv("VMCRAWL_RETRY_DNS_HOURS", "12"))),
     "SSL": max(1, int(os.getenv("VMCRAWL_RETRY_SSL_HOURS", "12"))),
     "TCP": max(1, int(os.getenv("VMCRAWL_RETRY_TCP_HOURS", "6"))),
+    "TIMEOUT": max(1, int(os.getenv("VMCRAWL_RETRY_TIMEOUT_HOURS", "3"))),
+    "REDIRECT": max(1, int(os.getenv("VMCRAWL_RETRY_REDIRECT_HOURS", "720"))),
     "SSRF": max(1, int(os.getenv("VMCRAWL_RETRY_SSRF_HOURS", "72"))),
     "OTHER": max(1, int(os.getenv("VMCRAWL_RETRY_OTHER_HOURS", "720"))),
     "CONTENT": max(1, int(os.getenv("VMCRAWL_RETRY_CONTENT_HOURS", "12"))),
@@ -228,6 +233,8 @@ _REASON_BASE_HOURS_CASE = sql.SQL(
     "  WHEN error_type = 'DNS' THEN {dns}"
     "  WHEN error_type = 'SSL' THEN {ssl}"
     "  WHEN error_type = 'TCP' THEN {tcp}"
+    "  WHEN error_type = 'TIMEOUT' THEN {timeout}"
+    "  WHEN error_type = 'REDIRECT' THEN {redirect}"
     "  WHEN error_type = 'SSRF' THEN {ssrf}"
     "  WHEN error_type = 'OTHER' THEN {other}"
     "  WHEN error_type = 'HARD' THEN {hard}"
@@ -243,6 +250,8 @@ _REASON_BASE_HOURS_CASE = sql.SQL(
     dns=sql.Literal(RETRY_BASE_HOURS["DNS"]),
     ssl=sql.Literal(RETRY_BASE_HOURS["SSL"]),
     tcp=sql.Literal(RETRY_BASE_HOURS["TCP"]),
+    timeout=sql.Literal(RETRY_BASE_HOURS["TIMEOUT"]),
+    redirect=sql.Literal(RETRY_BASE_HOURS["REDIRECT"]),
     ssrf=sql.Literal(RETRY_BASE_HOURS["SSRF"]),
     other=sql.Literal(RETRY_BASE_HOURS["OTHER"]),
     hard=sql.Literal(RETRY_BASE_HOURS["HARD"]),
@@ -706,12 +715,16 @@ def _is_blocked_ip(addr: ipaddress.IPv4Address | ipaddress.IPv6Address) -> bool:
     )
 
 
+class SSRFBlockedError(httpx.ConnectError):
+    """Raised by SSRFGuardTransport when a request targets a non-public address."""
+
+
 class SSRFGuardTransport(httpx.AsyncHTTPTransport):
     """httpx transport that refuses to connect to non-public addresses.
 
     Validates the destination on every request (including every redirect
-    hop) before delegating to the real transport. Raises httpx.ConnectError
-    on block, which existing error handlers treat as an unreachable host.
+    hop) before delegating to the real transport. Raises SSRFBlockedError
+    on block, which _classify_request_exception detects via isinstance.
     """
 
     async def handle_async_request(
@@ -731,7 +744,7 @@ class SSRFGuardTransport(httpx.AsyncHTTPTransport):
             literal = None
         if literal is not None:
             if _is_blocked_ip(literal):
-                raise httpx.ConnectError(
+                raise SSRFBlockedError(
                     f"SSRF guard: blocked non-public address {host}"
                 )
             return await super().handle_async_request(request)
@@ -752,7 +765,7 @@ class SSRFGuardTransport(httpx.AsyncHTTPTransport):
             except ValueError:
                 continue
             if _is_blocked_ip(resolved):
-                raise httpx.ConnectError(
+                raise SSRFBlockedError(
                     f"SSRF guard: {host} resolves to non-public address {ip_str}"
                 )
 
@@ -4308,15 +4321,24 @@ def _iter_exception_chain(exception: BaseException):
 
 
 def _classify_request_exception(exception: Exception) -> str:
-    """Classify transport-layer exceptions into FILE/SSL/DNS/SSRF/TCP buckets."""
+    """Classify transport-layer exceptions into FILE/SSL/DNS/SSRF/TIMEOUT/REDIRECT/TCP buckets."""
     error_message_lower = str(exception).casefold()
+
+    # Redirect loop — misconfiguration, not a connectivity failure.
+    if isinstance(exception, httpx.TooManyRedirects):
+        return "REDIRECT"
+
+    # Timeouts — server reachable but unresponsive; shorter retry than hard TCP.
+    if isinstance(exception, httpx.TimeoutException):
+        return "TIMEOUT"
+
+    # SSRF block — isinstance check is authoritative since SSRFBlockedError is our
+    # own subclass of httpx.ConnectError raised only by SSRFGuardTransport.
+    if isinstance(exception, SSRFBlockedError):
+        return "SSRF"
 
     if isinstance(exception, ValueError) and "too large" in error_message_lower:
         return "FILE"
-    if "bad file descriptor" in error_message_lower:
-        return "FILE"
-    if "ssrf guard" in error_message_lower:
-        return "SSRF"
 
     ssl_indicators = (
         "_ssl.c",
@@ -4324,7 +4346,7 @@ def _classify_request_exception(exception: Exception) -> str:
         "tls",
         "certificate",
         "cert",
-        "sslcertverficationerror",
+        "sslcertverificationerror",
         "handshake",
         "cipher",
     )
@@ -4348,6 +4370,8 @@ def _classify_request_exception(exception: Exception) -> str:
             return "DNS"
         if isinstance(cause, ssl.SSLError):
             return "SSL"
+        if isinstance(cause, OSError) and cause.errno == errno.EBADF:
+            return "FILE"
 
     return "TCP"
 
@@ -4364,16 +4388,10 @@ def _handle_tcp_exception(domain, target, exception):
         ):
             echo(f"{domain}: Response too large", "orange", use_tqdm=True)
             log_error(domain, f"Response too large on {target}")
-            increment_domain_error(domain, error_reason, target)
-            return
-        if "bad file descriptor" in error_message.casefold():
-            echo(f"{domain}: Connection closed unexpectedly", "orange", use_tqdm=True)
-            log_error(domain, f"Connection closed unexpectedly on {target}")
-            increment_domain_error(domain, error_reason, target)
-            return
-        cleaned_message = _clean_exception_message(error_message, "File/stream error")
-        echo(f"{domain}: {cleaned_message}", "orange", use_tqdm=True)
-        log_error(domain, f"{target}: {error_message or cleaned_message}")
+        else:
+            cleaned_message = _clean_exception_message(error_message, "File/stream error")
+            echo(f"{domain}: {cleaned_message}", "orange", use_tqdm=True)
+            log_error(domain, f"{target}: {error_message or cleaned_message}")
         increment_domain_error(domain, error_reason, target)
         return
 
@@ -4398,6 +4416,19 @@ def _handle_tcp_exception(domain, target, exception):
         )
         echo(f"{domain}: {cleaned_message}", "orange", use_tqdm=True)
         log_error(domain, f"{target}: {error_message or cleaned_message}")
+        increment_domain_error(domain, error_reason, target)
+        return
+
+    if error_reason == "TIMEOUT":
+        cleaned_message = _clean_exception_message(error_message, "Timeout")
+        echo(f"{domain}: {cleaned_message}", "orange", use_tqdm=True)
+        log_error(domain, f"{target}: {error_message or cleaned_message}")
+        increment_domain_error(domain, error_reason, target)
+        return
+
+    if error_reason == "REDIRECT":
+        echo(f"{domain}: Too many redirects on {target}", "orange", use_tqdm=True)
+        log_error(domain, f"{target}: too many redirects")
         increment_domain_error(domain, error_reason, target)
         return
 
