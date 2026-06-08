@@ -46,7 +46,6 @@ CREATE TABLE IF NOT EXISTS
   raw_domains (
     domain TEXT PRIMARY KEY CHECK (domain = LOWER(domain)),
     reason TEXT DEFAULT NULL,
-    alias BOOLEAN DEFAULT NULL,
     last_response_time DOUBLE PRECISION DEFAULT NULL
   );
 
@@ -81,6 +80,10 @@ ALTER TABLE raw_domains DROP COLUMN IF EXISTS bad_robot;
 -- instances now. Non-Mastodon classification uses reason='OTHER+nodeinfo' instead.
 ALTER TABLE raw_domains DROP COLUMN IF EXISTS nodeinfo;
 
+-- alias replaced by reason='ALIAS+*'; alias domains now back off on the same
+-- 90-day flat cadence as HARD errors via the ALIAS entry in _REASON_BASE_HOURS_CASE.
+ALTER TABLE raw_domains DROP COLUMN IF EXISTS alias;
+
 -- Durable crawl queue columns (see docs/durable-queue.md).
 -- raw_domains doubles as the work ledger; these columns add queue discipline
 -- (due time, lease, backoff) so the crawler can run as a crash-safe,
@@ -106,7 +109,7 @@ ALTER TABLE raw_domains
 --   * everything else (healthy)      -> spread over ~1h
 UPDATE raw_domains
 SET next_crawl_at = now()
-WHERE next_crawl_at IS NULL AND reason IS NULL AND nodeinfo IS NULL;
+WHERE next_crawl_at IS NULL AND reason IS NULL;
 
 UPDATE raw_domains
 SET next_crawl_at = now() + random() * INTERVAL '30 days'
@@ -345,26 +348,12 @@ DROP INDEX IF EXISTS idx_raw_domains_bad_robot;
 CREATE INDEX IF NOT EXISTS idx_raw_domains_reason
     ON raw_domains (reason text_pattern_ops) WHERE reason IS NOT NULL;
 
--- Index for alias domain filtering
--- Used by: alias domain skip logic
-CREATE INDEX IF NOT EXISTS idx_raw_domains_alias
-    ON raw_domains (domain) WHERE alias = TRUE;
-
--- Index for non-alias domain scans
--- Used by: most crawler menu queries include (alias IS NULL OR alias = FALSE)
-CREATE INDEX IF NOT EXISTS idx_raw_domains_not_alias
-    ON raw_domains (domain) WHERE (alias IS NULL OR alias = FALSE);
-
--- Index for nodeinfo filtering (used to find non-Mastodon platforms and Mastodon instances)
--- Used by: get_not_masto_domains(), menu options 4, 5, 10, 53, api.py health endpoint
-CREATE INDEX IF NOT EXISTS idx_raw_domains_nodeinfo
-    ON raw_domains (nodeinfo) WHERE nodeinfo IS NOT NULL;
-
--- Composite index for nodeinfo + domain scans on non-alias rows
--- Used by: option 10/53 style queries with ORDER BY domain
-CREATE INDEX IF NOT EXISTS idx_raw_domains_nodeinfo_domain_not_alias
-    ON raw_domains (nodeinfo, domain)
-    WHERE (alias IS NULL OR alias = FALSE);
+-- Obsolete alias/nodeinfo column indexes (columns dropped above). Drop idempotently.
+DROP INDEX IF EXISTS idx_raw_domains_alias;
+DROP INDEX IF EXISTS idx_raw_domains_not_alias;
+DROP INDEX IF EXISTS idx_raw_domains_nodeinfo;
+DROP INDEX IF EXISTS idx_raw_domains_nodeinfo_domain_not_alias;
+DROP INDEX IF EXISTS idx_raw_domains_mastodon_reason;
 
 -- Index for error reason queries (LIKE 'SSL%', 'DNS%', regex patterns, etc.)
 -- Used by: menu options 20-32 (retry errors by type)
@@ -372,51 +361,45 @@ CREATE INDEX IF NOT EXISTS idx_raw_domains_nodeinfo_domain_not_alias
 CREATE INDEX IF NOT EXISTS idx_raw_domains_reason
     ON raw_domains (reason) WHERE reason IS NOT NULL;
 
--- Composite reason index for non-alias retries (menu options 20-32, now ordered
--- by domain). The old _errors variant referenced the dropped errors column; it is
--- auto-removed with the column, but drop the name explicitly for re-runs.
+-- Composite reason index for retries (menu options 20-32, now ordered by domain).
+-- The old _errors and _not_alias variants referenced dropped columns; drop them
+-- explicitly for re-runs.
 DROP INDEX IF EXISTS idx_raw_domains_reason_errors_not_alias;
+DROP INDEX IF EXISTS idx_raw_domains_reason_not_alias;
 CREATE INDEX IF NOT EXISTS idx_raw_domains_reason_not_alias
     ON raw_domains (reason text_pattern_ops)
-    WHERE reason IS NOT NULL AND (alias IS NULL OR alias = FALSE);
+    WHERE reason IS NOT NULL;
 
 -- Expression index for HTTP class regex filters (^2xx/^3xx/^4xx/^5xx)
 -- Used by: menu options 27-30 and health/report style queries
 DROP INDEX IF EXISTS idx_raw_domains_reason_leading_digit_errors_not_alias;
+DROP INDEX IF EXISTS idx_raw_domains_reason_leading_digit_not_alias;
 CREATE INDEX IF NOT EXISTS idx_raw_domains_reason_leading_digit_not_alias
     ON raw_domains ((left(reason, 1)))
-    WHERE reason IS NOT NULL AND (alias IS NULL OR alias = FALSE);
-
--- Health/report index for mastodon + reason filters
--- Used by: api.py crawler-health queries (nodeinfo='mastodon' and reason predicates)
-CREATE INDEX IF NOT EXISTS idx_raw_domains_mastodon_reason
-    ON raw_domains (reason)
-    WHERE nodeinfo = 'mastodon' AND reason IS NOT NULL;
+    WHERE reason IS NOT NULL;
 
 -- The errors column was dropped; its ordering index is obsolete.
 DROP INDEX IF EXISTS idx_raw_domains_errors;
 
 -- Index for uncrawled domain selection (menu option 0)
--- Used by: SELECT domain WHERE reason IS NULL AND nodeinfo IS NULL ORDER BY LENGTH(domain)
+-- Used by: SELECT domain WHERE reason IS NULL ORDER BY LENGTH(domain)
 DROP INDEX IF EXISTS idx_raw_domains_uncrawled;
 CREATE INDEX IF NOT EXISTS idx_raw_domains_uncrawled
     ON raw_domains ((LENGTH(domain)))
-    WHERE reason IS NULL AND nodeinfo IS NULL AND (alias IS NULL OR alias = FALSE);
+    WHERE reason IS NULL;
 
 -- Index for the durable queue claim query (see docs/durable-queue.md)
 -- Used by: claim_due_domains() -- ORDER BY last_response_time NULLS FIRST,
--- next_crawl_at NULLS FIRST over due, non-alias rows (fastest-first priority).
--- The partial predicate mirrors the claim filter's only immutable condition
--- (non-alias) to keep the index small. Failure domains are deliberately NOT
--- excluded: queue mode recrawls them once due, on a per-type cadence derived
--- from reason, so it actually re-attempts known failures. The hard-DNI exclusion
--- is applied during the scan (it references another table and can't live in the
--- predicate). Drop first so the leading-column change applies on existing
--- deployments; CREATE ... IF NOT EXISTS alone would keep the stale index.
+-- next_crawl_at NULLS FIRST over due rows (fastest-first priority).
+-- Failure domains are deliberately NOT excluded: queue mode recrawls them once
+-- due, on a per-type cadence derived from reason, so it actually re-attempts
+-- known failures. The hard-DNI exclusion is applied during the scan (it
+-- references another table and can't live in the predicate). Drop first so the
+-- leading-column change applies on existing deployments; CREATE ... IF NOT
+-- EXISTS alone would keep the stale index.
 DROP INDEX IF EXISTS idx_raw_domains_due;
 CREATE INDEX IF NOT EXISTS idx_raw_domains_due
-    ON raw_domains (last_response_time NULLS FIRST, next_crawl_at NULLS FIRST)
-    WHERE (alias IS NULL OR alias = FALSE);
+    ON raw_domains (last_response_time NULLS FIRST, next_crawl_at NULLS FIRST);
 
 -- =============================================================================
 -- mastodon_domains table indexes

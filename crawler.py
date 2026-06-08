@@ -196,6 +196,7 @@ TRACKED_ERROR_TYPES = (
     "JSON",
     "HARD",
     "ROBOT",
+    "ALIAS",
 )
 
 # Per-error-type base reschedule cadence in hours (env-overridable). The queue
@@ -215,6 +216,7 @@ RETRY_BASE_HOURS: dict[str, int] = {
     "HTTP5XX": max(1, int(os.getenv("VMCRAWL_RETRY_HTTP5XX_HOURS", "3"))),
     "ROBOT": max(1, int(os.getenv("VMCRAWL_RETRY_ROBOT_HOURS", "720"))),
     "HARD": max(1, int(os.getenv("VMCRAWL_RETRY_HARD_HOURS", "2160"))),
+    "ALIAS": max(1, int(os.getenv("VMCRAWL_RETRY_ALIAS_HOURS", "2160"))),
 }
 
 # Maps the leading token of reason -> base cadence hours. Mirrors the prefix
@@ -231,6 +233,7 @@ _REASON_BASE_HOURS_CASE = sql.SQL(
     "  WHEN reason LIKE 'OTHER%%' THEN {other}"
     "  WHEN reason LIKE 'HARD%%' THEN {hard}"
     "  WHEN reason LIKE 'ROBOT%%' THEN {robot}"
+    "  WHEN reason LIKE 'ALIAS%%' THEN {alias_base}"
     "  WHEN reason ~ '^5[0-9][0-9]' THEN {http5xx}"
     "  WHEN reason ~ '^4[0-9][0-9]' THEN {http4xx}"
     "  WHEN reason ~ '^3[0-9][0-9]' THEN {http3xx}"
@@ -245,6 +248,7 @@ _REASON_BASE_HOURS_CASE = sql.SQL(
     other=sql.Literal(RETRY_BASE_HOURS["OTHER"]),
     hard=sql.Literal(RETRY_BASE_HOURS["HARD"]),
     robot=sql.Literal(RETRY_BASE_HOURS["ROBOT"]),
+    alias_base=sql.Literal(RETRY_BASE_HOURS["ALIAS"]),
     http5xx=sql.Literal(RETRY_BASE_HOURS["HTTP5XX"]),
     http4xx=sql.Literal(RETRY_BASE_HOURS["HTTP4XX"]),
     http3xx=sql.Literal(RETRY_BASE_HOURS["HTTP3XX"]),
@@ -636,7 +640,6 @@ queue_lease_seconds = max(1, int(os.getenv("VMCRAWL_QUEUE_LEASE_SECONDS", "900")
 queue_poll_seconds = max(1, int(os.getenv("VMCRAWL_QUEUE_POLL_SECONDS", "15")))
 # Recrawl cadences and transient-failure backoff, all expressed in hours.
 recrawl_hours = max(1, int(os.getenv("VMCRAWL_RECRAWL_HOURS", "1")))
-recrawl_alias_hours = max(1, int(os.getenv("VMCRAWL_RECRAWL_ALIAS_HOURS", "168")))
 # Global ceiling for the per-type exponential backoff (base * 2**attempts). A
 # transient type backs off up to this cap; ROBOT/HARD bases already exceed it so
 # they stay flat. Default 720h (30d) keeps even persistently-dead domains on a
@@ -1752,7 +1755,7 @@ def clear_domain_error(domain: str) -> None:
             _ = cursor.execute(
                 "INSERT INTO raw_domains (domain, reason)"
                 " VALUES (%s, NULL)"
-                " ON CONFLICT(domain) DO UPDATE SET reason = excluded.reason, alias = NULL",
+                " ON CONFLICT(domain) DO UPDATE SET reason = excluded.reason",
                 (domain,),
             )
             conn.commit()
@@ -1793,40 +1796,16 @@ def delete_domain_if_known(domain: str) -> None:
 
 
 def mark_domain_as_alias(domain: str) -> None:
-    """Mark a domain as an alias in raw_domains and clear all other state.
+    """Record a domain as an alias pointing to a canonical host.
 
-    When a domain is identified as an alias to another canonical domain,
-    all error tracking, flags, and status information should be cleared
-    since they no longer apply.
+    Alias domains get reason='ALIAS+instance_api' and back off on the same
+    90-day flat cadence as HARD errors; they will be revisited in case the
+    redirect ever changes.
 
     Args:
         domain: The domain to mark as an alias (should be pre-normalized to lowercase)
     """
-    # Build list of all state columns to clear
-    state_columns = ["reason"]
-
-    # Build SET clause: alias = TRUE, col1 = NULL, col2 = NULL, ...
-    set_clause = sql.SQL("alias = TRUE, ") + sql.SQL(", ").join(
-        sql.SQL("{} = NULL").format(sql.Identifier(col)) for col in state_columns
-    )
-
-    query = sql.SQL("""
-        INSERT INTO raw_domains (domain, alias)
-        VALUES (%s, TRUE)
-        ON CONFLICT(domain) DO UPDATE SET {}
-    """).format(set_clause)
-
-    with db_pool.connection() as conn, conn.cursor() as cursor:
-        try:
-            _ = cursor.execute(query, (domain,))
-            conn.commit()
-        except Exception as exception:
-            echo(
-                f"{domain}: Failed to mark as alias: {exception}",
-                "red",
-                use_tqdm=True,
-            )
-            conn.rollback()
+    increment_domain_error(domain, "ALIAS+instance_api")
 
 
 def delete_domain_from_raw(domain: str) -> None:
@@ -6539,10 +6518,8 @@ def reschedule_domain(domain: str, response_time: float | None = None) -> None:
     branch recorded the result:
       * a recorded failure (reason set) -> per-type base * 2**attempts, ceilinged
         at greatest(base, cap). Transient types (DNS/SSL/TCP/HTTP/content) back
-        off up to the cap (default 30d); ROBOT/HARD bases already exceed the cap
-        so they stay flat at their long interval (default 30d / 90d).
-      * alias domain (alias = TRUE)     -> non-Mastodon cadence (default 7d)
-      * known non-Mastodon software     -> non-Mastodon cadence (default 7d)
+        off up to the cap (default 30d); ROBOT/HARD/ALIAS bases already exceed
+        the cap so they stay flat at their long interval (default 30d / 90d).
       * healthy                         -> normal recrawl cadence (default 1h)
     The per-type base is selected from ``reason`` by ``_REASON_BASE_HOURS_CASE``.
     Using greatest(base, cap) as the ceiling means a long flat type is unaffected
@@ -6563,8 +6540,6 @@ def reschedule_domain(domain: str, response_time: float | None = None) -> None:
         "  WHEN reason IS NOT NULL "
         "    THEN least(({base}) * power(2, attempts), greatest(({base}), %(cap)s)) "
         "         * (0.9 + random() * 0.2) * INTERVAL '1 hour' "
-        "  WHEN alias = TRUE "
-        "    THEN %(alias)s * (0.9 + random() * 0.2) * INTERVAL '1 hour' "
         "  ELSE %(recrawl)s * (0.9 + random() * 0.2) * INTERVAL '1 hour' "
         "END) "
         "WHERE domain = %(domain)s"
@@ -6575,7 +6550,6 @@ def reschedule_domain(domain: str, response_time: float | None = None) -> None:
                 query,
                 {
                     "cap": retry_cap_hours,
-                    "alias": recrawl_alias_hours,
                     "recrawl": recrawl_hours,
                     "rt": response_time,
                     "domain": domain,
@@ -6645,16 +6619,12 @@ def claim_maintenance_slot(interval_seconds: int) -> bool:
 
 def load_from_database(user_choice):
     """Load domain list from database based on user menu selection."""
-    # Common filter to exclude alias domains from all raw_domains queries
-    no_alias = "AND (alias IS NULL OR alias = FALSE) "
-
     query_map = {
         # --new one-shot flag: brand-new, never-crawled domains.
         "0": (
             "SELECT domain FROM raw_domains "
             "WHERE reason IS NULL "
-            + no_alias
-            + "ORDER BY LENGTH(DOMAIN)"
+            "ORDER BY LENGTH(DOMAIN)"
         ),
         "50": (
             "SELECT domain FROM mastodon_domains WHERE "
