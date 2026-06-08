@@ -5585,6 +5585,11 @@ async def process_domain(domain, nightly_version_ranges, user_choice=None):
         software_data = nodeinfo_20_result.get("software")
         if software_data and isinstance(software_data, dict):
             await asyncio.to_thread(save_nodeinfo_software, domain, software_data)
+            # Also write nodeinfo for the canonical domain when it differs from the
+            # crawled domain; clear_domain_error only sets reason/alias so the
+            # canonical row would otherwise have nodeinfo=NULL until directly crawled.
+            if instance_uri and instance_uri != domain:
+                await asyncio.to_thread(save_nodeinfo_software, instance_uri, software_data)
 
         await asyncio.to_thread(
             process_mastodon_instance,
