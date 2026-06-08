@@ -188,6 +188,7 @@ TRACKED_ERROR_TYPES = (
     "DNS",
     "SSL",
     "TCP",
+    "SSRF",
     "TYPE",
     "FILE",
     "API",
@@ -204,6 +205,7 @@ RETRY_BASE_HOURS: dict[str, int] = {
     "DNS": max(1, int(os.getenv("VMCRAWL_RETRY_DNS_HOURS", "24"))),
     "SSL": max(1, int(os.getenv("VMCRAWL_RETRY_SSL_HOURS", "24"))),
     "TCP": max(1, int(os.getenv("VMCRAWL_RETRY_TCP_HOURS", "12"))),
+    "SSRF": max(1, int(os.getenv("VMCRAWL_RETRY_SSRF_HOURS", "168"))),
     "CONTENT": max(1, int(os.getenv("VMCRAWL_RETRY_CONTENT_HOURS", "24"))),
     "HTTP2XX": max(1, int(os.getenv("VMCRAWL_RETRY_HTTP2XX_HOURS", "48"))),
     "HTTP3XX": max(1, int(os.getenv("VMCRAWL_RETRY_HTTP3XX_HOURS", "48"))),
@@ -229,6 +231,7 @@ _REASON_BASE_HOURS_CASE = sql.SQL(
     "  WHEN reason LIKE 'DNS%%' THEN {dns}"
     "  WHEN reason LIKE 'SSL%%' THEN {ssl}"
     "  WHEN reason LIKE 'TCP%%' THEN {tcp}"
+    "  WHEN reason LIKE 'SSRF%%' THEN {ssrf}"
     "  WHEN reason LIKE 'HARD%%' THEN {hard}"
     "  WHEN reason LIKE 'ROBOT%%' THEN {robot}"
     "  WHEN reason ~ '^5[0-9][0-9]' THEN {http5xx}"
@@ -241,6 +244,7 @@ _REASON_BASE_HOURS_CASE = sql.SQL(
     dns=sql.Literal(RETRY_BASE_HOURS["DNS"]),
     ssl=sql.Literal(RETRY_BASE_HOURS["SSL"]),
     tcp=sql.Literal(RETRY_BASE_HOURS["TCP"]),
+    ssrf=sql.Literal(RETRY_BASE_HOURS["SSRF"]),
     hard=sql.Literal(RETRY_BASE_HOURS["HARD"]),
     robot=sql.Literal(RETRY_BASE_HOURS["ROBOT"]),
     http5xx=sql.Literal(RETRY_BASE_HOURS["HTTP5XX"]),
@@ -675,6 +679,14 @@ _allow_private_ips = os.getenv("VMCRAWL_ALLOW_PRIVATE_IPS", "").lower() in (
     "yes",
 )
 
+# Domains that are allowed to resolve to non-public addresses (e.g. a domain
+# that runs on the same private network as the crawler workers).
+_ssrf_allowlist: frozenset[str] = frozenset(
+    h.strip().lower()
+    for h in os.getenv("VMCRAWL_SSRF_ALLOWLIST", "").split(",")
+    if h.strip()
+)
+
 
 def _is_blocked_ip(addr: ipaddress.IPv4Address | ipaddress.IPv6Address) -> bool:
     return (
@@ -701,6 +713,9 @@ class SSRFGuardTransport(httpx.AsyncHTTPTransport):
         host = request.url.host
         if not host:
             raise httpx.ConnectError("Missing host in URL")
+
+        if host.lower() in _ssrf_allowlist:
+            return await super().handle_async_request(request)
 
         # Hostname may already be an IP literal (common SSRF vector).
         try:
@@ -1655,10 +1670,10 @@ def log_error(domain: str, error_to_print: str) -> None:
         try:
             _ = cursor.execute(
                 """
-                    INSERT INTO error_log (domain, error)
-                    VALUES (%s, %s)
+                    INSERT INTO error_log (domain, error, worker)
+                    VALUES (%s, %s, %s)
                 """,
-                (domain, error_to_print),
+                (domain, error_to_print, _worker_id()),
             )
             conn.commit()
         except Exception as exception:
@@ -2861,7 +2876,7 @@ def display_domain_search(domain: str) -> None:
 
             _ = cursor.execute(
                 """
-                SELECT timestamp, error
+                SELECT timestamp, error, worker
                 FROM error_log
                 WHERE domain = %s
                 ORDER BY event DESC
@@ -2877,6 +2892,7 @@ def display_domain_search(domain: str) -> None:
             else:
                 echo(f"  timestamp: {error_row[0]}", "white")
                 echo(f"  error: {error_row[1]}", "white")
+                echo(f"  worker: {error_row[2] or 'NULL'}", "white")
         except Exception as e:
             echo(f"Failed to search for domain {lookup_domain}: {e}", "red")
             conn.rollback()
@@ -4438,13 +4454,15 @@ def _iter_exception_chain(exception: BaseException):
 
 
 def _classify_request_exception(exception: Exception) -> str:
-    """Classify transport-layer exceptions into FILE/SSL/DNS/TCP buckets."""
+    """Classify transport-layer exceptions into FILE/SSL/DNS/SSRF/TCP buckets."""
     error_message_lower = str(exception).casefold()
 
     if isinstance(exception, ValueError) and "too large" in error_message_lower:
         return "FILE"
     if "bad file descriptor" in error_message_lower:
         return "FILE"
+    if "ssrf guard" in error_message_lower:
+        return "SSRF"
 
     ssl_indicators = (
         "_ssl.c",
@@ -4501,6 +4519,12 @@ def _handle_tcp_exception(domain, target, exception):
             return
         cleaned_message = _clean_exception_message(error_message, "File/stream error")
         echo(f"{domain}: {cleaned_message}", "orange", use_tqdm=True)
+        log_error(domain, f"{target}: {error_message or cleaned_message}")
+        increment_domain_error(domain, f"{error_reason}+{target}")
+        return
+
+    if error_reason == "SSRF":
+        echo(f"{domain}: Blocked — resolves to non-public address", "orange", use_tqdm=True)
         log_error(domain, f"{target}: {error_message}")
         increment_domain_error(domain, f"{error_reason}+{target}")
         return
@@ -4510,7 +4534,7 @@ def _handle_tcp_exception(domain, target, exception):
             error_message, "SSL connection error"
         )
         echo(f"{domain}: {cleaned_message}", "orange", use_tqdm=True)
-        log_error(domain, f"{target}: {error_message}")
+        log_error(domain, f"{target}: {error_message or cleaned_message}")
         increment_domain_error(domain, f"{error_reason}+{target}")
         return
 
@@ -4519,14 +4543,14 @@ def _handle_tcp_exception(domain, target, exception):
             error_message, "DNS resolution failed"
         )
         echo(f"{domain}: {cleaned_message}", "orange", use_tqdm=True)
-        log_error(domain, f"{target}: {error_message}")
+        log_error(domain, f"{target}: {error_message or cleaned_message}")
         increment_domain_error(domain, f"{error_reason}+{target}")
         return
 
     # All remaining transport failures are categorized as TCP.
     cleaned_message = _clean_exception_message(error_message, "TCP error")
     echo(f"{domain}: {cleaned_message}", "orange", use_tqdm=True)
-    log_error(domain, f"{target}: {error_message}")
+    log_error(domain, f"{target}: {error_message or cleaned_message}")
     increment_domain_error(domain, f"{error_reason}+{target}")
 
 
