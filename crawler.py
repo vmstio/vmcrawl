@@ -202,15 +202,15 @@ TRACKED_ERROR_TYPES = (
 # reschedule_domain. Transient types use short bases and back off; ROBOT/HARD
 # use long flat intervals (base >= cap, so the backoff is a no-op for them).
 RETRY_BASE_HOURS: dict[str, int] = {
-    "DNS": max(1, int(os.getenv("VMCRAWL_RETRY_DNS_HOURS", "24"))),
-    "SSL": max(1, int(os.getenv("VMCRAWL_RETRY_SSL_HOURS", "24"))),
-    "TCP": max(1, int(os.getenv("VMCRAWL_RETRY_TCP_HOURS", "12"))),
-    "SSRF": max(1, int(os.getenv("VMCRAWL_RETRY_SSRF_HOURS", "168"))),
-    "CONTENT": max(1, int(os.getenv("VMCRAWL_RETRY_CONTENT_HOURS", "24"))),
-    "HTTP2XX": max(1, int(os.getenv("VMCRAWL_RETRY_HTTP2XX_HOURS", "48"))),
-    "HTTP3XX": max(1, int(os.getenv("VMCRAWL_RETRY_HTTP3XX_HOURS", "48"))),
-    "HTTP4XX": max(1, int(os.getenv("VMCRAWL_RETRY_HTTP4XX_HOURS", "48"))),
-    "HTTP5XX": max(1, int(os.getenv("VMCRAWL_RETRY_HTTP5XX_HOURS", "6"))),
+    "DNS": max(1, int(os.getenv("VMCRAWL_RETRY_DNS_HOURS", "12"))),
+    "SSL": max(1, int(os.getenv("VMCRAWL_RETRY_SSL_HOURS", "12"))),
+    "TCP": max(1, int(os.getenv("VMCRAWL_RETRY_TCP_HOURS", "6"))),
+    "SSRF": max(1, int(os.getenv("VMCRAWL_RETRY_SSRF_HOURS", "72"))),
+    "CONTENT": max(1, int(os.getenv("VMCRAWL_RETRY_CONTENT_HOURS", "12"))),
+    "HTTP2XX": max(1, int(os.getenv("VMCRAWL_RETRY_HTTP2XX_HOURS", "24"))),
+    "HTTP3XX": max(1, int(os.getenv("VMCRAWL_RETRY_HTTP3XX_HOURS", "24"))),
+    "HTTP4XX": max(1, int(os.getenv("VMCRAWL_RETRY_HTTP4XX_HOURS", "24"))),
+    "HTTP5XX": max(1, int(os.getenv("VMCRAWL_RETRY_HTTP5XX_HOURS", "3"))),
     "ROBOT": max(1, int(os.getenv("VMCRAWL_RETRY_ROBOT_HOURS", "720"))),
     "HARD": max(1, int(os.getenv("VMCRAWL_RETRY_HARD_HOURS", "2160"))),
 }
@@ -643,7 +643,7 @@ recrawl_nonmasto_hours = max(1, int(os.getenv("VMCRAWL_RECRAWL_NONMASTO_HOURS", 
 # transient type backs off up to this cap; ROBOT/HARD bases already exceed it so
 # they stay flat. Default 720h (30d) keeps even persistently-dead domains on a
 # monthly revival check rather than abandoning them.
-retry_cap_hours = max(1, int(os.getenv("VMCRAWL_RETRY_CAP_HOURS", "720")))
+retry_cap_hours = max(1, int(os.getenv("VMCRAWL_RETRY_CAP_HOURS", "168")))
 # Inline peer discovery: when the daemon crawls a healthy Mastodon instance with
 # more than peers_min_active monthly users, it also pulls that instance's peers
 # in the same pass and imports new domains, making the queue self-feeding. The
