@@ -646,8 +646,7 @@ recrawl_hours = max(1, int(os.getenv("VMCRAWL_RECRAWL_HOURS", "1")))
 retry_cap_hours = max(1, int(os.getenv("VMCRAWL_RETRY_CAP_HOURS", "168")))
 # Inline peer discovery: when the daemon crawls a healthy Mastodon instance with
 # more than peers_min_active monthly users, it also pulls that instance's peers
-# in the same pass and imports new domains, making the queue self-feeding. The
-# mastodon_domains.peers flag throttles instances whose peers endpoint has failed.
+# in the same pass and imports new domains, making the queue self-feeding.
 queue_peers_enabled = os.getenv("VMCRAWL_QUEUE_PEERS", "true").strip().lower() in {
     "1",
     "true",
@@ -2004,22 +2003,6 @@ async def load_domain_filter_data():
 # =============================================================================
 
 
-def ensure_mastodon_peers_column() -> bool:
-    """Ensure mastodon_domains has a peers column used by fetch mode."""
-    with db_pool.connection() as conn, conn.cursor() as cursor:
-        try:
-            _ = cursor.execute(
-                "ALTER TABLE mastodon_domains "
-                "ADD COLUMN IF NOT EXISTS peers BOOLEAN DEFAULT TRUE"
-            )
-            conn.commit()
-            return True
-        except Exception as e:
-            echo(f"Failed to ensure peers column exists: {e}", "red")
-            conn.rollback()
-            return False
-
-
 def fetch_domain_list(db_limit, db_offset, randomize=False):
     """Fetch list of domains to query for peers.
 
@@ -2033,7 +2016,6 @@ def fetch_domain_list(db_limit, db_offset, randomize=False):
             base_query = sql.SQL(
                 "SELECT domain FROM mastodon_domains "
                 "WHERE active_users_monthly > %s "
-                "AND (peers IS NULL OR peers = TRUE) "
                 "ORDER BY active_users_monthly DESC"
             )
             base_params = (min_active,)
@@ -2080,27 +2062,6 @@ def get_existing_domains() -> set[str] | None:
             echo(f"Failed to get list of existing domains: {e}", "red")
             conn.rollback()
             return None
-
-
-def disable_peer_fetch(domain, use_tqdm=False):
-    """Disable peer polling for a domain in mastodon_domains."""
-    with db_pool.connection() as conn, conn.cursor() as cursor:
-        try:
-            _ = cursor.execute(
-                "UPDATE mastodon_domains SET peers = FALSE WHERE domain = %s",
-                (domain,),
-            )
-            if cursor.rowcount > 0:
-                echo(f"{domain}: peer polling disabled", "orange", use_tqdm=use_tqdm)
-            conn.commit()
-        except Exception as e:
-            echo(
-                f"Failed to disable peer polling for {domain}: {e}",
-                "orange",
-                use_tqdm=use_tqdm,
-            )
-            conn.rollback()
-            return
 
 
 # Each row contributes 1 bind param (domain); Postgres caps a single statement at
@@ -2201,15 +2162,9 @@ async def fetch_peer_domains(
 
         return (filtered_domains, None)
     except json.JSONDecodeError:
-        # JSON decode errors indicate HTML or non-JSON response - disable polling
-        await asyncio.to_thread(disable_peer_fetch, domain, True)
         return ([], "no_peers")
     except Exception as e:
         error_str = str(e).lower()
-
-        # Only disable polling for persistent issues, not transient errors
-        # Authentication issues: 401, 403, unauthorized, forbidden
-        # 404 errors: endpoint doesn't exist
         persistent_error_indicators = [
             "401",
             "403",
@@ -2218,13 +2173,9 @@ async def fetch_peer_domains(
             "forbidden",
             "not authorized",
         ]
-
         if any(indicator in error_str for indicator in persistent_error_indicators):
-            await asyncio.to_thread(disable_peer_fetch, domain, True)
             return ([], "no_peers")
-        else:
-            # Transient errors - don't mark the domain
-            return ([], "transient")
+        return ([], "transient")
 
 
 async def process_fetch_domain(
@@ -2264,7 +2215,6 @@ async def process_fetch_domain(
         status = f"0 new ({len(domains)} known)"
         status_color = "cyan"
     elif error_type == "no_peers":
-        # disable_peer_fetch() already emits an orange terminal alert
         status = None
         status_color = "cyan"
     elif error_type == "transient":
@@ -2277,24 +2227,23 @@ async def process_fetch_domain(
     return (domain, unique_domains, status, status_color)
 
 
-def get_peers_fetch_eligibility(domain: str) -> tuple[int, bool] | None:
-    """Return (active_users_monthly, peers_enabled) for a known Mastodon instance.
+def get_peers_fetch_eligibility(domain: str) -> int | None:
+    """Return active_users_monthly for a known Mastodon instance.
 
     Returns None when the domain is not in mastodon_domains (not a valid Mastodon
-    server, so not a peer-discovery source). ``peers`` NULL is treated as enabled.
-    Used by the queue daemon's inline peer discovery.
+    server, so not a peer-discovery source).
     """
     with db_pool.connection() as conn, conn.cursor() as cursor:
         try:
             _ = cursor.execute(
-                "SELECT active_users_monthly, peers FROM mastodon_domains "
+                "SELECT active_users_monthly FROM mastodon_domains "
                 "WHERE domain = %s",
                 (domain,),
             )
             row = cursor.fetchone()
             if row is None:
                 return None
-            return (row[0] or 0, row[1] is not False)
+            return row[0] or 0
         except Exception as exception:
             echo(
                 f"{domain}: Failed to read peer eligibility {exception}",
@@ -2309,17 +2258,12 @@ async def maybe_fetch_peers(domain: str, domain_endings, dni) -> None:
     """Inline peer discovery for the queue daemon (see docs/durable-queue.md).
 
     Called after a domain is crawled in queue mode. When the domain is a healthy
-    Mastodon instance with more than ``peers_min_active`` monthly users and its
-    peers endpoint has not been disabled, fetch its peers and import any new
-    domains into raw_domains (where they become due immediately). Failure
-    handling — transient vs. disabling a dead endpoint — is delegated to
-    ``fetch_peer_domains``; imports are ON CONFLICT DO NOTHING.
+    Mastodon instance with more than ``peers_min_active`` monthly users, fetch its
+    peers and import any new domains into raw_domains (where they become due
+    immediately). Imports are ON CONFLICT DO NOTHING.
     """
-    eligibility = await asyncio.to_thread(get_peers_fetch_eligibility, domain)
-    if eligibility is None:
-        return
-    active_users, peers_enabled = eligibility
-    if not peers_enabled or active_users <= peers_min_active:
+    active_users = await asyncio.to_thread(get_peers_fetch_eligibility, domain)
+    if active_users is None or active_users <= peers_min_active:
         return
 
     api_url = f"https://{domain}/api/v1/instance/peers"
@@ -2353,10 +2297,6 @@ async def run_fetch_mode(args: argparse.Namespace) -> int:
     echo(f"{appname} v{appversion} (fetch mode)", "bold")
     if _is_running_headless():
         echo("Running in headless mode", "cyan")
-
-    if not ensure_mastodon_peers_column():
-        echo("Failed to prepare fetch schema, exiting…", "red")
-        return EXIT_FAILURE
 
     domain_endings = await get_domain_endings()
 
@@ -5704,8 +5644,6 @@ async def run_queue_daemon() -> int:
             f"Inline peer discovery: on (instances with >{peers_min_active} active users)",
             "cyan",
         )
-        # The peers flag throttles failed endpoints; ensure the column exists.
-        _ = await asyncio.to_thread(ensure_mastodon_peers_column)
 
     # Release leases left behind by a previously crashed process so their
     # domains don't show as claimed until the lease ages out.

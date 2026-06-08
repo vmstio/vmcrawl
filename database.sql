@@ -20,15 +20,11 @@ CREATE TABLE IF NOT EXISTS
     software_version TEXT DEFAULT NULL,
     active_users_monthly INTEGER DEFAULT NULL,
     timestamp TIMESTAMP DEFAULT NULL,
-    full_version TEXT DEFAULT NULL,
-    peers BOOLEAN DEFAULT TRUE
+    full_version TEXT DEFAULT NULL
   );
 
--- peers gates inline peer discovery: FALSE means the instance's /api/v1/instance/
--- peers endpoint has failed (401/403/404/non-JSON) and is skipped. Idempotent so
--- an existing mastodon_domains table predating the column gets it on upgrade.
-ALTER TABLE mastodon_domains
-  ADD COLUMN IF NOT EXISTS peers BOOLEAN DEFAULT TRUE;
+-- peers column removed: every qualifying instance is queried every time.
+ALTER TABLE mastodon_domains DROP COLUMN IF EXISTS peers;
 -- Software variant detected from nodeinfo (e.g. 'mastodon', 'glitch', 'hometown').
 -- Only populated for Mastodon-compatible instances; replaces raw_domains.nodeinfo.
 ALTER TABLE mastodon_domains
