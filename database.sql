@@ -29,6 +29,10 @@ CREATE TABLE IF NOT EXISTS
 -- an existing mastodon_domains table predating the column gets it on upgrade.
 ALTER TABLE mastodon_domains
   ADD COLUMN IF NOT EXISTS peers BOOLEAN DEFAULT TRUE;
+-- Software variant detected from nodeinfo (e.g. 'mastodon', 'glitch', 'hometown').
+-- Only populated for Mastodon-compatible instances; replaces raw_domains.nodeinfo.
+ALTER TABLE mastodon_domains
+  ADD COLUMN IF NOT EXISTS nodeinfo TEXT DEFAULT NULL;
 
 CREATE TABLE IF NOT EXISTS
   release_versions (
@@ -42,7 +46,6 @@ CREATE TABLE IF NOT EXISTS
   raw_domains (
     domain TEXT PRIMARY KEY CHECK (domain = LOWER(domain)),
     reason TEXT DEFAULT NULL,
-    nodeinfo TEXT DEFAULT NULL,
     alias BOOLEAN DEFAULT NULL,
     last_response_time DOUBLE PRECISION DEFAULT NULL
   );
@@ -74,6 +77,10 @@ ALTER TABLE raw_domains DROP COLUMN IF EXISTS bad_http5xx;
 ALTER TABLE raw_domains DROP COLUMN IF EXISTS bad_hard;
 ALTER TABLE raw_domains DROP COLUMN IF EXISTS bad_robot;
 
+-- nodeinfo moved to mastodon_domains.nodeinfo; only stored for Mastodon-compatible
+-- instances now. Non-Mastodon classification uses reason='OTHER+nodeinfo' instead.
+ALTER TABLE raw_domains DROP COLUMN IF EXISTS nodeinfo;
+
 -- Durable crawl queue columns (see docs/durable-queue.md).
 -- raw_domains doubles as the work ledger; these columns add queue discipline
 -- (due time, lease, backoff) so the crawler can run as a crash-safe,
@@ -94,9 +101,9 @@ ALTER TABLE raw_domains
 -- once. Only touches rows that have not yet been scheduled (next_crawl_at IS
 -- NULL); re-running this file after the daemon is live is a no-op. The queue
 -- reschedules each row precisely on its next claim; this is just initial jitter.
---   * never crawled (reason IS NULL AND nodeinfo IS NULL) -> due now
---   * has a failure (reason set)                          -> spread over ~30d
---   * everything else (crawled, healthy)                  -> spread over ~1h
+--   * never crawled (reason IS NULL) -> due now
+--   * has a failure (reason set)     -> spread over ~30d
+--   * everything else (healthy)      -> spread over ~1h
 UPDATE raw_domains
 SET next_crawl_at = now()
 WHERE next_crawl_at IS NULL AND reason IS NULL AND nodeinfo IS NULL;

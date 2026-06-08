@@ -614,7 +614,6 @@
       branchAdoption,
       history,
       versionsData,
-      nodeinfo,
     ] = await Promise.all([
       api("/stats/summary"),
       api("/stats/patch-adoption"),
@@ -626,7 +625,6 @@
       api("/stats/branch-adoption"),
       api("/stats/history?days=365"),
       api("/stats/versions"),
-      api("/stats/nodeinfo"),
     ]);
 
     // Big numbers
@@ -878,49 +876,6 @@
       bd.map((d) => d.mau),
       bdColors,
       { afterBody: eolBreakdownAfterBody("mau") },
-    );
-
-    // Nodeinfo: detected software as a treemap. Any platform that makes up less
-    // than 0.1% of all detected nodeinfo is folded into "Other"; the rest are
-    // shown individually. Threshold uses the same total as the tooltip %.
-    const sw = (nodeinfo.software || []).filter((s) => s.software);
-    const swTotal = nodeinfo.total_detected || 0;
-    const minShare = swTotal * 0.001; // 0.1%
-    const swItems = [];
-    let otherTotal = 0;
-    for (const s of sw) {
-      const count = s.count || 0;
-      if (count >= minShare) {
-        swItems.push({
-          software: s.software.charAt(0).toUpperCase() + s.software.slice(1),
-          value: count,
-        });
-      } else {
-        otherTotal += count;
-      }
-    }
-    if (otherTotal > 0) {
-      swItems.push({ software: "Other", value: otherTotal });
-    }
-    // Mastodon = purple, Other = orange, everything else cool shades.
-    const coolGreens = makeShades(GREEN, 4);
-    const coolTeals = makeShades("#1abc9c", 4);
-    const coolBlues = makeShades(BLUE, 4);
-    const coolShades = [];
-    for (let i = 0; i < 4; i++) {
-      coolShades.push(coolGreens[i], coolTeals[i], coolBlues[i]);
-    }
-    const softwareColor = (name, idx) => {
-      if ((name || "").toLowerCase() === "mastodon") return PURPLE;
-      if (name === "Other") return ORANGE;
-      return coolShades[idx % coolShades.length];
-    };
-    createTreemap(
-      "treemap-nodeinfo-software",
-      swItems,
-      nodeinfo.total_detected || 0,
-      "software",
-      softwareColor,
     );
 
     // Historical charts

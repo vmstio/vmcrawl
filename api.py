@@ -48,7 +48,6 @@ from slowapi.middleware import SlowAPIMiddleware
 from slowapi.util import get_remote_address
 
 # Mastodon-compatible software names shared with crawler logic.
-MASTODON_COMPATIBLE_SOFTWARE = ("mastodon", "hometown", "kmyblue")
 # Load environment variables
 _ = load_dotenv()
 
@@ -696,23 +695,17 @@ async def get_crawler_health(_api_key: str | None = Depends(get_api_key)):
     """Get crawler health statistics (error counts by type)."""
     try:
         with db_pool.connection() as conn, conn.cursor() as cur:
-            compatible_software = list(MASTODON_COMPATIBLE_SOFTWARE)
-
-            # TCP Issues
+            # TCP Issues (known Mastodon instances currently failing)
             _ = cur.execute(
                 """
                 SELECT COUNT(DISTINCT rd.domain) AS unique_domain_count
                 FROM raw_domains rd
-                WHERE LOWER(rd.nodeinfo) = ANY(%s::text[])
-                  AND rd.reason LIKE 'TCP%%'
+                WHERE rd.reason LIKE 'TCP%%'
                   AND (rd.alias IS NULL OR rd.alias = FALSE)
                   AND EXISTS (
-                    SELECT 1
-                    FROM mastodon_domains md
-                    WHERE md.domain = rd.domain
+                    SELECT 1 FROM mastodon_domains md WHERE md.domain = rd.domain
                   )
-            """,
-                (compatible_software,),
+            """
             )
             result = cur.fetchone()
             tcp_issues = result[0] if result else 0
@@ -722,16 +715,12 @@ async def get_crawler_health(_api_key: str | None = Depends(get_api_key)):
                 """
                 SELECT COUNT(DISTINCT rd.domain) AS unique_domain_count
                 FROM raw_domains rd
-                WHERE LOWER(rd.nodeinfo) = ANY(%s::text[])
-                  AND rd.reason LIKE 'SSL%%'
+                WHERE rd.reason LIKE 'SSL%%'
                   AND (rd.alias IS NULL OR rd.alias = FALSE)
                   AND EXISTS (
-                    SELECT 1
-                    FROM mastodon_domains md
-                    WHERE md.domain = rd.domain
+                    SELECT 1 FROM mastodon_domains md WHERE md.domain = rd.domain
                   )
-            """,
-                (compatible_software,),
+            """
             )
             result = cur.fetchone()
             ssl_issues = result[0] if result else 0
@@ -741,16 +730,12 @@ async def get_crawler_health(_api_key: str | None = Depends(get_api_key)):
                 """
                 SELECT COUNT(DISTINCT rd.domain) AS unique_domain_count
                 FROM raw_domains rd
-                WHERE LOWER(rd.nodeinfo) = ANY(%s::text[])
-                  AND rd.reason LIKE 'DNS%%'
+                WHERE rd.reason LIKE 'DNS%%'
                   AND (rd.alias IS NULL OR rd.alias = FALSE)
                   AND EXISTS (
-                    SELECT 1
-                    FROM mastodon_domains md
-                    WHERE md.domain = rd.domain
+                    SELECT 1 FROM mastodon_domains md WHERE md.domain = rd.domain
                   )
-            """,
-                (compatible_software,),
+            """
             )
             result = cur.fetchone()
             dns_issues = result[0] if result else 0
@@ -760,16 +745,12 @@ async def get_crawler_health(_api_key: str | None = Depends(get_api_key)):
                 """
                 SELECT COUNT(DISTINCT rd.domain) AS unique_domain_count
                 FROM raw_domains rd
-                WHERE LOWER(rd.nodeinfo) = ANY(%s::text[])
-                  AND rd.reason ~ '^5[0-9]{2}'
+                WHERE rd.reason ~ '^5[0-9]{2}'
                   AND (rd.alias IS NULL OR rd.alias = FALSE)
                   AND EXISTS (
-                    SELECT 1
-                    FROM mastodon_domains md
-                    WHERE md.domain = rd.domain
+                    SELECT 1 FROM mastodon_domains md WHERE md.domain = rd.domain
                   )
-            """,
-                (compatible_software,),
+            """
             )
             result = cur.fetchone()
             http_5xx_issues = result[0] if result else 0
@@ -779,35 +760,27 @@ async def get_crawler_health(_api_key: str | None = Depends(get_api_key)):
                 """
                 SELECT COUNT(DISTINCT rd.domain) AS unique_domain_count
                 FROM raw_domains rd
-                WHERE LOWER(rd.nodeinfo) = ANY(%s::text[])
-                  AND rd.reason ~ '^4[0-9]{2}'
+                WHERE rd.reason ~ '^4[0-9]{2}'
                   AND (rd.alias IS NULL OR rd.alias = FALSE)
                   AND EXISTS (
-                    SELECT 1
-                    FROM mastodon_domains md
-                    WHERE md.domain = rd.domain
+                    SELECT 1 FROM mastodon_domains md WHERE md.domain = rd.domain
                   )
-            """,
-                (compatible_software,),
+            """
             )
             result = cur.fetchone()
             http_4xx_issues = result[0] if result else 0
 
-            # File Issues
+            # File / Content Issues
             _ = cur.execute(
                 """
                 SELECT COUNT(DISTINCT rd.domain) AS unique_domain_count
                 FROM raw_domains rd
-                WHERE LOWER(rd.nodeinfo) = ANY(%s::text[])
-                  AND (rd.reason LIKE 'FILE%%' or rd.reason LIKE 'TYPE%%' or rd.reason LIKE 'JSON%%')
+                WHERE (rd.reason LIKE 'FILE%%' OR rd.reason LIKE 'TYPE%%' OR rd.reason LIKE 'JSON%%')
                   AND (rd.alias IS NULL OR rd.alias = FALSE)
                   AND EXISTS (
-                    SELECT 1
-                    FROM mastodon_domains md
-                    WHERE md.domain = rd.domain
+                    SELECT 1 FROM mastodon_domains md WHERE md.domain = rd.domain
                   )
-            """,
-                (compatible_software,),
+            """
             )
             result = cur.fetchone()
             file_issues = result[0] if result else 0
@@ -815,13 +788,14 @@ async def get_crawler_health(_api_key: str | None = Depends(get_api_key)):
             # MAU Issues
             _ = cur.execute(
                 """
-                SELECT COUNT(DISTINCT domain) AS unique_domain_count
-                FROM raw_domains
-                WHERE LOWER(nodeinfo) = ANY(%s::text[])
-                  AND reason LIKE 'MAU%%'
-                  AND (alias IS NULL OR alias = FALSE)
-            """,
-                (compatible_software,),
+                SELECT COUNT(DISTINCT rd.domain) AS unique_domain_count
+                FROM raw_domains rd
+                WHERE rd.reason LIKE 'MAU%%'
+                  AND (rd.alias IS NULL OR rd.alias = FALSE)
+                  AND EXISTS (
+                    SELECT 1 FROM mastodon_domains md WHERE md.domain = rd.domain
+                  )
+            """
             )
             result = cur.fetchone()
             mau_issues = result[0] if result else 0
@@ -865,15 +839,13 @@ async def get_domain_stats(_api_key: str | None = Depends(get_api_key)):
             result = cur.fetchone()
             dead_domains = result[0] if result else 0
 
-            # Non-Mastodon Instances
+            # Non-Mastodon Instances (classified by crawler as OTHER)
             _ = cur.execute(
                 """
                 SELECT COUNT(DISTINCT domain) AS unique_domain_count
                 FROM raw_domains
-                WHERE nodeinfo IS NOT NULL
-                  AND LOWER(nodeinfo) != ALL(%s::text[])
-            """,
-                (list(MASTODON_COMPATIBLE_SOFTWARE),),
+                WHERE reason LIKE 'OTHER%'
+            """
             )
             result = cur.fetchone()
             non_mastodon_instances = result[0] if result else 0
@@ -957,61 +929,6 @@ async def get_most_deployed(_api_key: str | None = Depends(get_api_key)):
         raise _db_error() from None
 
 
-@app.get("/stats/nodeinfo", tags=["Statistics"])
-async def get_nodeinfo_breakdown(_api_key: str | None = Depends(get_api_key)):
-    """Breakdown of detected server software from raw_domains.nodeinfo.
-
-    Returns the count of each unique nodeinfo value (case-normalized) along with
-    totals that let the web interface compare online Mastodon instances against
-    all detected instances:
-
-    - total_detected: every domain we received a nodeinfo response from
-    - detected_mastodon: detected Mastodon-compatible instances (any state)
-    - online_mastodon: Mastodon instances currently tracked as live
-    - software: per-software counts, highest first
-    """
-    try:
-        with db_pool.connection() as conn, conn.cursor() as cur:
-            # Per-software counts (case-normalized)
-            _ = cur.execute(
-                """
-                SELECT LOWER(nodeinfo) AS software, COUNT(*) AS count
-                FROM raw_domains
-                WHERE nodeinfo IS NOT NULL
-                GROUP BY LOWER(nodeinfo)
-                ORDER BY count DESC, software ASC
-            """
-            )
-            software = [
-                {"software": row[0], "count": row[1]} for row in cur.fetchall()
-            ]
-
-            # All detected Mastodon-compatible instances (any state)
-            _ = cur.execute(
-                """
-                SELECT COUNT(*)
-                FROM raw_domains
-                WHERE nodeinfo IS NOT NULL
-                  AND LOWER(nodeinfo) = ANY(%s::text[])
-            """,
-                (list(MASTODON_COMPATIBLE_SOFTWARE),),
-            )
-            result = cur.fetchone()
-            detected_mastodon = result[0] if result else 0
-
-            # Online Mastodon instances (currently tracked as live)
-            _ = cur.execute("SELECT COUNT(*) FROM mastodon_domains")
-            result = cur.fetchone()
-            online_mastodon = result[0] if result else 0
-
-        return {
-            "total_detected": sum(item["count"] for item in software),
-            "detected_mastodon": detected_mastodon,
-            "online_mastodon": online_mastodon,
-            "software": software,
-        }
-    except Exception as e:
-        raise _db_error() from None
 
 
 # =============================================================================
@@ -1120,7 +1037,7 @@ async def get_instances_table(
         "domain": ("md", "domain"),
         "version": ("md", "software_version"),
         "raw_version": ("md", "full_version"),
-        "software": ("rd", "nodeinfo"),
+        "software": ("md", "nodeinfo"),
         "last_crawled": ("md", "timestamp"),
     }
     if sort_by not in valid_sort_cols:
@@ -1149,9 +1066,7 @@ async def get_instances_table(
             " WHERE rv.status = 'main' AND md.software_version LIKE rv.branch || '.%%')"
         ),
         "modified-nodeinfo": sql.SQL(
-            " AND EXISTS (SELECT 1 FROM raw_domains rd2"
-            " WHERE rd2.domain = md.domain AND rd2.nodeinfo IS NOT NULL"
-            " AND LOWER(rd2.nodeinfo) <> 'mastodon')"
+            " AND md.nodeinfo IS NOT NULL AND LOWER(md.nodeinfo) <> 'mastodon'"
         ),
         "failing": sql.SQL(
             " AND (md.timestamp IS NULL OR md.timestamp < NOW() - INTERVAL '24 hours')"
@@ -1184,11 +1099,10 @@ async def get_instances_table(
                     md.domain,
                     md.software_version,
                     md.full_version,
-                    rd.nodeinfo,
+                    md.nodeinfo,
                     md.active_users_monthly,
                     md.timestamp
                 FROM mastodon_domains md
-                LEFT JOIN raw_domains rd ON rd.domain = md.domain
                 WHERE NOT EXISTS (
                     SELECT 1 FROM dni WHERE md.domain LIKE '%%' || dni.domain
                 )

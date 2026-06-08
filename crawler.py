@@ -189,6 +189,7 @@ TRACKED_ERROR_TYPES = (
     "SSL",
     "TCP",
     "SSRF",
+    "OTHER",
     "TYPE",
     "FILE",
     "API",
@@ -206,6 +207,7 @@ RETRY_BASE_HOURS: dict[str, int] = {
     "SSL": max(1, int(os.getenv("VMCRAWL_RETRY_SSL_HOURS", "12"))),
     "TCP": max(1, int(os.getenv("VMCRAWL_RETRY_TCP_HOURS", "6"))),
     "SSRF": max(1, int(os.getenv("VMCRAWL_RETRY_SSRF_HOURS", "72"))),
+    "OTHER": max(1, int(os.getenv("VMCRAWL_RETRY_OTHER_HOURS", "720"))),
     "CONTENT": max(1, int(os.getenv("VMCRAWL_RETRY_CONTENT_HOURS", "12"))),
     "HTTP2XX": max(1, int(os.getenv("VMCRAWL_RETRY_HTTP2XX_HOURS", "24"))),
     "HTTP3XX": max(1, int(os.getenv("VMCRAWL_RETRY_HTTP3XX_HOURS", "24"))),
@@ -214,12 +216,6 @@ RETRY_BASE_HOURS: dict[str, int] = {
     "ROBOT": max(1, int(os.getenv("VMCRAWL_RETRY_ROBOT_HOURS", "720"))),
     "HARD": max(1, int(os.getenv("VMCRAWL_RETRY_HARD_HOURS", "2160"))),
 }
-
-# Precomposed psycopg.sql fragments so call sites never interpolate values
-# or identifiers into SQL text directly. Built once at import time.
-_MASTODON_COMPATIBLE_IN_CLAUSE = sql.SQL("({})").format(
-    sql.SQL(", ").join(sql.Literal(s) for s in MASTODON_COMPATIBLE_SOFTWARE)
-)
 
 # Maps the leading token of reason -> base cadence hours. Mirrors the prefix
 # logic of get_error_type(): explicit DNS/SSL/TCP/HARD/ROBOT tokens, HTTP status
@@ -232,6 +228,7 @@ _REASON_BASE_HOURS_CASE = sql.SQL(
     "  WHEN reason LIKE 'SSL%%' THEN {ssl}"
     "  WHEN reason LIKE 'TCP%%' THEN {tcp}"
     "  WHEN reason LIKE 'SSRF%%' THEN {ssrf}"
+    "  WHEN reason LIKE 'OTHER%%' THEN {other}"
     "  WHEN reason LIKE 'HARD%%' THEN {hard}"
     "  WHEN reason LIKE 'ROBOT%%' THEN {robot}"
     "  WHEN reason ~ '^5[0-9][0-9]' THEN {http5xx}"
@@ -245,6 +242,7 @@ _REASON_BASE_HOURS_CASE = sql.SQL(
     ssl=sql.Literal(RETRY_BASE_HOURS["SSL"]),
     tcp=sql.Literal(RETRY_BASE_HOURS["TCP"]),
     ssrf=sql.Literal(RETRY_BASE_HOURS["SSRF"]),
+    other=sql.Literal(RETRY_BASE_HOURS["OTHER"]),
     hard=sql.Literal(RETRY_BASE_HOURS["HARD"]),
     robot=sql.Literal(RETRY_BASE_HOURS["ROBOT"]),
     http5xx=sql.Literal(RETRY_BASE_HOURS["HTTP5XX"]),
@@ -638,7 +636,7 @@ queue_lease_seconds = max(1, int(os.getenv("VMCRAWL_QUEUE_LEASE_SECONDS", "900")
 queue_poll_seconds = max(1, int(os.getenv("VMCRAWL_QUEUE_POLL_SECONDS", "15")))
 # Recrawl cadences and transient-failure backoff, all expressed in hours.
 recrawl_hours = max(1, int(os.getenv("VMCRAWL_RECRAWL_HOURS", "1")))
-recrawl_nonmasto_hours = max(1, int(os.getenv("VMCRAWL_RECRAWL_NONMASTO_HOURS", "168")))
+recrawl_alias_hours = max(1, int(os.getenv("VMCRAWL_RECRAWL_ALIAS_HOURS", "168")))
 # Global ceiling for the per-type exponential backoff (base * 2**attempts). A
 # transient type backs off up to this cap; ROBOT/HARD bases already exceed it so
 # they stay flat. Default 720h (30d) keeps even persistently-dead domains on a
@@ -1767,31 +1765,6 @@ def clear_domain_error(domain: str) -> None:
             conn.rollback()
 
 
-def _save_matrix_nodeinfo(domain: str) -> None:
-    """Save nodeinfo as 'matrix' for Matrix servers.
-
-    Note: Domain is expected to be pre-normalized to lowercase by caller.
-    """
-    with db_pool.connection() as conn, conn.cursor() as cursor:
-        try:
-            _ = cursor.execute(
-                """
-                    INSERT INTO raw_domains (domain, nodeinfo, reason)
-                    VALUES (%s, %s, %s)
-                    ON CONFLICT(domain) DO UPDATE SET
-                    nodeinfo = excluded.nodeinfo,
-                    reason = excluded.reason
-                """,
-                (domain, "matrix", None),
-            )
-            conn.commit()
-        except Exception as exception:
-            echo(
-                f"{domain}: Failed to save Matrix nodeinfo {exception}",
-                "red",
-                use_tqdm=True,
-            )
-            conn.rollback()
 
 
 # =============================================================================
@@ -1830,7 +1803,7 @@ def mark_domain_as_alias(domain: str) -> None:
         domain: The domain to mark as an alias (should be pre-normalized to lowercase)
     """
     # Build list of all state columns to clear
-    state_columns = ["reason", "nodeinfo"]
+    state_columns = ["reason"]
 
     # Build SET clause: alias = TRUE, col1 = NULL, col2 = NULL, ...
     set_clause = sql.SQL("alias = TRUE, ") + sql.SQL(", ").join(
@@ -1876,55 +1849,6 @@ def delete_domain_from_raw(domain: str) -> None:
             conn.rollback()
 
 
-def save_nodeinfo_software(domain: str, software_data: dict[str, Any]) -> None:
-    """Save software name from nodeinfo to raw_domains.nodeinfo for the domain.
-
-    When nodeinfo is set to non-Mastodon-compatible software, also clears
-    reason since this is not an error condition - it's just a different platform.
-
-    Args:
-        domain: The domain being processed
-        software_data: The 'software' dict from nodeinfo_20_result (contains
-            'name')
-
-    Note: Domain is expected to be pre-normalized to lowercase by caller.
-    """
-    software_name = software_data.get("name", "unknown").lower().replace(" ", "-")
-
-    with db_pool.connection() as conn, conn.cursor() as cursor:
-        try:
-            if not is_mastodon_compatible_software(software_name):
-                # For non-Mastodon platforms, clear reason
-                _ = cursor.execute(
-                    """
-                        INSERT INTO raw_domains
-                        (domain, nodeinfo, reason)
-                        VALUES (%s, %s, %s)
-                        ON CONFLICT(domain) DO UPDATE SET
-                        nodeinfo = excluded.nodeinfo,
-                        reason = excluded.reason
-                        """,
-                    (domain, software_name, None),
-                )
-            else:
-                # For Mastodon-compatible software, just update nodeinfo
-                _ = cursor.execute(
-                    """
-                        INSERT INTO raw_domains (domain, nodeinfo)
-                        VALUES (%s, %s)
-                        ON CONFLICT(domain) DO UPDATE SET
-                        nodeinfo = excluded.nodeinfo
-                        """,
-                    (domain, software_name),
-                )
-            conn.commit()
-        except Exception as exception:
-            echo(
-                f"{domain}: Failed to save nodeinfo software {exception}",
-                "red",
-                use_tqdm=True,
-            )
-            conn.rollback()
 
 
 def update_mastodon_domain(
@@ -1932,6 +1856,7 @@ def update_mastodon_domain(
     software_version,
     software_version_full,
     active_month_users,
+    nodeinfo=None,
 ):
     """Insert or update a Mastodon domain in the database.
 
@@ -1952,13 +1877,14 @@ def update_mastodon_domain(
                 """
                     INSERT INTO mastodon_domains
                     (domain, software_version,
-                     active_users_monthly, timestamp, full_version)
-                    VALUES (%s, %s, %s, %s, %s)
+                     active_users_monthly, timestamp, full_version, nodeinfo)
+                    VALUES (%s, %s, %s, %s, %s, %s)
                     ON CONFLICT(domain) DO UPDATE SET
                     software_version = excluded.software_version,
                     active_users_monthly = excluded.active_users_monthly,
                     timestamp = excluded.timestamp,
-                    full_version = excluded.full_version
+                    full_version = excluded.full_version,
+                    nodeinfo = excluded.nodeinfo
                     WHERE mastodon_domains.timestamp < excluded.timestamp
                 """,
                 (
@@ -1967,6 +1893,7 @@ def update_mastodon_domain(
                     active_month_users,
                     new_timestamp,
                     software_version_full,
+                    nodeinfo,
                 ),
             )
             conn.commit()
@@ -2054,15 +1981,12 @@ def get_dni_domains():
 
 
 def get_not_masto_domains():
-    """Get list of domains where nodeinfo is not Mastodon-compatible."""
+    """Get list of domains classified as non-Mastodon (reason starts with OTHER)."""
     with db_pool.connection() as conn, conn.cursor() as cursor:
         try:
-            query = sql.SQL(
-                "SELECT domain FROM raw_domains "
-                "WHERE nodeinfo IS NOT NULL AND nodeinfo NOT IN {clause}"
-            ).format(clause=_MASTODON_COMPATIBLE_IN_CLAUSE)
-            _ = cursor.execute(query)
-            # Use set for O(1) lookup, stream results
+            _ = cursor.execute(
+                "SELECT domain FROM raw_domains WHERE reason LIKE 'OTHER%'"
+            )
             return {row[0].strip() for row in cursor if row[0] and row[0].strip()}
         except Exception as exception:
             echo(f"Failed to obtain non-mastodon domains: {exception}", "red")
@@ -4996,10 +4920,7 @@ async def check_nodeinfo(
 
             # Check if this is a Matrix server (has m.server field)
             if "m.server" in data:
-                echo(f"{domain}: Matrix", "cyan", use_tqdm=True)
-                # Save nodeinfo as "matrix" and mark as non-Mastodon
-                await asyncio.to_thread(_save_matrix_nodeinfo, domain)
-                await asyncio.to_thread(clear_domain_error, domain)
+                await asyncio.to_thread(mark_as_non_mastodon, domain, "matrix")
                 return False
 
             # Check if this is actually nodeinfo data returned directly
@@ -5247,7 +5168,7 @@ def mark_as_non_mastodon(domain, other_platform):
         other_platform = "Unknown"
     other_platform = other_platform.lower().replace(" ", "-")
     echo(f"{domain}: {other_platform}", "cyan", use_tqdm=True)
-    clear_domain_error(domain)
+    increment_domain_error(domain, "OTHER+nodeinfo")
     delete_domain_if_known(domain)
 
 
@@ -5405,12 +5326,16 @@ def process_mastodon_instance(
         increment_domain_error(domain, "JSON+nodeinfo_20")
         return
 
+    software_name = (
+        nodeinfo_20_result["software"].get("name", "unknown").lower().replace(" ", "-")
+    )
     # Use db_domain (actual_domain if available) for database updates
     update_mastodon_domain(
         db_domain,
         software_version,
         software_version_full,
         active_month_users,
+        nodeinfo=software_name,
     )
 
     clear_domain_error(db_domain)
@@ -5581,16 +5506,6 @@ async def process_domain(domain, nightly_version_ranges, user_choice=None):
             )
             return
 
-        # Save software information from nodeinfo to database
-        software_data = nodeinfo_20_result.get("software")
-        if software_data and isinstance(software_data, dict):
-            await asyncio.to_thread(save_nodeinfo_software, domain, software_data)
-            # Also write nodeinfo for the canonical domain when it differs from the
-            # crawled domain; clear_domain_error only sets reason/alias so the
-            # canonical row would otherwise have nodeinfo=NULL until directly crawled.
-            if instance_uri and instance_uri != domain:
-                await asyncio.to_thread(save_nodeinfo_software, instance_uri, software_data)
-
         await asyncio.to_thread(
             process_mastodon_instance,
             domain,
@@ -5599,11 +5514,6 @@ async def process_domain(domain, nightly_version_ranges, user_choice=None):
             instance_uri,
         )
     else:
-        # Save software information for non-Mastodon platforms unconditionally
-        software_data = nodeinfo_20_result.get("software")
-        if software_data and isinstance(software_data, dict):
-            await asyncio.to_thread(save_nodeinfo_software, domain, software_data)
-
         software_name = (
             nodeinfo_20_result.get("software", {}).get("name")
             if isinstance(nodeinfo_20_result.get("software"), dict)
@@ -6654,20 +6564,18 @@ def reschedule_domain(domain: str, response_time: float | None = None) -> None:
         "    THEN least(({base}) * power(2, attempts), greatest(({base}), %(cap)s)) "
         "         * (0.9 + random() * 0.2) * INTERVAL '1 hour' "
         "  WHEN alias = TRUE "
-        "    THEN %(nonmasto)s * (0.9 + random() * 0.2) * INTERVAL '1 hour' "
-        "  WHEN nodeinfo IS NOT NULL AND nodeinfo NOT IN {masto} "
-        "    THEN %(nonmasto)s * (0.9 + random() * 0.2) * INTERVAL '1 hour' "
+        "    THEN %(alias)s * (0.9 + random() * 0.2) * INTERVAL '1 hour' "
         "  ELSE %(recrawl)s * (0.9 + random() * 0.2) * INTERVAL '1 hour' "
         "END) "
         "WHERE domain = %(domain)s"
-    ).format(base=_REASON_BASE_HOURS_CASE, masto=_MASTODON_COMPATIBLE_IN_CLAUSE)
+    ).format(base=_REASON_BASE_HOURS_CASE)
     with db_pool.connection() as conn, conn.cursor() as cursor:
         try:
             _ = cursor.execute(
                 query,
                 {
                     "cap": retry_cap_hours,
-                    "nonmasto": recrawl_nonmasto_hours,
+                    "alias": recrawl_alias_hours,
                     "recrawl": recrawl_hours,
                     "rt": response_time,
                     "domain": domain,
@@ -6744,7 +6652,7 @@ def load_from_database(user_choice):
         # --new one-shot flag: brand-new, never-crawled domains.
         "0": (
             "SELECT domain FROM raw_domains "
-            "WHERE reason IS NULL AND nodeinfo IS NULL "
+            "WHERE reason IS NULL "
             + no_alias
             + "ORDER BY LENGTH(DOMAIN)"
         ),
@@ -6760,12 +6668,7 @@ def load_from_database(user_choice):
         "52": (
             "SELECT domain FROM mastodon_domains ORDER BY active_users_monthly DESC"
         ),
-        "53": sql.SQL(
-            "SELECT domain FROM raw_domains "
-            "WHERE nodeinfo IN {masto_clause} "
-            "AND (alias IS NULL OR alias = FALSE) "
-            "ORDER BY domain"
-        ).format(masto_clause=_MASTODON_COMPATIBLE_IN_CLAUSE),
+        "53": "SELECT domain FROM mastodon_domains ORDER BY domain",
     }
 
     params = None
