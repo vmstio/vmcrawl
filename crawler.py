@@ -175,7 +175,7 @@ def echo(text: str, color: str, use_tqdm: bool = False, **kwargs: Any) -> None:
 
 
 # HTTP status codes for special handling
-http_codes_to_hardfail = [999, 451, 418, 410]  # gone
+http_codes_to_hardfail = frozenset({410, 418, 451, 999})  # gone / legal / teapot
 
 MASTODON_COMPATIBLE_SOFTWARE = ("mastodon", "hometown", "kmyblue")
 
@@ -201,6 +201,9 @@ TRACKED_ERROR_TYPES = (
     "ROBOT",
     "ALIAS",
 )
+# Subset of TRACKED_ERROR_TYPES that route to _handle_tcp_exception when
+# replayed from a suppressed nodeinfo probe error.
+_TRANSPORT_ERROR_TYPES = frozenset({"DNS", "SSL", "TCP", "TIMEOUT", "REDIRECT", "SSRF", "FILE"})
 
 # Per-error-type base reschedule cadence in hours (env-overridable). The queue
 # reschedules a failed domain at base * 2**attempts, ceilinged per the cap in
@@ -218,6 +221,7 @@ RETRY_BASE_HOURS: dict[str, int] = {
     "HTTP2XX": max(1, int(os.getenv("VMCRAWL_RETRY_HTTP2XX_HOURS", "24"))),
     "HTTP3XX": max(1, int(os.getenv("VMCRAWL_RETRY_HTTP3XX_HOURS", "24"))),
     "HTTP4XX": max(1, int(os.getenv("VMCRAWL_RETRY_HTTP4XX_HOURS", "24"))),
+    "HTTP429": max(1, int(os.getenv("VMCRAWL_RETRY_HTTP429_HOURS", "1"))),
     "HTTP5XX": max(1, int(os.getenv("VMCRAWL_RETRY_HTTP5XX_HOURS", "3"))),
     "ROBOT": max(1, int(os.getenv("VMCRAWL_RETRY_ROBOT_HOURS", "720"))),
     "HARD": max(1, int(os.getenv("VMCRAWL_RETRY_HARD_HOURS", "2160"))),
@@ -241,6 +245,7 @@ _REASON_BASE_HOURS_CASE = sql.SQL(
     "  WHEN error_type = 'ROBOT' THEN {robot}"
     "  WHEN error_type = 'ALIAS' THEN {alias_base}"
     "  WHEN error_type ~ '^5[0-9][0-9]' THEN {http5xx}"
+    "  WHEN error_type = '429' THEN {http429}"
     "  WHEN error_type ~ '^4[0-9][0-9]' THEN {http4xx}"
     "  WHEN error_type ~ '^3[0-9][0-9]' THEN {http3xx}"
     "  WHEN error_type ~ '^2[0-9][0-9]' THEN {http2xx}"
@@ -259,6 +264,7 @@ _REASON_BASE_HOURS_CASE = sql.SQL(
     alias_base=sql.Literal(RETRY_BASE_HOURS["ALIAS"]),
     http5xx=sql.Literal(RETRY_BASE_HOURS["HTTP5XX"]),
     http4xx=sql.Literal(RETRY_BASE_HOURS["HTTP4XX"]),
+    http429=sql.Literal(RETRY_BASE_HOURS["HTTP429"]),
     http3xx=sql.Literal(RETRY_BASE_HOURS["HTTP3XX"]),
     http2xx=sql.Literal(RETRY_BASE_HOURS["HTTP2XX"]),
     content=sql.Literal(RETRY_BASE_HOURS["CONTENT"]),
@@ -4427,8 +4433,10 @@ def _handle_tcp_exception(domain, target, exception):
         return
 
     if error_reason == "REDIRECT":
-        echo(f"{domain}: Too many redirects on {target}", "orange", use_tqdm=True)
-        log_error(domain, f"{target}: too many redirects")
+        redirect_url = getattr(getattr(exception, "request", None), "url", None)
+        redirect_info = f" → {redirect_url}" if redirect_url else ""
+        echo(f"{domain}: Too many redirects on {target}{redirect_info}", "orange", use_tqdm=True)
+        log_error(domain, f"{target}: too many redirects{redirect_info}")
         increment_domain_error(domain, error_reason, target)
         return
 
@@ -4825,7 +4833,7 @@ async def check_nodeinfo(
                 if suppress_errors:
                     return {
                         "suppressed_error": content_type,
-                        "suppressed_error_type": "type",
+                        "suppressed_error_type": "TYPE",
                     }
                 if not suppress_errors:
                     await asyncio.to_thread(
@@ -4839,7 +4847,7 @@ async def check_nodeinfo(
                 if suppress_errors:
                     return {
                         "suppressed_error": "reply is empty",
-                        "suppressed_error_type": "json",
+                        "suppressed_error_type": "JSON",
                     }
                 if not suppress_errors:
                     exception = "reply is empty"
@@ -4860,14 +4868,14 @@ async def check_nodeinfo(
                 if suppress_errors:
                     return {
                         "suppressed_error": "invalid json in nodeinfo reply",
-                        "suppressed_error_type": "json",
+                        "suppressed_error_type": "JSON",
                     }
                 return None if suppress_errors else False
             if not isinstance(data, dict):
                 if suppress_errors:
                     return {
                         "suppressed_error": "nodeinfo reply is not an object",
-                        "suppressed_error_type": "json",
+                        "suppressed_error_type": "JSON",
                     }
                 return None
 
@@ -4910,7 +4918,7 @@ async def check_nodeinfo(
                 if suppress_errors:
                     return {
                         "suppressed_error": "empty links array in reply",
-                        "suppressed_error_type": "json",
+                        "suppressed_error_type": "JSON",
                     }
                 if not suppress_errors:
                     exception = "empty links array in reply"
@@ -4964,7 +4972,7 @@ async def check_nodeinfo(
             elif suppress_errors:
                 return {
                     "suppressed_error": "no links in reply",
-                    "suppressed_error_type": "json",
+                    "suppressed_error_type": "JSON",
                 }
             return None if suppress_errors else False
         if response.status_code in http_codes_to_hardfail:
@@ -4973,7 +4981,7 @@ async def check_nodeinfo(
             )
             return False
         if suppress_errors:
-            return {"suppressed_error": response, "suppressed_error_type": "http"}
+            return {"suppressed_error": response, "suppressed_error_type": "HTTP"}
         await asyncio.to_thread(
             _handle_http_status_code,
             domain,
@@ -4984,7 +4992,7 @@ async def check_nodeinfo(
         if suppress_errors:
             return {
                 "suppressed_error": exception,
-                "suppressed_error_type": _classify_request_exception(exception).lower(),
+                "suppressed_error_type": _classify_request_exception(exception),
             }
         await asyncio.to_thread(
             _handle_tcp_exception,
@@ -4994,7 +5002,7 @@ async def check_nodeinfo(
         )
     except json.JSONDecodeError as exception:
         if suppress_errors:
-            return {"suppressed_error": exception, "suppressed_error_type": "json"}
+            return {"suppressed_error": exception, "suppressed_error_type": "JSON"}
         await asyncio.to_thread(
             _handle_json_exception,
             domain,
@@ -5008,7 +5016,7 @@ async def check_nodeinfo(
         if suppress_errors:
             return {
                 "suppressed_error": exception,
-                "suppressed_error_type": _classify_request_exception(exception).lower(),
+                "suppressed_error_type": _classify_request_exception(exception),
             }
         await asyncio.to_thread(
             _handle_tcp_exception,
@@ -5346,21 +5354,21 @@ async def process_domain(domain, nightly_version_ranges, user_choice=None):
                 error = nodeinfo_probe_error["suppressed_error"]
                 error_type = nodeinfo_probe_error["suppressed_error_type"]
                 target = "nodeinfo"
-                if error_type in {"tcp", "dns", "ssl", "file"}:
+                if error_type in _TRANSPORT_ERROR_TYPES:
                     await asyncio.to_thread(
                         _handle_tcp_exception,
                         domain,
                         target,
                         error,
                     )
-                elif error_type == "http":
+                elif error_type == "HTTP":
                     await asyncio.to_thread(
                         _handle_http_status_code,
                         domain,
                         target,
                         error,
                     )
-                elif error_type == "type":
+                elif error_type == "TYPE":
                     await asyncio.to_thread(
                         _handle_incorrect_file_type,
                         domain,
