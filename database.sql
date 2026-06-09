@@ -178,6 +178,18 @@ CREATE TABLE IF NOT EXISTS maintenance_state (
 );
 INSERT INTO maintenance_state (id) VALUES (TRUE) ON CONFLICT (id) DO NOTHING;
 
+-- Single-row ledger for remote crawl-control signals (pause/resume). The id
+-- CHECK enforces exactly one row. get_crawler_control() reads it each daemon
+-- loop iteration; set_crawler_control() writes it from the CLI or manage menu.
+CREATE TABLE IF NOT EXISTS crawler_control (
+    id BOOLEAN PRIMARY KEY DEFAULT TRUE CHECK (id),
+    paused BOOLEAN NOT NULL DEFAULT FALSE,
+    reason TEXT,
+    set_by TEXT,
+    set_at TIMESTAMPTZ DEFAULT now()
+);
+INSERT INTO crawler_control (id) VALUES (TRUE) ON CONFLICT (id) DO NOTHING;
+
 
 CREATE TABLE IF NOT EXISTS nightly_versions (
     version VARCHAR(50),

@@ -3555,7 +3555,7 @@ def display_queue_status() -> None:
 _MANAGE_CHOICES = frozenset(
     {"1", "2", "3", "4", "5", "6", "7", "8", "s",
      "9", "10", "11", "12", "13", "14", "15", "16", "17", "18", "19",
-     "20", "21"}
+     "20", "21", "22", "23"}
 )
 
 
@@ -4243,8 +4243,85 @@ async def _handle_manage_action(args: argparse.Namespace, choice: str) -> None:
         echo("", "white")
         input("Press Enter to continue...")
 
+    elif choice == "22":
+        ctrl = await asyncio.to_thread(get_crawler_control)
+        if ctrl["paused"]:
+            echo("Queue is already paused", "yellow")
+            if ctrl["reason"]:
+                echo(f"Reason: {ctrl['reason']}", "")
+        else:
+            echo("", "white")
+            reason = input("Reason for pausing (optional): ").strip()
+            ok = await asyncio.to_thread(
+                set_crawler_control, True, reason or None, _worker_id()
+            )
+            if ok:
+                echo(
+                    "Queue paused. Workers will stop claiming new domains after the current batch.",
+                    "yellow",
+                )
+            else:
+                echo("Failed to pause queue", "red")
+        echo("", "white")
+        input("Press Enter to continue...")
+
+    elif choice == "23":
+        ctrl = await asyncio.to_thread(get_crawler_control)
+        if not ctrl["paused"]:
+            echo("Queue is not paused", "yellow")
+        else:
+            ok = await asyncio.to_thread(set_crawler_control, False, None, _worker_id())
+            if ok:
+                echo("Queue resumed. Workers will begin claiming new domains.", "green")
+            else:
+                echo("Failed to resume queue", "red")
+        echo("", "white")
+        input("Press Enter to continue...")
+
     else:
         echo("Invalid choice, please try again", "yellow")
+
+
+async def run_control_mode(args: argparse.Namespace) -> int:
+    """Handle the ``control`` subcommand (pause / resume / status)."""
+    action = getattr(args, "control_action", None)
+
+    if action is None or action == "status":
+        ctrl = await asyncio.to_thread(get_crawler_control)
+        if ctrl["paused"]:
+            echo("Queue is PAUSED", "red")
+            if ctrl["reason"]:
+                echo(f"Reason: {ctrl['reason']}", "yellow")
+            if ctrl["set_by"]:
+                echo(f"Set by: {ctrl['set_by']}", "")
+            if ctrl["set_at"]:
+                echo(f"Set at: {ctrl['set_at']}", "")
+        else:
+            echo("Queue is running", "green")
+        return EXIT_SUCCESS
+
+    if action == "pause":
+        reason = getattr(args, "reason", "") or ""
+        ok = await asyncio.to_thread(
+            set_crawler_control, True, reason or None, _worker_id()
+        )
+        if ok:
+            echo(
+                "Queue paused. Workers will stop claiming new domains after the current batch.",
+                "yellow",
+            )
+            if reason:
+                echo(f"Reason: {reason}", "")
+        return EXIT_SUCCESS if ok else EXIT_FAILURE
+
+    if action == "resume":
+        ok = await asyncio.to_thread(set_crawler_control, False, None, _worker_id())
+        if ok:
+            echo("Queue resumed. Workers will begin claiming new domains.", "green")
+        return EXIT_SUCCESS if ok else EXIT_FAILURE
+
+    echo("Usage: vmcrawl control [status|pause|resume]", "red")
+    return EXIT_FAILURE
 
 
 async def run_manage_mode(args: argparse.Namespace) -> int:
@@ -5755,6 +5832,14 @@ async def run_queue_daemon() -> int:
     # Teardown is handled by async_main's cleanup_connections().
     while True:
         try:
+            # Check for a pause signal before claiming new work.
+            ctrl = await asyncio.to_thread(get_crawler_control)
+            if ctrl["paused"]:
+                reason_str = f": {ctrl['reason']}" if ctrl["reason"] else ""
+                echo(f"Queue paused{reason_str}", "yellow", use_tqdm=True)
+                await asyncio.sleep(queue_poll_seconds)
+                continue
+
             # Pick up version changes made by other instances each cycle.
             if _version_last_refresh is not None:
                 _ = load_versions_from_db()
@@ -6653,6 +6738,39 @@ def claim_maintenance_slot(interval_seconds: int) -> bool:
             return False
 
 
+def get_crawler_control() -> dict[str, Any]:
+    """Return the current crawl-control state from the single-row ledger."""
+    with db_pool.connection() as conn, conn.cursor() as cursor:
+        try:
+            cursor.execute(
+                "SELECT paused, reason, set_by, set_at FROM crawler_control"
+            )
+            row = cursor.fetchone()
+            if row is None:
+                return {"paused": False, "reason": None, "set_by": None, "set_at": None}
+            return {"paused": row[0], "reason": row[1], "set_by": row[2], "set_at": row[3]}
+        except Exception as exception:
+            echo(f"Failed to read crawler control state: {exception}", "red", use_tqdm=True)
+            return {"paused": False, "reason": None, "set_by": None, "set_at": None}
+
+
+def set_crawler_control(paused: bool, reason: str | None, set_by: str) -> bool:
+    """Write pause/resume state to the single-row crawl-control ledger."""
+    with db_pool.connection() as conn, conn.cursor() as cursor:
+        try:
+            cursor.execute(
+                "UPDATE crawler_control "
+                "SET paused = %s, reason = %s, set_by = %s, set_at = now()",
+                (paused, reason or None, set_by),
+            )
+            conn.commit()
+            return True
+        except Exception as exception:
+            echo(f"Failed to update crawler control state: {exception}", "red")
+            conn.rollback()
+            return False
+
+
 def load_from_database(user_choice):
     """Load domain list from database based on user menu selection."""
     query_map = {
@@ -6795,6 +6913,8 @@ def get_menu_options() -> dict[str, dict[str, str]]:
         },
         "Queue": {
             "19": "Show live queue status",
+            "22": "Pause crawl queue",
+            "23": "Resume crawl queue",
         },
     }
 
@@ -6827,7 +6947,7 @@ def interactive_select_menu(menu_options: dict[str, dict[str, str]]) -> str | No
     for category, options in menu_options.items():
         rows.append({"type": "header", "label": category})
         for key, value in options.items():
-            rows.append({"type": "option", "key": key, "label": f"({key}) {value}"})
+            rows.append({"type": "option", "key": key, "label": value})
             selectable_indices.append(len(rows) - 1)
 
     if not selectable_indices:
@@ -7083,6 +7203,24 @@ async def async_main() -> int:
         "manage", help="Manage DNI list and nightly versions (menu-driven interface)"
     )
 
+    # Control subcommand (pause/resume/status for the queue daemon)
+    control_parser = subparsers.add_parser(
+        "control", help="Control the crawl queue daemon (pause, resume, status)"
+    )
+    control_subparsers = control_parser.add_subparsers(
+        dest="control_action", help="Control action"
+    )
+    pause_parser = control_subparsers.add_parser("pause", help="Pause the crawl queue")
+    _ = pause_parser.add_argument(
+        "-r",
+        "--reason",
+        type=str,
+        default="",
+        help="reason for pausing (recorded in the database)",
+    )
+    _ = control_subparsers.add_parser("resume", help="Resume the crawl queue")
+    _ = control_subparsers.add_parser("status", help="Show current queue control state")
+
     # Also add crawl arguments to main parser for backwards compatibility
     _ = parser.add_argument(
         "-f",
@@ -7140,6 +7278,14 @@ async def async_main() -> int:
         if args.command == "manage":
             try:
                 return await run_manage_mode(args)
+            except KeyboardInterrupt:
+                echo(f"\n{appname} interrupted by user", "yellow")
+                return EXIT_INTERRUPTED
+
+        # Handle control subcommand (pause/resume/status)
+        if args.command == "control":
+            try:
+                return await run_control_mode(args)
             except KeyboardInterrupt:
                 echo(f"\n{appname} interrupted by user", "yellow")
                 return EXIT_INTERRUPTED
