@@ -2324,8 +2324,14 @@ async def run_fetch_mode(args: argparse.Namespace) -> int:
     active_domains: set[str] = set()
     completed_domains = 0
 
-    # Create progress bar
-    pbar = tqdm(total=len(domain_list), desc="Fetching", unit="d")
+    # Create progress bar (suppressed in queue mode, where output is consumed
+    # by the daemon rather than an interactive terminal)
+    pbar = tqdm(
+        total=len(domain_list),
+        desc="Fetching",
+        unit="d",
+        disable=queue_mode,
+    )
 
     def _refresh_progress_postfix() -> None:
         active_count = len(active_domains)
@@ -5738,11 +5744,16 @@ async def check_and_record_domains(
     active_domains: set[str] = set()
     completed_domains = 0
 
-    # Create progress bar. In queue mode the daemon runs unattended (often under
-    # a service manager / log aggregator), so the live bar is just noise; disable
-    # it. tqdm.write (echo use_tqdm=True) still works when the bar is disabled.
+    # Create progress bar. Under the durable queue daemon (reschedule=True, which
+    # may be reached via headless detection even when the queue_mode env flag is
+    # unset) the process runs unattended — often under a service manager / log
+    # aggregator — so the live bar is just noise; disable it. tqdm.write (echo
+    # use_tqdm=True) still works when the bar is disabled.
     pbar = tqdm(
-        total=len(domain_list), desc="Crawling", unit="d", disable=queue_mode
+        total=len(domain_list),
+        desc="Crawling",
+        unit="d",
+        disable=queue_mode or reschedule,
     )
 
     def _refresh_progress_postfix() -> None:
