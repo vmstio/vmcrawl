@@ -3243,7 +3243,7 @@ def get_queue_status() -> dict[str, Any]:
         FROM error_log
     """
     recent_errors_query = """
-        SELECT timestamp, domain, error
+        SELECT timestamp, domain, error_type, error_endpoint
         FROM error_log
         ORDER BY event DESC
         LIMIT 100
@@ -3514,22 +3514,22 @@ def render_queue_status(
     max_rows = max(0, max_rows)
 
     # Build error column lines
-    # Field widths: time(8) + 2 gaps(4) = 12 of overhead.
-    e_budget = col_w - 12
-    if 32 + 34 > e_budget:  # shrink, biasing slightly toward the domain
-        e_dom_w = max(12, min(32, e_budget * 5 // 9))
-        e_err_w = max(8, e_budget - e_dom_w)
-    else:
-        e_dom_w, e_err_w = 32, 34
+    # Field widths: time(8) + 3 gaps(6) = 14 overhead, plus the error_type tag.
+    # The standardized error_type values top out at 8 chars (e.g. REDIRECT).
+    e_type_w = 8
+    e_budget = col_w - 14 - e_type_w  # space shared by domain + endpoint
+    e_dom_w = max(12, min(32, e_budget * 3 // 5))  # bias toward the domain
+    e_end_w = max(6, e_budget - e_dom_w)
     ecol: list[str] = [_c("RECENT ERRORS", "bold"), _c("─" * col_w, "cyan"), *e_counts]
     if recent_errors:
         ecol.append("")
-        for ts_e, dom, err in recent_errors[:max_rows]:
+        for ts_e, dom, etype, endpoint in recent_errors[:max_rows]:
             t = ts_e.strftime("%H:%M:%S") if ts_e else "??:??:??"
             ecol.append(
                 f"{_c(t, 'gray')}  "
                 f"{_c(f'{(dom or "")[:e_dom_w]:<{e_dom_w}}', 'red')}  "
-                f"{(err or '')[:e_err_w]}"
+                f"{(etype or '')[:e_type_w]:<{e_type_w}}  "
+                f"{(endpoint or '')[:e_end_w]}"
             )
     else:
         ecol.append("")
