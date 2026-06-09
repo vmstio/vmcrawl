@@ -443,7 +443,7 @@ async def get_summary_stats(_api_key: str | None = Depends(get_api_key)):
             "unique_versions": unique_versions,
             "last_updated": last_updated.isoformat() if last_updated else None,
         }
-    except Exception as e:
+    except Exception:
         raise _db_error() from None
 
 
@@ -475,7 +475,7 @@ async def get_version_stats(_api_key: str | None = Depends(get_api_key)):
                 for row in results
             ]
         }
-    except Exception as e:
+    except Exception:
         raise _db_error() from None
 
 
@@ -587,7 +587,7 @@ async def get_branch_stats(_api_key: str | None = Depends(get_api_key)):
                 "monthly_active_users": (eol_result[1] or 0) if eol_result else 0,
             },
         }
-    except Exception as e:
+    except Exception:
         raise _db_error() from None
 
 
@@ -686,7 +686,7 @@ async def get_patch_adoption(_api_key: str | None = Depends(get_api_key)):
             "instances_patched_percent": patched_instances_percent,
             "mau_patched_percent": patched_mau_percent,
         }
-    except Exception as e:
+    except Exception:
         raise _db_error() from None
 
 
@@ -802,7 +802,7 @@ async def get_crawler_health(_api_key: str | None = Depends(get_api_key)):
             "file_issues": file_issues,
             "mau_issues": mau_issues,
         }
-    except Exception as e:
+    except Exception:
         raise _db_error() from None
 
 
@@ -848,7 +848,7 @@ async def get_domain_stats(_api_key: str | None = Depends(get_api_key)):
             "dead_domains": dead_domains,
             "non_mastodon_instances": non_mastodon_instances,
         }
-    except Exception as e:
+    except Exception:
         raise _db_error() from None
 
 
@@ -867,7 +867,7 @@ async def get_raw_versions(_api_key: str | None = Depends(get_api_key)):
             raw_versions = result[0] if result else 0
 
         return {"raw_versions": raw_versions}
-    except Exception as e:
+    except Exception:
         raise _db_error() from None
 
 
@@ -918,7 +918,7 @@ async def get_most_deployed(_api_key: str | None = Depends(get_api_key)):
                 "total_mau": mau_result[2] if mau_result else 0,
             },
         }
-    except Exception as e:
+    except Exception:
         raise _db_error() from None
 
 
@@ -1006,7 +1006,7 @@ async def get_instances(
                 for row in results
             ],
         }
-    except Exception as e:
+    except Exception:
         raise _db_error() from None
 
 
@@ -1145,7 +1145,7 @@ async def get_instances_table(
                 for row in results
             ],
         }
-    except Exception as e:
+    except Exception:
         raise _db_error() from None
 
 
@@ -1186,7 +1186,7 @@ async def get_instance(
         }
     except HTTPException:
         raise
-    except Exception as e:
+    except Exception:
         raise _db_error() from None
 
 
@@ -1242,7 +1242,7 @@ async def get_instances_by_version(
                 for row in results
             ],
         }
-    except Exception as e:
+    except Exception:
         raise _db_error() from None
 
 
@@ -1291,7 +1291,7 @@ async def search_instances(
                 for row in results
             ],
         }
-    except Exception as e:
+    except Exception:
         raise _db_error() from None
 
 
@@ -1374,7 +1374,7 @@ async def get_history_stats(
                 for row in results
             ]
         }
-    except Exception as e:
+    except Exception:
         raise _db_error() from None
 
 
@@ -1606,7 +1606,7 @@ async def get_patch_detail(_api_key: str | None = Depends(get_api_key)):
             }
 
         return {"branches": branches}
-    except Exception as e:
+    except Exception:
         raise _db_error() from None
 
 
@@ -1664,7 +1664,7 @@ async def get_patch_distribution(_api_key: str | None = Depends(get_api_key)):
                 for row in results
             ]
         }
-    except Exception as e:
+    except Exception:
         raise _db_error() from None
 
 
@@ -1721,7 +1721,7 @@ async def get_branch_distribution(_api_key: str | None = Depends(get_api_key)):
                 for row in results
             ]
         }
-    except Exception as e:
+    except Exception:
         raise _db_error() from None
 
 
@@ -1764,7 +1764,7 @@ async def get_eol_distribution(_api_key: str | None = Depends(get_api_key)):
                 for row in results
             ]
         }
-    except Exception as e:
+    except Exception:
         raise _db_error() from None
 
 
@@ -1846,7 +1846,7 @@ async def get_branch_adoption(_api_key: str | None = Depends(get_api_key)):
                 for row in results
             ]
         }
-    except Exception as e:
+    except Exception:
         raise _db_error() from None
 
 
@@ -1911,7 +1911,7 @@ async def get_supported_branches_coverage(
             ),
             "mau_percent": (round(float(result[1]), 1) if result and result[1] else 0),
         }
-    except Exception as e:
+    except Exception:
         raise _db_error() from None
 
 
@@ -1920,16 +1920,6 @@ async def get_supported_branches_coverage(
 # =============================================================================
 
 QUICKCHART_URL = "https://quickchart.io/chart"
-CHART_COLORS = [
-    "#9b59b6",
-    "#3498db",
-    "#2ecc71",
-    "#f39c12",
-    "#1abc9c",
-    "#e67e22",
-    "#95a5a6",
-]
-BRANCH_COLORS = ["#2ecc71", "#3498db", "#9b59b6", "#f39c12", "#1abc9c", "#e67e22"]
 RED = "#e74c3c"
 ORANGE = "#f39c12"
 PURPLE = "#9b59b6"
@@ -2195,9 +2185,9 @@ async def chart_patch_distribution(
 
         png = await _fetch_chart_png(chart_config)
         return Response(content=png, media_type="image/png")
-    except httpx.HTTPError as e:
+    except httpx.HTTPError:
         raise _chart_error() from None
-    except Exception as e:
+    except Exception:
         raise _db_error() from None
 
 
@@ -2304,9 +2294,9 @@ async def chart_branch_distribution(
 
         png = await _fetch_chart_png(chart_config)
         return Response(content=png, media_type="image/png")
-    except httpx.HTTPError as e:
+    except httpx.HTTPError:
         raise _chart_error() from None
-    except Exception as e:
+    except Exception:
         raise _db_error() from None
 
 
@@ -2435,9 +2425,9 @@ async def chart_branch_adoption(
 
         png = await _fetch_chart_png(chart_config)
         return Response(content=png, media_type="image/png")
-    except httpx.HTTPError as e:
+    except httpx.HTTPError:
         raise _chart_error() from None
-    except Exception as e:
+    except Exception:
         raise _db_error() from None
 
 
@@ -2466,7 +2456,7 @@ async def chart_patch_history(
             )
             rows = cur.fetchall()
 
-    except Exception as e:
+    except Exception:
         raise _db_error() from None
 
     # Reverse so oldest → newest left-to-right; take last 10 for readability
@@ -2573,7 +2563,7 @@ async def chart_patch_history(
 
     try:
         png = await _fetch_chart_png(chart_config, functions)
-    except httpx.HTTPError as e:
+    except httpx.HTTPError:
         raise _chart_error() from None
     return Response(content=png, media_type="image/png")
 
@@ -2603,7 +2593,7 @@ async def chart_branch_history(
             )
             rows = cur.fetchall()
 
-    except Exception as e:
+    except Exception:
         raise _db_error() from None
 
     hist = list(reversed(rows))[-10:]
@@ -2719,7 +2709,7 @@ async def chart_branch_history(
 
     try:
         png = await _fetch_chart_png(chart_config, functions)
-    except httpx.HTTPError as e:
+    except httpx.HTTPError:
         raise _chart_error() from None
     return Response(content=png, media_type="image/png")
 

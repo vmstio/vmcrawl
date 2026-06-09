@@ -1141,34 +1141,6 @@ async def read_main_version_info(url: str) -> dict[str, str] | None:
     return version_info
 
 
-async def get_highest_mastodon_version() -> str | None:
-    """Get the highest stable Mastodon release version from GitHub."""
-    highest_version: str | None = None
-    try:
-        release_url = "https://api.github.com/repos/mastodon/mastodon/releases"
-        response = await get_httpx(release_url)
-        if response.status_code == 200:
-            releases = response.json()
-            highest_version = None
-            for release in releases:
-                release_version = release["tag_name"].lstrip("v")
-                if version.parse(release_version).is_prerelease:
-                    continue
-                if highest_version is None or version.parse(
-                    release_version,
-                ) > version.parse(highest_version):
-                    highest_version = release_version
-    except (httpx.HTTPError, ValueError, RuntimeError) as exception:
-        # ValueError/RuntimeError cover oversized/malformed responses and
-        # exhausted retries from get_httpx; ValueError also covers a malformed
-        # response.json() (JSONDecodeError) and an unparseable release tag
-        # (packaging's InvalidVersion) — all of which were previously uncaught.
-        echo(f"Failed to retrieve Mastodon release version: {exception}", "red")
-        return None
-
-    return highest_version
-
-
 async def get_all_tracked_mastodon_versions():
     """Get the latest version for each tracked branch (release + EOL) from GitHub.
 
@@ -1294,20 +1266,6 @@ async def get_main_version_release():
 
     obtained_main_version = f"{major}.{minor}.{patch}-{pre}"
     return obtained_main_version
-
-
-async def get_main_version_branch():
-    """Get the current main branch number (e.g., '4.3')."""
-    url = "https://raw.githubusercontent.com/mastodon/mastodon/refs/heads/main/lib/mastodon/version.rb"
-    version_info = await read_main_version_info(url)
-    if not version_info:
-        return "0.0"
-
-    major = version_info.get("major", "0")
-    minor = version_info.get("minor", "0")
-
-    obtained_main_branch = f"{major}.{minor}"
-    return obtained_main_branch
 
 
 def get_nightly_version_ranges() -> (
@@ -2822,53 +2780,6 @@ def _parse_dni_csv(csv_content: str) -> list[str]:
         return []
 
 
-async def run_dni_mode(args):
-    """Run the DNI list management mode."""
-    echo(f"{appname} v{appversion} (dni mode)", "bold")
-    if _is_running_headless():
-        echo("Running in headless mode", "cyan")
-
-    # List domains
-    if args.list:
-        list_dni_domains()
-        return
-
-    # Count domains
-    if args.count:
-        _ = count_dni_domains()
-        return
-
-    # Get existing domains to avoid duplicates
-    existing_domains = get_existing_dni_domains()
-
-    # Fetch and import DNI list
-    echo("Fetching IFTAS DNI List…", "bold")
-    csv_content = await fetch_dni_csv(args.url)
-    if not csv_content:
-        echo("Failed to fetch DNI CSV", "red")
-        return
-
-    domains = _parse_dni_csv(csv_content)
-    if not domains:
-        echo("No domains parsed from DNI CSV", "yellow")
-        return
-
-    new_domains = [d for d in domains if d not in existing_domains]
-    echo(
-        f"Found {len(new_domains)} new DNI domains (out of {len(domains)} total)",
-        "cyan",
-    )
-
-    if new_domains:
-        imported = import_dni_domains(new_domains, comment="iftas-dni")
-        echo(f"Total new domains imported: {imported}", "green")
-    else:
-        echo("All DNI domains already exist in database", "yellow")
-
-    _ = count_dni_domains()
-    echo("DNI import complete!", "bold")
-
-
 # =============================================================================
 # NIGHTLY FUNCTIONS - Nightly Version Management
 # =============================================================================
@@ -2979,7 +2890,7 @@ def add_nightly_version(
         if auto_update_previous:
             active_version = get_active_nightly_version()
             if active_version:
-                old_version, old_start, old_end = active_version
+                old_version, _old_start, old_end = active_version
                 # Calculate new end date (one day before new start_date)
                 new_end_date = (
                     datetime.strptime(start_date, "%Y-%m-%d") - timedelta(days=1)
@@ -3106,7 +3017,7 @@ def interactive_add_nightly():
     # Confirm update of previous version
     active = get_active_nightly_version()
     if active and end_date == "2099-12-31":
-        old_version, old_start, old_end = active
+        old_version, _old_start, old_end = active
         new_end = (
             datetime.strptime(start_date, "%Y-%m-%d") - timedelta(days=1)
         ).strftime("%Y-%m-%d")
@@ -3540,16 +3451,6 @@ def render_queue_status(
     ln()
 
     return "\n".join(lines) + "\n"
-
-
-def display_queue_status() -> None:
-    """Print queue status metrics to stdout."""
-    try:
-        stats = get_queue_status()
-    except Exception as e:
-        echo(f"Failed to retrieve queue status: {e}", "red")
-        return
-    print(render_queue_status(stats), end="")
 
 
 _MANAGE_CHOICES = frozenset(
