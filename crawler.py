@@ -669,7 +669,7 @@ queue_peers_enabled = os.getenv("VMCRAWL_QUEUE_PEERS", "true").strip().lower() i
     "yes",
     "on",
 }
-peers_min_active = max(0, int(os.getenv("VMCRAWL_PEERS_MIN_ACTIVE", "10")))
+peers_min_active = max(0, int(os.getenv("VMCRAWL_PEERS_MIN_ACTIVE", "100")))
 
 
 def _worker_id() -> str:
