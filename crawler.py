@@ -3555,7 +3555,7 @@ def display_queue_status() -> None:
 _MANAGE_CHOICES = frozenset(
     {"1", "2", "3", "4", "5", "6", "7", "8", "s",
      "9", "10", "11", "12", "13", "14", "15", "16", "17", "18", "19",
-     "20", "21", "22", "23"}
+     "20", "21", "22", "23", "24", "50", "51", "52", "53"}
 )
 
 
@@ -4275,6 +4275,72 @@ async def _handle_manage_action(args: argparse.Namespace, choice: str) -> None:
                 echo("Queue resumed. Workers will begin claiming new domains.", "green")
             else:
                 echo("Failed to resume queue", "red")
+        echo("", "white")
+        input("Press Enter to continue...")
+
+    elif choice == "24":
+        echo("Compressing far-future schedules to within 24 hours…", "cyan")
+        with db_pool.connection() as conn, conn.cursor() as cursor:
+            try:
+                _ = cursor.execute(
+                    "UPDATE raw_domains "
+                    "SET next_crawl_at = now() + random() * INTERVAL '24 hours' "
+                    "WHERE next_crawl_at > now() + INTERVAL '24 hours'"
+                )
+                count = cursor.rowcount
+                conn.commit()
+                echo(f"Rescheduled {count} domain(s).", "green")
+            except Exception as exc:
+                conn.rollback()
+                echo(f"Failed to reschedule domains: {exc}", "red")
+        echo("", "white")
+        input("Press Enter to continue...")
+
+    elif choice in {"50", "51", "52", "53"}:
+        labels = {
+            "50": "Unpatched versions",
+            "51": f"{version_main_branch} branch",
+            "52": "All active instances",
+            "53": "All known instances",
+        }
+        echo(f"Requeueing: {labels[choice]}…", "cyan")
+
+        if choice == "50":
+            patched_versions = all_patched_versions or []
+            echo("Excluding versions:", "cyan")
+            for ver in patched_versions:
+                echo(f" - {ver}", "cyan")
+            subquery = (
+                "SELECT domain FROM mastodon_domains "
+                "WHERE software_version != ALL(%(versions)s::text[])"
+            )
+            params: dict | list = {"versions": patched_versions}
+        elif choice == "51":
+            subquery = (
+                "SELECT domain FROM mastodon_domains "
+                "WHERE software_version LIKE %s"
+            )
+            params = [f"{version_main_branch or ''}%"]
+        else:
+            subquery = "SELECT domain FROM mastodon_domains"
+            params = {}
+
+        update_sql = (
+            f"UPDATE raw_domains SET next_crawl_at = NULL "
+            f"WHERE domain IN ({subquery})"
+        )
+        with db_pool.connection() as conn, conn.cursor() as cursor:
+            try:
+                if params:
+                    _ = cursor.execute(update_sql, params)  # pyright: ignore[reportCallIssue,reportArgumentType]
+                else:
+                    _ = cursor.execute(update_sql)
+                count = cursor.rowcount
+                conn.commit()
+                echo(f"Requeued {count} domain(s).", "green")
+            except Exception as exc:
+                conn.rollback()
+                echo(f"Failed to requeue domains: {exc}", "red")
         echo("", "white")
         input("Press Enter to continue...")
 
@@ -6869,7 +6935,13 @@ def load_from_file(file_name):
 def get_menu_options() -> dict[str, dict[str, str]]:
     """Return the unified menu options dictionary."""
     return {
-        "Retry known instances": {
+        "Queue": {
+            "19": "Show live queue status",
+            "22": "Pause crawl queue",
+            "23": "Resume crawl queue",
+            "24": "Compress far-future schedules to 24h",
+        },
+        "Requeue known instances": {
             "50": "Unpatched versions",
             "51": f"{version_main_branch} branch",
             "52": "All active instances",
@@ -6910,11 +6982,6 @@ def get_menu_options() -> dict[str, dict[str, str]]:
             "16": "List flagged days",
             "17": "Flag day as invalid",
             "18": "Unflag day",
-        },
-        "Queue": {
-            "19": "Show live queue status",
-            "22": "Pause crawl queue",
-            "23": "Resume crawl queue",
         },
     }
 
