@@ -3225,7 +3225,7 @@ def get_queue_status() -> dict[str, Any]:
         SELECT timestamp, domain, error
         FROM error_log
         ORDER BY event DESC
-        LIMIT 20
+        LIMIT 100
     """
     with db_pool.connection() as conn, conn.cursor() as cursor:
         _ = cursor.execute(query, {"lease": queue_lease_seconds})
@@ -3275,7 +3275,7 @@ def get_queue_status() -> dict[str, Any]:
             FROM mastodon_domains
             WHERE timestamp IS NOT NULL
             ORDER BY timestamp DESC
-            LIMIT 20
+            LIMIT 100
             """
         )
         result["recent_updates"] = cursor.fetchall()
@@ -3296,8 +3296,21 @@ def render_queue_status(
     prev_stats: dict[str, Any] | None = None,
     elapsed: float = 0.0,
     header: str = "",
+    width: int = 168,
+    height: int | None = None,
 ) -> str:
-    """Render queue status as an ANSI-formatted string for the live monitor."""
+    """Render queue status as an ANSI-formatted string for the live monitor.
+
+    The layout is responsive: it degrades gracefully down to a 50-column
+    console. Wide terminals show RECENT ERRORS and RECENT UPDATES side by
+    side; narrow ones stack them and shrink each field to fit.
+
+    When ``height`` (the console row count) is given, the RECENT UPDATES and
+    RECENT ERRORS cells grow or shrink to fill the leftover vertical space
+    instead of always emitting every fetched row.
+    """
+    # Designed to stay readable down to a 50-column console.
+    width = max(50, width)
     lines: list[str] = []
 
     def ln(text: str = "") -> None:
@@ -3314,11 +3327,29 @@ def render_queue_status(
     def _c(text: str, color: str) -> str:
         return f"{colors.get(color, '')}{text}{colors['reset']}"
 
+    def _zip_cols(cols: list[list[str]], col_w: int, gap: int) -> list[str]:
+        """Lay column line-lists side by side, ``gap`` spaces between them."""
+        out: list[str] = []
+        for i in range(max((len(c) for c in cols), default=0)):
+            row = ""
+            for j, col in enumerate(cols):
+                cell = col[i] if i < len(col) else ""
+                row += _vpad(cell, col_w + gap) if j < len(cols) - 1 else cell
+            out.append(row.rstrip())
+        return out
+
     now = datetime.now(UTC)
     ts = now.strftime("%Y-%m-%d %H:%M:%S UTC")
     title = f"{header}Queue Status  [{ts}]"
+    # Keep the title on one physical row: a wrapped line would throw off the
+    # cursor-up line count the live monitor uses to redraw. Drop the date (then
+    # hard-truncate) on a narrow console.
+    if len(title) > width:
+        title = f"{header}Queue Status  [{now.strftime('%H:%M:%S UTC')}]"
+    if len(title) > width:
+        title = title[:width]
     ln(_c(title, "bold"))
-    ln(_c("─" * len(title), "cyan"))
+    ln(_c("─" * min(len(title), width), "cyan"))
     ln()
 
     total = stats.get("total", 0) or 0
@@ -3331,124 +3362,201 @@ def render_queue_status(
     total_attempts = stats.get("total_attempts") or 0
     avg_rt = stats.get("avg_response_time")
 
-    # Queue section
-    ln(_c("  QUEUE", "bold"))
-    ln(_c("  " + "─" * 46, "cyan"))
-    ln(f"  {'Total domains:':<20} {_c(f'{total:>10,}', 'white')}")
-    ln(f"  {'Due now:':<20} {_c(f'{due_now:>10,}', 'yellow' if due_now > 0 else 'white')}")
-    ln(f"  {'In progress:':<20} {_c(f'{in_progress:>10,}', 'green' if in_progress > 0 else 'white')}")
-    ln(f"  {'Scheduled:':<20} {_c(f'{scheduled:>10,}', 'white')}")
-    ln(f"  {'Stale leases:':<20} {_c(f'{stale:>10,}', 'red' if stale > 0 else 'white')}")
-    if next_due_at is not None:
-        diff = next_due_at - now
-        eta = _fmt_duration(max(0, int(diff.total_seconds())))
-        ln(f"  {'Next scheduled:':<20} {_c(f'{eta:>10}', 'white')} from now")
-    ln()
-
-    # Performance section
-    ln(_c("  PERFORMANCE", "bold"))
-    ln(_c("  " + "─" * 46, "cyan"))
-    if avg_rt is not None:
-        ln(f"  {'Avg response time:':<20} {_c(f'{avg_rt:>9.2f}s', 'white')}")
-    if prev_stats is not None and elapsed > 0:
-        prev_attempts = prev_stats.get("total_attempts") or 0
-        delta = max(0, total_attempts - prev_attempts)
-        rate = delta / elapsed * 60
-        tput = f"{rate:.1f}/min"
-        ln(f"  {'Throughput:':<20} {_c(f'{tput:>10}', 'green' if rate > 0 else 'white')}")
-    else:
-        ln(f"  {'Throughput:':<20} {_c('        –', 'white')}")
-    ln()
-
-    # RECENT ERRORS (left) and RECENT UPDATES (right) side by side.
-    # Each section is 82 visible chars wide; 4-char gap between them (total ~168).
-    SEC_W = 82
-    SEP = "─" * (SEC_W - 2)  # 80 dashes, with 2-char indent = 82 total
-
-    error_last_1m = stats.get("error_last_1m") or 0
-    error_last_10m = stats.get("error_last_10m") or 0
-    recent_errors = stats.get("recent_errors", [])
-    recent_updates = stats.get("recent_updates", [])
-
-    # Build error column lines
-    ecol: list[str] = []
-    ecol.append(_c("  RECENT ERRORS", "bold"))
-    ecol.append(_c("  " + SEP, "cyan"))
-    error_last_1h  = stats.get("error_last_1h") or 0
-    error_last_24h = stats.get("error_last_24h") or 0
-    def _ec(n: int) -> str:
-        return _c(f"{n:,}", "red" if n > 0 else "white")
-    ecol.append(
-        f"  Last 1m: {_ec(error_last_1m)}   Last 10m: {_ec(error_last_10m)}"
-        f"   Last 1h: {_ec(error_last_1h)}   Last 24h: {_ec(error_last_24h)}"
-    )
-    if recent_errors:
-        ecol.append("")
-        for ts_e, dom, err in recent_errors:
-            t = ts_e.strftime("%H:%M:%S") if ts_e else "??:??:??"
-            ecol.append(
-                f"  {_c(t, 'gray')}  "
-                f"{_c(f'{(dom or '')[:32]:<32}', 'cyan')}  "
-                f"{(err or '')[:34]}"
-            )
-    else:
-        ecol.append("")
-        ecol.append(_c("    No recent errors", "gray"))
-
-    # Build updates column lines
-    update_last_1m = stats.get("update_last_1m") or 0
-    update_last_10m = stats.get("update_last_10m") or 0
-    ucol: list[str] = []
-    ucol.append(_c("  RECENT UPDATES", "bold"))
-    ucol.append(_c("  " + SEP, "cyan"))
-    update_last_1h  = stats.get("update_last_1h") or 0
-    update_last_24h = stats.get("update_last_24h") or 0
-    def _uc(n: int) -> str:
-        return _c(f"{n:,}", "green" if n > 0 else "white")
-    ucol.append(
-        f"  Last 1m: {_uc(update_last_1m)}   Last 10m: {_uc(update_last_10m)}"
-        f"   Last 1h: {_uc(update_last_1h)}   Last 24h: {_uc(update_last_24h)}"
-    )
-    if recent_updates:
-        ucol.append("")
-        for dom, ver, mau, ts_u in recent_updates:
-            t = ts_u.strftime("%H:%M:%S") if ts_u else "??:??:??"
-            mau_s = f"{mau:,}" if mau is not None else "–"
-            ucol.append(
-                f"  {_c(t, 'gray')}  "
-                f"{_c(f'{(dom or '')[:34]:<34}', 'green')}  "
-                f"{(ver or '')[:16]:<16}  "
-                f"{_c(f'{mau_s:>9}', 'white')}"
-            )
-    else:
-        ucol.append("")
-        ucol.append(_c("    No updates yet", "gray"))
-
-    # Zip both columns side by side
-    for i in range(max(len(ecol), len(ucol))):
-        left = ecol[i] if i < len(ecol) else ""
-        right = ucol[i] if i < len(ucol) else ""
-        ln(_vpad(left, SEC_W + 4) + right)
-    ln()
-
-    # Workers section
-    ln(_c(f"  WORKERS  ({workers} active)", "bold"))
-    ln(_c("  " + "─" * 46, "cyan"))
+    # Top row: QUEUE, PERFORMANCE and WORKERS as three columns when the console
+    # is wide enough; otherwise stacked. TOP_MIN is the narrowest a column may be
+    # before we fall back to stacking.
+    TOP_GAP = 4
+    TOP_MIN = 31
     worker_rows = stats.get("workers", [])
-    if worker_rows:
+
+    def _queue_col(cw: int) -> list[str]:
+        c = [_c("QUEUE", "bold"), _c("─" * cw, "cyan")]
+        c.append(f"{'Total domains:':<20} {_c(f'{total:>10,}', 'white')}")
+        c.append(f"{'Due now:':<20} {_c(f'{due_now:>10,}', 'yellow' if due_now > 0 else 'white')}")
+        c.append(f"{'In progress:':<20} {_c(f'{in_progress:>10,}', 'green' if in_progress > 0 else 'white')}")
+        c.append(f"{'Scheduled:':<20} {_c(f'{scheduled:>10,}', 'white')}")
+        c.append(f"{'Stale leases:':<20} {_c(f'{stale:>10,}', 'red' if stale > 0 else 'white')}")
+        if next_due_at is not None:
+            eta = _fmt_duration(max(0, int((next_due_at - now).total_seconds())))
+            row = f"{'Next scheduled:':<20} {_c(f'{eta:>10}', 'white')}"
+            c.append(row + " from now" if cw >= 40 else row)
+        return c
+
+    def _perf_col(cw: int) -> list[str]:
+        c = [_c("PERFORMANCE", "bold"), _c("─" * cw, "cyan")]
+        if avg_rt is not None:
+            c.append(f"{'Avg response time:':<20} {_c(f'{avg_rt:>9.2f}s', 'white')}")
+        if prev_stats is not None and elapsed > 0:
+            prev_attempts = prev_stats.get("total_attempts") or 0
+            rate = max(0, total_attempts - prev_attempts) / elapsed * 60
+            tput = f"{rate:.1f}/min"
+            c.append(f"{'Throughput:':<20} {_c(f'{tput:>10}', 'green' if rate > 0 else 'white')}")
+        else:
+            c.append(f"{'Throughput:':<20} {_c('        –', 'white')}")
+        return c
+
+    def _workers_col(cw: int) -> list[str]:
+        c = [_c(f"WORKERS  ({workers} active)", "bold"), _c("─" * cw, "cyan")]
+        if not worker_rows:
+            c.append(_c("No active workers", "gray"))
+            return c
         hostnames = [w.split(":")[0] for w, _, _ in worker_rows]
         duplicate_hosts = {h for h in hostnames if hostnames.count(h) > 1}
         for worker_name, worker_count, worker_since in worker_rows:
             host = worker_name.split(":")[0]
             label = worker_name if host in duplicate_hosts else host
             since_str = ""
+            slen = 0
             if worker_since:
                 age = max(0, int((now - worker_since).total_seconds()))
-                since_str = f"  {_c(f'(since {_fmt_duration(age)})', 'gray')}"
-            ln(f"    {_c(f'{label:<30}', 'cyan')}{worker_count:>6,}{since_str}")
+                since_txt = f"(since {_fmt_duration(age)})"
+                since_str = f"  {_c(since_txt, 'gray')}"
+                slen = len(since_txt) + 2
+            # Row = label + count(6) + since. Shrink the label to the column
+            # width; drop "since" first if even that won't fit.
+            if cw - 6 - slen < 6:
+                since_str, slen = "", 0
+            label_w = min(30, max(6, cw - 6 - slen))
+            c.append(
+                f"{_c(f'{label[:label_w]:<{label_w}}', 'cyan')}"
+                f"{worker_count:>6,}{since_str}"
+            )
+        return c
+
+    if width >= 3 * TOP_MIN + 2 * TOP_GAP:
+        top_w = (width - 2 * TOP_GAP) // 3
+        for line in _zip_cols(
+            [_queue_col(top_w), _perf_col(top_w), _workers_col(top_w)],
+            top_w, TOP_GAP,
+        ):
+            ln(line)
+        ln()
     else:
-        ln(_c("    No active workers", "gray"))
+        for col in (_queue_col(width), _perf_col(width), _workers_col(width)):
+            for line in col:
+                ln(line)
+            ln()
+
+    # RECENT ERRORS and RECENT UPDATES. Shown side by side when the console
+    # is wide enough; otherwise stacked. ``SEC_W`` (82) is the preferred column
+    # width; each column shrinks to fit when space is tight.
+    SEC_W = 82
+    GAP = 4
+    two_col_w = (width - GAP) // 2
+    side_by_side = two_col_w >= 50
+    col_w = min(SEC_W, two_col_w) if side_by_side else width
+
+    error_last_1m = stats.get("error_last_1m") or 0
+    error_last_10m = stats.get("error_last_10m") or 0
+    error_last_1h = stats.get("error_last_1h") or 0
+    error_last_24h = stats.get("error_last_24h") or 0
+    update_last_1m = stats.get("update_last_1m") or 0
+    update_last_10m = stats.get("update_last_10m") or 0
+    update_last_1h = stats.get("update_last_1h") or 0
+    update_last_24h = stats.get("update_last_24h") or 0
+    recent_errors = stats.get("recent_errors", [])
+    recent_updates = stats.get("recent_updates", [])
+
+    def _counter_lines(cells: list[str]) -> list[str]:
+        """One line if the four counters fit ``col_w``; otherwise two per line."""
+        one = "   ".join(cells)
+        if _vlen(one) <= col_w:
+            return [one]
+        return ["   ".join(cells[i : i + 2]) for i in range(0, len(cells), 2)]
+
+    def _ec(n: int) -> str:
+        return _c(f"{n:,}", "red" if n > 0 else "white")
+    def _uc(n: int) -> str:
+        return _c(f"{n:,}", "green" if n > 0 else "white")
+    e_counts = _counter_lines([
+        f"Last 1m: {_ec(error_last_1m)}", f"Last 10m: {_ec(error_last_10m)}",
+        f"Last 1h: {_ec(error_last_1h)}", f"Last 24h: {_ec(error_last_24h)}",
+    ])
+    u_counts = _counter_lines([
+        f"Last 1m: {_uc(update_last_1m)}", f"Last 10m: {_uc(update_last_10m)}",
+        f"Last 1h: {_uc(update_last_1h)}", f"Last 24h: {_uc(update_last_24h)}",
+    ])
+
+    # Size the two cells to the window: show as many rows as the leftover
+    # vertical space allows — filling a tall console, truncating a short one.
+    # Per-cell non-data overhead = header + separator + counters + one blank.
+    # ``lines`` already holds the title and the top three-column block.
+    cell_overhead = 3 + max(len(e_counts), len(u_counts))
+    if height is None:
+        max_rows = max(len(recent_errors), len(recent_updates))
+    elif side_by_side:
+        # title/top rows + one zipped cell + trailing blank, leaving the footer.
+        max_rows = height - 2 - len(lines) - cell_overhead - 1
+    else:
+        # Stacked: both cells, a separating blank, and a trailing blank.
+        max_rows = (height - 2 - len(lines) - 2 * cell_overhead - 2) // 2
+    max_rows = max(0, max_rows)
+
+    # Build error column lines
+    # Field widths: time(8) + 2 gaps(4) = 12 of overhead.
+    e_budget = col_w - 12
+    if 32 + 34 > e_budget:  # shrink, biasing slightly toward the domain
+        e_dom_w = max(12, min(32, e_budget * 5 // 9))
+        e_err_w = max(8, e_budget - e_dom_w)
+    else:
+        e_dom_w, e_err_w = 32, 34
+    ecol: list[str] = [_c("RECENT ERRORS", "bold"), _c("─" * col_w, "cyan"), *e_counts]
+    if recent_errors:
+        ecol.append("")
+        for ts_e, dom, err in recent_errors[:max_rows]:
+            t = ts_e.strftime("%H:%M:%S") if ts_e else "??:??:??"
+            ecol.append(
+                f"{_c(t, 'gray')}  "
+                f"{_c(f'{(dom or "")[:e_dom_w]:<{e_dom_w}}', 'red')}  "
+                f"{(err or '')[:e_err_w]}"
+            )
+    else:
+        ecol.append("")
+        ecol.append(_c("  No recent errors", "gray"))
+
+    # Build updates column lines
+    # Field widths: time(8) + 3 gaps(6) = 14 overhead, plus mau(9).
+    u_mau_w = 9
+    u_budget = col_w - 14 - u_mau_w  # space shared by domain + version
+    if 34 + 16 > u_budget:
+        u_ver_w = max(6, min(16, u_budget // 3))
+        u_dom_w = max(10, u_budget - u_ver_w)
+    else:
+        u_dom_w, u_ver_w = 34, 16
+    ucol: list[str] = [_c("RECENT UPDATES", "bold"), _c("─" * col_w, "cyan"), *u_counts]
+    if recent_updates:
+        ucol.append("")
+        for dom, ver, mau, ts_u in recent_updates[:max_rows]:
+            t = ts_u.strftime("%H:%M:%S") if ts_u else "??:??:??"
+            mau_s = f"{mau:,}" if mau is not None else "–"
+            ucol.append(
+                f"{_c(t, 'gray')}  "
+                f"{_c(f'{(dom or "")[:u_dom_w]:<{u_dom_w}}', 'green')}  "
+                f"{(ver or '')[:u_ver_w]:<{u_ver_w}}  "
+                f"{_c(f'{mau_s:>{u_mau_w}}', 'white')}"
+            )
+    else:
+        ucol.append("")
+        ucol.append(_c("  No updates yet", "gray"))
+
+    if side_by_side:
+        # Updates left, errors right.
+        for line in _zip_cols([ucol, ecol], col_w, GAP):
+            ln(line)
+    else:
+        # Stack: updates, a blank line, then errors.
+        for line in ucol:
+            ln(line)
+        ln()
+        for line in ecol:
+            ln(line)
     ln()
+
+    # Final guard: on a console too short for even the section headers, clip the
+    # output so the monitor's cursor-up redraw never overruns the screen. Whole
+    # lines only, so no ANSI sequence is left dangling.
+    if height is not None:
+        del lines[max(1, height - 2):]
 
     return "\n".join(lines) + "\n"
 
@@ -4052,19 +4160,22 @@ async def _handle_manage_action(args: argparse.Namespace, choice: str) -> None:
                     elapsed = 0.0
                     fetch_error = None
                     render_prev = None
+                try:
+                    term_size = os.get_terminal_size()
+                    term_cols, term_rows = term_size.columns, term_size.lines
+                except OSError:
+                    term_cols, term_rows = 80, 24
                 output = render_queue_status(
                     last_stats,
                     prev_stats=render_prev,
                     elapsed=elapsed,
                     header=f"{appname} v{appversion} — ",
+                    width=term_cols,
+                    height=term_rows,
                 )
                 if fetch_error:
                     output += f"{colors['red']}Error: {fetch_error}{colors['reset']}\n"
                 content_lines = output.count("\n")
-                try:
-                    term_rows = os.get_terminal_size().lines
-                except OSError:
-                    term_rows = 24
                 padding = max(0, term_rows - content_lines - 1)
                 output += "\n" * padding
                 if paused[0]:
