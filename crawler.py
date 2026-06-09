@@ -3464,14 +3464,13 @@ def render_queue_status(
                 ln(line)
             ln()
 
-    # RECENT ERRORS and RECENT UPDATES. Shown side by side when the console
-    # is wide enough; otherwise stacked. ``SEC_W`` (82) is the preferred column
-    # width; each column shrinks to fit when space is tight.
-    SEC_W = 82
+    # RECENT ERRORS and RECENT UPDATES. Shown side by side, each filling half the
+    # console, when there is room for two 50-column cells; otherwise stacked full
+    # width. The cells grow with the window (matching the top three columns).
     GAP = 4
     two_col_w = (width - GAP) // 2
     side_by_side = two_col_w >= 50
-    col_w = min(SEC_W, two_col_w) if side_by_side else width
+    col_w = two_col_w if side_by_side else width
 
     error_last_1m = stats.get("error_last_1m") or 0
     error_last_10m = stats.get("error_last_10m") or 0
@@ -3506,9 +3505,10 @@ def render_queue_status(
 
     # Size the two cells to the window: show as many rows as the leftover
     # vertical space allows — filling a tall console, truncating a short one.
-    # Per-cell non-data overhead = header + separator + counters + one blank.
-    # ``lines`` already holds the title and the top three-column block.
-    cell_overhead = 3 + max(len(e_counts), len(u_counts))
+    # Per-cell non-data overhead = section title + separator + counters + one
+    # blank + the column-header row. ``lines`` already holds the title and the
+    # top three-column block.
+    cell_overhead = 4 + max(len(e_counts), len(u_counts))
     if height is None:
         max_rows = max(len(recent_errors), len(recent_updates))
     elif side_by_side:
@@ -3529,6 +3529,13 @@ def render_queue_status(
     ecol: list[str] = [_c("RECENT ERRORS", "bold"), _c("─" * col_w, "cyan"), *e_counts]
     if recent_errors:
         ecol.append("")
+        ecol.append(_c(
+            f"{'':<8}  "
+            f"{'Domain'[:e_dom_w]:<{e_dom_w}}  "
+            f"{'Error'[:e_type_w]:<{e_type_w}}  "
+            f"{'Endpoint'[:e_end_w]}",
+            "bold",
+        ))
         for ts_e, dom, etype, endpoint in recent_errors[:max_rows]:
             t = ts_e.strftime("%H:%M:%S") if ts_e else "??:??:??"
             ecol.append(
@@ -3553,6 +3560,13 @@ def render_queue_status(
     ucol: list[str] = [_c("RECENT UPDATES", "bold"), _c("─" * col_w, "cyan"), *u_counts]
     if recent_updates:
         ucol.append("")
+        ucol.append(_c(
+            f"{'':<8}  "
+            f"{'Domain'[:u_dom_w]:<{u_dom_w}}  "
+            f"{'Version'[:u_ver_w]:<{u_ver_w}}  "
+            f"{'MAU'[:u_mau_w]:>{u_mau_w}}",
+            "bold",
+        ))
         for dom, ver, mau, ts_u in recent_updates[:max_rows]:
             t = ts_u.strftime("%H:%M:%S") if ts_u else "??:??:??"
             mau_s = f"{mau:,}" if mau is not None else "–"
