@@ -1062,7 +1062,7 @@ async def get_instances_table(
             " AND md.nodeinfo IS NOT NULL AND LOWER(md.nodeinfo) <> 'mastodon'"
         ),
         "failing": sql.SQL(
-            " AND (md.timestamp IS NULL OR md.timestamp < NOW() - INTERVAL '24 hours')"
+            " AND (md.timestamp IS NULL OR md.timestamp < NOW() - INTERVAL '72 hours')"
         ),
     }
     if instance_filter and instance_filter not in filter_clauses:
