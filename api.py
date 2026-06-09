@@ -16,7 +16,7 @@ import threading
 import time
 from contextlib import asynccontextmanager
 from datetime import date as _date, datetime, timezone
-from typing import Any
+from typing import Any, cast
 
 import httpx
 import paramiko
@@ -261,7 +261,7 @@ def _chart_error(status_code: int = 502) -> HTTPException:
 # get_remote_address reads the real client IP from X-Forwarded-For.
 limiter = Limiter(key_func=get_remote_address, default_limits=["120/minute"])
 app.state.limiter = limiter
-app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
+app.add_exception_handler(RateLimitExceeded, cast(Any, _rate_limit_exceeded_handler))
 app.add_middleware(SlowAPIMiddleware)
 
 

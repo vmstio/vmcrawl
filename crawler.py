@@ -29,7 +29,7 @@ try:
     import tty
     from datetime import UTC, date, datetime, timedelta
     from io import StringIO
-    from typing import Any
+    from typing import Any, cast
     from urllib.parse import urlparse
 
     import httpx
@@ -363,7 +363,7 @@ if _ssh_host:
                     pass
                 _ssh_transport = None
             try:
-                transport = paramiko.Transport((_ssh_host, _ssh_port))
+                transport = paramiko.Transport((cast(str, _ssh_host), _ssh_port))
                 transport.set_keepalive(30)  # detect drops promptly
                 transport.connect(username=_ssh_user, pkey=_ssh_pkey)
                 _ssh_transport = transport
@@ -383,7 +383,7 @@ if _ssh_host:
         with _ssh_lock:
             if _ssh_transport is dead:
                 try:
-                    _ssh_transport.close()
+                    dead.close()
                 except Exception:
                     pass
                 _ssh_transport = None
