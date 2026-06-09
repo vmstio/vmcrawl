@@ -4533,7 +4533,7 @@ def _classify_request_exception(exception: Exception) -> str:
         return "REDIRECT"
 
     # Timeouts — server reachable but unresponsive; shorter retry than hard TCP.
-    if isinstance(exception, httpx.TimeoutException):
+    if isinstance(exception, (httpx.TimeoutException, TimeoutError)):
         return "TIMEOUT"
 
     # SSRF block — isinstance check is authoritative since SSRFBlockedError is our
@@ -5786,7 +5786,7 @@ async def check_and_record_domains(
                         await asyncio.to_thread(
                             _handle_tcp_exception,
                             domain,
-                            "timeout",
+                            "domain",
                             TimeoutError(f"Domain processing timed out after {domain_timeout}s"),
                         )
                 except httpx.CloseError:
