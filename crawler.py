@@ -205,6 +205,11 @@ TRACKED_ERROR_TYPES = (
 # replayed from a suppressed nodeinfo probe error.
 _TRANSPORT_ERROR_TYPES = frozenset({"DNS", "SSL", "TCP", "TIMEOUT", "REDIRECT", "SSRF", "FILE"})
 
+# How long to retain error_log event rows before they are pruned by
+# cleanup_old_domains (env-overridable). The dashboard only looks back 24h; this
+# governs how much history the per-domain "most recent error" lookup can show.
+ERROR_LOG_RETENTION_DAYS = max(1, int(os.getenv("VMCRAWL_ERROR_LOG_RETENTION_DAYS", "30")))
+
 # Per-error-type base reschedule cadence in hours (env-overridable). The queue
 # reschedules a failed domain at base * 2**attempts, ceilinged per the cap in
 # reschedule_domain. Transient types use short bases and back off; ROBOT/HARD
@@ -1649,27 +1654,6 @@ def get_release_versions_from_db() -> dict[str, Any]:
 # =============================================================================
 
 
-def log_error(domain: str, error_to_print: str) -> None:
-    """Log an error for a domain to the error_log table."""
-    with db_pool.connection() as conn, conn.cursor() as cursor:
-        try:
-            _ = cursor.execute(
-                """
-                    INSERT INTO error_log (domain, error, worker)
-                    VALUES (%s, %s, %s)
-                """,
-                (domain, error_to_print, _worker_id()),
-            )
-            conn.commit()
-        except Exception as exception:
-            echo(
-                f"{domain}: Failed to log error {exception}",
-                "red",
-                use_tqdm=True,
-            )
-            conn.rollback()
-
-
 def get_error_type(error_type: str | None) -> str | None:
     """Classify an error_type value into a scheduling bucket.
 
@@ -1684,28 +1668,46 @@ def get_error_type(error_type: str | None) -> str | None:
     return next((t for t in TRACKED_ERROR_TYPES if error_type == t), None)
 
 
-def increment_domain_error(
-    domain: str, error_type: str, error_endpoint: str | None = None
+def record_error(
+    domain: str,
+    error_type: str,
+    error_endpoint: str | None,
+    error_message: str,
 ) -> None:
-    """Record a crawl failure's classification in ``error_type`` / ``error_endpoint``.
+    """Record a crawl failure atomically, in a single transaction.
 
-    There are no terminal bad_* flags and no error counter. Scheduling is derived
-    from ``error_type`` by the queue (see ``reschedule_domain``); this function just
-    records the latest failure classification.
+    1. HARD (gone: 410/451/418/999) and ROBOT (robots.txt disallow) are definitive,
+       so on detection the domain is purged from the published mastodon_domains list
+       immediately. All other failure types leave the published row untouched
+       (last-known-good).
+    2. Append a structured row to ``error_log`` (free-text message plus the
+       ``error_type`` / ``error_endpoint`` classification and worker id).
+    3. Upsert the latest classification onto ``raw_domains``. There are no terminal
+       bad_* flags and no error counter; scheduling is derived from ``error_type``
+       by the queue (see ``reschedule_domain``).
 
-    HARD (gone: 410/451/418/999) and ROBOT (robots.txt disallow) are definitive,
-    so on detection the domain is purged from the published mastodon_domains list
-    immediately; it still records its type and reschedules on its long interval.
-    All other failure types leave the published row untouched (last-known-good).
+    Replaces the former ``log_error`` + ``increment_domain_error`` pair, which used
+    two separate pooled connections per failure.
 
     Note: Domain is expected to be pre-normalized to lowercase by caller.
     """
     with db_pool.connection() as conn, conn.cursor() as cursor:
         try:
             # Definitive "gone"/disallowed: drop from the published list at detection.
+            # Inlined here (rather than delete_domain_if_known) so the purge, the
+            # log row, and the classification all commit in one transaction.
             if get_error_type(error_type) in PURGE_ON_DETECTION_TYPES:
-                delete_domain_if_known(domain)
+                _ = cursor.execute(
+                    "DELETE FROM mastodon_domains WHERE domain = %s",
+                    (domain,),
+                )
 
+            _ = cursor.execute(
+                "INSERT INTO error_log"
+                " (domain, error, worker, error_type, error_endpoint)"
+                " VALUES (%s, %s, %s, %s, %s)",
+                (domain, error_message, _worker_id(), error_type, error_endpoint),
+            )
             _ = cursor.execute(
                 "INSERT INTO raw_domains (domain, error_type, error_endpoint)"
                 " VALUES (%s, %s, %s)"
@@ -1717,7 +1719,7 @@ def increment_domain_error(
             conn.commit()
         except Exception as exception:
             echo(
-                f"{domain}: Failed to increment domain error {exception}",
+                f"{domain}: Failed to record error {exception}",
                 "red",
                 use_tqdm=True,
             )
@@ -1776,7 +1778,7 @@ def delete_domain_if_known(domain: str) -> None:
             conn.rollback()
 
 
-def mark_domain_as_alias(domain: str) -> None:
+def mark_domain_as_alias(domain: str, canonical: str | None = None) -> None:
     """Record a domain as an alias pointing to a canonical host.
 
     Alias domains get error_type='ALIAS' and back off on the same 90-day flat
@@ -1784,8 +1786,10 @@ def mark_domain_as_alias(domain: str) -> None:
 
     Args:
         domain: The domain to mark as an alias (should be pre-normalized to lowercase)
+        canonical: The canonical host the domain redirects to, for the log message
     """
-    increment_domain_error(domain, "ALIAS", "instance_api")
+    message = f"Alias of {canonical}" if canonical else "Alias / redirect"
+    record_error(domain, "ALIAS", "instance_api", message)
 
 
 def delete_domain_from_raw(domain: str) -> None:
@@ -1862,11 +1866,13 @@ def update_mastodon_domain(
 
 
 def cleanup_old_domains():
-    """Delete known domains older than 7 days.
+    """Delete known domains older than 7 days and prune stale error_log rows.
 
     Uses a transaction-scoped advisory lock to ensure only one crawler instance
     performs cleanup at a time, preventing race conditions where multiple
-    instances might delete domains that other instances just updated.
+    instances might delete domains that other instances just updated. The same
+    lock and transaction also prune error_log rows older than
+    ``ERROR_LOG_RETENTION_DAYS`` so the event log does not grow unbounded.
     """
     # Use a fixed advisory lock ID for cleanup operations
     CLEANUP_LOCK_ID = 999999999
@@ -1906,6 +1912,21 @@ def cleanup_old_domains():
                             "yellow",
                             use_tqdm=True,
                         )
+
+                # Prune event-log rows past the retention window in the same
+                # transaction (shares the advisory lock acquired above).
+                _ = cursor.execute(
+                    "DELETE FROM error_log"
+                    " WHERE timestamp < now() - make_interval(days => %s)",
+                    (ERROR_LOG_RETENTION_DAYS,),
+                )
+                pruned_errors = cursor.rowcount
+                if pruned_errors > 0:
+                    echo(
+                        f"Pruned {pruned_errors:,} error_log rows older than "
+                        f"{ERROR_LOG_RETENTION_DAYS} days",
+                        "yellow",
+                    )
                 conn.commit()
             except Exception as exception:
                 echo(f"Failed to clean up old domains: {exception}", "red")
@@ -4437,8 +4458,7 @@ def _handle_incorrect_file_type(domain, target, content_type):
     clean_content_type = RE_CONTENT_TYPE_CHARSET.sub("", content_type).strip()
     error_message = f"{target} is {clean_content_type}"
     echo(f"{domain}: {error_message}", "yellow", use_tqdm=True)
-    log_error(domain, error_message)
-    increment_domain_error(domain, "TYPE", target)
+    record_error(domain, "TYPE", target, error_message)
 
 
 def _http_response_detail(response) -> str:
@@ -4499,8 +4519,7 @@ def _handle_http_status_code(domain, target, response):
     detail = _http_response_detail(response)
     error_message = f"HTTP {code} on {target}" + (f": {detail}" if detail else "")
     echo(f"{domain}: {error_message}", "yellow", use_tqdm=True)
-    log_error(domain, error_message)
-    increment_domain_error(domain, str(code), target)
+    record_error(domain, str(code), target, error_message)
 
 
 def _handle_http_failed(domain, target, response):
@@ -4509,8 +4528,7 @@ def _handle_http_failed(domain, target, response):
     detail = _http_response_detail(response)
     error_message = f"HTTP {code} on {target}" + (f": {detail}" if detail else "")
     echo(f"{domain}: {error_message}", "yellow", use_tqdm=True)
-    log_error(domain, error_message)
-    increment_domain_error(domain, "HARD", target)
+    record_error(domain, "HARD", target, error_message)
 
 
 def _clean_exception_message(error_message: str, default: str) -> str:
@@ -4603,18 +4621,16 @@ def _handle_tcp_exception(domain, target, exception):
             and "too large" in error_message.casefold()
         ):
             echo(f"{domain}: Response too large", "orange", use_tqdm=True)
-            log_error(domain, f"Response too large on {target}")
+            record_error(domain, error_reason, target, f"Response too large on {target}")
         else:
             cleaned_message = _clean_exception_message(error_message, "File/stream error")
             echo(f"{domain}: {cleaned_message}", "orange", use_tqdm=True)
-            log_error(domain, f"{target}: {error_message or cleaned_message}")
-        increment_domain_error(domain, error_reason, target)
+            record_error(domain, error_reason, target, f"{target}: {error_message or cleaned_message}")
         return
 
     if error_reason == "SSRF":
         echo(f"{domain}: Blocked — resolves to non-public address", "orange", use_tqdm=True)
-        log_error(domain, f"{target}: {error_message}")
-        increment_domain_error(domain, error_reason, target)
+        record_error(domain, error_reason, target, f"{target}: {error_message}")
         return
 
     if error_reason == "SSL":
@@ -4622,8 +4638,7 @@ def _handle_tcp_exception(domain, target, exception):
             error_message, "SSL connection error"
         )
         echo(f"{domain}: {cleaned_message}", "orange", use_tqdm=True)
-        log_error(domain, f"{target}: {error_message or cleaned_message}")
-        increment_domain_error(domain, error_reason, target)
+        record_error(domain, error_reason, target, f"{target}: {error_message or cleaned_message}")
         return
 
     if error_reason == "DNS":
@@ -4631,38 +4646,33 @@ def _handle_tcp_exception(domain, target, exception):
             error_message, "DNS resolution failed"
         )
         echo(f"{domain}: {cleaned_message}", "orange", use_tqdm=True)
-        log_error(domain, f"{target}: {error_message or cleaned_message}")
-        increment_domain_error(domain, error_reason, target)
+        record_error(domain, error_reason, target, f"{target}: {error_message or cleaned_message}")
         return
 
     if error_reason == "TIMEOUT":
         cleaned_message = _clean_exception_message(error_message, "Timeout")
         echo(f"{domain}: {cleaned_message}", "orange", use_tqdm=True)
-        log_error(domain, f"{target}: {error_message or cleaned_message}")
-        increment_domain_error(domain, error_reason, target)
+        record_error(domain, error_reason, target, f"{target}: {error_message or cleaned_message}")
         return
 
     if error_reason == "REDIRECT":
         redirect_url = getattr(getattr(exception, "request", None), "url", None)
         redirect_info = f" → {redirect_url}" if redirect_url else ""
         echo(f"{domain}: Too many redirects on {target}{redirect_info}", "orange", use_tqdm=True)
-        log_error(domain, f"{target}: too many redirects{redirect_info}")
-        increment_domain_error(domain, error_reason, target)
+        record_error(domain, error_reason, target, f"{target}: too many redirects{redirect_info}")
         return
 
     # All remaining transport failures are categorized as TCP.
     cleaned_message = _clean_exception_message(error_message, "TCP error")
     echo(f"{domain}: {cleaned_message}", "orange", use_tqdm=True)
-    log_error(domain, f"{target}: {error_message or cleaned_message}")
-    increment_domain_error(domain, error_reason, target)
+    record_error(domain, error_reason, target, f"{target}: {error_message or cleaned_message}")
 
 
 def _handle_json_exception(domain, target, exception):
     """Handle JSON parsing exceptions."""
     error_message = str(exception)
     echo(f"{domain}: {target} {error_message}", "yellow", use_tqdm=True)
-    log_error(domain, f"{target}: {error_message}")
-    increment_domain_error(domain, "JSON", target)
+    record_error(domain, "JSON", target, f"{target}: {error_message}")
 
 
 # =============================================================================
@@ -4787,12 +4797,12 @@ async def check_robots_txt(domain):
                             "yellow",
                             use_tqdm=True,
                         )
-                        await asyncio.to_thread(log_error, domain, error_to_print)
                         await asyncio.to_thread(
-                            increment_domain_error,
+                            record_error,
                             domain,
                             "ROBOT",
                             "robots_txt",
+                            error_to_print,
                         )
                         return False
         elif response.status_code in http_codes_to_hardfail:
@@ -5339,7 +5349,9 @@ def mark_as_non_mastodon(domain, other_platform):
         other_platform = "Unknown"
     other_platform = other_platform.lower().replace(" ", "-")
     echo(f"{domain}: {other_platform}", "cyan", use_tqdm=True)
-    increment_domain_error(domain, "OTHER", "nodeinfo")
+    # OTHER is not a purge-on-detection type, so record_error won't drop the
+    # published row; remove it explicitly since this host is not Mastodon.
+    record_error(domain, "OTHER", "nodeinfo", f"Non-Mastodon platform: {other_platform}")
     delete_domain_if_known(domain)
 
 
@@ -5469,8 +5481,7 @@ def process_mastodon_instance(
     if not isinstance(users, dict) or not users:
         error_to_print = "No usage data in NodeInfo"
         echo(f"{db_domain}: {error_to_print}", "yellow", use_tqdm=True)
-        log_error(domain, error_to_print)
-        increment_domain_error(domain, "JSON", "nodeinfo_20")
+        record_error(domain, "JSON", "nodeinfo_20", error_to_print)
         return
 
     required_fields = [
@@ -5482,8 +5493,7 @@ def process_mastodon_instance(
         # Allow 0 user counts, but reject null values.
         if field not in users or users[field] is None:
             echo(f"{db_domain}: {error_msg}", "yellow", use_tqdm=True)
-            log_error(domain, error_msg)
-            increment_domain_error(domain, "JSON", "nodeinfo_20")
+            record_error(domain, "JSON", "nodeinfo_20", error_msg)
             return
 
     active_month_users = users["activeMonth"]
@@ -5493,8 +5503,7 @@ def process_mastodon_instance(
     ) > version.parse(version_main_branch):
         error_to_print = "Mastodon version invalid"
         echo(f"{db_domain}: {error_to_print}", "yellow", use_tqdm=True)
-        log_error(domain, error_to_print)
-        increment_domain_error(domain, "JSON", "nodeinfo_20")
+        record_error(domain, "JSON", "nodeinfo_20", error_to_print)
         return
 
     software_name = (
@@ -5513,7 +5522,7 @@ def process_mastodon_instance(
 
     # If actual_domain is different from domain, mark original as alias and delete from mastodon_domains
     if actual_domain and actual_domain != domain:
-        mark_domain_as_alias(domain)
+        mark_domain_as_alias(domain, actual_domain)
         delete_domain_if_known(domain)
 
     version_info = f"Mastodon v{software_version}"
@@ -5599,12 +5608,12 @@ async def process_domain(domain, nightly_version_ranges, user_choice=None):
                     "yellow",
                     use_tqdm=True,
                 )
-                await asyncio.to_thread(log_error, domain, error_to_print)
                 await asyncio.to_thread(
-                    increment_domain_error,
+                    record_error,
                     domain,
                     "TCP",
                     "nodeinfo",
+                    error_to_print,
                 )
             return
         else:
@@ -5660,9 +5669,8 @@ async def process_domain(domain, nightly_version_ranges, user_choice=None):
             # Instance API requires authentication (401 Unauthorized)
             error_to_print = "Instance API requires authentication"
             echo(f"{domain}: {error_to_print}", "yellow", use_tqdm=True)
-            await asyncio.to_thread(log_error, domain, error_to_print)
             await asyncio.to_thread(
-                increment_domain_error, domain, "API", "instance_api"
+                record_error, domain, "API", "instance_api", error_to_print
             )
             return
 
@@ -5670,11 +5678,12 @@ async def process_domain(domain, nightly_version_ranges, user_choice=None):
             # Instance API endpoint is required for Mastodon instances
             error_to_print = "could not retrieve instance URI"
             echo(f"{domain}: {error_to_print}", "yellow", use_tqdm=True)
-            await asyncio.to_thread(log_error, domain, error_to_print)
             await asyncio.to_thread(
-                increment_domain_error,
+                record_error,
                 domain,
                 "API",
+                "instance_api",
+                error_to_print,
             )
             return
 

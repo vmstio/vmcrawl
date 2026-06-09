@@ -13,6 +13,11 @@ CREATE TABLE IF NOT EXISTS
   );
 
 ALTER TABLE error_log ADD COLUMN IF NOT EXISTS worker TEXT DEFAULT NULL;
+-- Structured classification alongside the free-text error, mirroring the values
+-- written to raw_domains.error_type / error_endpoint so the event log and the
+-- scheduling classification line up.
+ALTER TABLE error_log ADD COLUMN IF NOT EXISTS error_type TEXT DEFAULT NULL;
+ALTER TABLE error_log ADD COLUMN IF NOT EXISTS error_endpoint TEXT DEFAULT NULL;
 
 CREATE TABLE IF NOT EXISTS
   mastodon_domains (
