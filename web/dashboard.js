@@ -369,17 +369,6 @@
     });
   }
 
-  function fadeColor(color, alpha) {
-    const m = /^#([0-9a-f]{3}|[0-9a-f]{6})$/i.exec(color || "");
-    if (!m) return color;
-    let hex = m[1];
-    if (hex.length === 3) hex = hex.split("").map((c) => c + c).join("");
-    const r = parseInt(hex.slice(0, 2), 16);
-    const g = parseInt(hex.slice(2, 4), 16);
-    const b = parseInt(hex.slice(4, 6), 16);
-    return `rgba(${r}, ${g}, ${b}, ${alpha})`;
-  }
-
   function darkenHex(hex, factor) {
     const m = /^#([0-9a-f]{6})$/i.exec(hex || "");
     if (!m) return hex;
@@ -401,12 +390,6 @@
     return Array.from({ length: count }, (_, i) => darkenHex(base, i * step));
   }
 
-  function backgroundForDataset(color, flags) {
-    if (!flags || !flags.some(Boolean)) return color;
-    const faded = fadeColor(color, 0.25);
-    return flags.map((f) => (f ? faded : color));
-  }
-
   function createStackedBar(canvasId, labels, datasets, options = {}) {
     const ctx = document.getElementById(canvasId);
     if (!ctx) return;
@@ -417,17 +400,9 @@
     const populated = datasets.filter((d) =>
       (d.data || []).some((v) => Number(v) > 0),
     );
-    // Capture each series' base color before fading so the legend swatch can
-    // use it. Otherwise Chart.js resolves the swatch from the first bar, which
-    // shows the faded shade when day one is flagged.
-    const baseColors = populated.map((d) => d.backgroundColor);
-    const decorated = populated.map((d) => ({
-      ...d,
-      backgroundColor: backgroundForDataset(d.backgroundColor, flags),
-    }));
     new Chart(ctx, {
       type: "bar",
-      data: { labels: labels, datasets: decorated },
+      data: { labels: labels, datasets: populated },
       options: {
         indexAxis: "x",
         responsive: true,
@@ -435,7 +410,16 @@
           x: {
             stacked: true,
             grid: { display: false },
-            ticks: { autoSkip: true, maxRotation: 0 },
+            ticks: {
+              autoSkip: true,
+              maxRotation: 0,
+              // Flag impacted days with a ⚠ on the axis label rather than
+              // fading the bars, so the data stays at full color.
+              callback(value, index) {
+                const label = this.getLabelForValue(value);
+                return flags[index] ? `⚠ ${label}` : label;
+              },
+            },
           },
           y: {
             stacked: true,
@@ -449,18 +433,6 @@
             labels: {
               usePointStyle: true,
               font: { size: 11 },
-              generateLabels: (chart) => {
-                const items =
-                  Chart.defaults.plugins.legend.labels.generateLabels(chart);
-                items.forEach((item) => {
-                  const base = baseColors[item.datasetIndex];
-                  if (base != null) {
-                    item.fillStyle = base;
-                    item.strokeStyle = base;
-                  }
-                });
-                return items;
-              },
             },
           },
           tooltip: {

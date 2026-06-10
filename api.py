@@ -1942,17 +1942,6 @@ GREEN = "#2ecc71"
 BLUE = "#3498db"
 
 
-def _fade_hex(color: str, alpha: float) -> str:
-    """Convert ``#RRGGBB`` to ``rgba(r, g, b, alpha)``; return color unchanged otherwise."""
-    if not isinstance(color, str) or len(color) != 7 or not color.startswith("#"):
-        return color
-    try:
-        r, g, b = int(color[1:3], 16), int(color[3:5], 16), int(color[5:7], 16)
-    except ValueError:
-        return color
-    return f"rgba({r}, {g}, {b}, {alpha})"
-
-
 def _darken_hex(hex_color: str, factor: float) -> str:
     """Darken ``#RRGGBB`` by ``factor`` (0..1)."""
     if not isinstance(hex_color, str) or len(hex_color) != 7 or not hex_color.startswith("#"):
@@ -2010,50 +1999,12 @@ def _sort_distribution(distribution: list[dict], key_field: str) -> list[dict]:
 HIST_SHADES = [*_make_shades(BLUE, 3), ORANGE]
 
 
-def _bar_colors(color: str, flags: list[bool], alpha: float = 0.25):
-    """Per-bar color list: faded at flagged indices, base color otherwise."""
-    if not any(flags):
-        return color
-    faded = _fade_hex(color, alpha)
-    return [faded if f else color for f in flags]
+def _flag_labels(labels: list[str], flags: list[bool]) -> list[str]:
+    """Prefix a ⚠ to labels for impacted days, marking them without altering the bars."""
+    return [f"⚠ {label}" if flag else label for label, flag in zip(labels, flags)]
 
 
-# When a dataset's backgroundColor is a per-bar array (flagged days faded), the
-# legend swatch otherwise resolves the first bar's color — showing the faded
-# shade if day one is flagged. QuickChart's sandbox can't pass a chart-aware
-# generateLabels the chart, so we bake the legend entries (label + base color)
-# at request time and inject them as a static generateLabels function.
-_LEGEND_FN_SENTINEL = "__GENERATE_LABELS__"
-
-
-def _base_color_legend_fn(datasets: list[dict]) -> str:
-    """Build a static ``generateLabels`` returning each series' base ``#RRGGBB``
-    color (faded bars are ``rgba(...)``), so the legend never shows a faded shade."""
-    items = []
-    for i, d in enumerate(datasets):
-        bg = d["backgroundColor"]
-        if isinstance(bg, list):
-            base = next(
-                (c for c in bg if isinstance(c, str) and c.startswith("#")),
-                bg[0] if bg else None,
-            )
-        else:
-            base = bg
-        items.append(
-            {
-                "text": d["label"],
-                "fillStyle": base,
-                "strokeStyle": base,
-                "fontColor": "#8888a0",
-                "pointStyle": "circle",
-                "lineWidth": 0,
-                "datasetIndex": i,
-            }
-        )
-    return "function(){return " + json.dumps(items) + ";}"
-
-
-async def _fetch_chart_png(chart_config: dict, functions: dict | None = None) -> bytes:
+async def _fetch_chart_png(chart_config: dict) -> bytes:
     now = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M UTC")
     plugins = chart_config.setdefault("options", {}).setdefault("plugins", {})
     plugins["subtitle"] = {
@@ -2065,27 +2016,10 @@ async def _fetch_chart_png(chart_config: dict, functions: dict | None = None) ->
     }
     config_str = json.dumps(chart_config)
     async with httpx.AsyncClient(timeout=15) as client:
-        if functions:
-            # QuickChart only evaluates JS functions when they appear unquoted in
-            # the config, which requires the POST endpoint. Splice each function's
-            # code in place of its quoted sentinel string.
-            for sentinel, code in functions.items():
-                config_str = config_str.replace(json.dumps(sentinel), code)
-            resp = await client.post(
-                QUICKCHART_URL,
-                json={
-                    "chart": config_str,
-                    "width": 600,
-                    "height": 400,
-                    "backgroundColor": "#1a1a24",
-                    "version": "4",
-                },
-            )
-        else:
-            resp = await client.get(
-                QUICKCHART_URL,
-                params={"c": config_str, "w": 600, "h": 400, "bkg": "#1a1a24", "v": "4"},
-            )
+        resp = await client.get(
+            QUICKCHART_URL,
+            params={"c": config_str, "w": 600, "h": 400, "bkg": "#1a1a24", "v": "4"},
+        )
         resp.raise_for_status()
         return resp.content
 
@@ -2481,28 +2415,29 @@ async def chart_patch_history(
         for row in hist
     ]
     flags = [bool(r[9]) for r in hist]
+    labels = _flag_labels(labels, flags)
 
     if metric == "instances":
         datasets = [
             {
                 "label": "Main Branch",
                 "data": [r[1] for r in hist],
-                "backgroundColor": _bar_colors(HIST_SHADES[0], flags),
+                "backgroundColor": HIST_SHADES[0],
             },
             {
                 "label": "Latest Branch",
                 "data": [r[2] for r in hist],
-                "backgroundColor": _bar_colors(HIST_SHADES[1], flags),
+                "backgroundColor": HIST_SHADES[1],
             },
             {
                 "label": "Previous Branch",
                 "data": [r[3] for r in hist],
-                "backgroundColor": _bar_colors(HIST_SHADES[2], flags),
+                "backgroundColor": HIST_SHADES[2],
             },
             {
                 "label": "Deprecated Branch",
                 "data": [r[4] for r in hist],
-                "backgroundColor": _bar_colors(HIST_SHADES[3], flags),
+                "backgroundColor": HIST_SHADES[3],
             },
         ]
     else:
@@ -2510,22 +2445,22 @@ async def chart_patch_history(
             {
                 "label": "Main Branch",
                 "data": [r[5] for r in hist],
-                "backgroundColor": _bar_colors(HIST_SHADES[0], flags),
+                "backgroundColor": HIST_SHADES[0],
             },
             {
                 "label": "Latest Branch",
                 "data": [r[6] for r in hist],
-                "backgroundColor": _bar_colors(HIST_SHADES[1], flags),
+                "backgroundColor": HIST_SHADES[1],
             },
             {
                 "label": "Previous Branch",
                 "data": [r[7] for r in hist],
-                "backgroundColor": _bar_colors(HIST_SHADES[2], flags),
+                "backgroundColor": HIST_SHADES[2],
             },
             {
                 "label": "Deprecated Branch",
                 "data": [r[8] for r in hist],
-                "backgroundColor": _bar_colors(HIST_SHADES[3], flags),
+                "backgroundColor": HIST_SHADES[3],
             },
         ]
     datasets = [d for d in datasets if any(v for v in d["data"])]
@@ -2567,17 +2502,8 @@ async def chart_patch_history(
         },
     }
 
-    # Flagged days fade their bars; bake base-color legend entries so the legend
-    # swatch never shows a faded shade when the first day is flagged.
-    functions = None
-    if any(flags):
-        chart_config["options"]["plugins"]["legend"]["labels"][
-            "generateLabels"
-        ] = _LEGEND_FN_SENTINEL
-        functions = {_LEGEND_FN_SENTINEL: _base_color_legend_fn(datasets)}
-
     try:
-        png = await _fetch_chart_png(chart_config, functions)
+        png = await _fetch_chart_png(chart_config)
     except httpx.HTTPError:
         raise _chart_error() from None
     return Response(content=png, media_type="image/png")
@@ -2617,33 +2543,34 @@ async def chart_branch_history(
         for row in hist
     ]
     flags = [bool(r[11]) for r in hist]
+    labels = _flag_labels(labels, flags)
 
     if metric == "instances":
         datasets = [
             {
                 "label": "Main Branch",
                 "data": [r[1] for r in hist],
-                "backgroundColor": _bar_colors(HIST_SHADES[0], flags),
+                "backgroundColor": HIST_SHADES[0],
             },
             {
                 "label": "Latest Branch",
                 "data": [r[2] for r in hist],
-                "backgroundColor": _bar_colors(HIST_SHADES[1], flags),
+                "backgroundColor": HIST_SHADES[1],
             },
             {
                 "label": "Previous Branch",
                 "data": [r[3] for r in hist],
-                "backgroundColor": _bar_colors(HIST_SHADES[2], flags),
+                "backgroundColor": HIST_SHADES[2],
             },
             {
                 "label": "Deprecated Branch",
                 "data": [r[4] for r in hist],
-                "backgroundColor": _bar_colors(HIST_SHADES[3], flags),
+                "backgroundColor": HIST_SHADES[3],
             },
             {
                 "label": "EOL Branches",
                 "data": [r[5] for r in hist],
-                "backgroundColor": _bar_colors(RED, flags),
+                "backgroundColor": RED,
             },
         ]
     else:
@@ -2651,27 +2578,27 @@ async def chart_branch_history(
             {
                 "label": "Main Branch",
                 "data": [r[6] for r in hist],
-                "backgroundColor": _bar_colors(HIST_SHADES[0], flags),
+                "backgroundColor": HIST_SHADES[0],
             },
             {
                 "label": "Latest Branch",
                 "data": [r[7] for r in hist],
-                "backgroundColor": _bar_colors(HIST_SHADES[1], flags),
+                "backgroundColor": HIST_SHADES[1],
             },
             {
                 "label": "Previous Branch",
                 "data": [r[8] for r in hist],
-                "backgroundColor": _bar_colors(HIST_SHADES[2], flags),
+                "backgroundColor": HIST_SHADES[2],
             },
             {
                 "label": "Deprecated Branch",
                 "data": [r[9] for r in hist],
-                "backgroundColor": _bar_colors(HIST_SHADES[3], flags),
+                "backgroundColor": HIST_SHADES[3],
             },
             {
                 "label": "EOL Branches",
                 "data": [r[10] for r in hist],
-                "backgroundColor": _bar_colors(RED, flags),
+                "backgroundColor": RED,
             },
         ]
     datasets = [d for d in datasets if any(v for v in d["data"])]
@@ -2713,17 +2640,8 @@ async def chart_branch_history(
         },
     }
 
-    # Flagged days fade their bars; bake base-color legend entries so the legend
-    # swatch never shows a faded shade when the first day is flagged.
-    functions = None
-    if any(flags):
-        chart_config["options"]["plugins"]["legend"]["labels"][
-            "generateLabels"
-        ] = _LEGEND_FN_SENTINEL
-        functions = {_LEGEND_FN_SENTINEL: _base_color_legend_fn(datasets)}
-
     try:
-        png = await _fetch_chart_png(chart_config, functions)
+        png = await _fetch_chart_png(chart_config)
     except httpx.HTTPError:
         raise _chart_error() from None
     return Response(content=png, media_type="image/png")
