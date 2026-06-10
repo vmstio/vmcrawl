@@ -190,6 +190,7 @@ TRACKED_ERROR_TYPES = (
     "NXDOMAIN",
     "TEMP",
     "SSL",
+    "CERT",
     "TCP",
     "RESET",
     "TIMEOUT",
@@ -206,7 +207,7 @@ TRACKED_ERROR_TYPES = (
 )
 # Subset of TRACKED_ERROR_TYPES that route to _handle_tcp_exception when
 # replayed from a suppressed nodeinfo probe error.
-_TRANSPORT_ERROR_TYPES = frozenset({"DNS", "NXDOMAIN", "TEMP", "SSL", "TCP", "RESET", "TIMEOUT", "REDIRECT", "SSRF", "FILE"})
+_TRANSPORT_ERROR_TYPES = frozenset({"DNS", "NXDOMAIN", "TEMP", "SSL", "CERT", "TCP", "RESET", "TIMEOUT", "REDIRECT", "SSRF", "FILE"})
 
 # How long to retain error_log event rows before they are pruned by
 # cleanup_old_domains (env-overridable). The dashboard only looks back 24h; this
@@ -224,6 +225,9 @@ RETRY_BASE_HOURS: dict[str, int] = {
     "NXDOMAIN": max(1, int(os.getenv("VMCRAWL_RETRY_NXDOMAIN_HOURS", "2160"))),
     "TEMP": max(1, int(os.getenv("VMCRAWL_RETRY_TEMP_HOURS", "2"))),
     "SSL": max(1, int(os.getenv("VMCRAWL_RETRY_SSL_HOURS", "12"))),
+    # CERT: certificate verification failures (expiry, self-signed, issuer,
+    # hostname mismatch). Same cadence as SSL for now; not purged.
+    "CERT": max(1, int(os.getenv("VMCRAWL_RETRY_CERT_HOURS", "12"))),
     "TCP": max(1, int(os.getenv("VMCRAWL_RETRY_TCP_HOURS", "6"))),
     "RESET": max(1, int(os.getenv("VMCRAWL_RETRY_RESET_HOURS", "12"))),
     "TIMEOUT": max(1, int(os.getenv("VMCRAWL_RETRY_TIMEOUT_HOURS", "3"))),
@@ -251,6 +255,7 @@ _REASON_BASE_HOURS_CASE = sql.SQL(
     "  WHEN error_type = 'NXDOMAIN' THEN {nxdomain}"
     "  WHEN error_type = 'TEMP' THEN {temp}"
     "  WHEN error_type = 'SSL' THEN {ssl}"
+    "  WHEN error_type = 'CERT' THEN {cert}"
     "  WHEN error_type = 'TCP' THEN {tcp}"
     "  WHEN error_type = 'RESET' THEN {reset}"
     "  WHEN error_type = 'TIMEOUT' THEN {timeout}"
@@ -272,6 +277,7 @@ _REASON_BASE_HOURS_CASE = sql.SQL(
     nxdomain=sql.Literal(RETRY_BASE_HOURS["NXDOMAIN"]),
     temp=sql.Literal(RETRY_BASE_HOURS["TEMP"]),
     ssl=sql.Literal(RETRY_BASE_HOURS["SSL"]),
+    cert=sql.Literal(RETRY_BASE_HOURS["CERT"]),
     tcp=sql.Literal(RETRY_BASE_HOURS["TCP"]),
     reset=sql.Literal(RETRY_BASE_HOURS["RESET"]),
     timeout=sql.Literal(RETRY_BASE_HOURS["TIMEOUT"]),
@@ -4663,8 +4669,37 @@ def _classify_dns_error(exception: Exception) -> str:
     return "DNS"
 
 
+def _classify_ssl_error(exception: Exception) -> str:
+    """Sub-classify a TLS failure into CERT / SSL.
+
+    CERT covers certificate verification failures — expiry, self-signed,
+    issuer/untrusted CA, hostname mismatch — i.e. anything raised as an
+    ssl.SSLCertVerificationError, plus cert-verification text for the case where
+    the underlying exception survives only as a string (httpx-wrapped). Every
+    other TLS failure (handshake, protocol, cipher, EOF) stays SSL.
+    """
+    for cause in _iter_exception_chain(exception):
+        if isinstance(cause, ssl.SSLCertVerificationError):
+            return "CERT"
+
+    text = str(exception).casefold()
+    cert_phrases = (
+        "certificate verify failed",
+        "certificate has expired",
+        "certificate is not yet valid",
+        "self-signed certificate",
+        "self signed certificate",
+        "unable to get local issuer",
+        "hostname mismatch",
+        "certificate is not valid for",
+    )
+    if any(phrase in text for phrase in cert_phrases):
+        return "CERT"
+    return "SSL"
+
+
 def _classify_request_exception(exception: Exception) -> str:
-    """Classify transport-layer exceptions into FILE/SSL/DNS/NXDOMAIN/TEMP/SSRF/TIMEOUT/REDIRECT/TCP buckets."""
+    """Classify transport-layer exceptions into FILE/SSL/CERT/DNS/NXDOMAIN/TEMP/SSRF/TIMEOUT/REDIRECT/TCP buckets."""
     error_message_lower = str(exception).casefold()
 
     # Redirect loop — misconfiguration, not a connectivity failure.
@@ -4700,7 +4735,7 @@ def _classify_request_exception(exception: Exception) -> str:
         "cipher",
     )
     if any(indicator in error_message_lower for indicator in ssl_indicators):
-        return "SSL"
+        return _classify_ssl_error(exception)
 
     dns_indicators = (
         "no address associated with hostname",
@@ -4718,7 +4753,7 @@ def _classify_request_exception(exception: Exception) -> str:
         if isinstance(cause, socket.gaierror):
             return _classify_dns_error(exception)
         if isinstance(cause, ssl.SSLError):
-            return "SSL"
+            return _classify_ssl_error(exception)
         if isinstance(cause, OSError) and cause.errno == errno.EBADF:
             return "FILE"
 
@@ -4748,8 +4783,8 @@ def _handle_tcp_exception(domain, target, exception):
         record_error(domain, error_reason, target, f"{target}: too many redirects{redirect_info}")
         return
 
-    # All other transport failures (DNS/NXDOMAIN/TEMP/SSL/TIMEOUT/RESET/SSRF/TCP
-    # and FILE stream errors): emit the full, uncleaned exception text to both the
+    # All other transport failures (DNS/NXDOMAIN/TEMP/SSL/CERT/TIMEOUT/RESET/SSRF/
+    # TCP and FILE stream errors): emit the full, uncleaned exception text to both the
     # console and error_log. error_reason still drives classification, scheduling
     # and NXDOMAIN purging (in record_error); only the displayed text changes.
     # Fall back to a derived label only when the exception has no message.
