@@ -3376,7 +3376,7 @@ def render_queue_status(
     if len(title) > width:
         title = title[:width]
     ln(_c(title, "bold"))
-    ln(_c("─" * min(len(title), width), "cyan"))
+    ln(_c("─" * width, "cyan"))
     ln()
 
     total = stats.get("total", 0) or 0
