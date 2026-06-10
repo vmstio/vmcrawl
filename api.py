@@ -737,12 +737,12 @@ async def get_crawler_health(_api_key: str | None = Depends(get_api_key)):
             result = cur.fetchone()
             ssl_issues = result[0] if result else 0
 
-            # DNS Issues
+            # DNS Issues (generic + transient; NXDOMAIN purges the published row)
             _ = cur.execute(
                 """
                 SELECT COUNT(DISTINCT rd.domain) AS unique_domain_count
                 FROM raw_domains rd
-                WHERE rd.error_type = 'DNS'
+                WHERE rd.error_type IN ('DNS', 'TEMP')
                   AND EXISTS (
                     SELECT 1 FROM mastodon_domains md WHERE md.domain = rd.domain
                   )

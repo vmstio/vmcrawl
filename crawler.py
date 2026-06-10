@@ -184,9 +184,11 @@ MASTODON_COMPATIBLE_SOFTWARE = ("mastodon", "hometown", "kmyblue")
 # bad_* columns. HARD (gone: 410/451/418/999) and ROBOT (robots.txt disallow)
 # are the only classifications that purge a domain from the published
 # mastodon_domains list at detection. Every other type only reschedules.
-PURGE_ON_DETECTION_TYPES = ("HARD", "ROBOT")
+PURGE_ON_DETECTION_TYPES = ("HARD", "ROBOT", "NXDOMAIN")
 TRACKED_ERROR_TYPES = (
     "DNS",
+    "NXDOMAIN",
+    "TEMP",
     "SSL",
     "TCP",
     "RESET",
@@ -204,7 +206,7 @@ TRACKED_ERROR_TYPES = (
 )
 # Subset of TRACKED_ERROR_TYPES that route to _handle_tcp_exception when
 # replayed from a suppressed nodeinfo probe error.
-_TRANSPORT_ERROR_TYPES = frozenset({"DNS", "SSL", "TCP", "RESET", "TIMEOUT", "REDIRECT", "SSRF", "FILE"})
+_TRANSPORT_ERROR_TYPES = frozenset({"DNS", "NXDOMAIN", "TEMP", "SSL", "TCP", "RESET", "TIMEOUT", "REDIRECT", "SSRF", "FILE"})
 
 # How long to retain error_log event rows before they are pruned by
 # cleanup_old_domains (env-overridable). The dashboard only looks back 24h; this
@@ -217,6 +219,10 @@ ERROR_LOG_RETENTION_DAYS = max(1, int(os.getenv("VMCRAWL_ERROR_LOG_RETENTION_DAY
 # use long flat intervals (base >= cap, so the backoff is a no-op for them).
 RETRY_BASE_HOURS: dict[str, int] = {
     "DNS": max(1, int(os.getenv("VMCRAWL_RETRY_DNS_HOURS", "12"))),
+    # NXDOMAIN: name has no address (likely gone) — treated like HARD (purged on
+    # detection, long flat backoff). TEMP: transient resolver failure, retry soon.
+    "NXDOMAIN": max(1, int(os.getenv("VMCRAWL_RETRY_NXDOMAIN_HOURS", "2160"))),
+    "TEMP": max(1, int(os.getenv("VMCRAWL_RETRY_TEMP_HOURS", "2"))),
     "SSL": max(1, int(os.getenv("VMCRAWL_RETRY_SSL_HOURS", "12"))),
     "TCP": max(1, int(os.getenv("VMCRAWL_RETRY_TCP_HOURS", "6"))),
     "RESET": max(1, int(os.getenv("VMCRAWL_RETRY_RESET_HOURS", "12"))),
@@ -242,6 +248,8 @@ RETRY_BASE_HOURS: dict[str, int] = {
 _REASON_BASE_HOURS_CASE = sql.SQL(
     "CASE"
     "  WHEN error_type = 'DNS' THEN {dns}"
+    "  WHEN error_type = 'NXDOMAIN' THEN {nxdomain}"
+    "  WHEN error_type = 'TEMP' THEN {temp}"
     "  WHEN error_type = 'SSL' THEN {ssl}"
     "  WHEN error_type = 'TCP' THEN {tcp}"
     "  WHEN error_type = 'RESET' THEN {reset}"
@@ -261,6 +269,8 @@ _REASON_BASE_HOURS_CASE = sql.SQL(
     "END"
 ).format(
     dns=sql.Literal(RETRY_BASE_HOURS["DNS"]),
+    nxdomain=sql.Literal(RETRY_BASE_HOURS["NXDOMAIN"]),
+    temp=sql.Literal(RETRY_BASE_HOURS["TEMP"]),
     ssl=sql.Literal(RETRY_BASE_HOURS["SSL"]),
     tcp=sql.Literal(RETRY_BASE_HOURS["TCP"]),
     reset=sql.Literal(RETRY_BASE_HOURS["RESET"]),
@@ -314,7 +324,6 @@ RE_VOWEL_PATTERN = re.compile(r"\.[aeiou]{4}")
 
 # Pre-compiled regex patterns for URL and error handling
 RE_MULTIPLE_SLASHES = re.compile(r"/+")
-RE_CLEANUP_BRACKETS = re.compile(r"\s*(\[[^\]]*\]|\([^)]*\))")
 RE_CONTENT_TYPE_CHARSET = re.compile(r";.*$")
 RE_HTML_TAGS = re.compile(r"<[^>]+>")
 RE_FUNCTION_DEF = re.compile(r"def (\w+)")
@@ -4599,19 +4608,6 @@ def _describe_transport_failure(exception: Exception) -> str:
     return type_name
 
 
-def _clean_exception_message(error_message: str, default: str) -> str:
-    """Normalize noisy exception strings into concise error messages."""
-    cleaned_message = (
-        RE_CLEANUP_BRACKETS.sub("", error_message)
-        .replace(":", "")
-        .replace(",", "")
-        .split(" for ", 1)[0]
-        .lstrip()
-        .rstrip(" .")
-    )
-    return cleaned_message or default
-
-
 def _iter_exception_chain(exception: BaseException):
     """Yield exception plus chained causes/contexts exactly once."""
     seen: set[int] = set()
@@ -4622,8 +4618,51 @@ def _iter_exception_chain(exception: BaseException):
         current = current.__cause__ or current.__context__
 
 
+# getaddrinfo errno buckets, resolved from socket constants so the numeric
+# values stay correct across platforms (they differ Linux vs macOS). NXDOMAIN:
+# the name has no address / does not exist. TEMP: a transient resolver failure.
+# EAI_FAIL is deliberately left out of NXDOMAIN — it can be a transient SERVFAIL,
+# and NXDOMAIN purges the published row, so we only purge on definitive "no name".
+_DNS_NXDOMAIN_ERRNOS = frozenset(
+    getattr(socket, name)
+    for name in ("EAI_NONAME", "EAI_NODATA")
+    if hasattr(socket, name)
+)
+_DNS_TEMP_ERRNOS = frozenset(
+    getattr(socket, name) for name in ("EAI_AGAIN",) if hasattr(socket, name)
+)
+
+
+def _classify_dns_error(exception: Exception) -> str:
+    """Sub-classify a DNS failure into NXDOMAIN / TEMP / DNS.
+
+    Prefers the underlying getaddrinfo errno; falls back to strerror text when no
+    gaierror is present in the chain (e.g. a string-only transport message).
+    """
+    for cause in _iter_exception_chain(exception):
+        if isinstance(cause, socket.gaierror):
+            if cause.errno in _DNS_NXDOMAIN_ERRNOS:
+                return "NXDOMAIN"
+            if cause.errno in _DNS_TEMP_ERRNOS:
+                return "TEMP"
+
+    text = str(exception).casefold()
+    if "temporary failure in name resolution" in text:
+        return "TEMP"
+    if any(
+        phrase in text
+        for phrase in (
+            "no address associated with hostname",
+            "nodename nor servname provided",
+            "name or service not known",
+        )
+    ):
+        return "NXDOMAIN"
+    return "DNS"
+
+
 def _classify_request_exception(exception: Exception) -> str:
-    """Classify transport-layer exceptions into FILE/SSL/DNS/SSRF/TIMEOUT/REDIRECT/TCP buckets."""
+    """Classify transport-layer exceptions into FILE/SSL/DNS/NXDOMAIN/TEMP/SSRF/TIMEOUT/REDIRECT/TCP buckets."""
     error_message_lower = str(exception).casefold()
 
     # Redirect loop — misconfiguration, not a connectivity failure.
@@ -4671,11 +4710,11 @@ def _classify_request_exception(exception: Exception) -> str:
         "name resolution",
     )
     if any(indicator in error_message_lower for indicator in dns_indicators):
-        return "DNS"
+        return _classify_dns_error(exception)
 
     for cause in _iter_exception_chain(exception):
         if isinstance(cause, socket.gaierror):
-            return "DNS"
+            return _classify_dns_error(exception)
         if isinstance(cause, ssl.SSLError):
             return "SSL"
         if isinstance(cause, OSError) and cause.errno == errno.EBADF:
@@ -4689,44 +4728,15 @@ def _handle_tcp_exception(domain, target, exception):
     error_message = str(exception)
     error_reason = _classify_request_exception(exception)
 
-    if error_reason == "FILE":
-        if (
-            isinstance(exception, ValueError)
-            and "too large" in error_message.casefold()
-        ):
-            echo(f"{domain}: Response too large", "orange", use_tqdm=True)
-            record_error(domain, error_reason, target, f"Response too large on {target}")
-        else:
-            cleaned_message = _clean_exception_message(error_message, "File/stream error")
-            echo(f"{domain}: {cleaned_message}", "orange", use_tqdm=True)
-            record_error(domain, error_reason, target, f"{target}: {error_message or cleaned_message}")
-        return
-
-    if error_reason == "SSRF":
-        echo(f"{domain}: Blocked — resolves to non-public address", "orange", use_tqdm=True)
-        record_error(domain, error_reason, target, f"{target}: {error_message}")
-        return
-
-    if error_reason == "SSL":
-        cleaned_message = _clean_exception_message(
-            error_message, "SSL connection error"
-        )
-        echo(f"{domain}: {cleaned_message}", "orange", use_tqdm=True)
-        record_error(domain, error_reason, target, f"{target}: {error_message or cleaned_message}")
-        return
-
-    if error_reason == "DNS":
-        cleaned_message = _clean_exception_message(
-            error_message, "DNS resolution failed"
-        )
-        echo(f"{domain}: {cleaned_message}", "orange", use_tqdm=True)
-        record_error(domain, error_reason, target, f"{target}: {error_message or cleaned_message}")
-        return
-
-    if error_reason == "TIMEOUT":
-        cleaned_message = _clean_exception_message(error_message, "Timeout")
-        echo(f"{domain}: {cleaned_message}", "orange", use_tqdm=True)
-        record_error(domain, error_reason, target, f"{target}: {error_message or cleaned_message}")
+    # Oversized/streamed-too-large responses: fixed summary rather than the
+    # ValueError text, which is just a byte-count restatement.
+    if (
+        error_reason == "FILE"
+        and isinstance(exception, ValueError)
+        and "too large" in error_message.casefold()
+    ):
+        echo(f"{domain}: Response too large", "orange", use_tqdm=True)
+        record_error(domain, error_reason, target, f"Response too large on {target}")
         return
 
     if error_reason == "REDIRECT":
@@ -4736,22 +4746,14 @@ def _handle_tcp_exception(domain, target, exception):
         record_error(domain, error_reason, target, f"{target}: too many redirects{redirect_info}")
         return
 
-    if error_reason == "RESET":
-        cleaned_message = _clean_exception_message(
-            error_message, "Server disconnected without sending a response"
-        )
-        echo(f"{domain}: {cleaned_message}", "orange", use_tqdm=True)
-        record_error(domain, error_reason, target, f"{target}: {error_message or cleaned_message}")
-        return
-
-    # All remaining transport failures are categorized as TCP. When the
-    # exception carries no usable message, fall back to a derived label
-    # (exception type + OS-level reason) instead of a bare "TCP error".
-    cleaned_message = _clean_exception_message(
-        error_message, _describe_transport_failure(exception)
-    )
-    echo(f"{domain}: {cleaned_message}", "orange", use_tqdm=True)
-    record_error(domain, error_reason, target, f"{target}: {error_message or cleaned_message}")
+    # All other transport failures (DNS/NXDOMAIN/TEMP/SSL/TIMEOUT/RESET/SSRF/TCP
+    # and FILE stream errors): emit the full, uncleaned exception text to both the
+    # console and error_log. error_reason still drives classification, scheduling
+    # and NXDOMAIN purging (in record_error); only the displayed text changes.
+    # Fall back to a derived label only when the exception has no message.
+    verbose_message = error_message.strip() or _describe_transport_failure(exception)
+    echo(f"{domain}: {verbose_message}", "orange", use_tqdm=True)
+    record_error(domain, error_reason, target, f"{target}: {verbose_message}")
 
 
 def _handle_json_exception(domain, target, exception):
