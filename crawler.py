@@ -191,6 +191,7 @@ TRACKED_ERROR_TYPES = (
     "TEMP",
     "SSL",
     "CERT",
+    "CIPHER",
     "TCP",
     "RESET",
     "TIMEOUT",
@@ -207,7 +208,7 @@ TRACKED_ERROR_TYPES = (
 )
 # Subset of TRACKED_ERROR_TYPES that route to _handle_tcp_exception when
 # replayed from a suppressed nodeinfo probe error.
-_TRANSPORT_ERROR_TYPES = frozenset({"DNS", "NXDOMAIN", "TEMP", "SSL", "CERT", "TCP", "RESET", "TIMEOUT", "REDIRECT", "SSRF", "FILE"})
+_TRANSPORT_ERROR_TYPES = frozenset({"DNS", "NXDOMAIN", "TEMP", "SSL", "CERT", "CIPHER", "TCP", "RESET", "TIMEOUT", "REDIRECT", "SSRF", "FILE"})
 
 # How long to retain error_log event rows before they are pruned by
 # cleanup_old_domains (env-overridable). The dashboard only looks back 24h; this
@@ -228,6 +229,9 @@ RETRY_BASE_HOURS: dict[str, int] = {
     # CERT: certificate verification failures (expiry, self-signed, issuer,
     # hostname mismatch). Same cadence as SSL for now; not purged.
     "CERT": max(1, int(os.getenv("VMCRAWL_RETRY_CERT_HOURS", "12"))),
+    # CIPHER: insecure/incompatible protocol-version or cipher negotiation —
+    # a persistent server config, so retried far less often (7d default).
+    "CIPHER": max(1, int(os.getenv("VMCRAWL_RETRY_CIPHER_HOURS", "168"))),
     "TCP": max(1, int(os.getenv("VMCRAWL_RETRY_TCP_HOURS", "6"))),
     "RESET": max(1, int(os.getenv("VMCRAWL_RETRY_RESET_HOURS", "12"))),
     "TIMEOUT": max(1, int(os.getenv("VMCRAWL_RETRY_TIMEOUT_HOURS", "3"))),
@@ -256,6 +260,7 @@ _REASON_BASE_HOURS_CASE = sql.SQL(
     "  WHEN error_type = 'TEMP' THEN {temp}"
     "  WHEN error_type = 'SSL' THEN {ssl}"
     "  WHEN error_type = 'CERT' THEN {cert}"
+    "  WHEN error_type = 'CIPHER' THEN {cipher}"
     "  WHEN error_type = 'TCP' THEN {tcp}"
     "  WHEN error_type = 'RESET' THEN {reset}"
     "  WHEN error_type = 'TIMEOUT' THEN {timeout}"
@@ -278,6 +283,7 @@ _REASON_BASE_HOURS_CASE = sql.SQL(
     temp=sql.Literal(RETRY_BASE_HOURS["TEMP"]),
     ssl=sql.Literal(RETRY_BASE_HOURS["SSL"]),
     cert=sql.Literal(RETRY_BASE_HOURS["CERT"]),
+    cipher=sql.Literal(RETRY_BASE_HOURS["CIPHER"]),
     tcp=sql.Literal(RETRY_BASE_HOURS["TCP"]),
     reset=sql.Literal(RETRY_BASE_HOURS["RESET"]),
     timeout=sql.Literal(RETRY_BASE_HOURS["TIMEOUT"]),
@@ -4669,18 +4675,49 @@ def _classify_dns_error(exception: Exception) -> str:
     return "DNS"
 
 
-def _classify_ssl_error(exception: Exception) -> str:
-    """Sub-classify a TLS failure into CERT / SSL.
+# OpenSSL reason codes (ssl.SSLError.reason) for a protocol-version or cipher
+# negotiation failure — the server is too old/weak for our TLS 1.2+ context.
+# These map to the CIPHER bucket; the alert-handshake-failure codes are included
+# because on a modern ClientHello they almost always mean "no acceptable
+# protocol/cipher". (TLSV1_ALERT_INTERNAL_ERROR is deliberately absent — that is
+# the MLKEM/PQC issue handled by the SSL context, not an insecure server.)
+_SSL_CIPHER_REASONS = frozenset({
+    "UNSUPPORTED_PROTOCOL",
+    "TLSV1_ALERT_PROTOCOL_VERSION",
+    "UNSUPPORTED_SSL_VERSION",
+    "WRONG_SSL_VERSION",
+    "WRONG_VERSION_NUMBER",
+    "NO_PROTOCOLS_AVAILABLE",
+    "UNKNOWN_PROTOCOL",
+    "NO_SHARED_CIPHER",
+    "NO_CIPHERS_AVAILABLE",
+    "SSLV3_ALERT_HANDSHAKE_FAILURE",
+    "HANDSHAKE_FAILURE_ON_CLIENT_HELLO",
+    "TLSV1_ALERT_INSUFFICIENT_SECURITY",
+    "DH_KEY_TOO_SMALL",
+    "EE_KEY_TOO_SMALL",
+    "CA_MD_TOO_WEAK",
+})
 
-    CERT covers certificate verification failures — expiry, self-signed,
-    issuer/untrusted CA, hostname mismatch — i.e. anything raised as an
-    ssl.SSLCertVerificationError, plus cert-verification text for the case where
-    the underlying exception survives only as a string (httpx-wrapped). Every
-    other TLS failure (handshake, protocol, cipher, EOF) stays SSL.
+
+def _classify_ssl_error(exception: Exception) -> str:
+    """Sub-classify a TLS failure into CERT / CIPHER / SSL.
+
+    CERT: certificate verification failures — expiry, self-signed,
+        issuer/untrusted CA, hostname mismatch (ssl.SSLCertVerificationError, or
+        cert-verification text when httpx-wrapped to a string).
+    CIPHER: protocol-version or cipher negotiation failures — the server is too
+        old/weak for our TLS 1.2+ context (unsupported protocol, no shared
+        cipher, key too small, etc.).
+    SSL: everything else (generic handshake, EOF, …).
     """
     for cause in _iter_exception_chain(exception):
         if isinstance(cause, ssl.SSLCertVerificationError):
             return "CERT"
+        if isinstance(cause, ssl.SSLError) and (
+            getattr(cause, "reason", None) in _SSL_CIPHER_REASONS
+        ):
+            return "CIPHER"
 
     text = str(exception).casefold()
     cert_phrases = (
@@ -4695,6 +4732,21 @@ def _classify_ssl_error(exception: Exception) -> str:
     )
     if any(phrase in text for phrase in cert_phrases):
         return "CERT"
+    cipher_phrases = (
+        "unsupported protocol",
+        "protocol version",
+        "wrong version number",
+        "no protocols available",
+        "unknown protocol",
+        "no shared cipher",
+        "no ciphers available",
+        "handshake failure",
+        "insufficient security",
+        "key too small",
+        "md too weak",
+    )
+    if any(phrase in text for phrase in cipher_phrases):
+        return "CIPHER"
     return "SSL"
 
 
@@ -4783,8 +4835,8 @@ def _handle_tcp_exception(domain, target, exception):
         record_error(domain, error_reason, target, f"{target}: too many redirects{redirect_info}")
         return
 
-    # All other transport failures (DNS/NXDOMAIN/TEMP/SSL/CERT/TIMEOUT/RESET/SSRF/
-    # TCP and FILE stream errors): emit the full, uncleaned exception text to both the
+    # All other transport failures (DNS/NXDOMAIN/TEMP/SSL/CERT/CIPHER/TIMEOUT/RESET/
+    # SSRF/TCP and FILE stream errors): emit the full, uncleaned exception text to both the
     # console and error_log. error_reason still drives classification, scheduling
     # and NXDOMAIN purging (in record_error); only the displayed text changes.
     # Fall back to a derived label only when the exception has no message.

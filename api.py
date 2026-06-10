@@ -723,12 +723,12 @@ async def get_crawler_health(_api_key: str | None = Depends(get_api_key)):
             result = cur.fetchone()
             reset_issues = result[0] if result else 0
 
-            # SSL Issues (TLS failures + certificate verification failures)
+            # SSL Issues (TLS failures + certificate + protocol/cipher failures)
             _ = cur.execute(
                 """
                 SELECT COUNT(DISTINCT rd.domain) AS unique_domain_count
                 FROM raw_domains rd
-                WHERE rd.error_type IN ('SSL', 'CERT')
+                WHERE rd.error_type IN ('SSL', 'CERT', 'CIPHER')
                   AND EXISTS (
                     SELECT 1 FROM mastodon_domains md WHERE md.domain = rd.domain
                   )
