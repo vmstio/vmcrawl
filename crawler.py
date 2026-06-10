@@ -4620,12 +4620,13 @@ def _iter_exception_chain(exception: BaseException):
 
 # getaddrinfo errno buckets, resolved from socket constants so the numeric
 # values stay correct across platforms (they differ Linux vs macOS). NXDOMAIN:
-# the name has no address / does not exist. TEMP: a transient resolver failure.
-# EAI_FAIL is deliberately left out of NXDOMAIN — it can be a transient SERVFAIL,
-# and NXDOMAIN purges the published row, so we only purge on definitive "no name".
+# the name does not exist. TEMP: a transient resolver failure. NXDOMAIN purges
+# the published row, so it is kept deliberately narrow — only EAI_NONAME ("name
+# not known"). EAI_NODATA (name exists but has no A/AAAA record) and EAI_FAIL
+# (can be a transient SERVFAIL) are excluded; they fall through to plain DNS.
 _DNS_NXDOMAIN_ERRNOS = frozenset(
     getattr(socket, name)
-    for name in ("EAI_NONAME", "EAI_NODATA")
+    for name in ("EAI_NONAME",)
     if hasattr(socket, name)
 )
 _DNS_TEMP_ERRNOS = frozenset(
@@ -4649,10 +4650,11 @@ def _classify_dns_error(exception: Exception) -> str:
     text = str(exception).casefold()
     if "temporary failure in name resolution" in text:
         return "TEMP"
+    # "no address associated with hostname" (EAI_NODATA — the name exists) is
+    # intentionally absent: only "name not known" phrasing maps to NXDOMAIN.
     if any(
         phrase in text
         for phrase in (
-            "no address associated with hostname",
             "nodename nor servname provided",
             "name or service not known",
         )
