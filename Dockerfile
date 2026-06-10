@@ -1,28 +1,33 @@
-ARG DEBIAN_VERSION=trixie
 ARG PYTHON_VERSION=3.13
 
-FROM python:${PYTHON_VERSION}-${DEBIAN_VERSION}
+FROM python:${PYTHON_VERSION}-slim
 
-RUN apt-get update && apt-get upgrade -y
+# Pinned uv for reproducible dependency resolution.
+COPY --from=ghcr.io/astral-sh/uv:0.11.19 /uv /usr/local/bin/uv
 
-# Install uv
-COPY --from=ghcr.io/astral-sh/uv:latest /uv /usr/local/bin/uv
-
-# Clone repository and set up application
-RUN git clone https://github.com/vmstio/vmcrawl.git /opt/vmcrawl
-
-# Create vmcrawl system user and set ownership
-RUN useradd -r -s /bin/bash -d /opt/vmcrawl vmcrawl \
-    && chown -R vmcrawl:vmcrawl /opt/vmcrawl
-
-# Switch to vmcrawl user
-USER vmcrawl
 WORKDIR /opt/vmcrawl
 
-# Set up virtual environment and install dependencies
-RUN uv sync
+# Install locked dependencies first so this layer is cached unless the
+# dependency set actually changes. --frozen fails loudly on a stale lock
+# instead of silently re-resolving; --no-dev skips the dev dependency group.
+COPY pyproject.toml uv.lock ./
+RUN uv sync --no-dev --frozen
 
-# Make the startup script executable
-RUN chmod +x /opt/vmcrawl/vmcrawl.sh
+# Application source. crawler.py reads pyproject.toml at runtime to derive its
+# name/version for the User-Agent, so pyproject.toml (copied above) must stay.
+COPY crawler.py ./
 
-ENTRYPOINT ["/opt/vmcrawl/vmcrawl.sh"]
+# Drop privileges: unprivileged user owning the app tree. Home is /opt/vmcrawl
+# so the crawler's ~/.cache/vmcrawl directory resolves to a writable path.
+RUN useradd --system --home-dir /opt/vmcrawl --shell /usr/sbin/nologin vmcrawl \
+    && chown -R vmcrawl:vmcrawl /opt/vmcrawl
+USER vmcrawl
+
+# Flush stdout/stderr promptly to the container log; don't write .pyc files.
+ENV PYTHONUNBUFFERED=1 \
+    PYTHONDONTWRITEBYTECODE=1
+
+# Run the interpreter from the venv uv created (mirrors Dockerfile.api) so
+# startup does no dependency resolution and needs no network or uv cache.
+# Arguments passed to `docker run` are forwarded to crawler.py.
+ENTRYPOINT [".venv/bin/python", "crawler.py"]

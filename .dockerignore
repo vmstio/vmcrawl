@@ -1,0 +1,28 @@
+# Keep secrets, VCS, and local build artifacts out of the build context so they
+# can never be baked into an image layer.
+.git
+.gitignore
+.env
+.env.*
+*.env
+
+# Local Python virtualenv / caches
+.venv
+__pycache__/
+**/__pycache__/
+*.py[cod]
+.ruff_cache
+.pytest_cache
+.mypy_cache
+
+# Node tooling used only for local web asset work
+node_modules/
+**/node_modules/
+
+# Editor / OS cruft
+.DS_Store
+.idea/
+.vscode/
+
+# Docs and CI not needed at runtime
+*.md
