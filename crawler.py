@@ -189,6 +189,7 @@ TRACKED_ERROR_TYPES = (
     "DNS",
     "SSL",
     "TCP",
+    "RESET",
     "TIMEOUT",
     "REDIRECT",
     "SSRF",
@@ -203,7 +204,7 @@ TRACKED_ERROR_TYPES = (
 )
 # Subset of TRACKED_ERROR_TYPES that route to _handle_tcp_exception when
 # replayed from a suppressed nodeinfo probe error.
-_TRANSPORT_ERROR_TYPES = frozenset({"DNS", "SSL", "TCP", "TIMEOUT", "REDIRECT", "SSRF", "FILE"})
+_TRANSPORT_ERROR_TYPES = frozenset({"DNS", "SSL", "TCP", "RESET", "TIMEOUT", "REDIRECT", "SSRF", "FILE"})
 
 # How long to retain error_log event rows before they are pruned by
 # cleanup_old_domains (env-overridable). The dashboard only looks back 24h; this
@@ -218,6 +219,7 @@ RETRY_BASE_HOURS: dict[str, int] = {
     "DNS": max(1, int(os.getenv("VMCRAWL_RETRY_DNS_HOURS", "12"))),
     "SSL": max(1, int(os.getenv("VMCRAWL_RETRY_SSL_HOURS", "12"))),
     "TCP": max(1, int(os.getenv("VMCRAWL_RETRY_TCP_HOURS", "6"))),
+    "RESET": max(1, int(os.getenv("VMCRAWL_RETRY_RESET_HOURS", "12"))),
     "TIMEOUT": max(1, int(os.getenv("VMCRAWL_RETRY_TIMEOUT_HOURS", "3"))),
     "REDIRECT": max(1, int(os.getenv("VMCRAWL_RETRY_REDIRECT_HOURS", "720"))),
     "SSRF": max(1, int(os.getenv("VMCRAWL_RETRY_SSRF_HOURS", "72"))),
@@ -242,6 +244,7 @@ _REASON_BASE_HOURS_CASE = sql.SQL(
     "  WHEN error_type = 'DNS' THEN {dns}"
     "  WHEN error_type = 'SSL' THEN {ssl}"
     "  WHEN error_type = 'TCP' THEN {tcp}"
+    "  WHEN error_type = 'RESET' THEN {reset}"
     "  WHEN error_type = 'TIMEOUT' THEN {timeout}"
     "  WHEN error_type = 'REDIRECT' THEN {redirect}"
     "  WHEN error_type = 'SSRF' THEN {ssrf}"
@@ -260,6 +263,7 @@ _REASON_BASE_HOURS_CASE = sql.SQL(
     dns=sql.Literal(RETRY_BASE_HOURS["DNS"]),
     ssl=sql.Literal(RETRY_BASE_HOURS["SSL"]),
     tcp=sql.Literal(RETRY_BASE_HOURS["TCP"]),
+    reset=sql.Literal(RETRY_BASE_HOURS["RESET"]),
     timeout=sql.Literal(RETRY_BASE_HOURS["TIMEOUT"]),
     redirect=sql.Literal(RETRY_BASE_HOURS["REDIRECT"]),
     ssrf=sql.Literal(RETRY_BASE_HOURS["SSRF"]),
@@ -3605,7 +3609,7 @@ def render_queue_status(
 _MANAGE_CHOICES = frozenset(
     {"1", "2", "3", "4", "5", "6", "7", "8", "s",
      "9", "10", "11", "12", "13", "14", "15", "16", "17", "18", "19",
-     "20", "21", "22", "23", "24", "50", "51", "52", "53"}
+     "20", "21", "22", "23", "24", "25", "50", "51", "52", "53"}
 )
 
 
@@ -4296,6 +4300,31 @@ async def _handle_manage_action(args: argparse.Namespace, choice: str) -> None:
         echo("", "white")
         input("Press Enter to continue...")
 
+    elif choice == "25":
+        echo("", "white")
+        domain = input("Enter the domain to requeue: ").strip().lower()
+        if not domain:
+            echo("Domain cannot be empty", "yellow")
+            echo("", "white")
+            input("Press Enter to continue...")
+            return
+        domain = domain.removeprefix("https://").removeprefix("http://").rstrip("/")
+        update_sql = "UPDATE raw_domains SET next_crawl_at = NULL WHERE domain = %s"
+        with db_pool.connection() as conn, conn.cursor() as cursor:
+            try:
+                _ = cursor.execute(update_sql, (domain,))
+                count = cursor.rowcount
+                conn.commit()
+                if count > 0:
+                    echo(f"Requeued {domain} for scanning.", "green")
+                else:
+                    echo(f"Domain not found in raw_domains: {domain}", "yellow")
+            except Exception as exc:
+                conn.rollback()
+                echo(f"Failed to requeue domain: {exc}", "red")
+        echo("", "white")
+        input("Press Enter to continue...")
+
     elif choice == "22":
         ctrl = await asyncio.to_thread(get_crawler_control)
         if ctrl["paused"]:
@@ -4551,6 +4580,25 @@ def _handle_http_failed(domain, target, response):
     record_error(domain, "HARD", target, error_message)
 
 
+def _describe_transport_failure(exception: Exception) -> str:
+    """Build a descriptive label for a transport exception whose own message is
+    empty (e.g. a bare ``httpx.ConnectError``). Combines the exception type with
+    any underlying OS-level reason (errno/strerror) or chained message, so the
+    catch-all records "ConnectError: Connection refused" instead of "TCP error".
+    """
+    type_name = type(exception).__name__
+    for cause in _iter_exception_chain(exception):
+        if isinstance(cause, OSError):
+            detail = cause.strerror or errno.errorcode.get(cause.errno or -1, "")
+            if detail:
+                return f"{type_name}: {detail}"
+        if cause is not exception:
+            text = str(cause).strip()
+            if text:
+                return f"{type_name}: {text}"
+    return type_name
+
+
 def _clean_exception_message(error_message: str, default: str) -> str:
     """Normalize noisy exception strings into concise error messages."""
     cleaned_message = (
@@ -4590,6 +4638,12 @@ def _classify_request_exception(exception: Exception) -> str:
     # own subclass of httpx.ConnectError raised only by SSRFGuardTransport.
     if isinstance(exception, SSRFBlockedError):
         return "SSRF"
+
+    # Connection established (TCP + TLS) but the server hung up before sending
+    # any HTTP response — distinct from a plain connect failure (TCP). Often an
+    # IP-level block/reset or an HTTP/2 stream reset (RST_STREAM PROTOCOL_ERROR).
+    if isinstance(exception, httpx.RemoteProtocolError):
+        return "RESET"
 
     if isinstance(exception, ValueError) and "too large" in error_message_lower:
         return "FILE"
@@ -4682,8 +4736,20 @@ def _handle_tcp_exception(domain, target, exception):
         record_error(domain, error_reason, target, f"{target}: too many redirects{redirect_info}")
         return
 
-    # All remaining transport failures are categorized as TCP.
-    cleaned_message = _clean_exception_message(error_message, "TCP error")
+    if error_reason == "RESET":
+        cleaned_message = _clean_exception_message(
+            error_message, "Server disconnected without sending a response"
+        )
+        echo(f"{domain}: {cleaned_message}", "orange", use_tqdm=True)
+        record_error(domain, error_reason, target, f"{target}: {error_message or cleaned_message}")
+        return
+
+    # All remaining transport failures are categorized as TCP. When the
+    # exception carries no usable message, fall back to a derived label
+    # (exception type + OS-level reason) instead of a bare "TCP error".
+    cleaned_message = _clean_exception_message(
+        error_message, _describe_transport_failure(exception)
+    )
     echo(f"{domain}: {cleaned_message}", "orange", use_tqdm=True)
     record_error(domain, error_reason, target, f"{target}: {error_message or cleaned_message}")
 
@@ -7023,6 +7089,7 @@ def get_menu_options() -> dict[str, dict[str, str]]:
             "15": "Search domain details",
             "20": "Crawl specific domain",
             "21": "Fetch peers from domain",
+            "25": "Requeue domain for scanning",
         },
         "Statistics": {
             "16": "List flagged days",
