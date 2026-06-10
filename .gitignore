@@ -210,7 +210,8 @@ __marimo__/
 .DS_Store
 
 # UV
-uv.lock
+# uv.lock is committed: the Docker builds COPY it and `uv sync --frozen`
+# requires it for reproducible, locked installs.
 .uv-cache
 
 # Node
