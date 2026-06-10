@@ -3367,12 +3367,12 @@ def render_queue_status(
 
     now = datetime.now(UTC)
     ts = now.strftime("%Y-%m-%d %H:%M:%S UTC")
-    title = f"{header}Queue Status  [{ts}]"
+    title = f"{header}Crawl Monitor  [{ts}]"
     # Keep the title on one physical row: a wrapped line would throw off the
     # cursor-up line count the live monitor uses to redraw. Drop the date (then
     # hard-truncate) on a narrow console.
     if len(title) > width:
-        title = f"{header}Queue Status  [{now.strftime('%H:%M:%S UTC')}]"
+        title = f"{header}Crawl Monitor  [{now.strftime('%H:%M:%S UTC')}]"
     if len(title) > width:
         title = title[:width]
     ln(_c(title, "bold"))
