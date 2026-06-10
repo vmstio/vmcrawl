@@ -2459,8 +2459,8 @@ async def chart_patch_history(
     except Exception:
         raise _db_error() from None
 
-    # Reverse so oldest → newest left-to-right; take last 10 for readability
-    hist = list(reversed(rows))[-10:]
+    # Reverse so oldest → newest left-to-right; take last 30 for readability
+    hist = list(reversed(rows))[-30:]
     labels = [
         row[0].strftime("%d %b") if hasattr(row[0], "strftime") else str(row[0])
         for row in hist
@@ -2520,17 +2520,17 @@ async def chart_patch_history(
         "type": "bar",
         "data": {"labels": labels, "datasets": datasets},
         "options": {
-            "indexAxis": "y",
+            "indexAxis": "x",
             "scales": {
                 "x": {
                     "stacked": True,
-                    "ticks": {"color": "#8888a0"},
-                    "grid": {"color": "#2a2a3a"},
+                    "ticks": {"color": "#8888a0", "autoSkip": True, "maxRotation": 0},
+                    "grid": {"display": False},
                 },
                 "y": {
                     "stacked": True,
                     "ticks": {"color": "#8888a0"},
-                    "grid": {"display": False},
+                    "grid": {"color": "#2a2a3a"},
                 },
             },
             "plugins": {
@@ -2596,7 +2596,7 @@ async def chart_branch_history(
     except Exception:
         raise _db_error() from None
 
-    hist = list(reversed(rows))[-10:]
+    hist = list(reversed(rows))[-30:]
     labels = [
         row[0].strftime("%d %b") if hasattr(row[0], "strftime") else str(row[0])
         for row in hist
@@ -2666,17 +2666,17 @@ async def chart_branch_history(
         "type": "bar",
         "data": {"labels": labels, "datasets": datasets},
         "options": {
-            "indexAxis": "y",
+            "indexAxis": "x",
             "scales": {
                 "x": {
                     "stacked": True,
-                    "ticks": {"color": "#8888a0"},
-                    "grid": {"color": "#2a2a3a"},
+                    "ticks": {"color": "#8888a0", "autoSkip": True, "maxRotation": 0},
+                    "grid": {"display": False},
                 },
                 "y": {
                     "stacked": True,
                     "ticks": {"color": "#8888a0"},
-                    "grid": {"display": False},
+                    "grid": {"color": "#2a2a3a"},
                 },
             },
             "plugins": {

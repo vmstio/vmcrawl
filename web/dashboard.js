@@ -429,17 +429,18 @@
       type: "bar",
       data: { labels: labels, datasets: decorated },
       options: {
-        indexAxis: "y",
+        indexAxis: "x",
         responsive: true,
         scales: {
           x: {
             stacked: true,
-            grid: { color: theme.border },
-            ticks: { callback: (v) => fmt(v) },
+            grid: { display: false },
+            ticks: { autoSkip: true, maxRotation: 0 },
           },
           y: {
             stacked: true,
-            grid: { display: false },
+            grid: { color: theme.border },
+            ticks: { callback: (v) => fmt(v) },
           },
         },
         plugins: {
@@ -464,7 +465,7 @@
           },
           tooltip: {
             callbacks: {
-              label: (ctx) => ctx.dataset.label + ": " + fmt(ctx.parsed.x),
+              label: (ctx) => ctx.dataset.label + ": " + fmt(ctx.parsed.y),
               afterBody: (items) => {
                 if (!items.length) return "";
                 const idx = items[0].dataIndex;
@@ -879,7 +880,7 @@
     );
 
     // Historical charts
-    const histSlice = hist.slice(-10);
+    const histSlice = hist.slice(-30);
     const histLabels = histSlice.map((h) => {
       const [y, m, day] = h.date.split("-").map(Number);
       const d = new Date(y, m - 1, day);
