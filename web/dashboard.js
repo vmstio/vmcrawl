@@ -453,7 +453,10 @@
     });
   }
 
-  // Table state
+  // Table state. Persisted to sessionStorage so the periodic auto-refresh
+  // (full page reload) preserves the user's search, filter, sort, and page.
+  const TABLE_STATE_KEY = "vmcrawl-table-state";
+  const SCROLL_KEY = "vmcrawl-scroll";
   let tableState = {
     offset: 0,
     limit: 100,
@@ -464,8 +467,36 @@
     total: 0,
   };
 
+  function restoreTableState() {
+    let saved;
+    try {
+      saved = JSON.parse(sessionStorage.getItem(TABLE_STATE_KEY) || "null");
+    } catch (_) {
+      saved = null;
+    }
+    if (!saved) return;
+    // total is recomputed by loadTable; everything else is user-driven.
+    for (const key of ["offset", "limit", "sort_by", "order", "q", "filter"]) {
+      if (saved[key] != null) tableState[key] = saved[key];
+    }
+    const searchInput = document.getElementById("search-input");
+    if (searchInput) searchInput.value = tableState.q;
+    const filterSelect = document.getElementById("filter-select");
+    if (filterSelect) filterSelect.value = tableState.filter;
+  }
+  restoreTableState();
+
+  function persistTableState() {
+    try {
+      sessionStorage.setItem(TABLE_STATE_KEY, JSON.stringify(tableState));
+    } catch (_) {
+      /* sessionStorage unavailable (e.g. private mode) — refresh still works */
+    }
+  }
+
   async function loadTable() {
     const s = tableState;
+    persistTableState();
     const params = new URLSearchParams({
       limit: s.limit,
       offset: s.offset,
@@ -1002,10 +1033,70 @@
 
     // Load table
     await loadTable().catch(handleTableError);
+
+    // Stamp the footer with the crawl data's age and when the page last
+    // fetched it. The crawl timestamp may lack a trailing "Z"; treat it as
+    // UTC (matching the table) so it renders in the viewer's local time.
+    const tsEl = document.getElementById("data-timestamp");
+    if (tsEl) {
+      const parts = [];
+      if (summary.last_updated) {
+        const raw = summary.last_updated;
+        const crawled = new Date(raw.endsWith("Z") ? raw : raw + "Z");
+        parts.push("Crawl data as of " + crawled.toLocaleString());
+      }
+      parts.push("Page refreshed " + new Date().toLocaleString());
+      tsEl.textContent = parts.join(" · ");
+    }
+
+    // Restore scroll position saved by an auto-refresh. One-shot: consume it
+    // so a later manual reload starts at the top as usual.
+    let savedScroll;
+    try {
+      savedScroll = sessionStorage.getItem(SCROLL_KEY);
+      if (savedScroll != null) sessionStorage.removeItem(SCROLL_KEY);
+    } catch (_) {
+      savedScroll = null;
+    }
+    if (savedScroll != null) {
+      window.scrollTo(0, parseInt(savedScroll, 10) || 0);
+    }
   }
 
   init().catch((err) => {
     console.error("Dashboard load error:", err);
+  });
+
+  // Auto-refresh so the displayed crawl data stays current without a manual
+  // reload. A full reload (matching the theme-toggle pattern) avoids leaking
+  // Chart.js instances and correctly re-renders branches that gain/lose a
+  // supported version. Table state is preserved via sessionStorage; scroll
+  // position is saved here so the refresh lands where the user was (and only
+  // an auto-refresh restores scroll — a manual reload still starts at top).
+  // Skip while the tab is hidden to avoid churning background tabs, then catch
+  // up when it next becomes visible.
+  function autoRefresh() {
+    try {
+      sessionStorage.setItem(SCROLL_KEY, String(window.scrollY));
+    } catch (_) {
+      /* sessionStorage unavailable — refresh still works, just no scroll */
+    }
+    window.location.reload();
+  }
+
+  const REFRESH_INTERVAL_MS = 5 * 60 * 1000;
+  let refreshPending = false;
+  setInterval(() => {
+    if (document.hidden) {
+      refreshPending = true;
+    } else {
+      autoRefresh();
+    }
+  }, REFRESH_INTERVAL_MS);
+  document.addEventListener("visibilitychange", () => {
+    if (!document.hidden && refreshPending) {
+      autoRefresh();
+    }
   });
 
   const themeToggle = document.querySelector(".theme-toggle");
