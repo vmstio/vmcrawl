@@ -3247,9 +3247,10 @@ def get_queue_status() -> dict[str, Any]:
                   AND claimed_at > now() - make_interval(secs => %(lease)s)
             ) AS active_workers,
             MIN(next_crawl_at) FILTER (
-                WHERE next_crawl_at > now()
-                  AND claimed_at IS NULL
-            ) AS next_due_at,
+                WHERE next_crawl_at <= now()
+                  AND (claimed_at IS NULL
+                       OR claimed_at <= now() - make_interval(secs => %(lease)s))
+            ) AS oldest_due_at,
             SUM(attempts) AS total_attempts,
             AVG(last_response_time) FILTER (
                 WHERE last_response_time IS NOT NULL
@@ -3291,7 +3292,7 @@ def get_queue_status() -> dict[str, Any]:
             "scheduled",
             "stale_leases",
             "active_workers",
-            "next_due_at",
+            "oldest_due_at",
             "total_attempts",
             "avg_response_time",
         ]
@@ -3410,7 +3411,7 @@ def render_queue_status(
     scheduled = stats.get("scheduled", 0) or 0
     stale = stats.get("stale_leases", 0) or 0
     workers = stats.get("active_workers", 0) or 0
-    next_due_at = stats.get("next_due_at")
+    oldest_due_at = stats.get("oldest_due_at")
     total_attempts = stats.get("total_attempts") or 0
     avg_rt = stats.get("avg_response_time")
 
@@ -3430,16 +3431,13 @@ def render_queue_status(
         c.append(f"{'In progress:':<20}{_c(f'{in_progress:>{vw},}', 'green' if in_progress > 0 else 'white')}")
         c.append(f"{'Scheduled:':<20}{_c(f'{scheduled:>{vw},}', 'white')}")
         c.append(f"{'Stale leases:':<20}{_c(f'{stale:>{vw},}', 'red' if stale > 0 else 'white')}")
-        if next_due_at is not None:
-            eta = _fmt_duration(max(0, int((next_due_at - now).total_seconds())))
-            val = f"{eta} from now" if cw >= 40 else eta
-            c.append(f"{'Next scheduled:':<20}{_c(f'{val:>{vw}}', 'white')}")
         return c
 
     def _perf_col(cw: int) -> list[str]:
         # Right-align values to the column edge so each row spans the full width.
         vw = max(10, cw - 20)
         c = [_c("PERFORMANCE", "bold"), _c("─" * cw, "cyan")]
+        c.append(f"{'Active workers:':<20}{_c(f'{workers:>{vw},}', 'green' if workers > 0 else 'white')}")
         if avg_rt is not None:
             rt = f"{avg_rt:.2f}s"
             c.append(f"{'Avg response time:':<20}{_c(f'{rt:>{vw}}', 'white')}")
@@ -3450,34 +3448,41 @@ def render_queue_status(
             c.append(f"{'Throughput:':<20}{_c(f'{tput:>{vw}}', 'green' if rate > 0 else 'white')}")
         else:
             c.append(f"{'Throughput:':<20}{_c(f'{'–':>{vw}}', 'white')}")
+        # How far behind schedule the queue is: the lag of the oldest domain
+        # that is due but not yet crawled. "0s" means fully caught up.
+        if oldest_due_at is not None:
+            lag = max(0, int((now - oldest_due_at).total_seconds()))
+            behind = _fmt_duration(lag)
+            c.append(f"{'Behind by:':<20}{_c(f'{behind:>{vw}}', 'yellow' if lag > 0 else 'white')}")
+        else:
+            c.append(f"{'Behind by:':<20}{_c(f'{'0s':>{vw}}', 'white')}")
         return c
 
     def _workers_col(cw: int) -> list[str]:
-        c = [_c(f"WORKERS  ({workers} active)", "bold"), _c("─" * cw, "cyan")]
+        c = [_c("WORKERS", "bold"), _c("─" * cw, "cyan")]
         if not worker_rows:
             c.append(_c("No active workers", "gray"))
             return c
         hostnames = [w.split(":")[0] for w, _, _ in worker_rows]
         duplicate_hosts = {h for h in hostnames if hostnames.count(h) > 1}
-        for worker_name, worker_count, worker_since in worker_rows:
+        # Newest check-in first; rows without a timestamp sort to the bottom.
+        sorted_rows = sorted(
+            worker_rows,
+            key=lambda r: (r[2] is not None, r[2] or datetime.min.replace(tzinfo=UTC)),
+            reverse=True,
+        )
+        for worker_name, worker_count, worker_since in sorted_rows:
             host = worker_name.split(":")[0]
             label = worker_name if host in duplicate_hosts else host
-            since_str = ""
-            slen = 0
-            if worker_since:
-                age = max(0, int((now - worker_since).total_seconds()))
-                since_txt = f"(since {_fmt_duration(age)})"
-                since_str = f"  {_c(since_txt, 'gray')}"
-                slen = len(since_txt) + 2
-            # Row = label + count(6) + since, spanning the column: the label
-            # fills the left, pushing count and "since" to the right edge. Drop
-            # "since" first if even that won't fit.
-            if cw - 6 - slen < 6:
-                since_str, slen = "", 0
-            label_w = max(6, cw - 6 - slen)
+            # Row = check-in time(8) + label + count(6), spanning the column:
+            # the time leads (like RECENT UPDATES/ERRORS), the label fills the
+            # middle, and the count is pinned to the right edge.
+            t = worker_since.strftime("%H:%M:%S") if worker_since else "??:??:??"
+            label_w = max(6, cw - 8 - 2 - 6)
             c.append(
+                f"{_c(t, 'gray')}  "
                 f"{_c(f'{label[:label_w]:<{label_w}}', 'cyan')}"
-                f"{worker_count:>6,}{since_str}"
+                f"{worker_count:>6,}"
             )
         return c
 
