@@ -3422,29 +3422,34 @@ def render_queue_status(
     worker_rows = stats.get("workers", [])
 
     def _queue_col(cw: int) -> list[str]:
+        # Right-align values to the column edge so each row spans the full width.
+        vw = max(10, cw - 20)
         c = [_c("QUEUE", "bold"), _c("─" * cw, "cyan")]
-        c.append(f"{'Total domains:':<20} {_c(f'{total:>10,}', 'white')}")
-        c.append(f"{'Due now:':<20} {_c(f'{due_now:>10,}', 'yellow' if due_now > 0 else 'white')}")
-        c.append(f"{'In progress:':<20} {_c(f'{in_progress:>10,}', 'green' if in_progress > 0 else 'white')}")
-        c.append(f"{'Scheduled:':<20} {_c(f'{scheduled:>10,}', 'white')}")
-        c.append(f"{'Stale leases:':<20} {_c(f'{stale:>10,}', 'red' if stale > 0 else 'white')}")
+        c.append(f"{'Total domains:':<20}{_c(f'{total:>{vw},}', 'white')}")
+        c.append(f"{'Due now:':<20}{_c(f'{due_now:>{vw},}', 'yellow' if due_now > 0 else 'white')}")
+        c.append(f"{'In progress:':<20}{_c(f'{in_progress:>{vw},}', 'green' if in_progress > 0 else 'white')}")
+        c.append(f"{'Scheduled:':<20}{_c(f'{scheduled:>{vw},}', 'white')}")
+        c.append(f"{'Stale leases:':<20}{_c(f'{stale:>{vw},}', 'red' if stale > 0 else 'white')}")
         if next_due_at is not None:
             eta = _fmt_duration(max(0, int((next_due_at - now).total_seconds())))
-            row = f"{'Next scheduled:':<20} {_c(f'{eta:>10}', 'white')}"
-            c.append(row + " from now" if cw >= 40 else row)
+            val = f"{eta} from now" if cw >= 40 else eta
+            c.append(f"{'Next scheduled:':<20}{_c(f'{val:>{vw}}', 'white')}")
         return c
 
     def _perf_col(cw: int) -> list[str]:
+        # Right-align values to the column edge so each row spans the full width.
+        vw = max(10, cw - 20)
         c = [_c("PERFORMANCE", "bold"), _c("─" * cw, "cyan")]
         if avg_rt is not None:
-            c.append(f"{'Avg response time:':<20} {_c(f'{avg_rt:>9.2f}s', 'white')}")
+            rt = f"{avg_rt:.2f}s"
+            c.append(f"{'Avg response time:':<20}{_c(f'{rt:>{vw}}', 'white')}")
         if prev_stats is not None and elapsed > 0:
             prev_attempts = prev_stats.get("total_attempts") or 0
             rate = max(0, total_attempts - prev_attempts) / elapsed * 60
             tput = f"{rate:.1f}/min"
-            c.append(f"{'Throughput:':<20} {_c(f'{tput:>10}', 'green' if rate > 0 else 'white')}")
+            c.append(f"{'Throughput:':<20}{_c(f'{tput:>{vw}}', 'green' if rate > 0 else 'white')}")
         else:
-            c.append(f"{'Throughput:':<20} {_c('        –', 'white')}")
+            c.append(f"{'Throughput:':<20}{_c(f'{'–':>{vw}}', 'white')}")
         return c
 
     def _workers_col(cw: int) -> list[str]:
@@ -3464,11 +3469,12 @@ def render_queue_status(
                 since_txt = f"(since {_fmt_duration(age)})"
                 since_str = f"  {_c(since_txt, 'gray')}"
                 slen = len(since_txt) + 2
-            # Row = label + count(6) + since. Shrink the label to the column
-            # width; drop "since" first if even that won't fit.
+            # Row = label + count(6) + since, spanning the column: the label
+            # fills the left, pushing count and "since" to the right edge. Drop
+            # "since" first if even that won't fit.
             if cw - 6 - slen < 6:
                 since_str, slen = "", 0
-            label_w = min(30, max(6, cw - 6 - slen))
+            label_w = max(6, cw - 6 - slen)
             c.append(
                 f"{_c(f'{label[:label_w]:<{label_w}}', 'cyan')}"
                 f"{worker_count:>6,}{since_str}"
@@ -3549,8 +3555,10 @@ def render_queue_status(
     # The standardized error_type values top out at 8 chars (e.g. REDIRECT).
     e_type_w = 8
     e_budget = col_w - 14 - e_type_w  # space shared by domain + endpoint
-    e_dom_w = max(12, min(32, e_budget * 3 // 5))  # bias toward the domain
-    e_end_w = max(6, e_budget - e_dom_w)
+    # Endpoint is a short enum (nodeinfo / robots_txt / domain); keep it narrow
+    # and let the domain absorb the slack so the row spans the full width.
+    e_end_w = max(8, min(12, e_budget // 4))
+    e_dom_w = max(12, e_budget - e_end_w)
     ecol: list[str] = [_c("RECENT ERRORS", "bold"), _c("─" * col_w, "cyan"), *e_counts]
     if recent_errors:
         ecol.append("")
@@ -3577,11 +3585,10 @@ def render_queue_status(
     # Field widths: time(8) + 3 gaps(6) = 14 overhead, plus mau(9).
     u_mau_w = 9
     u_budget = col_w - 14 - u_mau_w  # space shared by domain + version
-    if 34 + 16 > u_budget:
-        u_ver_w = max(6, min(16, u_budget // 3))
-        u_dom_w = max(10, u_budget - u_ver_w)
-    else:
-        u_dom_w, u_ver_w = 34, 16
+    # Version tops out around 16 chars; let the domain absorb the slack so the
+    # row spans the full width.
+    u_ver_w = max(6, min(16, u_budget // 3))
+    u_dom_w = max(10, u_budget - u_ver_w)
     ucol: list[str] = [_c("RECENT UPDATES", "bold"), _c("─" * col_w, "cyan"), *u_counts]
     if recent_updates:
         ucol.append("")
