@@ -1435,6 +1435,13 @@ def _build_affected_spec_from_patched(
     safe. ``lower`` floors the oldest branch (the version the flaw was
     introduced in); when None the oldest branch is open below, covering all
     earlier releases (used for "all"-style advisories).
+
+    Each non-oldest branch is floored at "{branch}.0a0" rather than
+    "{branch}.0" so the branch's own prereleases are included: in PEP 440 a
+    prerelease sorts before its final release, so ">=4.3.0" would wrongly
+    exclude 4.3.0-rc.1, and a prerelease fix like 4.5.0-beta.2 paired with a
+    ">=4.5.0" floor would yield an empty interval. ".0a0" is the lowest
+    prerelease of a branch and never reaches into the prior branch.
     """
     fixes: list[tuple[str, str]] = []
     for token in patched_raw.split(","):
@@ -1459,7 +1466,7 @@ def _build_affected_spec_from_patched(
         if index == 0:
             floor = lower
         else:
-            floor = f"{branch}.0"
+            floor = f"{branch}.0a0"
             if lower_ver is not None and lower_ver > version.parse(floor):
                 floor = lower
         clause = f">={floor},<{fix}" if floor else f"<{fix}"
