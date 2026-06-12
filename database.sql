@@ -269,6 +269,28 @@ CREATE TABLE IF NOT EXISTS
     tld TEXT PRIMARY KEY
   );
 
+-- Mastodon GitHub Security Advisories (GHSA), fetched from
+-- /repos/mastodon/mastodon/security-advisories. affected_spec is the parsed,
+-- normalized affected-version expression (OR-of-SpecifierSet DSL, see
+-- parse_vulnerable_range in crawler.py); affected_spec_override is a manual
+-- correction that wins over affected_spec and is never touched by the refresh
+-- job (for the prose/typo advisories the parser can't resolve).
+CREATE TABLE IF NOT EXISTS
+  security_advisories (
+    ghsa_id TEXT PRIMARY KEY,
+    summary TEXT,
+    severity TEXT,
+    cve_id TEXT,
+    url TEXT,
+    published_at TIMESTAMPTZ,
+    vulnerable_version_range TEXT,
+    patched_versions TEXT,
+    affected_spec TEXT,
+    affected_spec_override TEXT,
+    parse_status TEXT,
+    updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
+  );
+
 INSERT INTO
   bad_tld (tld)
 VALUES

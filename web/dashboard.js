@@ -540,6 +540,138 @@
     return d.innerHTML;
   }
 
+  function severityBadge(sev) {
+    const s = (sev || "unknown").toLowerCase();
+    const label = s.charAt(0).toUpperCase() + s.slice(1);
+    return `<span class="sev-badge sev-${esc(s)}">${esc(label)}</span>`;
+  }
+
+  const ADV_PAGE_SIZE = 10;
+  const ADV_SEVERITY_RANK = { critical: 4, high: 3, medium: 2, low: 1 };
+  // Numeric/date columns read best high-to-low; text columns A-to-Z.
+  const ADV_DEFAULT_DESC = new Set([
+    "severity",
+    "published_at",
+    "instances_percent",
+    "mau_percent",
+  ]);
+  let advisoriesData = [];
+  let advisoriesPage = 0;
+  let advSort = { key: "published_at", order: "desc" };
+
+  function advSortValue(a, key) {
+    switch (key) {
+      case "severity":
+        return ADV_SEVERITY_RANK[(a.severity || "").toLowerCase()] || 0;
+      case "published_at":
+        return a.published_at ? new Date(a.published_at).getTime() : 0;
+      case "instances_percent":
+        return a.instances_percent || 0;
+      case "mau_percent":
+        return a.mau_percent || 0;
+      case "summary":
+        return (a.summary || "").toLowerCase();
+      default:
+        return (a.ghsa_id || "").toLowerCase();
+    }
+  }
+
+  function sortAdvisories() {
+    const dir = advSort.order === "asc" ? 1 : -1;
+    advisoriesData.sort((x, y) => {
+      const vx = advSortValue(x, advSort.key);
+      const vy = advSortValue(y, advSort.key);
+      if (vx < vy) return -dir;
+      if (vx > vy) return dir;
+      // Stable tie-break so equal rows keep a deterministic order.
+      return (x.ghsa_id || "").localeCompare(y.ghsa_id || "");
+    });
+  }
+
+  function updateAdvSortIndicators() {
+    document
+      .querySelectorAll("#advisories-table th[data-adv-sort]")
+      .forEach((th) => {
+        const existing = th.querySelector(".sort-icon");
+        if (existing) existing.remove();
+        if (th.dataset.advSort === advSort.key) {
+          const icon = document.createElement("span");
+          icon.className = "sort-icon sort-icon--active";
+          icon.textContent = advSort.order === "asc" ? " ↑" : " ↓";
+          th.appendChild(icon);
+        }
+      });
+  }
+
+  function advisoryRow(a) {
+    const published = a.published_at
+      ? new Date(a.published_at).toLocaleDateString(undefined, {
+          year: "numeric",
+          month: "short",
+          day: "numeric",
+        })
+      : "";
+    const ghsa = a.url
+      ? `<a href="${esc(a.url)}" target="_blank" rel="noopener">${esc(a.ghsa_id)}</a>`
+      : esc(a.ghsa_id);
+    const cve = a.cve_id
+      ? `<br /><span class="adv-cve">${esc(a.cve_id)}</span>`
+      : "";
+    let instCell;
+    let mauCell;
+    if (a.parse_status === "needs_review") {
+      instCell = mauCell =
+        '<span class="adv-review" title="Affected range needs manual review">review</span>';
+    } else {
+      instCell = `${pct(a.instances_percent)}<br /><span class="adv-count">${fmt(a.affected_instances)}</span>`;
+      mauCell = `${pct(a.mau_percent)}<br /><span class="adv-count">${fmt(a.affected_mau)}</span>`;
+    }
+    return `<tr>
+        <td class="adv-nowrap">${ghsa}${cve}</td>
+        <td>${severityBadge(a.severity)}</td>
+        <td class="adv-summary">${esc(a.summary || "")}</td>
+        <td class="adv-nowrap" style="text-align:right">${esc(published)}</td>
+        <td style="text-align:right">${instCell}</td>
+        <td style="text-align:right">${mauCell}</td>
+    </tr>`;
+  }
+
+  function renderAdvisoriesPage() {
+    const tbody = document.getElementById("advisories-tbody");
+    if (!tbody) return;
+
+    const total = advisoriesData.length;
+    const pageCount = Math.max(1, Math.ceil(total / ADV_PAGE_SIZE));
+    advisoriesPage = Math.min(advisoriesPage, pageCount - 1);
+
+    const start = advisoriesPage * ADV_PAGE_SIZE;
+    const end = Math.min(start + ADV_PAGE_SIZE, total);
+    tbody.innerHTML = advisoriesData
+      .slice(start, end)
+      .map(advisoryRow)
+      .join("");
+
+    const pageInfo = document.getElementById("adv-page-info");
+    if (pageInfo) {
+      pageInfo.textContent = total
+        ? `${fmt(start + 1)}-${fmt(end)} of ${fmt(total)}`
+        : "0 of 0";
+    }
+    const prevBtn = document.getElementById("adv-prev-btn");
+    const nextBtn = document.getElementById("adv-next-btn");
+    if (prevBtn) prevBtn.disabled = advisoriesPage === 0;
+    if (nextBtn) nextBtn.disabled = end >= total;
+
+    updateAdvSortIndicators();
+  }
+
+  function renderAdvisories(data) {
+    advisoriesData = (data && data.advisories) || [];
+    sortAdvisories();
+    advisoriesPage = 0;
+    renderAdvisoriesPage();
+  }
+
   function handleTableError(err) {
     console.error("Table load error:", err);
   }
@@ -574,6 +706,35 @@
     tableState.offset += tableState.limit;
     loadTable().catch(handleTableError);
   });
+
+  document.getElementById("adv-prev-btn").addEventListener("click", () => {
+    if (advisoriesPage > 0) {
+      advisoriesPage -= 1;
+      renderAdvisoriesPage();
+    }
+  });
+
+  document.getElementById("adv-next-btn").addEventListener("click", () => {
+    advisoriesPage += 1;
+    renderAdvisoriesPage();
+  });
+
+  document
+    .querySelectorAll("#advisories-table th[data-adv-sort]")
+    .forEach((th) => {
+      th.addEventListener("click", () => {
+        const key = th.dataset.advSort;
+        if (advSort.key === key) {
+          advSort.order = advSort.order === "desc" ? "asc" : "desc";
+        } else {
+          advSort.key = key;
+          advSort.order = ADV_DEFAULT_DESC.has(key) ? "desc" : "asc";
+        }
+        sortAdvisories();
+        advisoriesPage = 0;
+        renderAdvisoriesPage();
+      });
+    });
 
   function updateSortIndicators() {
     document.querySelectorAll("th[data-sort]").forEach((th) => {
@@ -618,6 +779,7 @@
       branchAdoption,
       history,
       versionsData,
+      advisories,
     ] = await Promise.all([
       api("/stats/summary"),
       api("/stats/patch-adoption"),
@@ -629,7 +791,10 @@
       api("/stats/branch-adoption"),
       api("/stats/history?days=365"),
       api("/stats/versions"),
+      api("/stats/advisories"),
     ]);
+
+    renderAdvisories(advisories);
 
     // Big numbers
     document.getElementById("total-instances").textContent = fmt(

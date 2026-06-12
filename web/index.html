@@ -313,6 +313,43 @@
         </div>
       </section>
 
+      <!-- Security Advisories -->
+      <section class="section">
+        <h2>Security Advisory Impact</h2>
+        <p class="table-note">
+          Share of instances and monthly active users running a version
+          affected by each published Mastodon security advisory (GHSA).
+          Advisories marked &ldquo;review&rdquo; have version ranges that
+          can&rsquo;t be resolved automatically and are pending manual mapping.
+        </p>
+        <div class="table-wrapper">
+          <table id="advisories-table">
+            <thead>
+              <tr>
+                <th data-adv-sort="ghsa_id">Advisory</th>
+                <th data-adv-sort="severity">Severity</th>
+                <th data-adv-sort="summary">Summary</th>
+                <th data-adv-sort="published_at" style="text-align: right">
+                  Published
+                </th>
+                <th data-adv-sort="instances_percent" style="text-align: right">
+                  Affected Instances
+                </th>
+                <th data-adv-sort="mau_percent" style="text-align: right">
+                  Affected MAU
+                </th>
+              </tr>
+            </thead>
+            <tbody id="advisories-tbody"></tbody>
+          </table>
+        </div>
+        <div class="pagination">
+          <button id="adv-prev-btn" disabled>Previous</button>
+          <span id="adv-page-info">--</span>
+          <button id="adv-next-btn" disabled>Next</button>
+        </div>
+      </section>
+
       <!-- Instance Table -->
       <section class="section">
         <h2>All Instances</h2>

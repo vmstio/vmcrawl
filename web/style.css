@@ -403,12 +403,14 @@ th {
     white-space: nowrap;
 }
 
-th[data-sort] {
+th[data-sort],
+th[data-adv-sort] {
     cursor: pointer;
     user-select: none;
 }
 
-th[data-sort]:hover { color: var(--purple-light); }
+th[data-sort]:hover,
+th[data-adv-sort]:hover { color: var(--purple-light); }
 
 .sort-icon--active {
     font-style: normal;
@@ -433,7 +435,8 @@ tr:hover td { background: var(--bg-card-hover); }
     margin-top: 1rem;
 }
 
-#page-info {
+#page-info,
+#adv-page-info {
     font-size: 0.85rem;
     color: var(--text-muted);
 }
@@ -456,6 +459,38 @@ footer a {
     margin-top: 0.5rem;
     font-size: 0.75rem;
     opacity: 0.7;
+}
+
+/* Security advisory table */
+.sev-badge {
+    display: inline-block;
+    padding: 0.1rem 0.5rem;
+    border-radius: 0.75rem;
+    font-size: 0.7rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+    color: #fff;
+    background: var(--text-muted);
+}
+.sev-critical { background: var(--red-dark); }
+.sev-high { background: var(--red); }
+.sev-medium { background: var(--orange); }
+.sev-low { background: var(--green); }
+.adv-cve { font-size: 0.7rem; color: var(--text-muted); }
+.adv-count { font-size: 0.75rem; color: var(--text-muted); }
+/* Let the summary column wrap so the table fits its container; keep the
+   short columns on a single line. */
+#advisories-table td.adv-summary {
+    white-space: normal;
+    min-width: 14rem;
+    line-height: 1.35;
+}
+#advisories-table td.adv-nowrap { white-space: nowrap; }
+.adv-review {
+    font-size: 0.75rem;
+    font-style: italic;
+    color: var(--text-muted);
 }
 
 /* Responsive */
