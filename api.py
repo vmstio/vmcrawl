@@ -886,6 +886,35 @@ async def get_raw_versions(_api_key: str | None = Depends(get_api_key)):
         raise _db_error() from None
 
 
+@app.get("/stats/release-versions", tags=["Statistics"])
+async def get_release_versions(_api_key: str | None = Depends(get_api_key)):
+    """Get the tracked Mastodon release branches and their latest versions."""
+    try:
+        with db_pool.connection() as conn, conn.cursor() as cur:
+            _ = cur.execute(
+                """
+                SELECT branch, status, n_level, latest
+                FROM release_versions
+                ORDER BY n_level
+            """
+            )
+            results = cur.fetchall()
+
+        return {
+            "release_versions": [
+                {
+                    "branch": row[0],
+                    "status": row[1],
+                    "n_level": row[2],
+                    "latest": row[3],
+                }
+                for row in results
+            ]
+        }
+    except Exception:
+        raise _db_error() from None
+
+
 @app.get("/stats/most-deployed", tags=["Statistics"])
 async def get_most_deployed(_api_key: str | None = Depends(get_api_key)):
     """Get the most deployed Mastodon version by instance count and by MAU."""
