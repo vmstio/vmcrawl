@@ -1384,21 +1384,6 @@ def parse_vulnerable_range(raw: str) -> tuple[str | None, str]:
     return " || ".join(unique), ("needs_review" if had_unparsed else "ok")
 
 
-def validate_affected_spec(spec: str) -> tuple[bool, str | None]:
-    """Validate a manually entered affected-spec DSL. Returns (ok, error)."""
-    if not spec.strip():
-        return False, "empty spec"
-    for clause in spec.split("||"):
-        clause = clause.strip()
-        if not clause or clause == "*":
-            continue
-        try:
-            _ = SpecifierSet(clause)
-        except InvalidSpecifier as exc:
-            return False, str(exc)
-    return True, None
-
-
 # A "first fixed version" token from patched_versions (e.g. "4.2.5", "v4.4.18").
 _RE_ADVISORY_PATCH = re.compile(r"^(\d+)\.(\d+)\.(\d+)(?:[-.][0-9A-Za-z.]+)?$")
 # A lower-bound clause (">= 4.2.0", "> v4.0") used to floor the affected set.
@@ -4768,45 +4753,68 @@ async def _handle_manage_action(args: argparse.Namespace, choice: str) -> None:
                 echo("", "white")
                 input("Press Enter to continue...")
                 return
-            echo(f"Raw range: {row[0]}", "cyan")
-            echo(f"Auto spec: {row[1]}", "cyan")
-            echo(f"Override:  {row[2] or '(none)'}", "cyan")
+            cur_range, auto_spec, cur_override, cur_patched = row
+            echo(f"Raw range:      {cur_range}", "cyan")
+            echo(f"Patched:        {cur_patched}", "cyan")
+            echo(f"Auto spec:      {auto_spec}", "cyan")
+            echo(f"Current override: {cur_override or '(none)'}", "cyan")
             echo("", "white")
             echo(
-                "Enter override spec: OR clauses joined by ' || ', each a PEP 440",
+                "Enter corrected source strings and the override spec is computed",
                 "white",
             )
-            echo(
-                "specifier set (e.g. '>=4.4.0,<=4.4.13'), or '*' for all versions.",
-                "white",
-            )
-            echo("Leave blank to clear the override.", "white")
-            new_override = input("Override: ").strip()
-            if new_override:
-                ok, err = validate_affected_spec(new_override)
-                if not ok:
-                    conn.rollback()
-                    echo(f"Invalid spec: {err}", "red")
-                    echo("", "white")
-                    input("Press Enter to continue...")
-                    return
-                _ = cur.execute(
-                    "UPDATE security_advisories SET affected_spec_override = %s, "
-                    "parse_status = 'overridden', updated_at = CURRENT_TIMESTAMP "
-                    "WHERE ghsa_id = %s",
-                    (new_override, ghsa_id),
-                )
-                echo("Override saved.", "green")
-            else:
-                spec, status = resolve_affected_spec(row[0], row[3])
+            echo("for you. Blank keeps the current value shown in [brackets].", "white")
+            if cur_override:
+                echo("Type 'clear' at the range to remove the override.", "white")
+            echo("", "white")
+
+            range_in = input(f"Vulnerable version range [{cur_range or ''}]: ").strip()
+            if range_in.lower() == "clear":
+                spec, status = resolve_affected_spec(cur_range, cur_patched)
                 _ = cur.execute(
                     "UPDATE security_advisories SET affected_spec_override = NULL, "
                     "affected_spec = %s, parse_status = %s, "
                     "updated_at = CURRENT_TIMESTAMP WHERE ghsa_id = %s",
                     (spec, status, ghsa_id),
                 )
-                echo("Override cleared.", "green")
-            conn.commit()
+                conn.commit()
+                echo("Override cleared; reverted to auto spec.", "green")
+                echo("", "white")
+                input("Press Enter to continue...")
+                return
+
+            patched_in = input(f"Patched versions [{cur_patched or ''}]: ").strip()
+            new_range = range_in or cur_range
+            new_patched = patched_in or cur_patched
+
+            spec, status = resolve_affected_spec(new_range, new_patched)
+            echo("", "white")
+            echo(f"Computed spec:  {spec or '(none)'}", "bold")
+            if not spec:
+                conn.rollback()
+                echo("Could not compute a spec from those inputs.", "red")
+                echo("", "white")
+                input("Press Enter to continue...")
+                return
+            if status != "ok":
+                echo(
+                    "Warning: some clauses could not be parsed; spec may be partial.",
+                    "yellow",
+                )
+
+            confirm = input("Save as override? (Y/n): ").strip().lower()
+            if confirm in ("", "y", "yes"):
+                _ = cur.execute(
+                    "UPDATE security_advisories SET affected_spec_override = %s, "
+                    "parse_status = 'overridden', updated_at = CURRENT_TIMESTAMP "
+                    "WHERE ghsa_id = %s",
+                    (spec, ghsa_id),
+                )
+                conn.commit()
+                echo("Override saved.", "green")
+            else:
+                conn.rollback()
+                echo("Cancelled; no changes made.", "yellow")
         echo("", "white")
         input("Press Enter to continue...")
 
