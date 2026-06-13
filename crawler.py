@@ -1276,6 +1276,10 @@ _RE_ADVISORY_HYPHEN = re.compile(
 _RE_ADVISORY_WILDCARD = re.compile(r"^(?:<=|>=|<|>|==)?\s*v?(\d+\.\d+)\.x$", re.IGNORECASE)
 # "<= 4.5.10" / "< v4.4.18" / ">= 4.2.0" operator forms.
 _RE_ADVISORY_OPERATOR = re.compile(r"^(<=|>=|<|>|==)\s*v?(.+)$")
+# A normalized lone upper-bound specifier ("<4.4.18" / "<=4.5.10").
+_RE_ADVISORY_LONE_UPPER = re.compile(
+    r"^(<=|<)(\d+(?:\.\d+){1,2}(?:[-.][0-9A-Za-z.]+)?)$"
+)
 
 
 def _validate_specifier_set(spec: str) -> str | None:
@@ -1321,6 +1325,43 @@ def _parse_advisory_range_clause(clause: str) -> str | None:
         return _validate_specifier_set(f"=={bare.group(1)}")
 
     return None
+
+
+def _branch_bound_upper_bounds(clauses: list[str]) -> list[str] | None:
+    """Convert per-branch upper bounds into closed per-branch intervals.
+
+    Given specifier clauses that are *all* lone upper bounds ("<4.4.18",
+    "<=4.5.10") on two or more distinct branches, floor each newer branch at
+    "{branch}.0a0" so a bound on one branch can't bleed into older branches
+    (e.g. "<=4.5.10" must not flag a patched 4.4.18). The oldest branch stays
+    open below, covering all earlier releases. Returns None when the clauses
+    aren't a set of branch-distinct lone upper bounds (caller keeps the union).
+    """
+    parsed: list[tuple[str, str]] = []  # (branch, clause op+version)
+    for clause in clauses:
+        match = _RE_ADVISORY_LONE_UPPER.match(clause)
+        if not match:
+            return None
+        op, ver = match.group(1), match.group(2)
+        branch_match = re.match(r"^(\d+)\.(\d+)", ver)
+        if not branch_match:
+            return None
+        branch = f"{branch_match.group(1)}.{branch_match.group(2)}"
+        parsed.append((branch, f"{op}{ver}"))
+
+    branches = {b for b, _ in parsed}
+    if len(branches) < 2 or len(branches) != len(parsed):
+        # Need at least two branches, one clause each.
+        return None
+
+    parsed.sort(key=lambda item: version.parse(item[1].lstrip("<=")))
+    bounded: list[str] = []
+    for index, (branch, upper) in enumerate(parsed):
+        clause = upper if index == 0 else f">={branch}.0a0,{upper}"
+        validated = _validate_specifier_set(clause)
+        if validated:
+            bounded.append(validated)
+    return bounded or None
 
 
 def parse_vulnerable_range(raw: str) -> tuple[str | None, str]:
@@ -1381,6 +1422,13 @@ def parse_vulnerable_range(raw: str) -> tuple[str | None, str]:
     # De-duplicate while preserving order.
     seen: set[str] = set()
     unique = [c for c in clauses if not (c in seen or seen.add(c))]
+
+    # When every clause is a lone per-branch upper bound, close each interval
+    # so a bound on one branch can't bleed into older branches.
+    bounded = _branch_bound_upper_bounds(unique)
+    if bounded is not None:
+        unique = bounded
+
     return " || ".join(unique), ("needs_review" if had_unparsed else "ok")
 
 
@@ -1496,6 +1544,33 @@ def resolve_affected_spec(
         spec, status = parse_vulnerable_range(raw_range)
 
     if raw_patched and status == "ok" and (spec == "*" or not _spec_is_bounded(spec)):
+        derived = _build_affected_spec_from_patched(
+            raw_patched, _extract_lower_bound(raw_range or "")
+        )
+        if derived:
+            return derived, "ok"
+
+    return spec, status
+
+
+def resolve_override_spec(
+    raw_range: str | None, raw_patched: str | None
+) -> tuple[str | None, str]:
+    """Resolve an override spec from a manually entered range (range-driven).
+
+    Unlike resolve_affected_spec — used by the auto refresh, which treats the
+    per-branch patched_versions as authoritative — this trusts the typed range:
+    its per-branch upper bounds are kept exactly as entered (so adding "< 4.3.24"
+    yields a 4.3 branch even when stored patched_versions has none).
+    patched_versions is only a fallback when the range is open above ("all" or a
+    lone ">= X") and so carries no upper bound of its own.
+    """
+    spec, status = (None, "needs_review")
+    if raw_range:
+        spec, status = parse_vulnerable_range(raw_range)
+
+    range_has_no_upper = not spec or spec == "*" or "<" not in spec
+    if range_has_no_upper and raw_patched:
         derived = _build_affected_spec_from_patched(
             raw_patched, _extract_lower_bound(raw_range or "")
         )
@@ -4835,7 +4910,7 @@ async def _handle_manage_action(args: argparse.Namespace, choice: str) -> None:
                 range_in = input(
                     f"Vulnerable version range [{cur_range or ''}]: "
                 ).strip()
-                spec, status = resolve_affected_spec(
+                spec, status = resolve_override_spec(
                     range_in or cur_range, cur_patched
                 )
                 echo("", "white")
