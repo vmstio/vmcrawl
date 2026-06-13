@@ -634,9 +634,9 @@
         <td class="adv-nowrap">${ghsa}${cve}</td>
         <td>${severityBadge(a.severity)}</td>
         <td class="adv-summary">${esc(a.summary || "")}</td>
-        <td class="adv-nowrap" style="text-align:right">${esc(published)}</td>
         <td style="text-align:right">${instCell}</td>
         <td style="text-align:right">${mauCell}</td>
+        <td class="adv-nowrap" style="text-align:right">${esc(published)}</td>
     </tr>`;
   }
 
