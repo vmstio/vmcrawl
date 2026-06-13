@@ -318,6 +318,13 @@ main {
     margin-bottom: 1rem;
 }
 
+.table-note a {
+    color: var(--purple-light);
+    text-decoration: none;
+}
+
+.table-note a:hover { text-decoration: underline; }
+
 /* Left-aligned sub-header within a section (e.g. above the instance table). */
 .subhead {
     font-size: 0.9rem;
