@@ -40,7 +40,7 @@ try:
     from cachetools import TTLCache
     from dotenv import load_dotenv
     from packaging import version
-    from packaging.specifiers import InvalidSpecifier, SpecifierSet
+    from packaging.specifiers import InvalidSpecifier, Specifier, SpecifierSet
     from psycopg import sql
     from psycopg_pool import ConnectionPool
     from tqdm import tqdm
@@ -1283,12 +1283,34 @@ _RE_ADVISORY_LONE_UPPER = re.compile(
 
 
 def _validate_specifier_set(spec: str) -> str | None:
-    """Return spec if it is a valid PEP 440 SpecifierSet, else None."""
+    """Return spec (PEP 440-normalized) if it's a valid SpecifierSet, else None.
+
+    SpecifierSet preserves operands exactly as written, so a hand-typed
+    "<4.6.0-alpha.8" stays in that form rather than the canonical "<4.6.0a8".
+    Normalize each clause's version through ``version.parse`` so stored and
+    displayed specs are canonical. Wildcard versions ("4.2.*") aren't valid
+    Version inputs, so they're left untouched. Clause order is preserved.
+    """
     try:
         _ = SpecifierSet(spec)
     except InvalidSpecifier:
         return None
-    return spec
+    parts: list[str] = []
+    for token in spec.split(","):
+        token = token.strip()
+        try:
+            clause = Specifier(token)
+        except InvalidSpecifier:
+            parts.append(token)
+            continue
+        ver = clause.version
+        if "*" not in ver:
+            try:
+                ver = str(version.parse(ver))
+            except version.InvalidVersion:
+                pass
+        parts.append(f"{clause.operator}{ver}")
+    return ",".join(parts)
 
 
 def _parse_advisory_range_clause(clause: str) -> str | None:
