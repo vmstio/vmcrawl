@@ -1530,7 +1530,7 @@ def _build_affected_spec_from_patched(
 
 
 def resolve_affected_spec(
-    raw_range: str | None, raw_patched: str | None
+    raw_range: str | None, raw_patched: str | None, fence_oldest: bool = True
 ) -> tuple[str | None, str]:
     """Resolve an advisory's affected-spec, returning (spec, parse_status).
 
@@ -1538,6 +1538,11 @@ def resolve_affected_spec(
     or cross-branch ("all", a lone "<= X", or ">= X") — refines it with the
     per-branch upper bounds from patched_versions so instances on a patched
     version aren't counted as affected.
+
+    By default each affected branch (including the oldest) is fenced to its own
+    series, so an advisory is scoped to the branches it names and doesn't sweep
+    in arbitrarily old releases. Pass ``fence_oldest=False`` to leave the oldest
+    branch open below (covering all earlier releases).
     """
     spec, status = (None, "needs_review")
     if raw_range:
@@ -1548,7 +1553,10 @@ def resolve_affected_spec(
             raw_patched, _extract_lower_bound(raw_range or "")
         )
         if derived:
-            return derived, "ok"
+            spec, status = derived, "ok"
+
+    if fence_oldest:
+        spec = _fence_oldest_clause(spec)
 
     return spec, status
 
@@ -1580,7 +1588,7 @@ def _fence_oldest_clause(spec: str | None) -> str | None:
 
 
 def resolve_override_spec(
-    raw_range: str | None, raw_patched: str | None, fence_oldest: bool = False
+    raw_range: str | None, raw_patched: str | None, fence_oldest: bool = True
 ) -> tuple[str | None, str]:
     """Resolve an override spec from a manually entered range (range-driven).
 
@@ -4942,14 +4950,14 @@ async def _handle_manage_action(args: argparse.Namespace, choice: str) -> None:
                 range_in = input(
                     f"Vulnerable version range [{cur_range or ''}]: "
                 ).strip()
-                fence_in = input(
-                    "Limit oldest branch to its own series "
-                    "(exclude older releases)? (y/N): "
+                include_in = input(
+                    "Include releases older than the oldest affected branch? "
+                    "(y/N): "
                 ).strip().lower()
                 spec, status = resolve_override_spec(
                     range_in or cur_range,
                     cur_patched,
-                    fence_oldest=fence_in in ("y", "yes"),
+                    fence_oldest=include_in not in ("y", "yes"),
                 )
                 echo("", "white")
                 echo(f"Computed spec:  {spec or '(none)'}", "bold")
