@@ -618,7 +618,7 @@
       ? `<br /><span class="adv-cve">${esc(a.cve_id)}</span>`
       : "";
     const specBtn = a.affected_spec
-      ? `<button type="button" class="adv-spec-btn" data-spec="${esc(a.affected_spec)}" aria-label="Show affected version spec" title="Show affected version spec">i</button>`
+      ? `<button type="button" class="adv-spec-btn" data-spec="${esc(a.affected_spec)}" aria-label="Show affected version spec" title="Show affected version spec">{ }</button>`
       : "";
     let instCell;
     let mauCell;
