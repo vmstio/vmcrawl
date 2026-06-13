@@ -630,9 +630,8 @@
       mauCell = `${pct(a.mau_percent)}<br /><span class="adv-count">${fmt(a.affected_mau)}</span>`;
     }
     return `<tr>
-        <td class="adv-nowrap">${ghsa}${cve}</td>
+        <td class="adv-nowrap">${specBtn}${ghsa}${cve}</td>
         <td>${severityBadge(a.severity)}</td>
-        <td class="adv-info" style="text-align:center">${specBtn}</td>
         <td class="adv-summary">${esc(a.summary || "")}</td>
         <td class="adv-nowrap" style="text-align:right">${esc(published)}</td>
         <td style="text-align:right">${instCell}</td>

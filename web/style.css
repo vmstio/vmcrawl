@@ -500,14 +500,15 @@ footer a {
     font-style: italic;
     color: var(--text-muted);
 }
-.adv-info-col { width: 1.75rem; }
 .adv-spec-btn {
     display: inline-flex;
     align-items: center;
     justify-content: center;
     width: 1.15rem;
     height: 1.15rem;
+    margin-right: 0.4rem;
     padding: 0;
+    vertical-align: middle;
     border: 1px solid var(--border);
     border-radius: 50%;
     background: transparent;
