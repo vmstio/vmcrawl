@@ -325,6 +325,14 @@ main {
 
 .table-note a:hover { text-decoration: underline; }
 
+.table-footnote {
+    font-size: 0.7rem;
+    color: var(--text-muted);
+    margin-top: 0.75rem;
+    line-height: 1.4;
+    opacity: 0.85;
+}
+
 /* Left-aligned sub-header within a section (e.g. above the instance table). */
 .subhead {
     font-size: 0.9rem;
