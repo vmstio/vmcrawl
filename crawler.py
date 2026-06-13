@@ -1553,8 +1553,34 @@ def resolve_affected_spec(
     return spec, status
 
 
+def _fence_oldest_clause(spec: str | None) -> str | None:
+    """Floor the open-below clause at its own branch ".0a0".
+
+    A branch-bounded spec leaves its oldest clause open below ("<4.3.24") to
+    sweep in all earlier releases. Fencing rewrites that clause to
+    ">=4.3.0a0,<4.3.24" so only that branch's own series is affected and older
+    releases (4.2.x and below) are excluded. Already-fenced clauses are left
+    untouched.
+    """
+    if not spec or spec == "*":
+        return spec
+    out: list[str] = []
+    for clause in spec.split(" || "):
+        clause = clause.strip()
+        match = _RE_ADVISORY_LONE_UPPER.match(clause)
+        if match:
+            branch_match = re.match(r"^(\d+)\.(\d+)", match.group(2))
+            if branch_match:
+                branch = f"{branch_match.group(1)}.{branch_match.group(2)}"
+                fenced = _validate_specifier_set(f">={branch}.0a0,{clause}")
+                out.append(fenced or clause)
+                continue
+        out.append(clause)
+    return " || ".join(out)
+
+
 def resolve_override_spec(
-    raw_range: str | None, raw_patched: str | None
+    raw_range: str | None, raw_patched: str | None, fence_oldest: bool = False
 ) -> tuple[str | None, str]:
     """Resolve an override spec from a manually entered range (range-driven).
 
@@ -1564,6 +1590,9 @@ def resolve_override_spec(
     yields a 4.3 branch even when stored patched_versions has none).
     patched_versions is only a fallback when the range is open above ("all" or a
     lone ">= X") and so carries no upper bound of its own.
+
+    When ``fence_oldest`` is set, the oldest branch is floored at its own ".0a0"
+    too, excluding releases older than that branch.
     """
     spec, status = (None, "needs_review")
     if raw_range:
@@ -1575,7 +1604,10 @@ def resolve_override_spec(
             raw_patched, _extract_lower_bound(raw_range or "")
         )
         if derived:
-            return derived, "ok"
+            spec, status = derived, "ok"
+
+    if fence_oldest:
+        spec = _fence_oldest_clause(spec)
 
     return spec, status
 
@@ -4910,8 +4942,14 @@ async def _handle_manage_action(args: argparse.Namespace, choice: str) -> None:
                 range_in = input(
                     f"Vulnerable version range [{cur_range or ''}]: "
                 ).strip()
+                fence_in = input(
+                    "Limit oldest branch to its own series "
+                    "(exclude older releases)? (y/N): "
+                ).strip().lower()
                 spec, status = resolve_override_spec(
-                    range_in or cur_range, cur_patched
+                    range_in or cur_range,
+                    cur_patched,
+                    fence_oldest=fence_in in ("y", "yes"),
                 )
                 echo("", "white")
                 echo(f"Computed spec:  {spec or '(none)'}", "bold")
