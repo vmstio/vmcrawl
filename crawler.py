@@ -1505,6 +1505,25 @@ def resolve_affected_spec(
     return spec, status
 
 
+def validate_affected_spec(spec: str) -> tuple[bool, str | None]:
+    """Validate a hand-entered affected-spec DSL. Returns (ok, error).
+
+    Each clause (split on '||') must be the sentinel '*' or a valid PEP 440
+    SpecifierSet, e.g. '>=4.6.0a5,<=4.6.0a7 || ==4.3.0-beta.1'.
+    """
+    if not spec.strip():
+        return False, "empty spec"
+    for clause in spec.split("||"):
+        clause = clause.strip()
+        if not clause or clause == "*":
+            continue
+        try:
+            _ = SpecifierSet(clause)
+        except InvalidSpecifier as exc:
+            return False, str(exc)
+    return True, None
+
+
 async def refresh_security_advisories() -> int:
     """Fetch Mastodon's GitHub Security Advisories and upsert them.
 
@@ -4761,22 +4780,21 @@ async def _handle_manage_action(args: argparse.Namespace, choice: str) -> None:
                 input("Press Enter to continue...")
                 return
             cur_range, auto_spec, cur_override, cur_patched = row
-            echo(f"Raw range:      {cur_range}", "cyan")
-            echo(f"Patched:        {cur_patched}", "cyan")
-            echo(f"Auto spec:      {auto_spec}", "cyan")
+            echo(f"Raw range:        {cur_range}", "cyan")
+            echo(f"Patched:          {cur_patched}", "cyan")
+            echo(f"Auto spec:        {auto_spec}", "cyan")
             echo(f"Current override: {cur_override or '(none)'}", "cyan")
             echo("", "white")
-            echo(
-                "Enter corrected source strings and the override spec is computed",
-                "white",
-            )
-            echo("for you. Blank keeps the current value shown in [brackets].", "white")
+            echo("How do you want to set the override?", "white")
+            echo("  (c) Calculate from corrected range/patched strings", "white")
+            echo("  (p) Provide a PEP 440 affected spec directly", "white")
             if cur_override:
-                echo("Type 'clear' at the range to remove the override.", "white")
-            echo("", "white")
+                echo("  (x) Clear the override and revert to the auto spec", "white")
+            echo("  (Enter) Cancel", "white")
+            mode = input("Choice: ").strip().lower()
 
-            range_in = input(f"Vulnerable version range [{cur_range or ''}]: ").strip()
-            if range_in.lower() == "clear":
+            spec: str | None = None
+            if mode == "x" and cur_override:
                 spec, status = resolve_affected_spec(cur_range, cur_patched)
                 _ = cur.execute(
                     "UPDATE security_advisories SET affected_spec_override = NULL, "
@@ -4790,26 +4808,58 @@ async def _handle_manage_action(args: argparse.Namespace, choice: str) -> None:
                 input("Press Enter to continue...")
                 return
 
-            patched_in = input(f"Patched versions [{cur_patched or ''}]: ").strip()
-            new_range = range_in or cur_range
-            new_patched = patched_in or cur_patched
-
-            spec, status = resolve_affected_spec(new_range, new_patched)
-            echo("", "white")
-            echo(f"Computed spec:  {spec or '(none)'}", "bold")
-            if not spec:
+            if mode == "p":
+                echo("", "white")
+                echo(
+                    "Enter the affected spec: OR clauses joined by ' || ', each a",
+                    "white",
+                )
+                echo(
+                    "PEP 440 specifier set (e.g. '>=4.6.0a5,<=4.6.0a7'), or '*' for "
+                    "all versions.",
+                    "white",
+                )
+                default_spec = cur_override or auto_spec or ""
+                manual = input(f"Affected spec [{default_spec}]: ").strip()
+                spec = manual or default_spec
+                ok, err = validate_affected_spec(spec) if spec else (False, "empty spec")
+                if not ok:
+                    conn.rollback()
+                    echo(f"Invalid spec: {err}", "red")
+                    echo("", "white")
+                    input("Press Enter to continue...")
+                    return
+            elif mode == "c":
+                echo("", "white")
+                echo("Blank keeps the current range shown in [brackets].", "white")
+                range_in = input(
+                    f"Vulnerable version range [{cur_range or ''}]: "
+                ).strip()
+                spec, status = resolve_affected_spec(
+                    range_in or cur_range, cur_patched
+                )
+                echo("", "white")
+                echo(f"Computed spec:  {spec or '(none)'}", "bold")
+                if not spec:
+                    conn.rollback()
+                    echo("Could not compute a spec from those inputs.", "red")
+                    echo("", "white")
+                    input("Press Enter to continue...")
+                    return
+                if status != "ok":
+                    echo(
+                        "Warning: some clauses could not be parsed; spec may be "
+                        "partial.",
+                        "yellow",
+                    )
+            else:
                 conn.rollback()
-                echo("Could not compute a spec from those inputs.", "red")
+                echo("Cancelled; no changes made.", "yellow")
                 echo("", "white")
                 input("Press Enter to continue...")
                 return
-            if status != "ok":
-                echo(
-                    "Warning: some clauses could not be parsed; spec may be partial.",
-                    "yellow",
-                )
 
-            confirm = input("Save as override? (Y/n): ").strip().lower()
+            confirm = input(f"Save override '{spec}'? (Y/n): ").strip().lower()
             if confirm in ("", "y", "yes"):
                 _ = cur.execute(
                     "UPDATE security_advisories SET affected_spec_override = %s, "
