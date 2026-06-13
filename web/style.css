@@ -500,6 +500,55 @@ footer a {
     font-style: italic;
     color: var(--text-muted);
 }
+.adv-info-col { width: 1.75rem; }
+.adv-spec-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 1.15rem;
+    height: 1.15rem;
+    padding: 0;
+    border: 1px solid var(--border);
+    border-radius: 50%;
+    background: transparent;
+    color: var(--text-muted);
+    font-family: Georgia, 'Times New Roman', serif;
+    font-size: 0.72rem;
+    font-style: italic;
+    font-weight: 700;
+    line-height: 1;
+    cursor: pointer;
+}
+.adv-spec-btn:hover {
+    color: var(--purple-light);
+    border-color: var(--purple-light);
+}
+.adv-spec-popover {
+    position: absolute;
+    z-index: 50;
+    max-width: min(90vw, 32rem);
+    padding: 0.6rem 0.75rem;
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: 0.5rem;
+    box-shadow: 0 6px 20px rgba(0, 0, 0, 0.35);
+}
+.adv-spec-popover-label {
+    font-size: 0.65rem;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: var(--text-muted);
+    margin-bottom: 0.35rem;
+}
+.adv-spec-popover code {
+    display: block;
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    font-size: 0.8rem;
+    color: var(--text);
+    white-space: pre-wrap;
+    word-break: break-word;
+    line-height: 1.4;
+}
 
 /* Responsive */
 @media (max-width: 768px) {

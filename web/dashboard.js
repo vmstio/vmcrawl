@@ -617,6 +617,9 @@
     const cve = a.cve_id
       ? `<br /><span class="adv-cve">${esc(a.cve_id)}</span>`
       : "";
+    const specBtn = a.affected_spec
+      ? `<button type="button" class="adv-spec-btn" data-spec="${esc(a.affected_spec)}" aria-label="Show affected version spec" title="Show affected version spec">i</button>`
+      : "";
     let instCell;
     let mauCell;
     if (a.parse_status === "needs_review") {
@@ -629,6 +632,7 @@
     return `<tr>
         <td class="adv-nowrap">${ghsa}${cve}</td>
         <td>${severityBadge(a.severity)}</td>
+        <td class="adv-info" style="text-align:center">${specBtn}</td>
         <td class="adv-summary">${esc(a.summary || "")}</td>
         <td class="adv-nowrap" style="text-align:right">${esc(published)}</td>
         <td style="text-align:right">${instCell}</td>
@@ -636,9 +640,43 @@
     </tr>`;
   }
 
+  // Click-to-reveal popover showing the PEP 440 affected-version spec used to
+  // compute an advisory's impact. A single shared element is repositioned next
+  // to whichever icon is active.
+  let advSpecPopover = null;
+  let advSpecOwner = null;
+
+  function closeAdvSpecPopover() {
+    if (advSpecPopover) advSpecPopover.remove();
+    advSpecPopover = null;
+    advSpecOwner = null;
+  }
+
+  function openAdvSpecPopover(btn) {
+    closeAdvSpecPopover();
+    const pop = document.createElement("div");
+    pop.className = "adv-spec-popover";
+    pop.innerHTML =
+      `<div class="adv-spec-popover-label">Affected version spec (PEP 440)</div>` +
+      `<code>${esc(btn.dataset.spec || "")}</code>`;
+    document.body.appendChild(pop);
+
+    const rect = btn.getBoundingClientRect();
+    pop.style.top = `${window.scrollY + rect.bottom + 6}px`;
+    let left = window.scrollX + rect.left;
+    // Keep the popover inside the viewport's right edge.
+    const overflow = left + pop.offsetWidth - (window.scrollX + window.innerWidth) + 8;
+    if (overflow > 0) left -= overflow;
+    pop.style.left = `${Math.max(window.scrollX + 8, left)}px`;
+
+    advSpecPopover = pop;
+    advSpecOwner = btn;
+  }
+
   function renderAdvisoriesPage() {
     const tbody = document.getElementById("advisories-tbody");
     if (!tbody) return;
+    closeAdvSpecPopover();
 
     const total = advisoriesData.length;
     const pageCount = Math.max(1, Math.ceil(total / ADV_PAGE_SIZE));
@@ -717,6 +755,30 @@
   document.getElementById("adv-next-btn").addEventListener("click", () => {
     advisoriesPage += 1;
     renderAdvisoriesPage();
+  });
+
+  // Toggle the affected-spec popover from the per-row info icons. Delegated on
+  // the tbody so it survives re-renders; document handlers dismiss it.
+  const advTbodyEl = document.getElementById("advisories-tbody");
+  if (advTbodyEl) {
+    advTbodyEl.addEventListener("click", (e) => {
+      const btn = e.target.closest(".adv-spec-btn");
+      if (!btn) return;
+      e.stopPropagation();
+      if (advSpecOwner === btn) {
+        closeAdvSpecPopover();
+      } else {
+        openAdvSpecPopover(btn);
+      }
+    });
+  }
+  document.addEventListener("click", (e) => {
+    if (advSpecPopover && !advSpecPopover.contains(e.target)) {
+      closeAdvSpecPopover();
+    }
+  });
+  document.addEventListener("keydown", (e) => {
+    if (e.key === "Escape") closeAdvSpecPopover();
   });
 
   document

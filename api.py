@@ -1032,6 +1032,7 @@ async def get_advisories(_api_key: str | None = Depends(get_api_key)):
                     else None,
                     "vulnerable_version_range": raw_range,
                     "patched_versions": patched,
+                    "affected_spec": effective_spec,
                     "parse_status": parse_status,
                     "affected_instances": affected_instances,
                     "affected_mau": affected_mau,
