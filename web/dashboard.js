@@ -459,7 +459,7 @@
   const SCROLL_KEY = "vmcrawl-scroll";
   let tableState = {
     offset: 0,
-    limit: 100,
+    limit: 25,
     sort_by: "mau",
     order: "desc",
     q: "",
@@ -475,8 +475,9 @@
       saved = null;
     }
     if (!saved) return;
-    // total is recomputed by loadTable; everything else is user-driven.
-    for (const key of ["offset", "limit", "sort_by", "order", "q", "filter"]) {
+    // total is recomputed by loadTable; limit is a fixed design choice (no UI
+    // to change it), so it's not restored; everything else is user-driven.
+    for (const key of ["offset", "sort_by", "order", "q", "filter"]) {
       if (saved[key] != null) tableState[key] = saved[key];
     }
     const searchInput = document.getElementById("search-input");
