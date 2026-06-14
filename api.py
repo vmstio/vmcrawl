@@ -40,6 +40,8 @@ from starlette.requests import Request
 from starlette.responses import Response as StarletteResponse
 from fastapi.security import APIKeyHeader
 from fastapi.staticfiles import StaticFiles
+from packaging.specifiers import InvalidSpecifier, SpecifierSet
+from packaging.version import InvalidVersion
 from psycopg import sql
 from psycopg_pool import ConnectionPool
 from slowapi import Limiter, _rate_limit_exceeded_handler
@@ -910,6 +912,139 @@ async def get_release_versions(_api_key: str | None = Depends(get_api_key)):
                 }
                 for row in results
             ]
+        }
+    except Exception:
+        raise _db_error() from None
+
+
+def _version_affected(ver: str | None, spec_dsl: str | None) -> bool:
+    """Return True if version string ``ver`` falls within the affected-spec DSL.
+
+    The DSL (produced by the crawler's parse_vulnerable_range) is OR clauses
+    joined by ' || '; each clause is a PEP 440 SpecifierSet, or the sentinel
+    '*' meaning all versions. Unparseable versions/specifiers are treated as
+    non-matching so a single bad row can never crash the report.
+    """
+    if not ver or not spec_dsl:
+        return False
+    for clause in spec_dsl.split(" || "):
+        clause = clause.strip()
+        if not clause:
+            continue
+        if clause == "*":
+            return True
+        try:
+            if SpecifierSet(clause).contains(ver, prereleases=True):
+                return True
+        except (InvalidSpecifier, InvalidVersion):
+            continue
+    return False
+
+
+@app.get("/stats/advisories", tags=["Statistics"])
+async def get_advisories(_api_key: str | None = Depends(get_api_key)):
+    """Per-advisory impact for Mastodon GHSA security advisories.
+
+    Returns each advisory with the share of instances and MAU running an
+    affected version, computed live against the current instance population.
+    Advisories sort newest first.
+    """
+    try:
+        with db_pool.connection() as conn, conn.cursor() as cur:
+            # Version histogram: instances + MAU per distinct software_version.
+            _ = cur.execute(
+                """
+                SELECT software_version,
+                       COUNT(*) AS instances,
+                       COALESCE(SUM(active_users_monthly), 0) AS mau
+                FROM mastodon_domains
+                WHERE software_version IS NOT NULL
+                GROUP BY software_version
+                """
+            )
+            histogram = cur.fetchall()
+
+            # Population totals (all instances and all MAU).
+            _ = cur.execute(
+                """
+                SELECT COUNT(*),
+                       COALESCE(SUM(active_users_monthly), 0)
+                FROM mastodon_domains
+                """
+            )
+            total_row = cur.fetchone()
+            total_instances = total_row[0] if total_row else 0
+            total_mau = total_row[1] if total_row else 0
+
+            _ = cur.execute(
+                """
+                SELECT ghsa_id, summary, severity, cve_id, url, published_at,
+                       vulnerable_version_range, patched_versions,
+                       affected_spec, affected_spec_override, parse_status
+                FROM security_advisories
+                ORDER BY published_at DESC NULLS LAST
+                """
+            )
+            advisories = cur.fetchall()
+
+        results = []
+        for row in advisories:
+            (
+                ghsa_id,
+                summary,
+                severity,
+                cve_id,
+                url,
+                published_at,
+                raw_range,
+                patched,
+                affected_spec,
+                override,
+                parse_status,
+            ) = row
+            effective_spec = override or affected_spec
+
+            affected_instances = 0
+            affected_mau = 0
+            for ver, instances, mau in histogram:
+                if _version_affected(ver, effective_spec):
+                    affected_instances += instances
+                    affected_mau += mau
+
+            instances_percent = (
+                affected_instances * 100.0 / total_instances
+                if total_instances
+                else 0.0
+            )
+            mau_percent = (
+                affected_mau * 100.0 / total_mau if total_mau else 0.0
+            )
+
+            results.append(
+                {
+                    "ghsa_id": ghsa_id,
+                    "summary": summary,
+                    "severity": severity,
+                    "cve_id": cve_id,
+                    "url": url,
+                    "published_at": published_at.isoformat()
+                    if published_at
+                    else None,
+                    "vulnerable_version_range": raw_range,
+                    "patched_versions": patched,
+                    "affected_spec": effective_spec,
+                    "parse_status": parse_status,
+                    "affected_instances": affected_instances,
+                    "affected_mau": affected_mau,
+                    "instances_percent": round(instances_percent, 2),
+                    "mau_percent": round(mau_percent, 2),
+                }
+            )
+
+        return {
+            "total_instances": total_instances,
+            "total_mau": total_mau,
+            "advisories": results,
         }
     except Exception:
         raise _db_error() from None

@@ -40,6 +40,7 @@ try:
     from cachetools import TTLCache
     from dotenv import load_dotenv
     from packaging import version
+    from packaging.specifiers import InvalidSpecifier, Specifier, SpecifierSet
     from psycopg import sql
     from psycopg_pool import ConnectionPool
     from tqdm import tqdm
@@ -1244,6 +1245,532 @@ async def get_all_tracked_mastodon_versions():
     # Only return branches that were actually found in GitHub releases
     # This prevents overwriting old EOL versions with placeholder values
     return {k: v for k, v in tracked_versions.items() if v}
+
+
+# =============================================================================
+# SECURITY ADVISORIES (GHSA)
+# =============================================================================
+
+# Whole-population prose that means "every version is affected" (the entire
+# vulnerable_version_range, not one branch). "all main" is deliberately NOT
+# here: it means the main development branch only and is left for manual review.
+_ADVISORY_ALL_PROSE = frozenset(
+    {
+        "all",
+        "any",
+        "*",
+        "all versions",
+        "all supported",
+        "all supported version",
+        "all supported versions",
+    }
+)
+
+# A bare version token, optionally with a PEP 440-ish prerelease suffix.
+_RE_ADVISORY_VERSION = re.compile(r"^v?(\d+\.\d+(?:\.\d+)?(?:[-.][0-9A-Za-z.]+)?)$")
+# "4.4.0-4.4.13" / "3.1.5-4.4.2" hyphen range (both sides look like versions).
+_RE_ADVISORY_HYPHEN = re.compile(
+    r"^v?(\d+\.\d+(?:\.\d+)?)\s*-\s*v?(\d+\.\d+(?:\.\d+)?)$"
+)
+# "4.2.x" wildcard, optionally with a comparison operator.
+_RE_ADVISORY_WILDCARD = re.compile(r"^(?:<=|>=|<|>|==)?\s*v?(\d+\.\d+)\.x$", re.IGNORECASE)
+# "<= 4.5.10" / "< v4.4.18" / ">= 4.2.0" operator forms.
+_RE_ADVISORY_OPERATOR = re.compile(r"^(<=|>=|<|>|==)\s*v?(.+)$")
+# A normalized lone upper-bound specifier ("<4.4.18" / "<=4.5.10").
+_RE_ADVISORY_LONE_UPPER = re.compile(
+    r"^(<=|<)(\d+(?:\.\d+){1,2}(?:[-.][0-9A-Za-z.]+)?)$"
+)
+
+
+def _validate_specifier_set(spec: str) -> str | None:
+    """Return spec (PEP 440-normalized) if it's a valid SpecifierSet, else None.
+
+    SpecifierSet preserves operands exactly as written, so a hand-typed
+    "<4.6.0-alpha.8" stays in that form rather than the canonical "<4.6.0a8".
+    Normalize each clause's version through ``version.parse`` so stored and
+    displayed specs are canonical. Wildcard versions ("4.2.*") aren't valid
+    Version inputs, so they're left untouched. Clause order is preserved.
+    """
+    try:
+        _ = SpecifierSet(spec)
+    except InvalidSpecifier:
+        return None
+    parts: list[str] = []
+    for token in spec.split(","):
+        token = token.strip()
+        try:
+            clause = Specifier(token)
+        except InvalidSpecifier:
+            parts.append(token)
+            continue
+        ver = clause.version
+        if "*" not in ver:
+            try:
+                ver = str(version.parse(ver))
+            except version.InvalidVersion:
+                pass
+        parts.append(f"{clause.operator}{ver}")
+    return ",".join(parts)
+
+
+def _parse_advisory_range_clause(clause: str) -> str | None:
+    """Parse a single comma-separated clause of a vulnerable_version_range.
+
+    Returns a PEP 440 SpecifierSet string, the sentinel ``"*"`` (all
+    versions), or None when the clause can't be recognized (e.g. nightly
+    ranges or prose like "all main").
+    """
+    clause = clause.strip()
+    if not clause:
+        return None
+
+    if clause.lower() in _ADVISORY_ALL_PROSE:
+        return "*"
+
+    hyphen = _RE_ADVISORY_HYPHEN.match(clause)
+    if hyphen:
+        return _validate_specifier_set(f">={hyphen.group(1)},<={hyphen.group(2)}")
+
+    wildcard = _RE_ADVISORY_WILDCARD.match(clause)
+    if wildcard:
+        return _validate_specifier_set(f"=={wildcard.group(1)}.*")
+
+    operator = _RE_ADVISORY_OPERATOR.match(clause)
+    if operator:
+        op, operand = operator.group(1), operator.group(2).strip()
+        if not operand or not operand[0].isdigit():
+            return None
+        return _validate_specifier_set(f"{op}{operand}")
+
+    bare = _RE_ADVISORY_VERSION.match(clause)
+    if bare:
+        return _validate_specifier_set(f"=={bare.group(1)}")
+
+    return None
+
+
+def _branch_bound_upper_bounds(clauses: list[str]) -> list[str] | None:
+    """Convert per-branch upper bounds into closed per-branch intervals.
+
+    Given specifier clauses that are *all* lone upper bounds ("<4.4.18",
+    "<=4.5.10") on two or more distinct branches, floor each newer branch at
+    "{branch}.0a0" so a bound on one branch can't bleed into older branches
+    (e.g. "<=4.5.10" must not flag a patched 4.4.18). The oldest branch stays
+    open below, covering all earlier releases. Returns None when the clauses
+    aren't a set of branch-distinct lone upper bounds (caller keeps the union).
+    """
+    parsed: list[tuple[str, str]] = []  # (branch, clause op+version)
+    for clause in clauses:
+        match = _RE_ADVISORY_LONE_UPPER.match(clause)
+        if not match:
+            return None
+        op, ver = match.group(1), match.group(2)
+        branch_match = re.match(r"^(\d+)\.(\d+)", ver)
+        if not branch_match:
+            return None
+        branch = f"{branch_match.group(1)}.{branch_match.group(2)}"
+        parsed.append((branch, f"{op}{ver}"))
+
+    branches = {b for b, _ in parsed}
+    if len(branches) < 2 or len(branches) != len(parsed):
+        # Need at least two branches, one clause each.
+        return None
+
+    parsed.sort(key=lambda item: version.parse(item[1].lstrip("<=")))
+    bounded: list[str] = []
+    for index, (branch, upper) in enumerate(parsed):
+        clause = upper if index == 0 else f">={branch}.0a0,{upper}"
+        validated = _validate_specifier_set(clause)
+        if validated:
+            bounded.append(validated)
+    return bounded or None
+
+
+def parse_vulnerable_range(raw: str) -> tuple[str | None, str]:
+    """Parse a Mastodon GHSA vulnerable_version_range into an affected-spec DSL.
+
+    Mastodon's ranges are inconsistent: the comma means OR (per-branch upper
+    bounds), versions may carry a ``v`` prefix, and entries include hyphen
+    ranges ("4.4.0-4.4.13"), "X.Y.x" wildcards, and prose ("all", "all main").
+
+    Returns ``(affected_spec, status)`` where affected_spec is clauses joined
+    by " || " (each a SpecifierSet string, or the sentinel "*" meaning all
+    versions) and status is "ok" if every clause parsed or "needs_review" if
+    any clause was unrecognized and dropped. Returns ``(None, "needs_review")``
+    when nothing parsed.
+    """
+    if not raw or not raw.strip():
+        return None, "needs_review"
+
+    parts = [p for p in (part.strip() for part in raw.split(",")) if p]
+    if not parts:
+        return None, "needs_review"
+
+    # AND mode: a single bounded range like ">= 4.2.0-beta1, < 4.2.0-rc2".
+    # Mastodon overwhelmingly uses the comma as OR (one upper bound per
+    # branch), but when a lower-bound clause (>=/>) appears alongside others
+    # the comma is the standard GHSA AND, so intersect into one SpecifierSet
+    # instead of unioning (which would match almost everything).
+    has_lower_bound = any(re.match(r"^(?:>=|>)\s*v?\d", p) for p in parts)
+    if has_lower_bound and len(parts) > 1:
+        specs: list[str] = []
+        for part in parts:
+            parsed = _parse_advisory_range_clause(part)
+            if parsed is None or parsed == "*":
+                return None, "needs_review"
+            specs.append(parsed)
+        combined = _validate_specifier_set(",".join(specs))
+        if combined is None:
+            return None, "needs_review"
+        return combined, "ok"
+
+    # OR mode: each comma-separated clause is an independent affected range.
+    clauses: list[str] = []
+    had_unparsed = False
+    for part in parts:
+        parsed = _parse_advisory_range_clause(part)
+        if parsed is None:
+            had_unparsed = True
+            continue
+        clauses.append(parsed)
+
+    if not clauses:
+        return None, "needs_review"
+
+    # A "*" clause unions to "all versions"; it dominates everything else.
+    if "*" in clauses:
+        return "*", "ok"
+
+    # De-duplicate while preserving order.
+    seen: set[str] = set()
+    unique = [c for c in clauses if not (c in seen or seen.add(c))]
+
+    # When every clause is a lone per-branch upper bound, close each interval
+    # so a bound on one branch can't bleed into older branches.
+    bounded = _branch_bound_upper_bounds(unique)
+    if bounded is not None:
+        unique = bounded
+
+    return " || ".join(unique), ("needs_review" if had_unparsed else "ok")
+
+
+# A "first fixed version" token from patched_versions (e.g. "4.2.5", "v4.4.18").
+_RE_ADVISORY_PATCH = re.compile(r"^(\d+)\.(\d+)\.(\d+)(?:[-.][0-9A-Za-z.]+)?$")
+# A lower-bound clause (">= 4.2.0", "> v4.0") used to floor the affected set.
+_RE_ADVISORY_LOWER = re.compile(
+    r"^(?:>=|>)\s*v?(\d+(?:\.\d+){1,2}(?:[-.][0-9A-Za-z.]+)?)"
+)
+
+
+def _extract_lower_bound(raw: str) -> str | None:
+    """Return the lowest ">="/">" version in a range, or None if it's open."""
+    lowers: list[str] = []
+    for part in raw.split(","):
+        match = _RE_ADVISORY_LOWER.match(part.strip())
+        if match:
+            lowers.append(match.group(1))
+    if not lowers:
+        return None
+    return min(lowers, key=version.parse)
+
+
+def _spec_is_bounded(spec: str | None) -> bool:
+    """True if every OR clause is an exact match or a closed interval.
+
+    A lone upper bound ("<4.5.10") or lower bound (">=4.2.0") bleeds across
+    branches (e.g. "<=4.5.10" wrongly flags a patched 4.4.18), so such specs
+    should be refined with patched_versions instead.
+    """
+    if not spec or spec == "*":
+        return False
+    for clause in spec.split(" || "):
+        clause = clause.strip()
+        if clause == "*":
+            return False
+        if "==" in clause:
+            continue
+        if "<" not in clause or ">" not in clause:
+            return False
+    return True
+
+
+def _build_affected_spec_from_patched(
+    patched_raw: str, lower: str | None
+) -> str | None:
+    """Derive an affected-spec DSL from the per-branch patched_versions.
+
+    patched_versions lists the first fixed version on each branch (e.g.
+    "3.5.17, 4.0.13, 4.1.13, 4.2.5"). Everything below a branch's fix is
+    affected; the fix carries forward so anything at or above the newest fix is
+    safe. ``lower`` floors the oldest branch (the version the flaw was
+    introduced in); when None the oldest branch is open below, covering all
+    earlier releases (used for "all"-style advisories).
+
+    Each non-oldest branch is floored at "{branch}.0a0" rather than
+    "{branch}.0" so the branch's own prereleases are included: in PEP 440 a
+    prerelease sorts before its final release, so ">=4.3.0" would wrongly
+    exclude 4.3.0-rc.1, and a prerelease fix like 4.5.0-beta.2 paired with a
+    ">=4.5.0" floor would yield an empty interval. ".0a0" is the lowest
+    prerelease of a branch and never reaches into the prior branch.
+    """
+    fixes: list[tuple[str, str]] = []
+    for token in patched_raw.split(","):
+        token = token.strip().lstrip("vV").strip()
+        match = _RE_ADVISORY_PATCH.match(token)
+        if not match:
+            continue
+        try:
+            _ = version.parse(token)
+        except version.InvalidVersion:
+            continue
+        branch = f"{match.group(1)}.{match.group(2)}"
+        fixes.append((branch, token))
+    if not fixes:
+        return None
+
+    fixes.sort(key=lambda f: version.parse(f[1]))
+    lower_ver = version.parse(lower) if lower else None
+
+    clauses: list[str] = []
+    for index, (branch, fix) in enumerate(fixes):
+        if index == 0:
+            floor = lower
+        else:
+            floor = f"{branch}.0a0"
+            if lower_ver is not None and lower_ver > version.parse(floor):
+                floor = lower
+        clause = f">={floor},<{fix}" if floor else f"<{fix}"
+        validated = _validate_specifier_set(clause)
+        if validated:
+            clauses.append(validated)
+    if not clauses:
+        return None
+
+    seen: set[str] = set()
+    unique = [c for c in clauses if not (c in seen or seen.add(c))]
+    return " || ".join(unique)
+
+
+def resolve_affected_spec(
+    raw_range: str | None, raw_patched: str | None, fence_oldest: bool = True
+) -> tuple[str | None, str]:
+    """Resolve an advisory's affected-spec, returning (spec, parse_status).
+
+    Parses the vulnerable_version_range, then — when that range is open-ended
+    or cross-branch ("all", a lone "<= X", or ">= X") — refines it with the
+    per-branch upper bounds from patched_versions so instances on a patched
+    version aren't counted as affected.
+
+    By default each affected branch (including the oldest) is fenced to its own
+    series, so an advisory is scoped to the branches it names and doesn't sweep
+    in arbitrarily old releases. Pass ``fence_oldest=False`` to leave the oldest
+    branch open below (covering all earlier releases).
+    """
+    spec, status = (None, "needs_review")
+    if raw_range:
+        spec, status = parse_vulnerable_range(raw_range)
+
+    if raw_patched and status == "ok" and (spec == "*" or not _spec_is_bounded(spec)):
+        derived = _build_affected_spec_from_patched(
+            raw_patched, _extract_lower_bound(raw_range or "")
+        )
+        if derived:
+            spec, status = derived, "ok"
+
+    if fence_oldest:
+        spec = _fence_oldest_clause(spec)
+
+    return spec, status
+
+
+def _fence_oldest_clause(spec: str | None) -> str | None:
+    """Floor the open-below clause at its own branch ".0a0".
+
+    A branch-bounded spec leaves its oldest clause open below ("<4.3.24") to
+    sweep in all earlier releases. Fencing rewrites that clause to
+    ">=4.3.0a0,<4.3.24" so only that branch's own series is affected and older
+    releases (4.2.x and below) are excluded. Already-fenced clauses are left
+    untouched.
+    """
+    if not spec or spec == "*":
+        return spec
+    out: list[str] = []
+    for clause in spec.split(" || "):
+        clause = clause.strip()
+        match = _RE_ADVISORY_LONE_UPPER.match(clause)
+        if match:
+            branch_match = re.match(r"^(\d+)\.(\d+)", match.group(2))
+            if branch_match:
+                branch = f"{branch_match.group(1)}.{branch_match.group(2)}"
+                fenced = _validate_specifier_set(f">={branch}.0a0,{clause}")
+                out.append(fenced or clause)
+                continue
+        out.append(clause)
+    return " || ".join(out)
+
+
+def resolve_override_spec(
+    raw_range: str | None, raw_patched: str | None, fence_oldest: bool = True
+) -> tuple[str | None, str]:
+    """Resolve an override spec from a manually entered range (range-driven).
+
+    Unlike resolve_affected_spec — used by the auto refresh, which treats the
+    per-branch patched_versions as authoritative — this trusts the typed range:
+    its per-branch upper bounds are kept exactly as entered (so adding "< 4.3.24"
+    yields a 4.3 branch even when stored patched_versions has none).
+    patched_versions is only a fallback when the range is open above ("all" or a
+    lone ">= X") and so carries no upper bound of its own.
+
+    When ``fence_oldest`` is set, the oldest branch is floored at its own ".0a0"
+    too, excluding releases older than that branch.
+    """
+    spec, status = (None, "needs_review")
+    if raw_range:
+        spec, status = parse_vulnerable_range(raw_range)
+
+    range_has_no_upper = not spec or spec == "*" or "<" not in spec
+    if range_has_no_upper and raw_patched:
+        derived = _build_affected_spec_from_patched(
+            raw_patched, _extract_lower_bound(raw_range or "")
+        )
+        if derived:
+            spec, status = derived, "ok"
+
+    if fence_oldest:
+        spec = _fence_oldest_clause(spec)
+
+    return spec, status
+
+
+def validate_affected_spec(spec: str) -> tuple[bool, str | None]:
+    """Validate a hand-entered affected-spec DSL. Returns (ok, error).
+
+    Each clause (split on '||') must be the sentinel '*' or a valid PEP 440
+    SpecifierSet, e.g. '>=4.6.0a5,<=4.6.0a7 || ==4.3.0-beta.1'.
+    """
+    if not spec.strip():
+        return False, "empty spec"
+    for clause in spec.split("||"):
+        clause = clause.strip()
+        if not clause or clause == "*":
+            continue
+        try:
+            _ = SpecifierSet(clause)
+        except InvalidSpecifier as exc:
+            return False, str(exc)
+    return True, None
+
+
+async def refresh_security_advisories() -> int:
+    """Fetch Mastodon's GitHub Security Advisories and upsert them.
+
+    Tries the authenticated gh CLI first (higher rate limits), falling back to
+    the unauthenticated GitHub REST API. A row's affected_spec_override is
+    preserved across refreshes. Returns the number of advisories processed.
+    """
+    advisories = None
+    try:
+        result = subprocess.run(
+            [
+                "gh",
+                "api",
+                "/repos/mastodon/mastodon/security-advisories?per_page=100",
+            ],
+            capture_output=True,
+            text=True,
+            check=True,
+        )
+        advisories = json.loads(result.stdout)
+    except (subprocess.CalledProcessError, FileNotFoundError, json.JSONDecodeError):
+        echo("gh CLI failed, falling back to HTTP API", "yellow")
+        try:
+            url = (
+                "https://api.github.com/repos/mastodon/mastodon/"
+                "security-advisories?per_page=100"
+            )
+            response = await get_httpx(url)
+            _ = response.raise_for_status()
+            advisories = response.json()
+        except (httpx.HTTPError, ValueError, RuntimeError) as exception:
+            echo(
+                f"Failed to retrieve security advisories from GitHub: {exception}",
+                "red",
+            )
+            return 0
+
+    if not advisories:
+        return 0
+
+    count = 0
+    with db_pool.connection() as conn, conn.cursor() as cur:
+        for adv in advisories:
+            ghsa_id = adv.get("ghsa_id")
+            if not ghsa_id:
+                continue
+
+            vulns = adv.get("vulnerabilities") or []
+            ranges = [
+                v["vulnerable_version_range"]
+                for v in vulns
+                if v.get("vulnerable_version_range")
+            ]
+            patched = [
+                v["patched_versions"] for v in vulns if v.get("patched_versions")
+            ]
+            raw_range = ", ".join(ranges) if ranges else None
+            raw_patched = ", ".join(patched) if patched else None
+
+            affected_spec, parse_status = resolve_affected_spec(
+                raw_range, raw_patched
+            )
+
+            # Preserve a manual override if one already exists for this advisory.
+            _ = cur.execute(
+                "SELECT affected_spec_override FROM security_advisories "
+                "WHERE ghsa_id = %s",
+                (ghsa_id,),
+            )
+            existing = cur.fetchone()
+            if existing and existing[0]:
+                parse_status = "overridden"
+
+            _ = cur.execute(
+                """
+                INSERT INTO security_advisories
+                    (ghsa_id, summary, severity, cve_id, url, published_at,
+                     vulnerable_version_range, patched_versions,
+                     affected_spec, parse_status, updated_at)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, CURRENT_TIMESTAMP)
+                ON CONFLICT (ghsa_id) DO UPDATE SET
+                    summary = EXCLUDED.summary,
+                    severity = EXCLUDED.severity,
+                    cve_id = EXCLUDED.cve_id,
+                    url = EXCLUDED.url,
+                    published_at = EXCLUDED.published_at,
+                    vulnerable_version_range = EXCLUDED.vulnerable_version_range,
+                    patched_versions = EXCLUDED.patched_versions,
+                    affected_spec = EXCLUDED.affected_spec,
+                    parse_status = EXCLUDED.parse_status,
+                    updated_at = CURRENT_TIMESTAMP
+                """,
+                (
+                    ghsa_id,
+                    adv.get("summary"),
+                    adv.get("severity"),
+                    adv.get("cve_id"),
+                    adv.get("html_url"),
+                    adv.get("published_at"),
+                    raw_range,
+                    raw_patched,
+                    affected_spec,
+                    parse_status,
+                ),
+            )
+            count += 1
+        conn.commit()
+
+    echo(f"Refreshed {count} security advisories", "green")
+    return count
 
 
 async def get_main_version_release():
@@ -3642,7 +4169,8 @@ def render_queue_status(
 _MANAGE_CHOICES = frozenset(
     {"1", "2", "3", "4", "5", "6", "7", "8", "s",
      "9", "10", "11", "12", "13", "14", "15", "16", "17", "18", "19",
-     "20", "21", "22", "23", "24", "25", "50", "51", "52", "53"}
+     "20", "21", "22", "23", "24", "25", "26", "27",
+     "50", "51", "52", "53"}
 )
 
 
@@ -4355,6 +4883,138 @@ async def _handle_manage_action(args: argparse.Namespace, choice: str) -> None:
             except Exception as exc:
                 conn.rollback()
                 echo(f"Failed to requeue domain: {exc}", "red")
+        echo("", "white")
+        input("Press Enter to continue...")
+
+    elif choice == "26":
+        echo("", "white")
+        echo("Refreshing security advisories from GitHub…", "cyan")
+        count = await refresh_security_advisories()
+        echo(f"Done. {count} advisories in database.", "green")
+        echo("", "white")
+        input("Press Enter to continue...")
+
+    elif choice == "27":
+        echo("", "white")
+        ghsa_id = input("Enter GHSA ID to override: ").strip()
+        if not ghsa_id:
+            echo("GHSA ID cannot be empty", "yellow")
+            echo("", "white")
+            input("Press Enter to continue...")
+            return
+        with db_pool.connection() as conn, conn.cursor() as cur:
+            _ = cur.execute(
+                "SELECT vulnerable_version_range, affected_spec, "
+                "affected_spec_override, patched_versions "
+                "FROM security_advisories WHERE ghsa_id = %s",
+                (ghsa_id,),
+            )
+            row = cur.fetchone()
+            if not row:
+                conn.rollback()
+                echo(f"No advisory found with ID {ghsa_id}", "yellow")
+                echo("", "white")
+                input("Press Enter to continue...")
+                return
+            cur_range, auto_spec, cur_override, cur_patched = row
+            echo(f"Raw range:        {cur_range}", "cyan")
+            echo(f"Patched:          {cur_patched}", "cyan")
+            echo(f"Auto spec:        {auto_spec}", "cyan")
+            echo(f"Current override: {cur_override or '(none)'}", "cyan")
+            echo("", "white")
+            echo("How do you want to set the override?", "white")
+            echo("  (c) Calculate from corrected range/patched strings", "white")
+            echo("  (p) Provide a PEP 440 affected spec directly", "white")
+            if cur_override:
+                echo("  (x) Clear the override and revert to the auto spec", "white")
+            echo("  (Enter) Cancel", "white")
+            mode = input("Choice: ").strip().lower()
+
+            spec: str | None = None
+            if mode == "x" and cur_override:
+                spec, status = resolve_affected_spec(cur_range, cur_patched)
+                _ = cur.execute(
+                    "UPDATE security_advisories SET affected_spec_override = NULL, "
+                    "affected_spec = %s, parse_status = %s, "
+                    "updated_at = CURRENT_TIMESTAMP WHERE ghsa_id = %s",
+                    (spec, status, ghsa_id),
+                )
+                conn.commit()
+                echo("Override cleared; reverted to auto spec.", "green")
+                echo("", "white")
+                input("Press Enter to continue...")
+                return
+
+            if mode == "p":
+                echo("", "white")
+                echo(
+                    "Enter the affected spec: OR clauses joined by ' || ', each a",
+                    "white",
+                )
+                echo(
+                    "PEP 440 specifier set (e.g. '>=4.6.0a5,<=4.6.0a7'), or '*' for "
+                    "all versions.",
+                    "white",
+                )
+                default_spec = cur_override or auto_spec or ""
+                manual = input(f"Affected spec [{default_spec}]: ").strip()
+                spec = manual or default_spec
+                ok, err = validate_affected_spec(spec) if spec else (False, "empty spec")
+                if not ok:
+                    conn.rollback()
+                    echo(f"Invalid spec: {err}", "red")
+                    echo("", "white")
+                    input("Press Enter to continue...")
+                    return
+            elif mode == "c":
+                echo("", "white")
+                echo("Blank keeps the current range shown in [brackets].", "white")
+                range_in = input(
+                    f"Vulnerable version range [{cur_range or ''}]: "
+                ).strip()
+                include_in = input(
+                    "Include releases older than the oldest affected branch? "
+                    "(y/N): "
+                ).strip().lower()
+                spec, status = resolve_override_spec(
+                    range_in or cur_range,
+                    cur_patched,
+                    fence_oldest=include_in not in ("y", "yes"),
+                )
+                echo("", "white")
+                echo(f"Computed spec:  {spec or '(none)'}", "bold")
+                if not spec:
+                    conn.rollback()
+                    echo("Could not compute a spec from those inputs.", "red")
+                    echo("", "white")
+                    input("Press Enter to continue...")
+                    return
+                if status != "ok":
+                    echo(
+                        "Warning: some clauses could not be parsed; spec may be "
+                        "partial.",
+                        "yellow",
+                    )
+            else:
+                conn.rollback()
+                echo("Cancelled; no changes made.", "yellow")
+                echo("", "white")
+                input("Press Enter to continue...")
+                return
+
+            confirm = input(f"Save override '{spec}'? (Y/n): ").strip().lower()
+            if confirm in ("", "y", "yes"):
+                _ = cur.execute(
+                    "UPDATE security_advisories SET affected_spec_override = %s, "
+                    "parse_status = 'overridden', updated_at = CURRENT_TIMESTAMP "
+                    "WHERE ghsa_id = %s",
+                    (spec, ghsa_id),
+                )
+                conn.commit()
+                echo("Override saved.", "green")
+            else:
+                conn.rollback()
+                echo("Cancelled; no changes made.", "yellow")
         echo("", "white")
         input("Press Enter to continue...")
 
@@ -6152,6 +6812,7 @@ async def run_queue_daemon() -> int:
                 ):
                     cleanup_old_domains()
                     save_statistics()
+                    await maybe_refresh_advisories()
                 await asyncio.sleep(queue_poll_seconds)
                 continue
 
@@ -6170,6 +6831,7 @@ async def run_queue_daemon() -> int:
             if await asyncio.to_thread(claim_maintenance_slot, maintenance_interval):
                 cleanup_old_domains()
                 save_statistics()
+                await maybe_refresh_advisories()
 
         except KeyboardInterrupt:
             echo(f"\n{appname} interrupted by user", "yellow")
@@ -7185,6 +7847,10 @@ def get_menu_options() -> dict[str, dict[str, str]]:
             "12": "Mark branch as EOL",
             "13": "Reorder release branches",
         },
+        "Security advisories": {
+            "26": "Refresh advisories from GitHub",
+            "27": "Override affected versions",
+        },
         "TLD cache": {
             "14": "Update TLD cache from IANA",
         },
@@ -7313,6 +7979,36 @@ all_patched_versions: list[str] | None = None
 _version_last_refresh: float | None = None
 # Refresh interval in seconds (default: 1 hour, configurable via environment)
 VERSION_REFRESH_INTERVAL = int(os.getenv("VMCRAWL_VERSION_REFRESH_INTERVAL", "3600"))
+
+# Track last security-advisory refresh time for periodic updates
+_advisory_last_refresh: float | None = None
+# Refresh interval in seconds (default: 24 hours, configurable via environment)
+ADVISORY_REFRESH_INTERVAL = int(
+    os.getenv("VMCRAWL_ADVISORY_REFRESH_INTERVAL", "86400")
+)
+
+
+async def maybe_refresh_advisories() -> None:
+    """Refresh security advisories if the refresh interval has elapsed.
+
+    Called from the queue daemon's maintenance slot; internally rate-limited to
+    ADVISORY_REFRESH_INTERVAL so it runs about daily regardless of how often the
+    maintenance slot fires.
+    """
+    global _advisory_last_refresh
+
+    now = time.time()
+    if (
+        _advisory_last_refresh is not None
+        and (now - _advisory_last_refresh) < ADVISORY_REFRESH_INTERVAL
+    ):
+        return
+
+    try:
+        _ = await refresh_security_advisories()
+    except psycopg.Error as exception:
+        echo(f"Failed to refresh security advisories: {exception}", "red")
+    _advisory_last_refresh = now
 
 
 def load_versions_from_db():

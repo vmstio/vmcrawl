@@ -459,7 +459,7 @@
   const SCROLL_KEY = "vmcrawl-scroll";
   let tableState = {
     offset: 0,
-    limit: 100,
+    limit: 25,
     sort_by: "mau",
     order: "desc",
     q: "",
@@ -475,8 +475,9 @@
       saved = null;
     }
     if (!saved) return;
-    // total is recomputed by loadTable; everything else is user-driven.
-    for (const key of ["offset", "limit", "sort_by", "order", "q", "filter"]) {
+    // total is recomputed by loadTable; limit is a fixed design choice (no UI
+    // to change it), so it's not restored; everything else is user-driven.
+    for (const key of ["offset", "sort_by", "order", "q", "filter"]) {
       if (saved[key] != null) tableState[key] = saved[key];
     }
     const searchInput = document.getElementById("search-input");
@@ -540,6 +541,176 @@
     return d.innerHTML;
   }
 
+  function severityBadge(sev) {
+    const s = (sev || "unknown").toLowerCase();
+    const label = s.charAt(0).toUpperCase() + s.slice(1);
+    return `<span class="sev-badge sev-${esc(s)}">${esc(label)}</span>`;
+  }
+
+  const ADV_PAGE_SIZE = 10;
+  const ADV_SEVERITY_RANK = { critical: 4, high: 3, medium: 2, low: 1 };
+  // Numeric/date columns read best high-to-low; text columns A-to-Z.
+  const ADV_DEFAULT_DESC = new Set([
+    "severity",
+    "published_at",
+    "instances_percent",
+    "mau_percent",
+  ]);
+  let advisoriesData = [];
+  let advisoriesPage = 0;
+  let advSort = { key: "published_at", order: "desc" };
+
+  function advSortValue(a, key) {
+    switch (key) {
+      case "severity":
+        return ADV_SEVERITY_RANK[(a.severity || "").toLowerCase()] || 0;
+      case "published_at":
+        return a.published_at ? new Date(a.published_at).getTime() : 0;
+      case "instances_percent":
+        return a.instances_percent || 0;
+      case "mau_percent":
+        return a.mau_percent || 0;
+      case "summary":
+        return (a.summary || "").toLowerCase();
+      default:
+        return (a.ghsa_id || "").toLowerCase();
+    }
+  }
+
+  function sortAdvisories() {
+    const dir = advSort.order === "asc" ? 1 : -1;
+    advisoriesData.sort((x, y) => {
+      const vx = advSortValue(x, advSort.key);
+      const vy = advSortValue(y, advSort.key);
+      if (vx < vy) return -dir;
+      if (vx > vy) return dir;
+      // Stable tie-break so equal rows keep a deterministic order.
+      return (x.ghsa_id || "").localeCompare(y.ghsa_id || "");
+    });
+  }
+
+  function updateAdvSortIndicators() {
+    document
+      .querySelectorAll("#advisories-table th[data-adv-sort]")
+      .forEach((th) => {
+        const existing = th.querySelector(".sort-icon");
+        if (existing) existing.remove();
+        if (th.dataset.advSort === advSort.key) {
+          const icon = document.createElement("span");
+          icon.className = "sort-icon sort-icon--active";
+          icon.textContent = advSort.order === "asc" ? " ↑" : " ↓";
+          th.appendChild(icon);
+        }
+      });
+  }
+
+  function advisoryRow(a) {
+    const published = a.published_at
+      ? new Date(a.published_at).toLocaleDateString(undefined, {
+          year: "numeric",
+          month: "short",
+          day: "numeric",
+        })
+      : "";
+    const ghsa = a.url
+      ? `<a href="${esc(a.url)}" target="_blank" rel="noopener">${esc(a.ghsa_id)}</a>`
+      : esc(a.ghsa_id);
+    const cve = a.cve_id
+      ? `<br /><span class="adv-cve">${esc(a.cve_id)}</span>`
+      : "";
+    const specBtn = a.affected_spec
+      ? `<button type="button" class="adv-spec-btn" data-spec="${esc(a.affected_spec)}" aria-label="Show affected version spec" title="Show affected version spec">{ }</button>`
+      : "";
+    let instCell;
+    let mauCell;
+    if (a.parse_status === "needs_review") {
+      instCell = mauCell =
+        '<span class="adv-review" title="Affected range needs manual review">review</span>';
+    } else {
+      instCell = `${pct(a.instances_percent)}<br /><span class="adv-count">${fmt(a.affected_instances)}</span>`;
+      mauCell = `${pct(a.mau_percent)}<br /><span class="adv-count">${fmt(a.affected_mau)}</span>`;
+    }
+    return `<tr>
+        <td class="adv-info" style="text-align:center">${specBtn}</td>
+        <td class="adv-nowrap">${ghsa}${cve}</td>
+        <td>${severityBadge(a.severity)}</td>
+        <td class="adv-nowrap" style="text-align:right">${esc(published)}</td>
+        <td class="adv-summary">${esc(a.summary || "")}</td>
+        <td style="text-align:right">${instCell}</td>
+        <td style="text-align:right">${mauCell}</td>
+    </tr>`;
+  }
+
+  // Click-to-reveal popover showing the PEP 440 affected-version spec used to
+  // compute an advisory's impact. A single shared element is repositioned next
+  // to whichever icon is active.
+  let advSpecPopover = null;
+  let advSpecOwner = null;
+
+  function closeAdvSpecPopover() {
+    if (advSpecPopover) advSpecPopover.remove();
+    advSpecPopover = null;
+    advSpecOwner = null;
+  }
+
+  function openAdvSpecPopover(btn) {
+    closeAdvSpecPopover();
+    const pop = document.createElement("div");
+    pop.className = "adv-spec-popover";
+    pop.innerHTML =
+      `<div class="adv-spec-popover-label">Affected version spec (PEP 440)</div>` +
+      `<code>${esc(btn.dataset.spec || "")}</code>`;
+    document.body.appendChild(pop);
+
+    const rect = btn.getBoundingClientRect();
+    pop.style.top = `${window.scrollY + rect.bottom + 6}px`;
+    let left = window.scrollX + rect.left;
+    // Keep the popover inside the viewport's right edge.
+    const overflow = left + pop.offsetWidth - (window.scrollX + window.innerWidth) + 8;
+    if (overflow > 0) left -= overflow;
+    pop.style.left = `${Math.max(window.scrollX + 8, left)}px`;
+
+    advSpecPopover = pop;
+    advSpecOwner = btn;
+  }
+
+  function renderAdvisoriesPage() {
+    const tbody = document.getElementById("advisories-tbody");
+    if (!tbody) return;
+    closeAdvSpecPopover();
+
+    const total = advisoriesData.length;
+    const pageCount = Math.max(1, Math.ceil(total / ADV_PAGE_SIZE));
+    advisoriesPage = Math.min(advisoriesPage, pageCount - 1);
+
+    const start = advisoriesPage * ADV_PAGE_SIZE;
+    const end = Math.min(start + ADV_PAGE_SIZE, total);
+    tbody.innerHTML = advisoriesData
+      .slice(start, end)
+      .map(advisoryRow)
+      .join("");
+
+    const pageInfo = document.getElementById("adv-page-info");
+    if (pageInfo) {
+      pageInfo.textContent = total
+        ? `${fmt(start + 1)}-${fmt(end)} of ${fmt(total)}`
+        : "0 of 0";
+    }
+    const prevBtn = document.getElementById("adv-prev-btn");
+    const nextBtn = document.getElementById("adv-next-btn");
+    if (prevBtn) prevBtn.disabled = advisoriesPage === 0;
+    if (nextBtn) nextBtn.disabled = end >= total;
+
+    updateAdvSortIndicators();
+  }
+
+  function renderAdvisories(data) {
+    advisoriesData = (data && data.advisories) || [];
+    sortAdvisories();
+    advisoriesPage = 0;
+    renderAdvisoriesPage();
+  }
+
   function handleTableError(err) {
     console.error("Table load error:", err);
   }
@@ -574,6 +745,59 @@
     tableState.offset += tableState.limit;
     loadTable().catch(handleTableError);
   });
+
+  document.getElementById("adv-prev-btn").addEventListener("click", () => {
+    if (advisoriesPage > 0) {
+      advisoriesPage -= 1;
+      renderAdvisoriesPage();
+    }
+  });
+
+  document.getElementById("adv-next-btn").addEventListener("click", () => {
+    advisoriesPage += 1;
+    renderAdvisoriesPage();
+  });
+
+  // Toggle the affected-spec popover from the per-row info icons. Delegated on
+  // the tbody so it survives re-renders; document handlers dismiss it.
+  const advTbodyEl = document.getElementById("advisories-tbody");
+  if (advTbodyEl) {
+    advTbodyEl.addEventListener("click", (e) => {
+      const btn = e.target.closest(".adv-spec-btn");
+      if (!btn) return;
+      e.stopPropagation();
+      if (advSpecOwner === btn) {
+        closeAdvSpecPopover();
+      } else {
+        openAdvSpecPopover(btn);
+      }
+    });
+  }
+  document.addEventListener("click", (e) => {
+    if (advSpecPopover && !advSpecPopover.contains(e.target)) {
+      closeAdvSpecPopover();
+    }
+  });
+  document.addEventListener("keydown", (e) => {
+    if (e.key === "Escape") closeAdvSpecPopover();
+  });
+
+  document
+    .querySelectorAll("#advisories-table th[data-adv-sort]")
+    .forEach((th) => {
+      th.addEventListener("click", () => {
+        const key = th.dataset.advSort;
+        if (advSort.key === key) {
+          advSort.order = advSort.order === "desc" ? "asc" : "desc";
+        } else {
+          advSort.key = key;
+          advSort.order = ADV_DEFAULT_DESC.has(key) ? "desc" : "asc";
+        }
+        sortAdvisories();
+        advisoriesPage = 0;
+        renderAdvisoriesPage();
+      });
+    });
 
   function updateSortIndicators() {
     document.querySelectorAll("th[data-sort]").forEach((th) => {
@@ -618,6 +842,7 @@
       branchAdoption,
       history,
       versionsData,
+      advisories,
     ] = await Promise.all([
       api("/stats/summary"),
       api("/stats/patch-adoption"),
@@ -629,7 +854,10 @@
       api("/stats/branch-adoption"),
       api("/stats/history?days=365"),
       api("/stats/versions"),
+      api("/stats/advisories"),
     ]);
+
+    renderAdvisories(advisories);
 
     // Big numbers
     document.getElementById("total-instances").textContent = fmt(
